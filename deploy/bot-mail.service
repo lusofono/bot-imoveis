@@ -1,0 +1,24 @@
+[Unit]
+Description=bot_mail personal MCP
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=botmail
+Group=botmail
+WorkingDirectory=/opt/bot_mail
+Environment=BOT_MAIL_INSTANCE=/opt/bot_mail/apalace/rent
+Environment=BOT_MAIL_PORT=8000
+ExecStart=/opt/bot_mail/.venv/bin/python -m bot_mail.cli serve
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/bot_mail/apalace/rent
+
+[Install]
+WantedBy=multi-user.target

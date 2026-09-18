@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "integration_status": "pending",
+  "scope": "owner_all_properties",
+  "style": {
+    "greeting": {
+      "selected": null,
+      "status": "awaiting_owner_choice",
+      "options": {
+        "formal": {
+          "description": "Saudação formal, sem presumir género ou título.",
+          "examples": {
+            "pt": "Exmo./Exma. — usar apenas quando o tratamento for conhecido; caso contrário, «Bom dia, {customer_name}.»",
+            "en": "Dear {customer_name},",
+            "fr": "Bonjour {customer_name},"
+          }
+        },
+        "cordial": {
+          "description": "Saudação cordial e simples.",
+          "examples": {
+            "pt": "Olá, {customer_name}.",
+            "en": "Hello {customer_name},",
+            "fr": "Bonjour {customer_name},"
+          }
+        }
+      },
+      "missing_name": "Omitir o nome sem inventar tratamento ou identidade."
+    },
+    "languages": {
+      "selected": null,
+      "status": "awaiting_owner_choice",
+      "options": {
+        "multilingual": {
+          "description": "Responder no idioma da mensagem do cliente, quando identificável."
+        },
+        "pt_en_fr": {
+          "description": "Responder em português, inglês ou francês, conforme o idioma da mensagem.",
+          "allowed": [
+            "pt",
+            "en",
+            "fr"
+          ]
+        }
+      },
+      "portuguese_locale": "pt-PT",
+      "one_language_per_reply": true,
+      "on_unclear_or_unsupported_language": "Avisar o proprietário e pedir indicação do idioma, sem enviar automaticamente."
+    },
+    "closing": {
+      "selected": null,
+      "status": "awaiting_owner_choice",
+      "options": {
+        "formal": {
+          "pt": "Com os melhores cumprimentos,",
+          "en": "Kind regards,",
+          "fr": "Cordialement,"
+        },
+        "cordial": {
+          "pt": "Obrigado pelo seu contacto.",
+          "en": "Thank you for getting in touch.",
+          "fr": "Merci pour votre message."
+        }
+      }
+    },
+    "signature": {
+      "text": "Equipa APalace Imobiliária",
+      "status": "proposed_by_owner",
+      "translate": false,
+      "append_once": true
+    }
+  },
+  "application_instructions": "Aplicar as opções de estilo selecionadas a todas as interações. A saudação e o fecho da configuração de estilo substituem os do texto base. Traduzir o conteúdo para o idioma escolhido, mantendo a assinatura exatamente como configurada. Não produzir várias versões linguísticas na mesma resposta, salvo pedido do proprietário.",
+  "frontend_section": "Voz e estilo",
+  "frontend_scope": "Uma configuração comum a todos os imóveis desta pessoa ou equipa."
+}

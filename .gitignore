@@ -1,0 +1,22 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+.DS_Store
+*.zip
+.env
+.env.*
+!.env.example
+**/queue.json
+**/state.json
+**/config.json
+**/secrets/
+**/logs/
+**/launchd/
+**/*.lock
+**/oauth.json
+**/queue*.backup*
+
+# Real per-property profiles (account, listing, address) stay local.
+**/properties/*/

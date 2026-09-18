@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bot-mail"
+version = "0.1.0"
+description = "Personal Gmail workflow through MCP, one JSON queue per replica"
+requires-python = ">=3.11"
+dependencies = ["mcp==1.30.0"]
+
+[project.optional-dependencies]
+test = ["pytest>=8,<10", "httpx>=0.28,<1"]
+
+[project.scripts]
+bot-mail = "bot_mail.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["bot_mail*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

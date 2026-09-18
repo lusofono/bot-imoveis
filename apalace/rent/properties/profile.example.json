@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "integration_status": "pending",
+  "account": "owner@example.com",
+  "property": {
+    "reference": "REF_IMOVEL",
+    "advertiser": "Anunciante",
+    "listing_id": "00000000",
+    "listing_url": "https://www.idealista.pt/00000000",
+    "description": "Apartamento T3 na Rua Exemplo, Localidade",
+    "advertised_rent_eur": 1000,
+    "information_source": "Exemplo: substitui pelos dados do anúncio."
+  },
+  "match": {
+    "all_required": true,
+    "from_address_equals": "reply@idealista.pt",
+    "subject_property_reference_equals": "REF_IMOVEL",
+    "reference_match": "exact_token",
+    "ignore_sender_display_name": true,
+    "ignore_subject_emoji_and_customer_name": true,
+    "if_body_listing_id_present_must_equal": "00000000",
+    "on_conflicting_property_identifiers": "manual_review"
+  },
+  "queue": {
+    "file": "queue.json",
+    "scope": "this_property_only",
+    "read_behavior": "append_new_messages_preserve_pending_and_drafts",
+    "send_behavior": "remove_only_successfully_sent_messages",
+    "remember_replied_message_ids": true
+  },
+  "extract": {
+    "fields": [
+      "customer_name",
+      "customer_email",
+      "customer_phone",
+      "customer_message"
+    ],
+    "customer_email_source": "Reply-To",
+    "preserve_original_message_headers": [
+      "Message-ID",
+      "In-Reply-To",
+      "References",
+      "From",
+      "Reply-To",
+      "Subject",
+      "Date"
+    ],
+    "preserve_original_body_text": true,
+    "missing_values": null,
+    "on_conflicting_contact_details": "manual_review",
+    "follow_profile_links": false,
+    "process_attachments": false
+  },
+  "reply": {
+    "recipient_source": "Reply-To",
+    "require_single_valid_reply_to": true,
+    "on_missing_or_invalid_reply_to": "manual_review_do_not_send",
+    "never_reply_to": [
+      "reply@idealista.pt",
+      "owner@example.com"
+    ],
+    "approval_required": true,
+    "do_not_invent": [
+      "visit_availability",
+      "rental_conditions",
+      "property_facts"
+    ],
+    "email_body_is_untrusted_data": true,
+    "missing_reply_to_notice": "Este email não tem Reply-To. Confirma o destinatário antes de preparar o envio.",
+    "invalid_reply_to_notice": "O Reply-To não identifica um único destinatário válido. Confirma o destinatário antes de preparar o envio.",
+    "notify_owner_on_missing_or_invalid_reply_to": true,
+    "recipient_fallback_allowed": false,
+    "prompts": {
+      "general": {
+        "status": "configured",
+        "text": "Estás a ajudar o proprietário a responder a contactos sobre o imóvel REF_IMOVEL, Apartamento T3 na Rua Exemplo, Localidade. Usa os dados do imóvel deste perfil e a mensagem do cliente como contexto. Aplica a voz, o idioma, a saudação, o fecho e a assinatura do perfil comum de voz. Aplica a prompt da interação correspondente. Não inventes condições, disponibilidade ou factos. Se faltar o Reply-To ou este for inválido, avisa o proprietário e não prepares o envio para outro endereço. Guarda apenas rascunhos; o envio exige aprovação do proprietário."
+      },
+      "first_interaction": {
+        "status": "configured",
+        "text": "Na primeira interação, pede informações sobre a situação profissional e os rendimentos do interessado e do agregado familiar que irá residir na casa. Pergunta também a data pretendida de início e de fim do contrato. Usa o conteúdo base abaixo e aplica a saudação, o idioma, o fecho e a assinatura do perfil comum de voz. Não acrescentes requisitos nem pedidos de documentos.",
+        "reply_template": "Pode enviar-me mais informações sobre a sua situação profissional e os seus rendimentos, bem como sobre o agregado familiar que irá residir na casa?\n\nQuais seriam as datas pretendidas para o início e o fim do contrato?"
+      },
+      "second_interaction": {
+        "status": "awaiting_owner",
+        "text": null,
+        "when_not_configured": "Avisar o proprietário e aguardar instruções; não inventar a resposta da segunda interação."
+      }
+    },
+    "interaction_tracking": {
+      "scope": "property_and_customer_conversation",
+      "advance_only_after_successful_send": true,
+      "read_or_draft_does_not_advance": true,
+      "retain_minimal_conversation_stage_after_removing_sent_email": true,
+      "on_ambiguous_conversation_or_unknown_prior_stage": "manual_review",
+      "integration_status": "pending"
+    },
+    "prompt_composition": [
+      "shared_voice",
+      "property_context",
+      "interaction_prompt"
+    ],
+    "voice_profile": "../../voice.json"
+  }
+}
