@@ -1,8 +1,16 @@
 # Instalar no servidor e ligar ao ChatGPT
 
+> **Em pausa desde 18/09/2026.** O foco passou para a versão local no Mac, em Python, e mais tarde para a
+> AWS Lambda. Ver
+> [DECISOES.md](DECISOES.md) e [PLANO-VERSAO-LOCAL.md](PLANO-VERSAO-LOCAL.md). Este guia fica como
+> referência e não foi testado num servidor real.
+
 Exemplo para Linux com Python 3.11+, systemd e Caddy. Não foi instalado nada no teu servidor.
 Escolhe um subdomínio para esta réplica, por exemplo `mail.teudominio.pt`, com DNS para o servidor.
 Abre HTTPS 443 (e 80 se usado pelo Caddy para certificados). A porta Python fica apenas em localhost.
+
+Antes do servidor, confirma no Mac que a leitura funciona com a tua conta: `apalace/rent/read.command`
+e depois `.venv/bin/bot-mail pending`. É mais fácil corrigir aí um problema de Gmail ou de extração.
 
 ## 1. Preparar a pasta
 
@@ -18,15 +26,23 @@ sudo -u botmail .venv/bin/bot-mail --instance apalace/rent setup
 
 A configuração pede conta, filtro, dias iniciais e Google App Password, sem a mostrar.
 É necessária uma conta Google que permita App Passwords. A password nunca deve ir para Git,
-logs, prompts ou ficheiros de configuração públicos.
+logs, prompts ou ficheiros de configuração públicos. A primeira leitura recua os «dias iniciais»:
+aumenta-os se quiseres apanhar contactos mais antigos.
+
+Os perfis dos imóveis **não estão no Git**. Copia cada `properties/<REF>/profile.json` do Mac para
+`/opt/bot_mail/apalace/rent/properties/<REF>/profile.json`, com o utilizador `botmail` como dono.
+O `voice.json` vem com o repositório. Sem perfis, esta pasta recusa arrancar em vez de ler o correio todo.
 
 ## 2. Configurar a ligação OAuth
 
-No ChatGPT, inicia a criação de uma ligação MCP personalizada em modo de desenvolvimento,
-com URL `https://mail.teudominio.pt/mcp` e autenticação OAuth. Copia o callback exato que a
-página de gestão da ligação apresenta. Se pedir client ID/secret, usa registo dinâmico (DCR),
-quando disponível: este servidor publica `/register`. A disponibilidade e a interface variam
-com o plano e as políticas da conta.
+No ChatGPT, ativa o modo de desenvolvimento (Definições → Segurança e início de sessão →
+Developer mode) e cria a ligação (Plugins → «+»), com nome, descrição e o URL
+`https://mail.teudominio.pt/mcp`, incluindo `/mcp`. Se o ChatGPT perguntar o método de registo,
+escolhe registo dinâmico (DCR): este servidor publica `/register` e não suporta CIMD.
+O callback exato (`https://chatgpt.com/connector/oauth/...`) aparece na página de gestão da ligação.
+Se o servidor já estiver a correr com outro callback, recusa o registo e mostra o callback recusado
+no erro e em `journalctl -u bot-mail`; copia-o de lá. A disponibilidade do modo de desenvolvimento
+depende da conta e das políticas do workspace.
 
 ```bash
 sudo -u botmail .venv/bin/bot-mail --instance apalace/rent setup-server
@@ -66,7 +82,7 @@ configurada. Um worker por réplica: não usar vários workers uvicorn sobre o m
 
 1. Volta à ligação MCP e conclui a autorização.
 2. Na página «Ligar o teu bot_mail», introduz a password MCP e autoriza.
-3. Confirma que aparecem as cinco ferramentas descritas no README.
+3. Confirma que aparecem as seis ferramentas descritas no README.
 4. Experimenta primeiro `list_pending` (sem Gmail) e depois pede «Lê os meus emails».
 5. Pede rascunhos; revê o lote; só então confirma o envio.
 

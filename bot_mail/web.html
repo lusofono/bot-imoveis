@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<base href="{{BASE}}">
+<title>bot_mail</title>
+<style>
+:root { --bg:#f5f6f8; --card:#fff; --text:#1c2230; --muted:#667085; --line:#e3e6eb; --accent:#2f5bea; --accent-text:#fff;
+  --warn:#93370d; --warn-bg:#fffaeb; --bad:#b42318; --bad-bg:#fef3f2; --ok:#067647; --ok-bg:#ecfdf3; }
+@media (prefers-color-scheme: dark) { :root { --bg:#101318; --card:#181d25; --text:#e7eaf0; --muted:#98a2b3; --line:#2a313c;
+  --accent:#7c9cff; --accent-text:#0b1020; --warn:#fec84b; --warn-bg:#2b2310; --bad:#fda29b; --bad-bg:#2d1615; --ok:#75e0a7; --ok-bg:#10251a; } }
+* { box-sizing: border-box; }
+body { margin: 0; font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); }
+header { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center;
+  padding: 10px 20px; background: var(--card); border-bottom: 1px solid var(--line); }
+header strong { font-size: 17px; }
+nav { display: flex; gap: 4px; margin-left: auto; }
+main { max-width: 960px; margin: 0 auto; padding: 16px 20px 80px; }
+h2 { font-size: 17px; margin: 28px 0 8px; }
+h3 { font-size: 15px; margin: 0 0 8px; }
+button { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 8px;
+  padding: 6px 12px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+button.tab.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+button.link { border: 0; background: none; color: var(--accent); padding: 6px 4px; }
+button.link.danger { color: var(--bad); }
+input, select, textarea { font: inherit; width: 100%; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--card); color: var(--text); }
+textarea { resize: vertical; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.row > input { flex: 1 1 280px; width: auto; }
+.row select { width: auto; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin: 12px 0; }
+.field { display: grid; gap: 4px; font-size: 13px; color: var(--muted); margin: 8px 0; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin: 10px 0; }
+.card.blocked { border-color: var(--bad); }
+.card-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; }
+.who { display: flex; gap: 8px; align-items: center; }
+.who input { width: auto; }
+.tag { font-size: 12px; padding: 1px 8px; border-radius: 99px; background: var(--bg); border: 1px solid var(--line); }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.alert { margin: 8px 0; padding: 7px 10px; border-radius: 8px; font-size: 14px; }
+.alert.warn { background: var(--warn-bg); color: var(--warn); }
+.alert.bad { background: var(--bad-bg); color: var(--bad); }
+blockquote { margin: 10px 0; padding: 8px 12px; border-left: 3px solid var(--line); white-space: pre-wrap; }
+pre { white-space: pre-wrap; font: 13px/1.45 ui-monospace, Menlo, monospace; background: var(--bg); padding: 10px;
+  border-radius: 8px; max-height: 420px; overflow: auto; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.step { color: var(--muted); margin: 0 0 8px; }
+#toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); max-width: min(640px, 92vw);
+  padding: 10px 16px; border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.18); background: var(--ok-bg); color: var(--ok); }
+#toast.bad { background: var(--bad-bg); color: var(--bad); }
+#toast.warn { background: var(--warn-bg); color: var(--warn); }
+#busy { font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <strong>bot_mail</strong>
+  <span id="account" class="muted small"></span>
+  <span id="busy" class="muted" hidden>A trabalhar…</span>
+  <nav>
+    <button class="tab active" data-tab="replies">Respostas</button>
+    <button class="tab" data-tab="properties">Imóveis</button>
+    <button class="tab" data-tab="voice">Voz e estilo</button>
+    <button id="logout" class="link" hidden>Sair</button>
+  </nav>
+</header>
+<main>
+  <p id="error" class="alert bad" hidden></p>
+
+  <section id="tab-replies">
+    <div class="row">
+      <label class="muted">Imóvel <select id="queue"></select></label>
+      <button id="read" class="primary">Ler emails do Gmail</button>
+      <span id="last-read" class="muted small"></span>
+    </div>
+
+    <h2>1. Emails pendentes</h2>
+    <p class="step">Seleciona os emails a tratar. Os bloqueados não se podem enviar: trata-os à mão e retira-os da fila.</p>
+    <div id="emails"></div>
+    <details><summary class="muted small">Instruções deste imóvel (voz, contexto, interações)</summary><pre id="instructions"></pre></details>
+
+    <h2>2. Copiar para o ChatGPT</h2>
+    <p class="step">O prompt leva as instruções e as mensagens, sem o email nem o telefone dos clientes.</p>
+    <textarea id="extra" rows="2" placeholder="Instruções extra para este lote (opcional), ex.: sê breve"></textarea>
+    <div class="actions"><button id="copy-prompt" class="primary">Copiar prompt</button></div>
+    <details id="prompt-box"><summary class="muted small">Ver o prompt</summary><pre id="prompt"></pre></details>
+
+    <h2>3. Colar a resposta do ChatGPT</h2>
+    <textarea id="answer" rows="6" placeholder="Cola aqui a resposta completa do ChatGPT (o bloco JSON)"></textarea>
+    <div class="actions"><button id="paste" class="primary">Guardar rascunhos</button></div>
+    <div id="notes"></div>
+
+    <h2>4. Rever e enviar</h2>
+    <p class="step">Revê e corrige os rascunhos no passo 1. O envio mostra primeiro os destinatários e os textos finais.</p>
+    <div class="actions"><button id="preview">Pré-visualizar envio dos selecionados</button></div>
+    <div id="preview-box"></div>
+  </section>
+
+  <section id="tab-properties" hidden>
+    <h2>Imóveis</h2>
+    <div id="property-list"></div>
+    <article class="card">
+      <h3>Novo imóvel ou dados do anúncio</h3>
+      <p class="step">À mão, ou com o ChatGPT: cola o link do anúncio, copia o prompt, cola a resposta e revê os campos.</p>
+      <div class="row">
+        <input id="listing-url" placeholder="https://www.idealista.pt/imovel/…">
+        <button id="listing-prompt">Copiar prompt do anúncio</button>
+      </div>
+      <details id="listing-prompt-box"><summary class="muted small">Ver o prompt</summary><pre id="listing-prompt-text"></pre></details>
+      <textarea id="listing-answer" rows="4" placeholder="Cola aqui a resposta do ChatGPT"></textarea>
+      <div class="actions"><button id="listing-parse">Preencher com a resposta</button></div>
+      <div class="grid">
+        <label class="field">Referência (a que aparece nos avisos do portal)<input id="f-reference"></label>
+        <label class="field">Remetente dos avisos do portal<input id="f-sender" placeholder="reply@idealista.pt"></label>
+        <label class="field">Código do anúncio<input id="f-listing_id"></label>
+        <label class="field">Link do anúncio<input id="f-listing_url"></label>
+        <label class="field">Anunciante<input id="f-advertiser"></label>
+        <label class="field">Renda anunciada (€)<input id="f-advertised_rent_eur"></label>
+      </div>
+      <label class="field">Descrição curta<input id="f-description" placeholder="Apartamento T3 na Rua …, Localidade"></label>
+      <label class="field">Características do anúncio, uma por linha (vão para a base de conhecimento)<textarea id="f-facts" rows="5"></textarea></label>
+      <div class="actions"><button id="property-save" class="primary">Guardar imóvel</button></div>
+    </article>
+  </section>
+
+  <section id="tab-voice" hidden>
+    <h2>Voz e estilo</h2>
+    <p class="step">Comum a todos os imóveis. Sem estas escolhas, nenhuma resposta é preparada.</p>
+    <article class="card" id="voice-form"></article>
+  </section>
+</main>
+<div id="toast" hidden></div>
+
+<script nonce="{{NONCE}}">
+const TOKEN = '{{TOKEN}}';
+const HOSTED = {{HOSTED}};
+const STATUS ={pending: 'por responder', draft: 'rascunho', error: 'erro no envio', sending: 'a enviar', uncertain: 'envio incerto'};
+const FIELDS = ['reference', 'sender', 'listing_id', 'listing_url', 'advertiser', 'advertised_rent_eur', 'description'];
+const $ = id => document.getElementById(id);
+let state = {properties: []}, settings = null, preview = null;
+
+// Emails are untrusted: every value goes in as text, never as HTML.
+function el(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(attrs)) {
+    if (key === 'class') node.className = value;
+    else if (key.startsWith('on')) node.addEventListener(key.slice(2), value);
+    else if (value !== false && value != null) node.setAttribute(key, value === true ? '' : value);
+  }
+  for (const child of children.flat()) if (child != null && child !== false && child !== '') node.append(child);
+  return node;
+}
+
+async function call(path, body) {
+  $('busy').hidden = false;
+  try {
+    const response = await fetch(path, {method: body === undefined ? 'GET' : 'POST',
+      headers: {'Content-Type': 'application/json', 'X-Bot-Mail-Token': TOKEN},
+      body: body === undefined ? undefined : JSON.stringify(body)});
+    const data = await response.json().catch(() => ({error: response.statusText}));
+    if (!response.ok) throw new Error(data.error || 'Erro inesperado.');
+    return data;
+  } finally { $('busy').hidden = true; }
+}
+
+function toast(text, kind = 'ok') {
+  const box = $('toast');
+  box.textContent = text; box.className = kind; box.hidden = false;
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => { box.hidden = true; }, 7000);
+}
+
+async function run(action) { try { await action(); } catch (error) { toast(error.message, 'bad'); } }
+
+async function copyText(text, done, fallbackBox) {
+  try { await navigator.clipboard.writeText(text); toast(done); }
+  catch { fallbackBox.open = true; toast('Não consegui copiar sozinho: seleciona o texto do prompt e copia-o.', 'warn'); }
+}
+
+function showTab(name) {
+  document.querySelectorAll('[data-tab]').forEach(button => button.classList.toggle('active', button.dataset.tab === name));
+  for (const tab of ['replies', 'properties', 'voice']) $('tab-' + tab).hidden = tab !== name;
+}
+
+function when(value) { return value ? new Date(value).toLocaleString('pt-PT', {dateStyle: 'short', timeStyle: 'short'}) : ''; }
+function currentQueue() {
+  return state.properties.find(queue => String(queue.property_ref ?? '') === $('queue').value) || state.properties[0];
+}
+function queueRef() { return currentQueue()?.property_ref ?? null; }
+function selectedIds() { return [...document.querySelectorAll('.pick:checked')].map(box => box.dataset.id); }
+function nameOf(id) {
+  const email = (currentQueue()?.emails || []).find(item => item.id === id) || {};
+  return (email.customer || {}).name || id;
+}
+
+function renderState() {
+  $('account').textContent = state.account || '';
+  $('error').hidden = !state.error; $('error').textContent = state.error || '';
+  const select = $('queue'), chosen = select.value;
+  select.replaceChildren(...state.properties.map(queue => el('option', {value: queue.property_ref ?? ''}, queue.property_ref ?? 'Todos')));
+  if ([...select.options].some(option => option.value === chosen)) select.value = chosen;
+  const queue = currentQueue();
+  $('last-read').textContent = queue?.last_read_at ? 'Última leitura: ' + when(queue.last_read_at) : '';
+  const emails = queue?.emails || [];
+  $('emails').replaceChildren(...(emails.length ? emails.map(card)
+    : [el('p', {class: 'muted'}, state.error ? '' : 'Não há emails pendentes. Usa «Ler emails do Gmail».')]));
+  $('instructions').textContent = queue?.instructions || '';
+  preview = null; $('preview-box').replaceChildren();
+}
+
+function card(email) {
+  const customer = email.customer || {}, sender = (email.from || [])[0] || {};
+  const draft = el('textarea', {rows: 7, placeholder: 'Rascunho: cola a resposta do ChatGPT no passo 3 ou escreve aqui.'}, email.reply_text || '');
+  const contact = [customer.email || (email.recipient || {}).email, customer.phone].filter(Boolean).join(' · ');
+  return el('article', {class: 'card' + (email.blocked ? ' blocked' : '')},
+    el('div', {class: 'card-head'},
+      el('label', {class: 'who'}, el('input', {type: 'checkbox', class: 'pick', 'data-id': email.id, checked: !email.blocked, disabled: !!email.blocked}),
+        el('strong', {}, customer.name || sender.name || sender.email || 'Sem nome')),
+      email.interaction && el('span', {class: 'tag'}, email.interaction + '.ª interação'),
+      el('span', {class: 'tag'}, STATUS[email.reply_status] || email.reply_status || ''),
+      el('span', {class: 'muted small'}, when(email.date))),
+    contact && el('div', {class: 'muted small'}, contact),
+    email.blocked && el('p', {class: 'alert bad'}, email.blocked),
+    (email.warnings || []).map(warning => el('p', {class: 'alert warn'}, warning)),
+    email.reply_error && el('p', {class: 'alert bad'}, email.reply_error),
+    el('blockquote', {}, customer.message || email.body_text || ''),
+    el('details', {}, el('summary', {class: 'muted small'}, 'Email completo'), el('pre', {}, email.body_text || '')),
+    draft,
+    el('div', {class: 'actions'},
+      el('button', {onclick: () => run(async () => {
+        state = await call('api/drafts', {property_ref: queueRef(), replies: [{id: email.id, reply_text: draft.value}]});
+        renderState(); toast('Rascunho guardado.');
+      })}, 'Guardar rascunho'),
+      el('button', {class: 'link danger', onclick: () => run(async () => {
+        if (!confirm('Retirar este email da fila sem responder? O Gmail não é alterado e o email não volta a entrar.')) return;
+        state = await call('api/dismiss', {property_ref: queueRef(), ids: [email.id]});
+        renderState(); toast('Email retirado da fila.');
+      })}, 'Retirar da fila')));
+}
+
+function renderPreview() {
+  const box = $('preview-box'), count = preview.replies.length;
+  box.replaceChildren(
+    el('p', {class: 'alert warn'}, `Vais enviar ${count} email(s) reais. Confere destinatários e textos; esta pré-visualização vale 15 minutos.`),
+    ...preview.replies.map(reply => el('article', {class: 'card'},
+      el('div', {}, el('strong', {}, 'Para: '), reply.to), el('div', {}, el('strong', {}, 'Assunto: '), reply.subject),
+      (reply.warnings || []).map(warning => el('p', {class: 'alert warn'}, warning)), el('pre', {}, reply.reply_text))),
+    el('div', {class: 'actions'},
+      el('button', {class: 'primary', onclick: () => run(async () => {
+        if (!confirm(`Enviar agora ${count} email(s) reais?`)) return;
+        const result = await call('api/send', {property_ref: queueRef(), preview_token: preview.preview_token, confirmed: true});
+        const sent = result.results.filter(item => item.status === 'sent').length;
+        state = await call('api/state'); renderState();
+        toast(`Enviados: ${sent} de ${result.results.length}.` + (sent < result.results.length ? ' Vê os avisos nos que ficaram.' : ''),
+          sent === result.results.length ? 'ok' : 'warn');
+      })}, `Enviar ${count} email(s)`),
+      el('button', {class: 'link', onclick: () => { preview = null; box.replaceChildren(); }}, 'Cancelar')));
+}
+
+async function refreshState() { state = await call('api/state'); renderState(); }
+async function loadSettings() { settings = await call('api/settings'); renderSettings(); }
+
+function renderSettings() {
+  renderVoice();
+  $('property-list').replaceChildren(...(settings.properties.length ? settings.properties.map(propertyCard)
+    : [el('p', {class: 'muted'}, 'Ainda não há imóveis: cria o primeiro abaixo.')]));
+  if (!$('f-sender').value) $('f-sender').value = settings.properties[0]?.sender || 'reply@idealista.pt';
+}
+
+function propertyCard(property) {
+  const areas = {};
+  const area = (name, label, rows) => {
+    areas[name] = el('textarea', {rows}, property.prompts[name] || '');
+    return el('label', {class: 'field'}, label, areas[name]);
+  };
+  const link = /^https:\/\//.test(property.listing_url || '')
+    && el('a', {href: property.listing_url, target: '_blank', rel: 'noopener noreferrer'}, property.listing_url);
+  return el('article', {class: 'card'},
+    el('div', {class: 'card-head'}, el('strong', {}, property.reference), el('span', {}, property.description || ''),
+      property.advertised_rent_eur != null && el('span', {class: 'tag'}, property.advertised_rent_eur + ' €')),
+    el('div', {class: 'muted small'}, [property.sender, property.listing_id && 'anúncio ' + property.listing_id,
+      property.knowledge_files.length ? 'conhecimento: ' + property.knowledge_files.join(', ') : 'base de conhecimento vazia']
+      .filter(Boolean).join(' · ')),
+    link,
+    el('details', {}, el('summary', {class: 'muted small'}, 'Prompts deste imóvel'),
+      area('general', 'Prompt base: contexto do imóvel', 4),
+      area('first', '1.ª interação', 4), area('first_template', 'Texto base da 1.ª resposta (opcional)', 4),
+      area('second', '2.ª interação (vazio: o ChatGPT avisa-te e aguarda)', 3),
+      area('knowledge', 'Como usar a base de conhecimento (RAG)', 3),
+      el('button', {class: 'primary', onclick: () => run(async () => {
+        const prompts = Object.fromEntries(Object.entries(areas).map(([name, box]) => [name, box.value]));
+        settings = await call('api/property/prompts', {reference: property.reference, prompts});
+        renderSettings(); await refreshState(); toast('Prompts guardados.');
+      })}, 'Guardar prompts')),
+    el('button', {class: 'link', onclick: () => fillProperty(property)}, 'Editar dados do anúncio'));
+}
+
+function fillProperty(fields) {
+  for (const name of FIELDS) if (name !== 'sender' || fields.sender) $('f-' + name).value = fields[name] ?? '';
+  $('f-facts').value = (fields.facts || []).join('\n');
+  $('f-reference').scrollIntoView({behavior: 'smooth', block: 'center'});
+}
+
+function renderVoice() {
+  const selects = {};
+  const choice = (key, label) => {
+    const voice = settings.voice[key];
+    selects[key] = el('select', {}, el('option', {value: ''}, '— escolhe —'),
+      Object.entries(voice.options).map(([name, text]) => el('option', {value: name}, `${name}: ${text}`)));
+    selects[key].value = voice.selected || '';
+    return el('label', {class: 'field'}, label, selects[key]);
+  };
+  const signature = el('input', {value: settings.voice.signature || ''});
+  $('voice-form').replaceChildren(choice('greeting', 'Saudação'), choice('languages', 'Idiomas'), choice('closing', 'Fecho'),
+    el('label', {class: 'field'}, 'Assinatura (sempre igual, sem tradução)', signature),
+    el('div', {class: 'actions'}, el('button', {class: 'primary', onclick: () => run(async () => {
+      const choices = Object.fromEntries(Object.entries(selects).map(([key, select]) => [key, select.value]));
+      settings = await call('api/voice', {...choices, signature: signature.value});
+      renderSettings(); await refreshState(); toast('Voz guardada.');
+    })}, 'Guardar voz')));
+}
+
+document.querySelectorAll('[data-tab]').forEach(button => button.addEventListener('click', () => showTab(button.dataset.tab)));
+$('queue').addEventListener('change', renderState);
+$('read').addEventListener('click', () => run(async () => {
+  state = await call('api/read', {}); renderState();
+  toast(state.added ? `${state.added} email(s) novo(s).` : 'Leitura concluída: nada de novo.');
+}));
+$('copy-prompt').addEventListener('click', () => run(async () => {
+  const ids = selectedIds();
+  if (!ids.length) throw new Error('Seleciona pelo menos um email.');
+  const {prompt} = await call('api/prompt', {property_ref: queueRef(), ids, extra: $('extra').value});
+  $('prompt').textContent = prompt;
+  await copyText(prompt, `Prompt copiado (${ids.length} email(s)). Cola-o numa conversa do ChatGPT.`, $('prompt-box'));
+}));
+$('paste').addEventListener('click', () => run(async () => {
+  const result = await call('api/paste', {property_ref: queueRef(), text: $('answer').value});
+  state = result.state; renderState();
+  $('notes').replaceChildren(...result.notes.map(note => el('p', {class: 'alert warn'}, `Nota do ChatGPT sobre ${nameOf(note.id)}: ${note.nota}`)));
+  $('answer').value = '';
+  toast(`${result.saved} rascunho(s) guardado(s). Revê-os no passo 1 antes de enviar.`);
+}));
+$('preview').addEventListener('click', () => run(async () => {
+  const ids = selectedIds();
+  if (!ids.length) throw new Error('Seleciona pelo menos um email.');
+  preview = await call('api/preview', {property_ref: queueRef(), ids});
+  renderPreview();
+}));
+$('listing-prompt').addEventListener('click', () => run(async () => {
+  const {prompt} = await call('api/property/prompt', {listing_url: $('listing-url').value});
+  $('listing-prompt-text').textContent = prompt;
+  await copyText(prompt, 'Prompt copiado. Cola-o no ChatGPT e traz a resposta.', $('listing-prompt-box'));
+}));
+$('listing-parse').addEventListener('click', () => run(async () => {
+  const {fields} = await call('api/property/parse', {text: $('listing-answer').value});
+  fillProperty({...fields, sender: null});
+  toast('Campos preenchidos: revê-os antes de guardar.', 'warn');
+}));
+$('property-save').addEventListener('click', () => run(async () => {
+  const fields = Object.fromEntries(FIELDS.map(name => [name, $('f-' + name).value.trim() || null]));
+  fields.facts = $('f-facts').value;
+  const result = await call('api/property/save', {fields});
+  settings = result.settings; renderSettings(); await refreshState();
+  toast(`Imóvel ${result.reference} ${result.created ? 'criado' : 'atualizado'}. Revê a base de conhecimento na pasta do imóvel.`);
+}));
+
+$('logout').hidden = !HOSTED;
+$('logout').addEventListener('click', () => run(async () => {
+  await fetch('logout', {method: 'POST'});
+  location.reload();
+}));
+
+run(async () => { await refreshState(); await loadSettings(); });
+</script>
+</body>
+</html>

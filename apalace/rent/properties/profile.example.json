@@ -84,6 +84,10 @@
         "status": "awaiting_owner",
         "text": null,
         "when_not_configured": "Avisar o proprietário e aguardar instruções; não inventar a resposta da segunda interação."
+      },
+      "knowledge": {
+        "status": "configured",
+        "text": "Usa esta base para responder às perguntas do cliente sobre o imóvel. Responde só com o que aqui está; se a resposta não estiver aqui, diz que vais confirmar e avisa o proprietário."
       }
     },
     "interaction_tracking": {

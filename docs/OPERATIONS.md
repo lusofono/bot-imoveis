@@ -7,6 +7,14 @@ Cada email inclui `id`, cabeçalhos, `body_text`, `reply_text` e `reply_status`.
 Depois de enviar tudo, `emails` fica `[]`. Os IDs respondidos permanecem para evitar reimportação.
 O ficheiro não fica literalmente vazio: é sempre JSON válido.
 
+Com imóveis, cada `properties/<REF>/queue.json` tem o mesmo formato, mais:
+- `conversations`: por email de cliente, a etapa (`stage` = respostas enviadas com sucesso), os
+  `Message-ID` enviados e as conversas do Gmail. Serve para calcular a interação seguinte e reconhecer
+  as respostas do cliente. Não guarda corpos de emails.
+- `dismissed_message_ids`: emails retirados sem resposta (`dismiss_emails`); também não voltam a entrar.
+- Em cada email: `kind` (`lead` ou `follow_up`), `customer`, `recipient`, `blocked` e `warnings`,
+  calculados no READ a partir do perfil.
+
 `config.json` guarda a configuração; `secrets/oauth.json` guarda a ligação autenticada.
 São ficheiros técnicos, não queues diárias. O modelo só recebe os pendentes e os resultados das operações,
 nunca estes segredos. O antigo `state.json` deixa de ser necessário e não é consultado.
@@ -25,6 +33,7 @@ Depois de confirmar o resultado, executa no servidor:
 
 `yes` remove o pendente e guarda o ID respondido. `no` volta a rascunho, sem enviar.
 O passo seguinte exige outra pré-visualização e confirmação. Este comando não está exposto ao modelo.
+Se houver mais do que um imóvel, acrescenta `--property REF`. Com `yes`, a etapa da conversa avança.
 
 ## Logs e backups
 

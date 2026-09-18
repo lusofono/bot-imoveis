@@ -21,13 +21,20 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="bot_mail — uma conta, uma pasta, um JSON")
     parser.add_argument("--instance", type=Path, default=Path(os.environ.get("BOT_MAIL_INSTANCE", ROOT / "apalace/rent")))
     commands = parser.add_subparsers(dest="action", required=True)
-    for name in ("setup", "setup-server", "read", "pending", "send", "serve", "stdio"):
+    for name in ("setup", "setup-server", "read", "serve", "stdio"):
         commands.add_parser(name)
+    for name in ("pending", "send"):
+        commands.add_parser(name).add_argument("--property", dest="property_ref", help="referência do imóvel")
     resolve = commands.add_parser("resolve")
     resolve.add_argument("message_id")
     resolve.add_argument("--was-sent", choices=["yes", "no"], required=True)
+    resolve.add_argument("--property", dest="property_ref", help="referência do imóvel")
     replicate = commands.add_parser("replicate")
     replicate.add_argument("destination", type=Path)
+    web = commands.add_parser("web", help="página local, sem MCP: copiar e colar no ChatGPT")
+    web.add_argument("--port", type=int, default=8765)
+    web.add_argument("--no-browser", action="store_true")
+    commands.add_parser("web-password", help="endereço e password da página alojada (ex.: cPanel)")
     args = parser.parse_args(argv)
     folder = args.instance.resolve()
     service = MailService(folder)
@@ -41,7 +48,7 @@ def main(argv=None):
             save_json(destination / "config.json", example)
             for name in ("logs", "secrets"):
                 (destination / name).mkdir(mode=0o700)
-            for name in ("read", "send", "setup", "setup_server", "mcp"):
+            for name in ("read", "send", "setup", "setup_server", "mcp", "web"):
                 content = (ROOT / "apalace/rent" / f"{name}.py").read_text()
                 # Fresh replica: source code only, never queue, credentials or OAuth state.
                 (destination / f"{name}.py").write_text(content.replace("Path(__file__).resolve().parents[2]", repr(str(ROOT))))
@@ -70,6 +77,10 @@ def main(argv=None):
             cfg.update(account=account, subject_contains=subject, mailbox=mailbox,
                        lookback_days=lookback, incoming_only=True)
             save_json(folder / "config.json", cfg)
+            from .configure import configure_properties, configure_voice, yes
+            if (folder / "voice.json").exists() or yes("Esta pasta trabalha por imóveis (avisos de portais como o Idealista)?"):
+                configure_voice(folder)
+                configure_properties(folder, account)
             print("Configuração guardada. Nenhum email lido ou enviado.")
         elif args.action == "setup-server":
             from .oauth import password_hash
@@ -94,31 +105,54 @@ def main(argv=None):
             print("Acesso MCP configurado. Reinicia o serviço e volta a ligar o ChatGPT.")
         elif args.action == "read":
             result = service.read()
-            print(json.dumps({"added": result["added"], "pending": len(result["emails"])}, ensure_ascii=False))
+            if "properties" in result:
+                summary = {queue["property_ref"]: {"added": queue["added"], "pending": len(queue["emails"])}
+                           for queue in result["properties"]}
+                print(json.dumps({"properties": summary, "ambiguous": result["ambiguous"]}, ensure_ascii=False))
+            else:
+                print(json.dumps({"added": result["added"], "pending": len(result["emails"])}, ensure_ascii=False))
         elif args.action == "pending":
-            print(json.dumps(service.pending(), ensure_ascii=False, indent=2))
+            print(json.dumps(service.pending(args.property_ref), ensure_ascii=False, indent=2))
         elif args.action == "send":
-            data = service.pending()
-            ids = [item["id"] for item in data["emails"] if item.get("send_reply") is True
-                   and item.get("reply_text", "").strip()]
+            ref, ids = service.marked(args.property_ref)
             if not ids:
                 print("Nada marcado para envio. No JSON, marca send_reply=true nos rascunhos pretendidos.")
                 return 0
-            preview = service.preview(ids)
+            preview = service.preview(ids, ref)
             print(json.dumps(preview["replies"], ensure_ascii=False, indent=2))
             if not sys.stdin.isatty() or input("Enviar este lote? Escreve ENVIAR: ") != "ENVIAR":
                 print("Nenhum email enviado.")
                 return 0
-            print(json.dumps(service.send(preview["preview_token"], True), ensure_ascii=False))
+            print(json.dumps(service.send(preview["preview_token"], True, ref), ensure_ascii=False))
         elif args.action == "resolve":
-            service.resolve(args.message_id, args.was_sent == "yes")
+            service.resolve(args.message_id, args.was_sent == "yes", args.property_ref)
             print("Resultado confirmado e JSON atualizado.")
+        elif args.action == "web":
+            from .web import serve
+            service.config()  # needs the account; the page itself shows what else is missing
+            serve(folder, args.port, not args.no_browser)
+        elif args.action == "web-password":
+            from .credentials import password_hash
+            url = ask("Endereço público da página (ex.: https://bgl.pt/bot/mail)")
+            parsed = urlsplit(url)
+            if parsed.scheme != "https" or not parsed.hostname or parsed.query or parsed.fragment or parsed.username:
+                raise ValueError("Usa um endereço https, sem parâmetros.")
+            password = getpass.getpass("Password da página (mínimo 12 caracteres; diferente da do Gmail): ")
+            if len(password) < 12 or password != getpass.getpass("Repetir a password: "):
+                raise ValueError("Passwords diferentes ou demasiado curtas.")
+            salt = secrets.token_hex(16)
+            (folder / "secrets").mkdir(parents=True, exist_ok=True, mode=0o700)
+            save_json(folder / "secrets" / "web.json", {"public_url": url.rstrip("/"), "salt": salt,
+                                                        "password_hash": password_hash(password, salt)})
+            print("Password da página guardada. Reinicia a aplicação; as sessões abertas terminam.")
         elif args.action == "stdio":
             from .server import create_server
+            service.check()
             create_server(folder).run(transport="stdio")
         elif args.action == "serve":
             from .server import http_app
             import uvicorn
+            service.check()
             settings = load_json(folder / "secrets" / "login.json", {})
             url = os.environ.get("BOT_MAIL_PUBLIC_URL", settings.get("public_url", ""))
             if not url:

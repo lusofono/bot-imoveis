@@ -1,0 +1,162 @@
+import json
+import re
+from unittest.mock import patch
+import pytest
+from starlette.testclient import TestClient
+from bot_mail.credentials import password_hash
+from bot_mail.prompts import parse_replies, short_id
+from bot_mail.storage import save_json
+from bot_mail.web import hosted_app, web_app
+from test_properties import CUSTOMER, REF, SMTP, lead, read, service  # noqa: F401 (service is a fixture)
+
+TOKEN = "test-token"
+PAGE_PASSWORD = "uma-password-longa"
+PUBLIC = "https://example.pt/bot/mail"
+
+
+def set_page_password(folder, password=PAGE_PASSWORD):
+    save_json(folder / "secrets" / "web.json", {"public_url": PUBLIC, "salt": "ab" * 16,
+                                                "password_hash": password_hash(password, "ab" * 16)})
+
+
+def test_hosted_page_needs_its_password_and_a_session(service):
+    with pytest.raises(RuntimeError, match="web-password"):
+        hosted_app(service.folder)  # never an open page on the internet
+    set_page_password(service.folder)
+    client = TestClient(hosted_app(service.folder), base_url="https://example.pt", root_path="/bot/mail")
+    login = client.get("/bot/mail/")
+    assert login.status_code == 200 and 'type="password"' in login.text and '<base href="/bot/mail/">' in login.text
+    assert client.get("/bot/mail/api/state", headers={"X-Bot-Mail-Token": "x"}).status_code == 403
+    assert client.post("/bot/mail/login", json={"password": "errada"}).status_code == 403
+    assert client.post("/bot/mail/login", json={"password": PAGE_PASSWORD},
+                       headers={"Origin": "https://evil.example"}).status_code == 403
+    signed = client.post("/bot/mail/login", json={"password": PAGE_PASSWORD})
+    cookie = signed.headers["set-cookie"].lower()
+    assert signed.status_code == 200 and all(flag in cookie for flag in ("httponly", "secure", "samesite=strict"))
+    page = client.get("/bot/mail/").text
+    token = re.search(r"const TOKEN = '([^']+)'", page)[1]
+    assert "const HOSTED = true;" in page
+    assert client.get("/bot/mail/api/state", headers={"X-Bot-Mail-Token": token}).status_code == 200
+    assert client.get("/bot/mail/api/state", headers={"X-Bot-Mail-Token": "outro"}).status_code == 403
+    assert client.get("/bot/mail/", headers={"Host": "evil.example"}).status_code == 400
+    # A new password ends the open sessions, even without logging out.
+    set_page_password(service.folder, "outra-password-longa")
+    other = TestClient(hosted_app(service.folder), base_url="https://example.pt", root_path="/bot/mail", cookies=client.cookies)
+    assert other.get("/bot/mail/api/state", headers={"X-Bot-Mail-Token": token}).status_code == 403
+    client.post("/bot/mail/logout")
+    assert 'type="password"' in client.get("/bot/mail/").text
+
+
+@pytest.fixture
+def page(service):
+    client = TestClient(web_app(service.folder, TOKEN), base_url="http://127.0.0.1:8765")
+    def call(path, body=None):
+        response = (client.get(path, headers={"X-Bot-Mail-Token": TOKEN}) if body is None
+                    else client.post(path, json=body, headers={"X-Bot-Mail-Token": TOKEN}))
+        return response.status_code, response.json()
+    return client, call
+
+
+def test_page_needs_the_start_link_and_the_api_needs_the_token(page):
+    client, _ = page
+    assert client.get("/").status_code == 403
+    assert client.get("/?t=wrong").status_code == 403
+    start = client.get(f"/?t={TOKEN}", follow_redirects=False)
+    assert start.status_code == 303 and "httponly" in start.headers["set-cookie"].lower()
+    html = client.get("/")
+    assert html.status_code == 200 and TOKEN in html.text
+    nonce = html.headers["content-security-policy"].split("'nonce-")[1].split("'")[0]
+    assert f'<script nonce="{nonce}">' in html.text and "{{" not in html.text
+    assert client.get("/api/state").status_code == 403
+    assert client.post("/api/send", json={"confirmed": True}, headers={"X-Bot-Mail-Token": "wrong"}).status_code == 403
+    assert client.get("/", headers={"Host": "evil.example"}).status_code == 400
+
+
+def test_copy_paste_flow_drafts_previews_and_sends(service, page):
+    _, call = page
+    read(service, [lead("1")])
+    status, state = call("/api/state")
+    [email] = state["properties"][0]["emails"]
+    status, result = call("/api/prompt", {"property_ref": REF, "ids": ["1"], "extra": "Sê breve."})
+    prompt = result["prompt"]
+    for expected in (email["short_id"], "Bom dia, gostaria de visitar o imóvel.", "Sê breve.",
+                     "Equipa APalace Imobiliária", '"respostas"'):
+        assert expected in prompt
+    assert CUSTOMER not in prompt and "900 000 001" not in prompt  # the model does not need them
+    answer = ("Aqui estão:\n```json\n" + json.dumps({"respostas": [{"id": email["short_id"],
+              "reply_text": "Cara Ana,\n\nObrigado pelo contacto.", "nota": "Confirma a data da visita."}]}) + "\n```")
+    status, pasted = call("/api/paste", {"property_ref": REF, "text": answer})
+    assert status == 200 and pasted["saved"] == 1 and pasted["notes"][0]["nota"] == "Confirma a data da visita."
+    assert pasted["state"]["properties"][0]["emails"][0]["reply_text"].startswith("Cara Ana")
+    status, preview = call("/api/preview", {"property_ref": REF, "ids": ["1"]})
+    assert preview["replies"][0]["to"] == CUSTOMER
+    status, refused = call("/api/send", {"property_ref": REF, "preview_token": preview["preview_token"]})
+    assert status == 400 and "Confirma" in refused["error"]
+    SMTP.sent = []
+    with patch("bot_mail.service.app_password", return_value="fake"), patch("bot_mail.service.smtplib.SMTP_SSL", SMTP):
+        status, sent = call("/api/send", {"property_ref": REF, "preview_token": preview["preview_token"],
+                                          "confirmed": True})
+    assert sent["results"] == [{"id": "1", "status": "sent"}] and SMTP.sent[0]["To"] == CUSTOMER
+
+
+def test_pasted_answers_must_match_the_queue(service, page):
+    _, call = page
+    read(service, [lead("1")])
+    status, error = call("/api/paste", {"property_ref": REF, "text": "Não consigo ajudar."})
+    assert status == 400 and "JSON" in error["error"]
+    status, error = call("/api/paste", {"property_ref": REF, "text": '{"respostas": [{"id": "ffffffff", "reply_text": "x"}]}'})
+    assert status == 400 and "ffffffff" in error["error"]
+    queue = {"emails": [{"id": "1843212345678901234"}]}
+    # Full IDs and the English key are accepted too; empty reply_text keeps only the note.
+    replies, notes = parse_replies('[{"id": "1843212345678901234", "reply_text": " ", "nota": "Espera."}]', queue)
+    assert (replies, notes) == ([], [{"id": "1843212345678901234", "nota": "Espera."}])
+    replies, _ = parse_replies(json.dumps({"replies": [{"id": short_id("1843212345678901234"), "reply_text": "Olá"}]}), queue)
+    assert replies == [{"id": "1843212345678901234", "reply_text": "Olá"}]
+
+
+def test_property_from_a_listing_answer_keeps_the_safety_rules(service, page):
+    _, call = page
+    status, result = call("/api/property/prompt", {"listing_url": "https://www.idealista.pt/imovel/12345678/"})
+    assert "https://www.idealista.pt/imovel/12345678/" in result["prompt"]
+    answer = json.dumps({"reference": "AP_NOVO", "listing_id": "12345678", "listing_url": "https://www.idealista.pt/imovel/12345678/",
+                         "advertiser": "Anunciante", "description": "Apartamento T2 na Rua Nova, Lisboa",
+                         "advertised_rent_eur": "1.250 €", "facts": ["70 m²", "Mobilado"],
+                         "sender": "x@evil.example", "never_reply_to": []})
+    status, parsed = call("/api/property/parse", {"text": answer})
+    fields = parsed["fields"]
+    assert fields["advertised_rent_eur"] == 1250 and fields["sender"] is None  # never taken from pasted text
+    status, saved = call("/api/property/save", {"fields": fields})
+    assert status == 200 and saved["created"] and saved["reference"] == "AP_NOVO"
+    folder = service.folder / "properties" / "AP_NOVO"
+    profile = json.loads((folder / "profile.json").read_text(encoding="utf-8"))
+    assert profile["match"]["from_address_equals"] == "reply@idealista.pt"
+    assert profile["reply"]["never_reply_to"] == ["reply@idealista.pt", "owner@example.com"]
+    assert "_knowledge" not in profile and "AP_NOVO" in profile["reply"]["prompts"]["general"]["text"]
+    assert "- Mobilado" in (folder / "knowledge" / "anuncio.md").read_text(encoding="utf-8")
+    assert (folder / "knowledge" / "imovel.md").exists()
+    # The new property receives its own portal notices, and its facts reach the instructions.
+    result = read(service, [lead("9", ref="AP_NOVO", listing="12345678")])
+    queue = next(item for item in result["properties"] if item["property_ref"] == "AP_NOVO")
+    assert queue["added"] == 1 and "Mobilado" in queue["instructions"]
+    # The owner can type the prompts, including the 2nd interaction.
+    status, settings = call("/api/property/prompts", {"reference": "AP_NOVO", "prompts": {
+        "general": "Contexto do AP_NOVO.", "first": "Pede rendimentos.", "second": "Propõe uma visita."}})
+    assert status == 200
+    status, state = call("/api/state")
+    queue = next(item for item in state["properties"] if item["property_ref"] == "AP_NOVO")
+    assert "2.ª: Propõe uma visita." in queue["instructions"]
+    status, error = call("/api/property/save", {"fields": {**fields, "reference": "../fora"}})
+    assert status == 400 and not (service.folder / "fora").exists()
+
+
+def test_voice_is_edited_on_the_page(service, page):
+    _, call = page
+    status, settings = call("/api/settings")
+    assert settings["voice"]["greeting"]["selected"] == "formal" and "cordial" in settings["voice"]["greeting"]["options"]
+    status, error = call("/api/voice", {"greeting": "inventada", "languages": "pt_en_fr", "closing": "formal", "signature": "X"})
+    assert status == 400
+    status, settings = call("/api/voice", {"greeting": "cordial", "languages": "pt_en_fr", "closing": "formal",
+                                           "signature": "Equipa Teste"})
+    assert settings["voice"]["greeting"]["selected"] == "cordial" and settings["voice"]["signature"] == "Equipa Teste"
+    status, state = call("/api/state")
+    assert "Equipa Teste" in state["properties"][0]["instructions"]

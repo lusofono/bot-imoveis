@@ -42,7 +42,6 @@ def parse_addresses(values):
     result = []
     for name, address in getaddresses(decoded):
         if name or address:
-            body, truncated = fetch_text_only(mail, uid, structure_bytes)
             result.append({"name": decode_mime(name).strip(),
                            "email": address.strip()})
     return result
@@ -125,7 +124,7 @@ def meta_from_fetch(meta: bytes):
     }
 
 def read_messages(account, password, subject_contains, date_from, date_to,
-                  mailbox="all", incoming_only=True):
+                  mailbox="all", incoming_only=True, accept=None):
     start = datetime.strptime(date_from, "%Y-%m-%d")
     end = datetime.strptime(date_to, "%Y-%m-%d")
     if end < start:
@@ -161,12 +160,13 @@ def read_messages(account, password, subject_contains, date_from, date_to,
             meta = {}
             structure_bytes = b""
             for item in fetched:
+                # Only found values: the trailing b")" must not blank IDs read before it.
                 if isinstance(item, tuple) and len(item) >= 2:
-                    meta.update(meta_from_fetch(item[0]))
+                    meta.update({k: v for k, v in meta_from_fetch(item[0]).items() if v})
                     structure_bytes += item[0] + b" "
                     raw = item[1]
                 elif isinstance(item, bytes):
-                    meta.update(meta_from_fetch(item))
+                    meta.update({k: v for k, v in meta_from_fetch(item).items() if v})
                     structure_bytes += item + b" "
             if not raw:
                 raise GmailReadError("Cabeçalhos em falta; tenta novamente.")
@@ -191,8 +191,7 @@ def read_messages(account, password, subject_contains, date_from, date_to,
             except Exception:
                 pass
 
-            body, truncated = fetch_text_only(mail, uid, structure_bytes)
-            result.append({
+            item = {
                 "uid": uid.decode("ascii", errors="ignore"),
                 "gmail_message_id": meta.get("gmail_message_id", ""),
                 "thread_id": meta.get("thread_id", ""),
@@ -206,9 +205,12 @@ def read_messages(account, password, subject_contains, date_from, date_to,
                 "message_id": (msg.get("Message-ID", "") or "").strip(),
                 "in_reply_to": (msg.get("In-Reply-To", "") or "").strip(),
                 "references": (msg.get("References", "") or "").strip(),
-                "body_text": body,
-                "body_truncated": truncated,
-            })
+            }
+            # Headers decide first: unrelated mail never has its text fetched.
+            if accept and not accept(item):
+                continue
+            item["body_text"], item["body_truncated"] = fetch_text_only(mail, uid, structure_bytes)
+            result.append(item)
 
         return result, len(uids), box
     finally:
@@ -316,7 +318,13 @@ def fetch_literal(mail, uid, section):
     raise GmailReadError("Texto esperado não recebido.")
 
 
-def fetch_text_only(mail, uid, structure_bytes):
+BLOCK_TAGS = {"br", "p", "div", "li", "ul", "ol", "tr", "td", "th", "table", "blockquote", "hr",
+              "h1", "h2", "h3", "h4", "h5", "h6"}
+HIDDEN_TAGS = {"script", "style", "title"}
+
+
+def html_to_text(markup):
+    """Visible text only; every block and table cell on its own line (portal emails are tables)."""
     from html.parser import HTMLParser
     class Text(HTMLParser):
         def __init__(self):
@@ -324,16 +332,27 @@ def fetch_text_only(mail, uid, structure_bytes):
             self.parts = []
             self.hidden = 0
         def handle_starttag(self, tag, attrs):
-            if tag in ("script", "style"):
+            if tag in HIDDEN_TAGS:
                 self.hidden += 1
-            elif tag in ("br", "p", "div", "li"):
+            elif tag in BLOCK_TAGS:
                 self.parts.append("\n")
         def handle_endtag(self, tag):
-            if tag in ("script", "style"):
+            if tag in HIDDEN_TAGS:
                 self.hidden = max(0, self.hidden-1)
+            elif tag in BLOCK_TAGS:
+                self.parts.append("\n")
         def handle_data(self, text):
             if not self.hidden:
-                self.parts.append(text)
+                # Source newlines are just spaces in HTML; only block tags break lines.
+                self.parts.append(re.sub(r"\s+", " ", text))
+    parser = Text()
+    parser.feed(markup)
+    parser.close()
+    lines = (" ".join(line.split()) for line in "".join(parser.parts).splitlines())
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+
+
+def fetch_text_only(mail, uid, structure_bytes):
     sections = body_sections(parse_structure(structure_bytes))
     texts = []
     truncated = len(sections) > 10
@@ -349,9 +368,7 @@ def fetch_text_only(mail, uid, structure_bytes):
         if not isinstance(text, str):
             continue
         if kind == "html":
-            parser = Text()
-            parser.feed(text)
-            text = "".join(parser.parts)
+            text = html_to_text(text)
         texts.append(text.strip())
     joined = "\n\n".join(texts)
     return joined[:100000], truncated or len(joined) > 100000

@@ -7,12 +7,14 @@ import hashlib
 import hmac
 import html
 import secrets
+import sys
 import time
 from urllib.parse import urlencode, urlsplit
 from mcp.server.auth.provider import (AccessToken, AuthorizationCode, AuthorizationParams,
     AuthorizeError, RefreshToken, RegistrationError, TokenError, construct_redirect_uri)
 from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
 from starlette.responses import HTMLResponse, RedirectResponse, PlainTextResponse
+from .credentials import password_hash  # noqa: F401 (also imported from here by the CLI and tests)
 from .storage import load_json, save_json
 
 SCOPE = "mail"
@@ -20,10 +22,6 @@ SCOPE = "mail"
 
 def digest(value):
     return hashlib.sha256(value.encode()).hexdigest()
-
-
-def password_hash(password, salt):
-    return hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=16384, r=8, p=1).hex()
 
 
 class PersonalOAuth:
@@ -52,15 +50,20 @@ class PersonalOAuth:
 
     async def register_client(self, client_info):
         allowed = self.login_config.get("redirect_uris", [])
-        if not allowed or any(str(uri) not in allowed for uri in client_info.redirect_uris or []):
-            raise RegistrationError("invalid_redirect_uri", "Adiciona o callback exato à lista permitida no setup-server.")
+        rejected = [str(uri) for uri in client_info.redirect_uris or [] if str(uri) not in allowed]
+        if not allowed or rejected:
+            # A callback is not a secret: show it, so the owner can copy the exact one into setup-server.
+            print(f"bot_mail: callback recusado {rejected!r}; usa-o exatamente em setup-server.", file=sys.stderr)
+            raise RegistrationError("invalid_redirect_uri", f"Callback não autorizado: {', '.join(rejected)}. "
+                                    "Adiciona este callback exato com setup-server.")
         if len(self.data["clients"]) >= 100:
             raise RegistrationError("invalid_client_metadata", "Limite de clientes atingido nesta réplica.")
         self.data["clients"][client_info.client_id] = client_info.model_dump(mode="json")
         self.save()
 
     async def authorize(self, client, params):
-        if params.resource != self.resource:
+        # Omitted resource means this server; the issued code is always bound to self.resource.
+        if params.resource not in (None, self.resource):
             raise AuthorizeError("invalid_request", "Resource inválido.")
         if set(params.scopes or [SCOPE]) - {SCOPE}:
             raise AuthorizeError("invalid_scope")

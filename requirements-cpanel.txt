@@ -1,0 +1,3 @@
+# Only what the hosted page needs (passenger_wsgi.py). The MCP server is installed from pyproject.toml.
+starlette>=0.40,<2
+a2wsgi>=1.10,<2

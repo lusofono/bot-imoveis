@@ -31,7 +31,13 @@ def build_reply(item, account):
     if not text:
         raise GmailReplyError("reply_text vazio.")
 
-    name, recipient = choose_recipient(item, account)
+    if "recipient" in item:
+        # Property emails: the recipient was fixed at READ by the profile rules; no fallback.
+        name, recipient = first_address([item["recipient"]])
+        if not recipient or recipient.casefold() == account.casefold():
+            raise GmailReplyError("Sem destinatário válido; revê manualmente.")
+    else:
+        name, recipient = choose_recipient(item, account)
     subject = str(item.get("subject", "")).strip()
     if not subject.lower().startswith("re:"):
         subject = "Re: " + subject if subject else "Re:"

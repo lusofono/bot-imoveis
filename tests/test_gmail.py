@@ -1,4 +1,5 @@
-from bot_mail.gmail import parse_structure, body_sections, fetch_text_only
+from unittest.mock import patch
+from bot_mail.gmail import parse_structure, body_sections, fetch_text_only, parse_addresses, read_messages
 
 
 def test_selects_text_without_attachments():
@@ -24,3 +25,55 @@ def test_fetch_only_selected_parts():
     raw = b'''BODYSTRUCTURE (("TEXT" "PLAIN" NIL NIL NIL "7BIT" 10 1 NIL NIL)("APPLICATION" "PDF" NIL NIL NIL "BASE64" 100 NIL NIL) "MIXED")'''
     assert fetch_text_only(mail, b"1", raw) == ("Hello", False)
     assert mail.calls == ["(BODY.PEEK[1.MIME]<0.131073>)", "(BODY.PEEK[1]<0.131073>)"]
+
+
+def test_parse_addresses_decodes_names():
+    assert parse_addresses(["=?utf-8?q?Ana_Exemplo?= <ana@example.com>, b@example.com"]) == [
+        {"name": "Ana Exemplo", "email": "ana@example.com"}, {"name": "", "email": "b@example.com"}]
+
+
+LEAD = ("From: idealista <reply@idealista.pt>\r\nTo: owner@example.com\r\nReply-To: ana.exemplo@example.com\r\n"
+        "Subject: =?utf-8?q?Nova_mensagem_de_Ana_Exemplo_sobre_o_teu_im=C3=B3vel?=\r\n"
+        "Message-ID: <lead@example.com>\r\nDate: Thu, 17 Sep 2026 08:58:43 +0100\r\n\r\n").encode()
+OTHER = b"From: Loja <news@example.com>\r\nTo: owner@example.com\r\nSubject: Promo\r\nMessage-ID: <n@example.com>\r\n\r\n"
+HTML = ("<html><head><title>idealista</title><style>td {color: red}</style></head><body><table>"
+        "<tr><td>Tens uma nova mensagem</td></tr><tr><td>Ana Exemplo</td></tr>"
+        "<tr><td>900 000 001</td><td>ana.exemplo@example.com</td></tr>"
+        "<tr><td>Bom dia,\n   gostaria de visitar.</td></tr></table></body></html>").encode()
+
+
+def test_read_messages_with_fake_imap_fetches_text_only_when_accepted():
+    structure = b'BODYSTRUCTURE ("TEXT" "HTML" ("CHARSET" "utf-8") NIL NIL "8BIT" 300 1 NIL NIL NIL NIL)'
+    class Mail:
+        calls = []
+        def list(self):
+            return "OK", [b'(\\HasNoChildren \\All) "/" "[Gmail]/All Mail"']
+        def select(self, box, readonly=True):
+            return "OK", [b"2"]
+        def uid(self, command, *args):
+            if command == "search":
+                return "OK", [b"1 2"]
+            uid, spec = args
+            self.calls.append((uid, spec))
+            if "HEADER" in spec:
+                header = LEAD if uid == b"1" else OTHER
+                prefix = b"%s (X-GM-THRID 70 X-GM-MSGID 8%s %s BODY[HEADER] {%d}" % (uid, uid, structure, len(header))
+                return "OK", [(prefix, header), b")"]
+            if ".MIME" in spec:
+                return "OK", [(b"", b"Content-Type: text/html; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\n")]
+            return "OK", [(b"", HTML)]
+        def logout(self):
+            pass
+    mail = Mail()
+    with patch("bot_mail.gmail.connect", return_value=mail):
+        items, scanned, box = read_messages("owner@example.com", "x", "", "2026-09-16", "2026-09-18",
+                                            accept=lambda item: item["from"][0]["email"] == "reply@idealista.pt")
+    assert (scanned, box, len(items)) == (2, "[Gmail]/All Mail", 1)
+    lead = items[0]
+    assert (lead["gmail_message_id"], lead["thread_id"]) == ("81", "70")
+    assert lead["reply_to"] == [{"name": "", "email": "ana.exemplo@example.com"}]
+    assert lead["subject"] == "Nova mensagem de Ana Exemplo sobre o teu imóvel"
+    assert [line for line in lead["body_text"].splitlines() if line] == [
+        "Tens uma nova mensagem", "Ana Exemplo", "900 000 001", "ana.exemplo@example.com", "Bom dia, gostaria de visitar."]
+    # The unrelated message was never downloaded beyond its headers.
+    assert [spec for uid, spec in mail.calls if uid == b"2"] == ["(BODY.PEEK[HEADER] BODYSTRUCTURE X-GM-THRID X-GM-MSGID)"]

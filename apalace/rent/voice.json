@@ -4,9 +4,17 @@
   "scope": "owner_all_properties",
   "style": {
     "greeting": {
-      "selected": null,
-      "status": "awaiting_owner_choice",
+      "selected": "normal",
+      "status": "configured",
       "options": {
+        "normal": {
+          "description": "Saudação habitual: «Caro» ou «Cara» conforme o nome do cliente; se o nome não o indicar, «Caro(a)». Sem nome: «Bom dia,».",
+          "examples": {
+            "pt": "Caro {customer_name}, / Cara {customer_name},",
+            "en": "Dear {customer_name},",
+            "fr": "Cher {customer_name}, / Chère {customer_name},"
+          }
+        },
         "formal": {
           "description": "Saudação formal, sem presumir género ou título.",
           "examples": {
@@ -27,8 +35,8 @@
       "missing_name": "Omitir o nome sem inventar tratamento ou identidade."
     },
     "languages": {
-      "selected": null,
-      "status": "awaiting_owner_choice",
+      "selected": "pt_en_fr",
+      "status": "configured",
       "options": {
         "multilingual": {
           "description": "Responder no idioma da mensagem do cliente, quando identificável."
@@ -47,8 +55,8 @@
       "on_unclear_or_unsupported_language": "Avisar o proprietário e pedir indicação do idioma, sem enviar automaticamente."
     },
     "closing": {
-      "selected": null,
-      "status": "awaiting_owner_choice",
+      "selected": "formal",
+      "status": "configured",
       "options": {
         "formal": {
           "pt": "Com os melhores cumprimentos,",

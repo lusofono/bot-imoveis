@@ -1,7 +1,13 @@
+import hashlib
 import os
 from pathlib import Path
 import subprocess
 import sys
+
+
+def password_hash(password, salt):
+    """scrypt for the MCP and page passwords; standard library only, so the hosted page needs no MCP SDK."""
+    return hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=16384, r=8, p=1).hex()
 
 
 def app_password(folder, account):

@@ -18,5 +18,8 @@ bot-mail = "bot_mail.cli:main"
 [tool.setuptools.packages.find]
 include = ["bot_mail*"]
 
+[tool.setuptools.package-data]
+bot_mail = ["*.html"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

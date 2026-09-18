@@ -28,6 +28,7 @@ def test_oauth_pkce_and_authenticated_mcp(tmp_path):
         assert "resource_metadata" in response.headers["www-authenticate"]
         metadata = http.get("/.well-known/oauth-protected-resource/mcp").json()
         assert metadata["resource"] == URL + "/mcp"
+        assert http.get("/.well-known/oauth-protected-resource").json() == metadata
         auth = http.get("/.well-known/oauth-authorization-server").json()
         assert "S256" in auth["code_challenge_methods_supported"]
         client = http.post("/register", json={"redirect_uris": [CALLBACK], "token_endpoint_auth_method": "none",
@@ -60,7 +61,8 @@ def test_oauth_pkce_and_authenticated_mcp(tmp_path):
             "params":{"protocolVersion":"2025-03-26", "capabilities":{}, "clientInfo":{"name":"test", "version":"1"}}})
         assert initialized.status_code == 200, initialized.text
         tools = http.post("/mcp", headers=headers, json={"jsonrpc":"2.0", "id":2, "method":"tools/list"})
-        assert {t["name"] for t in tools.json()["result"]["tools"]} == {"read_emails", "list_pending", "save_replies", "preview_send", "send_replies"}
+        assert {t["name"] for t in tools.json()["result"]["tools"]} == {"read_emails", "list_pending", "save_replies",
+                                                                        "preview_send", "send_replies", "dismiss_emails"}
         response = http.post("/mcp", headers=headers, json={"jsonrpc":"2.0", "id":3, "method":"tools/call", "params":{"name":"list_pending", "arguments":{}}})
         assert response.status_code == 200 and not response.json()["result"].get("isError"), response.text
         # Tokens and registration survive restart; another instance cannot use them.
@@ -72,5 +74,18 @@ def test_oauth_pkce_and_authenticated_mcp(tmp_path):
         renewed = http.post("/token", data=refresh)
         assert renewed.status_code == 200, renewed.text
         assert http.post("/token", data=refresh).status_code == 400
-        assert http.post("/register", json={"redirect_uris": ["https://evil.example/callback"]}).status_code == 400
+        # A refresh may omit resource, but may never name another server.
+        refresh["refresh_token"] = renewed.json()["refresh_token"]
+        assert http.post("/token", data={**refresh, "resource": "https://evil.example/mcp"}).status_code == 400
+        del refresh["resource"]
+        assert http.post("/token", data=refresh).status_code == 200
+        # Authorization without resource is bound to this server; another resource is refused.
+        request = {"client_id": client_id, "redirect_uri": CALLBACK, "response_type": "code", "code_challenge": challenge,
+                   "code_challenge_method": "S256", "state": "s"}
+        assert http.get("/authorize", params=request, follow_redirects=False).status_code == 302
+        refused = http.get("/authorize", params={**request, "resource": "https://evil.example/mcp"}, follow_redirects=False)
+        assert "error=invalid_request" in refused.headers["location"]
+        # A refused callback is shown, so the owner can copy it into setup-server.
+        refused = http.post("/register", json={"redirect_uris": ["https://evil.example/callback"]})
+        assert refused.status_code == 400 and "https://evil.example/callback" in refused.json()["error_description"]
         assert http.get("/health", headers={"Host": "evil.example"}).status_code == 400
