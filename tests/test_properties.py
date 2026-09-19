@@ -2,12 +2,13 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 import pytest
-from bot_mail.cli import main
-from bot_mail.properties import clean_property, load_voice
-from bot_mail.service import MailService
-from bot_mail.storage import save_json
+from backend.cli import main
+from backend.rules import check_voice, clean_property
+from backend.service import MailService
+from backend.store import save_json
 
 ROOT = Path(__file__).resolve().parent.parent
+TEMPLATES = ROOT / "backend" / "templates"
 REF = "REF_IMOVEL"
 IDEALISTA = {"name": "idealista", "email": "reply@idealista.pt"}
 CUSTOMER = "ana.exemplo@example.com"
@@ -16,9 +17,9 @@ CUSTOMER = "ana.exemplo@example.com"
 @pytest.fixture
 def service(tmp_path):
     save_json(tmp_path / "config.json", {"account": "owner@example.com", "lookback_days": 2})
-    profile = json.loads((ROOT / "apalace/rent/properties/profile.example.json").read_text(encoding="utf-8"))
+    profile = json.loads((TEMPLATES / "profile.example.json").read_text(encoding="utf-8"))
     save_json(tmp_path / "properties" / REF / "profile.json", profile)
-    voice = json.loads((ROOT / "apalace/rent/voice.json").read_text(encoding="utf-8"))
+    voice = json.loads((TEMPLATES / "voice.example.json").read_text(encoding="utf-8"))
     # Explicit choices, so the tests do not depend on the owner's current voice.
     for key, choice in (("greeting", "formal"), ("languages", "pt_en_fr"), ("closing", "cordial")):
         voice["style"][key]["selected"] = choice
@@ -39,8 +40,8 @@ def lead(key, reply_to=(CUSTOMER,), ref=REF, listing="00000000", body_email=CUST
 
 
 def read(service, messages):
-    with patch("bot_mail.service.app_password", return_value="fake"), patch(
-            "bot_mail.service.read_messages", return_value=(messages, len(messages), "INBOX")):
+    with patch("backend.service.app_password", return_value="fake"), patch(
+            "backend.service.read_messages", return_value=(messages, len(messages), "INBOX")):
         return service.read()
 
 
@@ -59,7 +60,7 @@ def draft_and_send(service, key, text="Olá, Ana."):
     service.drafts([{"id": key, "reply_text": text}], service.pending()["properties"][0]["revision"])
     preview = service.preview([key])
     SMTP.sent = []
-    with patch("bot_mail.service.app_password", return_value="fake"), patch("bot_mail.service.smtplib.SMTP_SSL", SMTP):
+    with patch("backend.service.app_password", return_value="fake"), patch("backend.service.smtplib.SMTP_SSL", SMTP):
         return service.send(preview["preview_token"], True)
 
 
@@ -113,8 +114,8 @@ def test_missing_or_invalid_reply_to_blocks_sending_until_dismissed(service, rep
 
 def test_headers_decide_which_texts_are_downloaded(service):
     read(service, [lead("1")])
-    with patch("bot_mail.service.app_password", return_value="fake"), patch(
-            "bot_mail.service.read_messages", return_value=([], 0, "INBOX")) as fetch:
+    with patch("backend.service.app_password", return_value="fake"), patch(
+            "backend.service.read_messages", return_value=([], 0, "INBOX")) as fetch:
         service.read()
     accept = fetch.call_args.kwargs["accept"]
     unrelated = {"gmail_message_id": "9", "from": [{"email": "news@example.com"}], "subject": "Promo"}
@@ -153,14 +154,15 @@ def test_voice_comes_from_the_json_and_is_required(service, capsys):
     save_json(service.folder / "voice.json", voice)
     with pytest.raises(ValueError, match="falta: saudação, assinatura"):
         service.pending()
-    # Without the voice the server does not start either.
-    assert main(["--instance", str(service.folder), "serve"]) == 1
+    # Without the voice the local MCP does not start either.
+    assert main(["--instance", str(service.folder), "stdio"]) == 1
     assert "Configura a voz" in capsys.readouterr().err
 
 
-def test_the_owners_voice_is_complete():
-    # The published voice.json must pass the same validation the server runs at start.
-    assert load_voice(ROOT / "apalace/rent")["style"]["signature"]["text"]
+def test_the_published_voice_is_complete():
+    # The published example must pass the same validation the MCP and the page run at start.
+    voice = json.loads((TEMPLATES / "voice.example.json").read_text(encoding="utf-8"))
+    assert check_voice(voice)["style"]["signature"]["text"]
 
 
 def test_several_properties_need_property_ref(service):
@@ -178,13 +180,13 @@ def test_several_properties_need_property_ref(service):
 
 
 def test_property_folder_without_profiles_refuses_instead_of_reading_everything(tmp_path, capsys):
-    # Profiles are not in Git: a server clone without them must not import the whole mailbox.
+    # Profiles are not in Git: a fresh clone without them must not import the whole mailbox.
     save_json(tmp_path / "config.json", {"account": "owner@example.com"})
-    save_json(tmp_path / "voice.json", json.loads((ROOT / "apalace/rent/voice.json").read_text(encoding="utf-8")))
-    with patch("bot_mail.service.read_messages") as fetch, pytest.raises(ValueError, match="Copia os perfis"):
+    save_json(tmp_path / "voice.json", json.loads((TEMPLATES / "voice.example.json").read_text(encoding="utf-8")))
+    with patch("backend.service.read_messages") as fetch, pytest.raises(ValueError, match="Copia os perfis"):
         MailService(tmp_path).read()
     fetch.assert_not_called()
-    assert main(["--instance", str(tmp_path), "serve"]) == 1
+    assert main(["--instance", str(tmp_path), "stdio"]) == 1
     assert "Copia os perfis" in capsys.readouterr().err
 
 

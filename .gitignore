@@ -8,6 +8,8 @@ __pycache__/
 .env
 .env.*
 !.env.example
+# The data folder (account, voice, properties, queues, logs) never goes to Git.
+/data/
 **/queue.json
 **/state.json
 **/config.json

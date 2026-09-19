@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bot_mail</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <strong>bot_mail</strong>
+  <span id="account" class="muted small"></span>
+  <span id="busy" class="muted" hidden>A trabalhar…</span>
+  <nav>
+    <button class="tab active" data-tab="replies">Respostas</button>
+    <button class="tab" data-tab="properties">Imóveis</button>
+    <button class="tab" data-tab="voice">Voz e estilo</button>
+  </nav>
+</header>
+<main>
+  <p id="error" class="alert bad" hidden></p>
+
+  <section id="tab-replies">
+    <div class="row">
+      <label class="muted">Imóvel <select id="queue"></select></label>
+      <button id="read" class="primary">Ler emails do Gmail</button>
+      <span id="last-read" class="muted small"></span>
+    </div>
+
+    <h2>1. Emails pendentes</h2>
+    <p class="step">Seleciona os emails a tratar. Os bloqueados não se podem enviar: trata-os à mão e retira-os da fila.</p>
+    <div id="emails"></div>
+    <details><summary class="muted small">Instruções deste imóvel (voz, contexto, interações)</summary><pre id="instructions"></pre></details>
+
+    <h2>2. Copiar para o ChatGPT</h2>
+    <p class="step">O prompt leva as instruções e as mensagens, sem o email nem o telefone dos clientes.</p>
+    <textarea id="extra" rows="2" placeholder="Instruções extra para este lote (opcional), ex.: sê breve"></textarea>
+    <div class="actions"><button id="copy-prompt" class="primary">Copiar prompt</button></div>
+    <details id="prompt-box"><summary class="muted small">Ver o prompt</summary><pre id="prompt"></pre></details>
+
+    <h2>3. Colar a resposta do ChatGPT</h2>
+    <textarea id="answer" rows="6" placeholder="Cola aqui a resposta completa do ChatGPT (o bloco JSON)"></textarea>
+    <div class="actions"><button id="paste" class="primary">Guardar rascunhos</button></div>
+    <div id="notes"></div>
+
+    <h2>4. Rever e enviar</h2>
+    <p class="step">Revê e corrige os rascunhos no passo 1. O envio mostra primeiro os destinatários e os textos finais.</p>
+    <div class="actions"><button id="preview">Pré-visualizar envio dos selecionados</button></div>
+    <div id="preview-box"></div>
+  </section>
+
+  <section id="tab-properties" hidden>
+    <h2>Imóveis</h2>
+    <div id="property-list"></div>
+    <article class="card">
+      <h3>Novo imóvel ou dados do anúncio</h3>
+      <p class="step">À mão, ou com o ChatGPT: cola o link do anúncio, copia o prompt, cola a resposta e revê os campos.</p>
+      <div class="row">
+        <input id="listing-url" placeholder="https://www.idealista.pt/imovel/…">
+        <button id="listing-prompt">Copiar prompt do anúncio</button>
+      </div>
+      <details id="listing-prompt-box"><summary class="muted small">Ver o prompt</summary><pre id="listing-prompt-text"></pre></details>
+      <textarea id="listing-answer" rows="4" placeholder="Cola aqui a resposta do ChatGPT"></textarea>
+      <div class="actions"><button id="listing-parse">Preencher com a resposta</button></div>
+      <div class="grid">
+        <label class="field">Referência (a que aparece nos avisos do portal)<input id="f-reference"></label>
+        <label class="field">Remetente dos avisos do portal<input id="f-sender" placeholder="reply@idealista.pt"></label>
+        <label class="field">Código do anúncio<input id="f-listing_id"></label>
+        <label class="field">Link do anúncio<input id="f-listing_url"></label>
+        <label class="field">Anunciante<input id="f-advertiser"></label>
+        <label class="field">Renda anunciada (€)<input id="f-advertised_rent_eur"></label>
+      </div>
+      <label class="field">Descrição curta<input id="f-description" placeholder="Apartamento T3 na Rua …, Localidade"></label>
+      <label class="field">Características do anúncio, uma por linha (vão para a base de conhecimento)<textarea id="f-facts" rows="5"></textarea></label>
+      <div class="actions"><button id="property-save" class="primary">Guardar imóvel</button></div>
+    </article>
+  </section>
+
+  <section id="tab-voice" hidden>
+    <h2>Voz e estilo</h2>
+    <p class="step">Comum a todos os imóveis. Sem estas escolhas, nenhuma resposta é preparada.</p>
+    <article class="card" id="voice-form"></article>
+  </section>
+</main>
+<div id="toast" hidden></div>
+
+<!-- The server writes a new token here at each start; app.js sends it with every API call. -->
+<script nonce="{{NONCE}}">const TOKEN = '{{TOKEN}}';</script>
+<script nonce="{{NONCE}}" src="app.js"></script>
+</body>
+</html>

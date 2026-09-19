@@ -1,50 +1,12 @@
 import json
-import re
 from unittest.mock import patch
 import pytest
 from starlette.testclient import TestClient
-from bot_mail.credentials import password_hash
-from bot_mail.prompts import parse_replies, short_id
-from bot_mail.storage import save_json
-from bot_mail.web import hosted_app, web_app
+from backend.ai import parse_replies, short_id
+from backend.api import web_app
 from test_properties import CUSTOMER, REF, SMTP, lead, read, service  # noqa: F401 (service is a fixture)
 
 TOKEN = "test-token"
-PAGE_PASSWORD = "uma-password-longa"
-PUBLIC = "https://example.pt/bot/mail"
-
-
-def set_page_password(folder, password=PAGE_PASSWORD):
-    save_json(folder / "secrets" / "web.json", {"public_url": PUBLIC, "salt": "ab" * 16,
-                                                "password_hash": password_hash(password, "ab" * 16)})
-
-
-def test_hosted_page_needs_its_password_and_a_session(service):
-    with pytest.raises(RuntimeError, match="web-password"):
-        hosted_app(service.folder)  # never an open page on the internet
-    set_page_password(service.folder)
-    client = TestClient(hosted_app(service.folder), base_url="https://example.pt", root_path="/bot/mail")
-    login = client.get("/bot/mail/")
-    assert login.status_code == 200 and 'type="password"' in login.text and '<base href="/bot/mail/">' in login.text
-    assert client.get("/bot/mail/api/state", headers={"X-Bot-Mail-Token": "x"}).status_code == 403
-    assert client.post("/bot/mail/login", json={"password": "errada"}).status_code == 403
-    assert client.post("/bot/mail/login", json={"password": PAGE_PASSWORD},
-                       headers={"Origin": "https://evil.example"}).status_code == 403
-    signed = client.post("/bot/mail/login", json={"password": PAGE_PASSWORD})
-    cookie = signed.headers["set-cookie"].lower()
-    assert signed.status_code == 200 and all(flag in cookie for flag in ("httponly", "secure", "samesite=strict"))
-    page = client.get("/bot/mail/").text
-    token = re.search(r"const TOKEN = '([^']+)'", page)[1]
-    assert "const HOSTED = true;" in page
-    assert client.get("/bot/mail/api/state", headers={"X-Bot-Mail-Token": token}).status_code == 200
-    assert client.get("/bot/mail/api/state", headers={"X-Bot-Mail-Token": "outro"}).status_code == 403
-    assert client.get("/bot/mail/", headers={"Host": "evil.example"}).status_code == 400
-    # A new password ends the open sessions, even without logging out.
-    set_page_password(service.folder, "outra-password-longa")
-    other = TestClient(hosted_app(service.folder), base_url="https://example.pt", root_path="/bot/mail", cookies=client.cookies)
-    assert other.get("/bot/mail/api/state", headers={"X-Bot-Mail-Token": token}).status_code == 403
-    client.post("/bot/mail/logout")
-    assert 'type="password"' in client.get("/bot/mail/").text
 
 
 @pytest.fixture
@@ -72,6 +34,22 @@ def test_page_needs_the_start_link_and_the_api_needs_the_token(page):
     assert client.get("/", headers={"Host": "evil.example"}).status_code == 400
 
 
+def test_the_page_is_served_as_its_three_files(page):
+    client, _ = page
+    client.get(f"/?t={TOKEN}")
+    html = client.get("/")
+    policy = html.headers["content-security-policy"]
+    nonce = policy.split("'nonce-")[1].split("'")[0]
+    assert "style-src 'self'" in policy and "unsafe-inline" not in policy
+    assert '<link rel="stylesheet" href="style.css">' in html.text
+    assert f'<script nonce="{nonce}" src="app.js"></script>' in html.text
+    script, style = client.get("/app.js"), client.get("/style.css")
+    assert script.headers["content-type"].startswith("text/javascript") and "X-Bot-Mail-Token" in script.text
+    assert style.headers["content-type"].startswith("text/css") and "--accent" in style.text
+    # The template itself, with its placeholders, is never served.
+    assert client.get("/index.html").status_code == 404
+
+
 def test_copy_paste_flow_drafts_previews_and_sends(service, page):
     _, call = page
     read(service, [lead("1")])
@@ -93,7 +71,7 @@ def test_copy_paste_flow_drafts_previews_and_sends(service, page):
     status, refused = call("/api/send", {"property_ref": REF, "preview_token": preview["preview_token"]})
     assert status == 400 and "Confirma" in refused["error"]
     SMTP.sent = []
-    with patch("bot_mail.service.app_password", return_value="fake"), patch("bot_mail.service.smtplib.SMTP_SSL", SMTP):
+    with patch("backend.service.app_password", return_value="fake"), patch("backend.service.smtplib.SMTP_SSL", SMTP):
         status, sent = call("/api/send", {"property_ref": REF, "preview_token": preview["preview_token"],
                                           "confirmed": True})
     assert sent["results"] == [{"id": "1", "status": "sent"}] and SMTP.sent[0]["To"] == CUSTOMER

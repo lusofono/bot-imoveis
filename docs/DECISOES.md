@@ -1,9 +1,46 @@
 # Decisões
 
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
-e porquê. O que ficou em pausa continua no repositório como referência.
+e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
+
+## 19/09/2026: etapa 1 feita; Starlette em vez de FastAPI; dados em `data/`
+
+**Decisão.**
+- **O backend fica em Starlette.** O FastAPI fica para quando houver login ou outros clientes da API.
+- **O nome mantém-se `bot_mail` até à .app.** Hoje há três nomes (a pasta `Lead_Imoveis`, o repositório
+  `bot-imoveis` e o pacote `bot_mail`); resolvem-se de uma vez com a .app, que é quando o nome passa a
+  aparecer a outras pessoas.
+- **MCP local: primeiro o Claude Desktop, por stdio.** O Codex usa o mesmo comando. O ChatGPT continua
+  pela página de copiar/colar até haver AWS.
+- **Os dados ficam em `data/`, na pasta do projeto, toda ignorada pelo Git.** O caminho é configurável com
+  `--instance` ou `BOT_MAIL_INSTANCE`. Os exemplos publicados (configuração, voz e perfil) passam para
+  `backend/templates/`, e os atalhos de duplo clique para `mac/`.
+- **O código em pausa sai da árvore:** o OAuth e o MCP por HTTP, a página alojada com password, o cPanel
+  (Passenger), o Docker, `deploy/` e as docs `SERVER.md` e `CPANEL.md`. Fica na tag `referencia-python`
+  (commit `ef74f54`).
+- **A pasta `php/` saiu do repositório** para `~/work/Lead_Imoveis-php-arquivo/`, sem ser apagada.
+- A reestruturação faz-se no ramo `versao-local`.
+
+**Porquê.**
+- **Starlette.** A razão dada para o FastAPI (correr na Lambda através do Mangum) também vale para o
+  Starlette: o Mangum corre qualquer aplicação ASGI. O Starlette já vem com o SDK MCP, e o FastAPI
+  prendia-o a um intervalo de versões. A API é pequena (14 rotas), as regras estão em `service.py` e a
+  etapa 1 não devia mudar o comportamento. Como o FastAPI assenta no Starlette, a passagem pode fazer-se
+  aos poucos, quando fizer falta.
+- **`data/`.** Num repositório público, separa o código dos dados com uma só regra no `.gitignore`. Tem a
+  mesma forma da pasta que a .app vai usar.
+- **Código em pausa fora da árvore.** Mantê-lo a funcionar sem uso até à AWS custava trabalho em cada
+  etapa, e o login da AWS vai ser outro (Cognito ou próprio, com o MCP por HTTP sem estado).
+
+**Consequências.**
+- Os testes do OAuth e da página alojada saíram com esse código. Há um teste novo do MCP local, que o
+  arranca por stdio e confirma as 6 ferramentas e as anotações.
+- `rules.py` e `ai.py` já não leem ficheiros nem o relógio. A leitura dos perfis, do conhecimento e da voz
+  está em `store.py`.
 
 ## 18/09/2026, mais tarde: afinal Python, com FastAPI e interface em HTML/CSS/JS
+
+> **Substituída na parte do FastAPI** pela decisão de 19/09/2026: o backend fica em Starlette por agora.
 
 **Decisão.**
 - A versão local continua em **Python**. A reescrita em PHP fica sem efeito.
@@ -34,6 +71,7 @@ e porquê. O que ficou em pausa continua no repositório como referência.
 ## 18/09/2026: pausa no servidor HTTPS; versão local em PHP
 
 > **Substituída na parte do PHP** pela decisão acima. A pausa no servidor HTTPS alojado continua válida.
+> A 19/09/2026 o código do servidor saiu da árvore: está na tag `referencia-python`.
 
 **Decisão.**
 - Fica em pausa tudo o que é servidor HTTPS alojado: o VPS Linux (systemd e Caddy, `docs/SERVER.md`) e o

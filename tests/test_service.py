@@ -2,8 +2,8 @@ import json
 from datetime import datetime, timezone, timedelta
 from unittest.mock import patch
 import pytest
-from bot_mail.service import MailService
-from bot_mail.storage import save_json, locked
+from backend.service import MailService
+from backend.store import save_json, locked
 
 
 def message(key, recipient="person@example.com"):
@@ -18,8 +18,8 @@ def service(tmp_path):
 
 
 def read(service, messages):
-    with patch("bot_mail.service.app_password", return_value="fake"), patch(
-        "bot_mail.service.read_messages", return_value=(messages, len(messages), "INBOX")) as fetch:
+    with patch("backend.service.app_password", return_value="fake"), patch(
+        "backend.service.read_messages", return_value=(messages, len(messages), "INBOX")) as fetch:
         result = service.read()
     return result, fetch
 
@@ -47,7 +47,7 @@ def test_batch_append_send_and_no_reimport(service):
     assert reread["emails"][0]["reply_text"] == "Olá 0"
     preview = service.preview([str(i) for i in range(10)])
     SMTP.sent, SMTP.fail_at = [], None
-    with patch("bot_mail.service.app_password", return_value="fake"), patch("bot_mail.service.smtplib.SMTP_SSL", SMTP):
+    with patch("backend.service.app_password", return_value="fake"), patch("backend.service.smtplib.SMTP_SSL", SMTP):
         result = service.send(preview["preview_token"], True)
     assert len(SMTP.sent) == 10 and result["remaining"] == 1
     assert all(m['In-Reply-To'] and not list(m.iter_attachments()) for m in SMTP.sent)
@@ -90,7 +90,7 @@ def test_uncertain_delivery_retained_and_cannot_retry(service):
     service.drafts([{"id": key, "reply_text": "ok"} for key in ("1", "2")], data["revision"])
     preview = service.preview(["1", "2"])
     SMTP.sent, SMTP.fail_at = [], 0
-    with patch("bot_mail.service.app_password", return_value="fake"), patch("bot_mail.service.smtplib.SMTP_SSL", SMTP):
+    with patch("backend.service.app_password", return_value="fake"), patch("backend.service.smtplib.SMTP_SSL", SMTP):
         service.send(preview["preview_token"], True)
     pending = service.pending()["emails"]
     assert pending[0]["reply_status"] == "uncertain"
@@ -128,7 +128,7 @@ def test_smtp_rejection_retained(service):
     data, _ = read(service, [message("1")])
     service.drafts([{"id": "1", "reply_text": "ok"}], data["revision"])
     preview = service.preview(["1"])
-    with patch("bot_mail.service.app_password", return_value="fake"), patch("bot_mail.service.smtplib.SMTP_SSL", Rejected):
+    with patch("backend.service.app_password", return_value="fake"), patch("backend.service.smtplib.SMTP_SSL", Rejected):
         result = service.send(preview["preview_token"], True)
     assert result["remaining"] == 1
     assert service.pending()["emails"][0]["reply_status"] == "error"

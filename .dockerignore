@@ -1,6 +1,0 @@
-*
-!pyproject.toml
-!bot_mail/
-!bot_mail/*.py
-!bot_mail/*.html
-!config.example.json

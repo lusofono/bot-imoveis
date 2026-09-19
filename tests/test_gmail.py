@@ -1,5 +1,5 @@
 from unittest.mock import patch
-from bot_mail.gmail import parse_structure, body_sections, fetch_text_only, parse_addresses, read_messages
+from backend.mail import parse_structure, body_sections, fetch_text_only, parse_addresses, read_messages
 
 
 def test_selects_text_without_attachments():
@@ -65,7 +65,7 @@ def test_read_messages_with_fake_imap_fetches_text_only_when_accepted():
         def logout(self):
             pass
     mail = Mail()
-    with patch("bot_mail.gmail.connect", return_value=mail):
+    with patch("backend.mail.connect", return_value=mail):
         items, scanned, box = read_messages("owner@example.com", "x", "", "2026-09-16", "2026-09-18",
                                             accept=lambda item: item["from"][0]["email"] == "reply@idealista.pt")
     assert (scanned, box, len(items)) == (2, "[Gmail]/All Mail", 1)

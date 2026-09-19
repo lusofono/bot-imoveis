@@ -1,11 +1,23 @@
-# Plano: versão local em Python (FastAPI e HTML/CSS/JS), preparada para a AWS Lambda
+# Plano: versão local em Python (Starlette e HTML/CSS/JS), preparada para a AWS Lambda
 
 Para começar numa sessão nova. Lê primeiro o `docs/DECISOES.md`, onde a decisão mais recente está no topo.
 
+## Estado (19/09/2026)
+
+- **A etapa 1 está feita**, no ramo `versao-local` e ainda sem commit. A estrutura é a da secção
+  Arquitetura, com os mesmos formatos de ficheiros. Os 52 testes passam: 50 existentes, adaptados, e 2
+  novos (MCP local por stdio e os três ficheiros da página).
+- **A versão de referência** é o commit `ef74f54` (tag `referencia-python`), que só existe neste Mac. Tem o
+  código do servidor em pausa.
+- **Dados reais no Mac, fora do Git, em `data/`:** `config.json` (a conta Gmail), `voice.json` e
+  `properties/<REF>/profile.json` (o perfil do primeiro imóvel).
+- **Continua a faltar a App Password.** Ainda não está guardada no Keychain do Mac.
+- **Nunca correu contra o Gmail real** nem num servidor.
+- **Segue-se a etapa 2.**
+
 ## Ponto de partida (18/09/2026)
 
-- **Versão Python atual** no ramo `perfis-imoveis`: cerca de 2800 linhas e 52 testes. Nunca correu contra o
-  Gmail real nem num servidor.
+- **Versão Python** no ramo `perfis-imoveis`: cerca de 2800 linhas e 52 testes.
 - **O que já faz:**
   - lê o Gmail por IMAP e junta numa fila, por imóvel, os avisos do Idealista e as respostas dos clientes;
   - extrai o nome, o telefone, o email (do Reply-To) e a mensagem do cliente;
@@ -13,18 +25,11 @@ Para começar numa sessão nova. Lê primeiro o `docs/DECISOES.md`, onde a decis
   - tem rascunhos, pré-visualização, envio por SMTP com aprovação, etapas da conversa e retirar da fila;
   - tem uma página local de copiar/colar (Respostas, Imóveis, Voz e estilo), um MCP com 6 ferramentas e
     configuração no terminal.
-- **Dados reais no Mac, fora do Git:**
-  - `apalace/rent/config.json`: a conta Gmail;
-  - `apalace/rent/properties/<REF>/profile.json`: o perfil do primeiro imóvel;
-  - o `apalace/rent/voice.json` está no Git.
-- **Falta a App Password.** Ainda não está guardada no Keychain do Mac.
-- **A pasta `php/` fica sem uso.** Foi começada noutra sessão, antes de se decidir ficar em Python. O dono
-  decide se a apaga.
 
 ## Objetivo
 
 - **Uma aplicação local no Mac:**
-  - a interface em HTML, CSS e JS, servida pelo FastAPI em `http://127.0.0.1:8765`;
+  - a interface em HTML, CSS e JS, servida pelo backend (Starlette) em `http://127.0.0.1:8765`;
   - um MCP local, por `stdio`, sobre as mesmas chamadas.
 - **As chamadas separadas de onde correm:** hoje no Mac; mais tarde na AWS Lambda, sem reescrever.
 - **Mais tarde:** uma .app para distribuir. Depois, a AWS.
@@ -32,23 +37,27 @@ Para começar numa sessão nova. Lê primeiro o `docs/DECISOES.md`, onde a decis
 ## Arquitetura
 
 ```text
-bot_mail/                 (nome a decidir: bot_mail ou biglearn-mail)
+Lead_Imoveis/             (repositório bot-imoveis; o nome decide-se com a .app)
 ├── backend/
-│   ├── rules.py          regras: família do email, imóvel, extração, destinatário, etapas
+│   ├── rules.py          regras: família do email, imóvel, extração, destinatário, perfis, voz, renda
 │   ├── ai.py             instruções para o assistente (voz + imóvel + interação), prompts e respostas coladas
-│   ├── mail.py           Gmail: ler (IMAP) e enviar (SMTP)
-│   ├── store.py          os dados: ficheiros JSON hoje; S3 ou DynamoDB na AWS
+│   ├── mail.py           Gmail: ler (IMAP) e construir as respostas; o SMTP passa para aqui na etapa 2
+│   ├── store.py          os dados: ficheiros JSON, bloqueio, perfis, conhecimento e voz; S3 ou DynamoDB na AWS
 │   ├── secrets.py        a App Password: Keychain hoje; Secrets Manager na AWS
 │   ├── service.py        as chamadas: ler, rascunhos, pré-visualizar, enviar, retirar, configurar
-│   ├── api.py            FastAPI: uma rota por chamada
-│   └── mcp.py            MCP por stdio: uma ferramenta por chamada
+│   ├── api.py            Starlette: uma rota por chamada
+│   ├── mcp.py            MCP por stdio: uma ferramenta por chamada
+│   ├── cli.py            os comandos bot-mail
+│   ├── configure.py      a configuração no terminal
+│   └── templates/        exemplos publicados: config, voz e perfil de imóvel (dados fictícios)
 ├── frontend/
 │   ├── index.html
 │   ├── app.js
 │   └── style.css
+├── mac/                  atalhos de duplo clique e o agendamento do READ (launchd)
 ├── data/                 fora do Git: config.json, voice.json, properties/<REF>/…
 ├── tests/
-└── main.py               arranque local: API em 127.0.0.1 e abre o browser; mais tarde, a .app
+└── main.py               arranque local: a página em 127.0.0.1 e o browser; mais tarde, a .app
 ```
 
 **Regras da arquitetura:**
@@ -69,36 +78,38 @@ bot_mail/                 (nome a decidir: bot_mail ou biglearn-mail)
 | Local (agora) | AWS (depois) |
 |---|---|
 | `api.py` com uvicorn | Lambda com um adaptador ASGI (por exemplo Mangum), atrás do API Gateway com HTTPS |
-| `frontend/` servido pelo FastAPI | S3 e CloudFront |
+| `frontend/` servido pelo backend | S3 e CloudFront |
 | `store` em ficheiros JSON com bloqueio | S3 com escrita condicional, ou DynamoDB |
 | `secrets` no Keychain | AWS Secrets Manager |
 | leitura a pedido | leitura agendada pelo EventBridge |
 | MCP por stdio | MCP por HTTP sem estado (o SDK já o suporta), com login |
-| sem login (só `127.0.0.1`) | Cognito ou login próprio |
+| sem login (só `127.0.0.1`) | Cognito ou login próprio; é aqui que se revê o FastAPI |
 
 **Para a .app, mais tarde:**
 - Uma janela nativa com o frontend (por exemplo pywebview), ou o browser.
 - Empacotar com PyInstaller ou Briefcase.
 - Para distribuir fora da App Store é preciso assinatura e notarização da Apple, com conta de programador.
-- Os dados passam para `~/Library/Application Support/<nome>/`. Por isso o caminho de `data/` tem de ser
-  configurável desde já.
+- Os dados passam para `~/Library/Application Support/<nome>/`. O caminho de `data/` já é configurável
+  (`--instance` ou `BOT_MAIL_INSTANCE`).
 
-## Da versão atual para a nova: reaproveitar, não reescrever
+## Da versão de referência para a nova (feito na etapa 1)
 
-| Hoje | Passa para |
+| Referência (`ef74f54`) | Passou para |
 |---|---|
-| `properties.py`: famílias, extração, destinatário, perfis, renda | `backend/rules.py` |
+| `properties.py`: famílias, extração, destinatário, perfis, renda | `backend/rules.py`; a leitura dos ficheiros foi para `backend/store.py` |
 | `properties.py` (instruções) e `prompts.py` | `backend/ai.py` |
 | `gmail.py` (IMAP, BODYSTRUCTURE, HTML→texto) e `reply.py` | `backend/mail.py` |
-| `storage.py`: JSON atómico e bloqueio | `backend/store.py` (implementação local) |
+| `storage.py`: JSON atómico e bloqueio | `backend/store.py` |
 | `credentials.py`: Keychain e hash de passwords | `backend/secrets.py` |
-| `service.py`: filas, leitura, rascunhos, envio, etapas, definições | `backend/service.py`, através de `store`, `secrets` e `mail` |
-| `web.py` (Starlette) | `backend/api.py` (FastAPI) |
+| `service.py` | `backend/service.py`; na etapa 2 passa a usar `store`, `secrets` e `mail` |
+| `web.py` (Starlette) | `backend/api.py` (Starlette), só o modo local |
 | `web.html` | `frontend/index.html`, `app.js` e `style.css` |
 | `server.py` (MCP) | `backend/mcp.py` (stdio) |
-| `configure.py` e `cli.py` | configuração inicial: CLI e, mais tarde, a própria interface |
-| `oauth.py`, `web_login.html`, modo alojado de `web.py`, `passenger_wsgi.py`, `requirements-cpanel.txt`, `deploy/` | em pausa; `oauth.py` e o login voltam com a AWS |
-| `tests/` (52 testes) | `tests/`, com os mesmos cenários adaptados |
+| `configure.py` e `cli.py` | `backend/configure.py` e `backend/cli.py` |
+| `apalace/rent/`: dados reais | `data/` |
+| `apalace/rent/`: atalhos `.command` e agendamento | `mac/` |
+| `oauth.py`, `web_login.html`, modo alojado de `web.py`, `passenger_wsgi.py`, `requirements-cpanel.txt`, `deploy/`, Docker | fora da árvore, na tag `referencia-python`; o login volta com a AWS |
+| `tests/` (52 testes) | `tests/`: 50 adaptados, mais 2 novos |
 
 ## O que não é para redesenhar
 
@@ -110,36 +121,37 @@ bot_mail/                 (nome a decidir: bot_mail ou biglearn-mail)
 
   Os campos da fila estão em `docs/OPERATIONS.md`.
 - **O contrato das 6 ferramentas MCP:** `read_emails`, `list_pending`, `save_replies`, `preview_send`,
-  `send_replies`, `dismiss_emails`, com `property_ref` e as mesmas anotações.
+  `send_replies`, `dismiss_emails`, com `property_ref` e as mesmas anotações (verificado em
+  `tests/test_mcp.py`).
 - **O que a página já faz:** os 3 separadores e o fluxo de copiar/colar.
 
-## Decisões em aberto
+## Decisões
 
-1. **Nome do projeto e do pacote:** manter `bot_mail` ou passar a `biglearn-mail`.
-2. **Que assistente usa o MCP local.**
-   - Por `stdio` ligam-se o Claude Desktop, o Codex e outros.
-   - O ChatGPT só aceita MCP por endereço público (ou pelo túnel da OpenAI), ou seja, quando houver AWS.
-     Até lá, com o ChatGPT usa-se a página de copiar/colar.
-3. **Onde ficam os dados locais.** Proposta: `data/` na pasta do projeto, com o caminho configurável para a
-   .app. Faz parte desta decisão como passar para lá os dados de `apalace/rent`.
-4. **A pasta `php/`:** apagá-la ou guardá-la fora do repositório.
-5. **Guardar a versão atual antes de reestruturar.** Proposta: um commit de referência no ramo
-   `perfis-imoveis`, só quando o dono pedir.
-6. **Duas pendências do proprietário:**
-   - qual é a assinatura certa, «Equipa APalace Imobiliária» ou «Equipa Imobiliária APalace»;
-   - o prompt da 2.ª interação.
+Tomadas a 19/09/2026 (o porquê está no `docs/DECISOES.md`):
+1. **Nome:** mantém-se `bot_mail` até à .app.
+2. **Assistente do MCP local:** primeiro o Claude Desktop; o Codex usa o mesmo comando. O ChatGPT continua
+   pela página de copiar/colar até haver AWS.
+3. **Dados locais:** em `data/`, toda ignorada pelo Git, com o caminho configurável.
+4. **A pasta `php/`:** saiu do repositório para `~/work/Lead_Imoveis-php-arquivo/`, sem ser apagada.
+5. **A versão de referência:** commit `ef74f54`, com a tag `referencia-python`. A reestruturação está no
+   ramo `versao-local`.
+6. **Backend:** Starlette; o FastAPI fica para quando houver login ou outros clientes da API.
+
+Continuam em aberto as duas pendências do proprietário:
+- qual é a assinatura certa, «Equipa APalace Imobiliária» ou «Equipa Imobiliária APalace»;
+- o prompt da 2.ª interação.
 
 ## Etapas
 
-### 1. Reestruturar sem mudar o comportamento
-- Criar `backend/`, `frontend/`, `data/` e `main.py`; passar a página de Starlette para FastAPI; separar o
-  `web.html` em três ficheiros.
-- **Fica pronta quando:** os testes existentes passam, adaptados só nos imports, e a página funciona igual
-  em `127.0.0.1`.
+### 1. Reestruturar sem mudar o comportamento (feita a 19/09/2026)
+- Criar `backend/`, `frontend/`, `data/` e `main.py`; separar o `web.html` em três ficheiros.
+- **Ficou pronta:** os testes passam, adaptados nos imports e nos caminhos dos exemplos, e a página
+  funciona igual em `127.0.0.1`: os 3 separadores foram percorridos no browser, com dados fictícios.
 
 ### 2. Interfaces para o exterior
 - `store`, `secrets`, `mail` e o relógio, com a implementação local. `service.py` deixa de abrir ficheiros
-  ou chamar o Keychain diretamente. Nos testes usa-se uma implementação em memória.
+  ou chamar o Keychain diretamente, e a ligação SMTP passa para `mail.py`. Nos testes usa-se uma
+  implementação em memória.
 - **Fica pronta quando:** só `store.py` abre ficheiros de dados e só `secrets.py` chama o Keychain.
 
 ### 3. Uso real no Mac
@@ -148,7 +160,9 @@ bot_mail/                 (nome a decidir: bot_mail ou biglearn-mail)
 - **Fica pronta quando:** uma resposta real sai depois de aprovação e aparece nos Enviados do Gmail.
 
 ### 4. MCP local
-- `mcp.py` por `stdio`, sobre as mesmas chamadas, para o assistente escolhido.
+- `mcp.py` por `stdio`, sobre as mesmas chamadas, ligado ao Claude Desktop.
+- Rever o que o MCP devolve ao assistente: hoje leva o email e o telefone dos clientes, que o prompt da
+  página não leva.
 - **Fica pronta quando:** o assistente lê a fila, grava rascunhos, pré-visualiza e envia depois de
   aprovação.
 
@@ -175,28 +189,25 @@ Estás na pasta do projeto bot_mail («bot de imóveis»). Não tens contexto an
 
 Antes de fazer qualquer coisa, lê por esta ordem:
 1. docs/DECISOES.md: as decisões tomadas e porquê. A mais recente está no topo.
-2. docs/PLANO-VERSAO-LOCAL.md: o plano desta fase, com a arquitetura.
+2. docs/PLANO-VERSAO-LOCAL.md: o plano desta fase, com a arquitetura e o estado.
 3. README.md e docs/OPERATIONS.md: como funciona a versão atual e o formato dos ficheiros.
-4. O código em bot_mail/ e os testes em tests/: a versão atual, que vamos reestruturar, não reescrever.
-Ignora a pasta php/: foi uma tentativa abandonada.
+4. O código em backend/ e frontend/ e os testes em tests/.
 
 Contexto:
 - Sou consultor imobiliário (BigLearn). Respondo a pedidos de arrendamento que chegam por email dos portais, para já do Idealista. Escrevo em português de Portugal; responde-me em pt-PT.
-- A versão atual é em Python, no ramo perfis-imoveis. Nunca correu contra o Gmail real.
-- Agora quero a versão local no Mac: backend em Python com FastAPI, interface em HTML, CSS e JS em ficheiros separados e MCP local por stdio.
+- A versão local no Mac está a ser reestruturada no ramo versao-local: backend em Python (Starlette), interface em HTML, CSS e JS em ficheiros separados e MCP local por stdio. A etapa 1 está feita.
 - As chamadas (casos de uso) têm de ficar separadas de onde correm, para mais tarde irem para a AWS Lambda sem reescrever. Um dia, tudo numa .app.
 - O servidor HTTPS alojado está em pausa; localmente basta HTTP em 127.0.0.1.
+- Nunca correu contra o Gmail real.
 
 Regras de trabalho:
-- O repositório é público (github.com/lusofono/bot-imoveis). Nunca ponhas no Git dados reais: perfis dos imóveis, conta de email, filas, segredos, nomes ou contactos de clientes. Nos testes, só dados fictícios.
+- O repositório é público (github.com/lusofono/bot-imoveis). Nunca ponhas no Git dados reais: perfis dos imóveis, conta de email, filas, segredos, nomes ou contactos de clientes. Os dados reais estão em data/, que o Git ignora. Nos testes, só dados fictícios.
 - Não faças commit nem push sem eu pedir.
 - Não escrevas nem guardes passwords (por exemplo, a App Password do Gmail): sou eu que as introduzo.
 - Pode haver outra sessão a trabalhar nesta pasta: relê os ficheiros antes de os alterar.
 - Mantém os formatos dos ficheiros JSON que já existem.
 
-Começamos pela etapa 1 do plano:
-1. Confirma comigo as decisões em aberto do plano: o nome do projeto, o assistente do MCP local, onde ficam os dados, a pasta php/ e o commit da versão atual antes de reestruturar. Dá a tua recomendação.
-2. Reestrutura sem mudar o comportamento: backend/, frontend/ (index.html, app.js, style.css), data/, main.py e FastAPI. Os testes existentes têm de continuar a passar.
+Continuamos pela etapa 2 do plano: interfaces para o exterior (store, secrets, mail e o relógio), com a implementação local e uma em memória para os testes. Os testes existentes têm de continuar a passar.
 
-Antes de mexer no código, mostra-me em poucas linhas como vais fazer a etapa 1.
+Antes de mexer no código, mostra-me em poucas linhas como vais fazer a etapa 2.
 ```

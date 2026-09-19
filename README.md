@@ -1,23 +1,26 @@
 # bot_mail
 
-> **Estado a 18/09/2026.** A próxima versão é local, no Mac, e continua em Python: backend FastAPI,
-> interface em HTML, CSS e JS, e MCP local. As chamadas ficam separadas de onde correm, para mais tarde
-> irem para a AWS Lambda e para uma .app. Esta versão vai ser reestruturada, não reescrita. O plano está
-> em [docs/PLANO-VERSAO-LOCAL.md](docs/PLANO-VERSAO-LOCAL.md) e as decisões em [docs/DECISOES.md](docs/DECISOES.md).
-> A instalação num servidor HTTPS alojado (`docs/SERVER.md`, `docs/CPANEL.md`) está em pausa.
+> **Estado a 19/09/2026.** Etapa 1 do plano feita: a versão local no Mac tem o backend em Python
+> (Starlette), a interface em HTML, CSS e JS e o MCP local por stdio. As chamadas ficam separadas de onde
+> correm, para mais tarde irem para a AWS Lambda e para uma .app. Segue-se a etapa 2 (interfaces para o
+> exterior). O plano está em [docs/PLANO-VERSAO-LOCAL.md](docs/PLANO-VERSAO-LOCAL.md) e as decisões em
+> [docs/DECISOES.md](docs/DECISOES.md). O servidor HTTPS alojado está em pausa: o código dele está na tag
+> `referencia-python`.
 
-Ferramenta pessoal para trabalhar emails em lote no **teu ChatGPT**, de duas formas:
-por MCP (o ChatGPT lê e grava diretamente) ou, sem MCP, por uma página local com copiar/colar.
-Uma réplica = uma pasta + uma conta Gmail. Cada imóvel tem o seu `queue.json` (sem imóveis, há um só).
-Sem API de IA e sem base de dados. O HTTP do servidor existe apenas para MCP e para a página de
-autorização da ligação; a página de copiar/colar corre só no teu computador.
+Ferramenta pessoal para responder em lote, com o teu assistente, aos pedidos de arrendamento que chegam
+por email dos portais. Há duas formas:
+- pela **página local, com copiar/colar**: serve qualquer assistente, incluindo o ChatGPT;
+- pelo **MCP local**: um assistente neste computador (por exemplo o Claude Desktop) lê e grava diretamente.
+
+Uma pasta de dados = uma conta Gmail. Cada imóvel tem o seu `queue.json` (sem imóveis, há um só).
+Sem API de IA e sem base de dados. Tudo corre no teu computador.
 
 ## Como se usa
 
-1. No ChatGPT, pede: **«Lê os meus emails.»**
+1. No assistente ligado ao MCP, pede: **«Lê os meus emails.»**
 2. O MCP consulta o Gmail, acrescenta os novos ao JSON e devolve os pendentes.
 3. Dá a tua prompt: **«Prepara respostas a estes 10 emails, em português, com estas regras…»**
-4. O ChatGPT grava todos os rascunhos no mesmo JSON numa chamada `save_replies`.
+4. O assistente grava todos os rascunhos no mesmo JSON numa chamada `save_replies`.
 5. Pede: **«Mostra o lote que vais enviar.»** Confere destinatários e textos.
 6. Confirma o envio. Só os enviados com sucesso saem dos pendentes.
 
@@ -28,14 +31,15 @@ Uma nova mensagem na mesma conversa tem outro ID e entra normalmente.
 
 ## Sem MCP: página local com copiar/colar
 
-Para quem não pode ou não quer ligar o ChatGPT por MCP (o modo de desenvolvimento depende da conta).
+Para quem não pode ou não quer ligar um assistente por MCP (o ChatGPT só aceita MCP por um endereço
+público, que ainda não existe).
 
 ```bash
-./apalace/rent/web.command
+./mac/web.command
 ```
 
 Abre `http://127.0.0.1:8765` com um código que muda a cada arranque; só funciona neste computador.
-Para a abrir de qualquer lado, com password, num alojamento cPanel com «Setup Python App»: [docs/CPANEL.md](docs/CPANEL.md).
+É o mesmo que `.venv/bin/python main.py`.
 
 1. **Ler emails do Gmail** e escolher os emails a tratar.
 2. **Copiar prompt** e colá-lo numa conversa normal do ChatGPT. Leva a voz, o contexto do imóvel e as
@@ -51,12 +55,14 @@ as regras de resposta nunca vêm do texto colado. As características vão para 
 
 ## Imóveis: uma família de emails por imóvel
 
-Cada imóvel tem uma pasta privada `properties/<REF>/` com `profile.json` (regras e prompts) e o seu
-`queue.json`. A voz é da pessoa ou equipa, comum a todos os imóveis: `voice.json` (saudação, idiomas,
+Cada imóvel tem uma pasta privada `data/properties/<REF>/` com `profile.json` (regras e prompts) e o seu
+`queue.json`. A voz é da pessoa ou equipa, comum a todos os imóveis: `data/voice.json` (saudação, idiomas,
 fecho e assinatura), escolhida sempre pelo `selected` de cada opção. Com imóveis, sem voz completa
-nada arranca: o servidor recusa iniciar e as operações indicam o que falta. Uma pasta com `voice.json`
-e sem perfis também recusa: nunca passa a ler o correio todo por engano. Para um imóvel novo, copia `properties/profile.example.json` para
-`properties/<REF>/profile.json` e preenche os dados reais. As pastas dos imóveis nunca entram no Git.
+nada arranca: o MCP recusa iniciar e as operações indicam o que falta. Uma pasta com `voice.json`
+e sem perfis também recusa: nunca passa a ler o correio todo por engano. Para um imóvel novo, usa o
+separador **Imóveis** da página ou `mac/setup.command`; à mão, copia
+`backend/templates/profile.example.json` para `data/properties/<REF>/profile.json` e preenche os dados
+reais. A pasta `data/` nunca entra no Git.
 
 Com pelo menos um perfil, o READ só guarda:
 - avisos do portal com o remetente exato (`from_address_equals`) e a referência exata no assunto;
@@ -64,40 +70,41 @@ Com pelo menos um perfil, o READ só guarda:
 
 O resto do correio é ignorado, sem descarregar o texto.
 
-Em cada aviso o MCP extrai o nome, o email (do Reply-To), o telefone e a mensagem do cliente, sem os
-blocos do portal. Calcula também a interação (1.ª, 2.ª…) pelas respostas já enviadas a esse cliente.
+Em cada aviso é extraído o nome, o email (do Reply-To), o telefone e a mensagem do cliente, sem os
+blocos do portal. Calcula-se também a interação (1.ª, 2.ª…) pelas respostas já enviadas a esse cliente.
 A etapa só avança depois de um envio com sucesso e fica em `conversations`, mesmo depois de o email
 sair da fila. A resposta vai só para o Reply-To, sem alternativa. Sem Reply-To, com vários endereços ou
-com um endereço proibido (`never_reply_to`), o email fica `blocked`: não pode ser enviado e o ChatGPT
+com um endereço proibido (`never_reply_to`), o email fica `blocked`: não pode ser enviado e o assistente
 avisa-te. Conflitos (outro código de anúncio, outro email no corpo) aparecem em `warnings`.
 Cada imóvel devolve `instructions`: voz comum + contexto do imóvel + prompt de cada interação.
 
 ## Estrutura
 
 ```text
-bot_mail/                  código Python partilhado
-apalace/rent/              primeira instância pessoal
-  config.json              conta e filtros (local, ignorado pelo Git)
+backend/                   o código Python
+  service.py               as chamadas: ler, rascunhos, pré-visualizar, enviar, retirar, configurar
+  rules.py                 regras: família do email, imóvel, extração, destinatário (sem ficheiros nem rede)
+  ai.py                    instruções para o assistente, prompts e respostas coladas (sem ficheiros nem rede)
+  mail.py                  Gmail: ler (IMAP) e construir as respostas
+  store.py                 a pasta de dados: JSON atómico, bloqueio, perfis, conhecimento e voz
+  secrets.py               a App Password (Keychain no Mac)
+  api.py                   a página local: uma rota por chamada (Starlette)
+  mcp.py                   o MCP local por stdio: uma ferramenta por chamada
+  cli.py, configure.py     os comandos bot-mail e a configuração no terminal
+  templates/               exemplos publicados, com dados fictícios: config, voz e perfil de imóvel
+frontend/                  a página: index.html, app.js, style.css (só fala com a API)
+mac/                       atalhos de duplo clique: web, setup, read, send, agendar e desagendar o READ
+main.py                    arranque local: a página em 127.0.0.1 e o browser; mais tarde, a .app
+data/                      os teus dados (local, ignorado pelo Git)
+  config.json              conta e filtros
   voice.json               voz e estilo comuns a todos os imóveis
-  properties/
-    profile.example.json   modelo de perfil com dados fictícios
-    <REF>/profile.json     perfil real do imóvel (local, ignorado pelo Git)
-    <REF>/queue.json       fila do imóvel: pendentes, rascunhos, IDs e etapas das conversas
-    <REF>/knowledge/*.md   base de conhecimento do imóvel (RAG), escrita por ti ou extraída do anúncio
+  properties/<REF>/profile.json     perfil real do imóvel
+  properties/<REF>/queue.json       fila do imóvel: pendentes, rascunhos, IDs e etapas das conversas
+  properties/<REF>/knowledge/*.md   base de conhecimento do imóvel (RAG)
   queue.json               fila única, só quando não há imóveis (criado no READ)
   logs/events.jsonl        registos sem conteúdo dos emails
-  secrets/                credenciais no servidor e estado OAuth (nunca no Git)
-  setup.py / .command
-  setup_server.py / .command
-  read.py / .command
-  send.py / .command
-  mcp.py / .command
-  web.py / .command        página local sem MCP (copiar/colar no ChatGPT)
-  install_schedule.py / .command
-  uninstall_schedule.py / .command
-deploy/                   exemplos de systemd e Caddy HTTPS
-docs/                     instalação e operação
-tests/                    testes sem Gmail real
+docs/                      decisões, plano e operação
+tests/                     testes sem Gmail real
 ```
 
 ## No Mac
@@ -106,48 +113,42 @@ Requer Python 3.11 ou superior.
 
 ```bash
 ./install.command
-./apalace/rent/setup.command
-./apalace/rent/read.command
+./mac/setup.command
+./mac/read.command
 ```
 
-A App Password do Gmail fica no Keychain. Não a partilhes com o ChatGPT.
-Para uma réplica configurada no servidor Linux, fica num ficheiro `secrets/gmail_app_password` com permissões 600.
-A password MCP é diferente e é guardada apenas como hash.
+Os dados ficam em `data/`. Para usar outra pasta, define `BOT_MAIL_INSTANCE` ou passa
+`--instance <pasta>` ao comando `bot-mail`.
+
+A App Password do Gmail fica no Keychain. Não a partilhes com o assistente.
 
 Os comandos locais READ/SEND continuam independentes. Para SEND local, preenche `reply_text`, marca
-`send_reply: true` no JSON e executa `send.command`. O terminal mostra o lote e pede `ENVIAR`.
+`send_reply: true` no JSON e executa `mac/send.command`. O terminal mostra o lote e pede `ENVIAR`.
 O fluxo MCP não exige editar estes campos manualmente: usa pré-visualização e confirmação.
 
-Para um cliente MCP local com transporte stdio (por exemplo Codex):
+Para um assistente com MCP local por stdio (por exemplo o Claude Desktop ou o Codex):
 
 ```json
 {
-  "command": "/caminho/bot_mail/.venv/bin/python",
-  "args": ["-m", "bot_mail.cli", "--instance", "/caminho/bot_mail/apalace/rent", "stdio"],
-  "cwd": "/caminho/bot_mail"
+  "command": "/caminho/Lead_Imoveis/.venv/bin/bot-mail",
+  "args": ["--instance", "/caminho/Lead_Imoveis/data", "stdio"]
 }
 ```
 
-## No teu servidor
+## Servidor: em pausa
 
-Segue [a instalação completa](docs/SERVER.md). O endpoint é `https://teu-dominio/mcp`.
-Inclui OAuth com PKCE, descoberta automática, registo de cliente e renovação de tokens.
-Cada réplica aceita apenas o callback que configurares e a password MCP do seu proprietário.
-Não é necessário abrir contas num fornecedor de autenticação adicional.
+O MCP por HTTPS com OAuth, a página alojada com password, o cPanel e o Docker estão em pausa. O código
+está na tag `referencia-python` e volta, adaptado, com a AWS. Ver [docs/DECISOES.md](docs/DECISOES.md).
 
 ## Replicar
 
 ```bash
-.venv/bin/bot-mail replicate pessoas/ana
-.venv/bin/bot-mail --instance pessoas/ana setup
-.venv/bin/bot-mail --instance pessoas/ana setup-server
+.venv/bin/bot-mail replicate ~/bot-mail-outra-conta
+.venv/bin/bot-mail --instance ~/bot-mail-outra-conta setup
 ```
 
-Cria uma pasta **vazia**, sem copiar emails, credenciais, tokens ou confirmações.
-As réplicas podem partilhar o mesmo código. Se preferires cópias completamente independentes,
-faz um novo clone por pessoa. Não copies uma instância já configurada com os seus segredos.
-No servidor, cada réplica tem processo, porta, subdomínio e credenciais próprios.
-O dimensionamento de 100 processos depende dos recursos do teu servidor; não foi feito teste de carga.
+Cria uma pasta de dados **vazia** para outra conta Gmail, sem copiar emails, credenciais ou confirmações.
+Não copies uma pasta já configurada com os seus segredos.
 
 ## MCP
 
@@ -162,10 +163,10 @@ O dimensionamento de 100 processos depende dos recursos do teu servidor; não fo
 
 Com mais do que um imóvel, as operações sobre uma fila recebem `property_ref`. Com um só, é opcional.
 
-O ChatGPT tem de mostrar a pré-visualização e obter confirmação humana. A ferramenta de envio está
+O assistente tem de mostrar a pré-visualização e obter confirmação humana. A ferramenta de envio está
 marcada como destrutiva e externa para que o cliente peça aprovação. O booleano de confirmação é
 fornecido pelo cliente: não constitui, por si só, prova técnica de um clique humano. Mantém a aprovação
-de ferramentas de escrita ativa no ChatGPT e não autorizes envio automático.
+de ferramentas de escrita ativa no assistente e não autorizes envio automático.
 
 ## Proteções e limites
 
@@ -178,8 +179,9 @@ de ferramentas de escrita ativa no ChatGPT e não autorizes envio automático.
 - Cabeçalhos e partes de texto são lidos por `BODY.PEEK`; anexos não são pedidos nem guardados.
   HTML é convertido em texto sem carregar imagens, links ou scripts. Textos longos são limitados e sinalizados.
 - Sem imóveis, filtros de assunto vazios abrangem qualquer assunto. Configura antes da primeira leitura.
-- Não edites o JSON à mão durante operações. Usa as ferramentas MCP para beneficiar da validação e do lock.
-- Não existe nenhuma chamada à API OpenAI. Aplicam-se os limites do plano pessoal de cada utilizador.
+- Não edites o JSON à mão durante operações. Usa as ferramentas MCP ou a página para beneficiar da
+  validação e do lock.
+- Não existe nenhuma chamada a APIs de IA. Aplicam-se os limites do plano pessoal de cada utilizador.
 
 ## Testes
 
@@ -188,10 +190,9 @@ de ferramentas de escrita ativa no ChatGPT e não autorizes envio automático.
 .venv/bin/python -m pytest -q
 ```
 
-Testes de lotes, persistência, falhas SMTP, deduplicação, anexos, OAuth/MCP HTTP em memória,
-leitura IMAP simulada e regras dos imóveis (com dados fictícios).
-Nenhum teste lê uma caixa real ou envia emails. O arranque final no teu domínio e a ligação no ChatGPT
-precisam de ser verificados depois da instalação no servidor.
+Testes de lotes, persistência, falhas SMTP, deduplicação, anexos, leitura IMAP simulada, regras dos
+imóveis, página local e MCP local por stdio, sempre com dados fictícios.
+Nenhum teste lê uma caixa real ou envia emails. O primeiro teste com o Gmail real é a etapa 3 do plano.
 
 Código de leitura e construção de respostas adaptado do ZIP original `gmail_cycle_mac.zip`.
 O ZIP, configurações pessoais, emails e segredos não são publicados no Git.
