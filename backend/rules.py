@@ -4,6 +4,7 @@ Which property an email belongs to, what to extract from it, who may receive the
 on profiles, voice and listing data. Pure functions: no files, network or clock. The files are read by
 store.py; the instructions for the assistant are in ai.py.
 """
+import base64
 import copy
 import re
 from urllib.parse import urlsplit
@@ -16,6 +17,31 @@ SUBJECT_NAME = re.compile(r"\bde (.+?) sobre o teu imóvel")
 QUOTE = re.compile(r"^(>|(Em|On|No dia) .+(escreveu|wrote):?$|_{10,}$|-{3,} ?(Original Message|Mensagem original))")
 KNOWLEDGE_LIMIT = 30000
 COMMENT = re.compile(r"<!--.*?-->", re.S)
+# The subject of a reply to a portal lead, until the owner writes another one in voice.json.
+SUBJECT_DEFAULT = "{imovel}"
+IDEALISTA_LINK = re.compile(r"https://(?:www\.)?idealista\.pt/(?:imovel/)?(\d+)/?(?:[?#].*)?")
+# The property's photo is the owner's own file: the portal blocks robots, so it is never fetched.
+PHOTO_LIMIT = 3 * 1024 * 1024
+PHOTO_KINDS = {b"\xff\xd8\xff": "jpg", b"\x89PNG\r\n\x1a\n": "png"}
+
+
+def photo_of(data_url):
+    """(kind, bytes) of an uploaded photo, checked by its first bytes and not by what the browser claims."""
+    header, _, payload = str(data_url or "").partition(",")
+    if not header.startswith("data:image/") or not header.endswith(";base64"):
+        raise ValueError("Escolhe uma fotografia (JPG, PNG ou WebP).")
+    try:
+        data = base64.b64decode(payload, validate=True)
+    except ValueError:
+        raise ValueError("A fotografia chegou incompleta; tenta outra vez.") from None
+    if len(data) > PHOTO_LIMIT:
+        raise ValueError("A fotografia é demasiado grande (máximo 3 MB).")
+    kind = next((kind for magic, kind in PHOTO_KINDS.items() if data.startswith(magic)), None)
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        kind = "webp"
+    if not kind:
+        raise ValueError("O ficheiro não é uma fotografia JPG, PNG ou WebP.")
+    return kind, data
 
 
 def drop_empty_sections(text):
@@ -104,6 +130,13 @@ def clean_property(fields):
         raise ValueError("O código do anúncio tem de ter só algarismos.")
     if clean["listing_url"] and urlsplit(clean["listing_url"]).scheme != "https":
         raise ValueError("O link do anúncio tem de começar por https://.")
+    idealista = IDEALISTA_LINK.fullmatch(clean["listing_url"] or "")
+    if idealista:
+        # One form for every Idealista link, and the listing code comes with it.
+        if clean["listing_id"] and clean["listing_id"] != idealista[1]:
+            raise ValueError("O código do anúncio não corresponde ao link.")
+        clean["listing_id"] = idealista[1]
+        clean["listing_url"] = f"https://www.idealista.pt/imovel/{idealista[1]}/"
     rent = parse_rent(fields.get("advertised_rent_eur"))
     if rent is not None and not 0 <= rent <= 1_000_000:
         raise ValueError("Renda inválida.")
@@ -154,6 +187,22 @@ def check_voice(voice):
     if missing:
         raise ValueError("Configura a voz em voice.json antes de usar (falta: " + ", ".join(missing) + ").")
     return voice
+
+
+def subject_of(kind, template, profile):
+    """The subject the customer sees, or None to keep answering under their own subject.
+
+    A portal lead is our first email to that person: the portal's subject was written for the owner
+    (emoji, internal reference, advertiser), so it names the property instead. A direct reply from the
+    customer keeps their subject, so the conversation stays together.
+    """
+    if kind != "lead":
+        return None
+    prop = profile.get("property", {})
+    text = str(template or SUBJECT_DEFAULT)
+    for token, value in (("{imovel}", prop.get("description")), ("{referencia}", prop.get("reference"))):
+        text = text.replace(token, str(value or "").strip())
+    return " ".join(text.split())[:200] or None
 
 
 def addresses(values):

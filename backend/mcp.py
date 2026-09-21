@@ -19,6 +19,7 @@ class ReplyDraft(BaseModel):
 
 
 def create_server(folder):
+    """The 6 tools over one data folder. Their names and annotations are a contract: see tests/test_mcp.py."""
     folder = Path(folder).resolve()
     service = MailService(folder)
     mcp = FastMCP("bot_mail", instructions=(

@@ -10,7 +10,9 @@ import json
 import os
 from pathlib import Path
 import tempfile
-from .rules import check_profile, check_voice, knowledge
+from .rules import REFERENCE, check_profile, check_voice, knowledge
+
+PHOTO_TYPES = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
 
 
 def load_json(path, default):
@@ -19,6 +21,7 @@ def load_json(path, default):
 
 
 def save_json(path, data):
+    """Atomic write: a temporary file, fsync and rename, so a crash never leaves half a JSON."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(prefix=".write-", dir=path.parent)
@@ -41,6 +44,7 @@ def save_json(path, data):
 
 @contextmanager
 def locked(folder, name="queue"):
+    """One operation at a time on a data folder. A second one fails at once instead of waiting."""
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
     fd = os.open(folder / f".{name}.lock", os.O_CREAT | os.O_RDWR, 0o600)
@@ -85,5 +89,55 @@ def load_profiles(folder, account):
 
 
 def load_voice(folder):
-    """The voice in <folder>/voice.json is shared by every property of the same owner."""
-    return check_voice(load_json(Path(folder) / "voice.json", {}))
+    """The voice in <folder>/voice.json is shared by every property of the same owner, and so is the
+    agency's know-how in <folder>/knowledge/ (runtime only: never written back to voice.json)."""
+    voice = check_voice(load_json(Path(folder) / "voice.json", {}))
+    try:
+        voice["_knowledge"] = load_knowledge(folder)
+    except (ValueError, OSError) as exc:
+        raise ValueError(f"Know-how comum: {exc}") from None
+    return voice
+
+
+def load_events(folder, limit=5000):
+    """The last operations from logs/events.jsonl. It never holds bodies, addresses or subjects."""
+    path = Path(folder) / "logs" / "events.jsonl"
+    if not path.exists():
+        return []
+    events = []
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines()[-limit:]:
+        try:
+            events.append(json.loads(line))
+        except ValueError:
+            continue  # a half-written line never stops the page from opening
+    return events
+
+
+def property_folder(folder, ref):
+    """A property's private folder; the reference is checked again here before it becomes a path."""
+    if not REFERENCE.fullmatch(str(ref or "")):
+        raise ValueError("Referência de imóvel inválida.")
+    return Path(folder) / "properties" / ref
+
+
+def write_photo(folder, ref, kind, data):
+    """properties/<REF>/foto.<jpg|png|webp>, private (600). A new photo replaces the old one."""
+    base = property_folder(folder, ref)
+    for old in PHOTO_TYPES:
+        (base / f"foto.{old}").unlink(missing_ok=True)
+    fd = os.open(base / f"foto.{kind}", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "wb") as stream:
+        stream.write(data)
+
+
+def find_photo(folder, ref):
+    """(path, media type) of the property's photo, or None."""
+    base = property_folder(folder, ref)
+    return next(((base / f"foto.{kind}", media) for kind, media in PHOTO_TYPES.items()
+                 if (base / f"foto.{kind}").is_file()), None)
+
+
+def read_photo(folder, ref):
+    """(bytes, media type) of the property's photo, or None."""
+    found = find_photo(folder, ref)
+    return (found[0].read_bytes(), found[1]) if found else None

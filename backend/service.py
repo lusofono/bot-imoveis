@@ -14,9 +14,11 @@ import os
 from .ai import KNOWLEDGE_RULE, describe, instructions
 from .configure import STARTER, example_profile
 from .mail import build_reply, read_messages
-from .rules import build_profile, check_profile, clean_property, prepare, route
-from .secrets import app_password
-from .store import locked, load_json, load_profiles, load_voice, save_json
+from .rules import (SUBJECT_DEFAULT, build_profile, check_profile, clean_property, photo_of, prepare, route,
+                    subject_of)
+from .secrets import app_password, has_app_password
+from .store import (find_photo, load_events, locked, load_json, load_profiles, load_voice, read_photo, save_json,
+                    write_photo)
 
 VIEW_FIELDS = ("id", "kind", "date", "subject", "customer", "recipient", "blocked", "body_text", "body_truncated",
                "reply_text", "reply_status", "reply_error", "reply_message_id")
@@ -36,6 +38,17 @@ def now():
     return datetime.now(timezone.utc).isoformat()
 
 
+def waited_hours(item):
+    """Hours between the customer's email and now, or None when the email had no usable date."""
+    try:
+        arrived = datetime.fromisoformat(str(item.get("date") or ""))
+    except ValueError:
+        return None
+    if arrived.tzinfo is None:
+        arrived = arrived.replace(tzinfo=timezone.utc)
+    return round((datetime.now(timezone.utc) - arrived).total_seconds() / 3600, 1)
+
+
 def message_key(item):
     for field in ("gmail_message_id", "message_id", "id"):
         if item.get(field):
@@ -44,11 +57,18 @@ def message_key(item):
 
 
 class MailService:
+    """The calls of one data folder: read, drafts, preview, send, dismiss, resolve and the settings.
+
+    Every call takes and returns plain data (it becomes JSON for the page and the MCP) and runs under the
+    folder's lock. The safety rules live here, never in api.py or mcp.py: only the Reply-To, blocked emails
+    never go out, the queue revision, and a preview token that a human must confirm before sending.
+    """
     def __init__(self, folder):
         self.folder = Path(folder).resolve()
         self.path = self.folder / "queue.json"
 
     def config(self):
+        """config.json, with a usable account; nothing starts without one."""
         cfg = load_json(self.folder / "config.json", {})
         account = cfg.get("account", "")
         if not account or "@" not in account or any(c in account for c in "\r\n"):
@@ -85,6 +105,7 @@ class MailService:
         return self.path if ref is None else self.folder / "properties" / ref / "queue.json"
 
     def load(self, ref=None):
+        """One queue (a property's, or the single one), with every field the older files may lack."""
         account = self.config()["account"]
         data = load_json(self.queue_path(ref), {"account": account, "created_at": now(),
                                                "revision": 0, "emails": [], "replied_message_ids": []})
@@ -101,6 +122,7 @@ class MailService:
         return data
 
     def save(self, data, ref=None):
+        """Writes a queue atomically and bumps its revision, so a stale draft can never overwrite it."""
         data["revision"] += 1
         data["updated_at"] = now()
         data.setdefault("stats", {})["emails_in_queue"] = len(data["emails"])
@@ -236,6 +258,7 @@ class MailService:
 
     @staticmethod
     def selected(data, ids):
+        """The chosen emails, refused whole if one is unknown, repeated or waiting for an uncertain send."""
         if not ids or len(ids) != len(set(ids)):
             raise ValueError("Seleciona IDs distintos.")
         entries = {e["id"]: e for e in data["emails"]}
@@ -258,6 +281,7 @@ class MailService:
 
     @staticmethod
     def advance(data, item):
+        """After a successful send: the customer's conversation moves to the next interaction."""
         # The stage outlives the email in the queue; only address, IDs and dates are kept.
         conversation = data["conversations"].setdefault(
             item["recipient"]["email"].casefold(), {"stage": 0, "sent_message_ids": [], "thread_ids": []})
@@ -273,6 +297,17 @@ class MailService:
             [data["account"], [e for key in ids for e in data["emails"] if e["id"] == key]],
             sort_keys=True, ensure_ascii=False).encode()).hexdigest()
 
+    def composer(self, profiles, ref, account):
+        """How each reply is built: the shared voice gives the From name and the subject of a portal lead."""
+        style = load_voice(self.folder).get("style", {}) if ref else {}
+        name = (style.get("sender_name") or {}).get("text") or ""
+        template = (style.get("reply_subject") or {}).get("text") or None
+
+        def compose(item):
+            subject = subject_of(item.get("kind"), template, profiles[ref]) if ref else None
+            return build_reply(item, account, name, subject)
+        return compose
+
     def preview(self, ids, property_ref=None):
         with locked(self.folder):
             profiles = self.profiles()
@@ -281,9 +316,10 @@ class MailService:
             entries = self.selected(data, ids)
             if ref:
                 self.check_recipients(entries, profiles[ref], data["account"])
+            compose = self.composer(profiles, ref, data["account"])
             replies = []
             for item in entries:
-                msg, recipient = build_reply(item, data["account"])
+                msg, recipient = compose(item)
                 replies.append({"id": item["id"], "to": recipient, "subject": str(msg["Subject"]),
                                 "reply_text": item["reply_text"], "warnings": item.get("warnings", [])})
             token = secrets.token_urlsafe(32)
@@ -312,7 +348,8 @@ class MailService:
             if ref:
                 self.check_recipients(entries, profiles[ref], data["account"])
             # Validate everything before connecting or sending anything.
-            messages = [(item, *build_reply(item, data["account"])) for item in entries]
+            compose = self.composer(profiles, ref, data["account"])
+            messages = [(item, *compose(item)) for item in entries]
             password = app_password(self.folder, data["account"])
             results = []
             with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as smtp:
@@ -347,7 +384,8 @@ class MailService:
                     self.save(data, ref)
                     status = item["reply_status"]
                     results.append({"id": item["id"], "status": status})
-                    self.log("send", message_id=item["id"], status=status)
+                    # How long the customer waited, for the dashboard; no address, subject or text is logged.
+                    self.log("send", message_id=item["id"], status=status, waited_hours=waited_hours(item))
                     if status == "uncertain":
                         break
             return {"results": results, "remaining": len(data["emails"])}
@@ -392,6 +430,57 @@ class MailService:
             self.save(data, ref)
             self.log("resolved", message_id=message_id, was_sent=was_sent)
 
+    def voice_ready(self):
+        try:
+            load_voice(self.folder)
+            return True
+        except ValueError:
+            return False
+
+    def metrics(self):
+        """Numbers for the dashboard. Nothing that identifies a customer leaves this call."""
+        with locked(self.folder):
+            account = self.config()["account"]
+            profiles = load_profiles(self.folder, account)
+            refs = list(profiles) or [None]
+            first = datetime.now(timezone.utc).date() - timedelta(days=13)
+            days = [(first + timedelta(days=n)).isoformat() for n in range(14)]
+            requests, totals, properties, last_read = Counter(), Counter(), [], None
+            for ref in refs:
+                data = self.load(ref)
+                emails = data["emails"]
+                status = Counter(item.get("reply_status") or "pending" for item in emails)
+                blocked = sum(1 for item in emails if item.get("blocked"))
+                conversations = data.get("conversations", {})
+                answered = sum(conversation.get("stage", 0) for conversation in conversations.values())
+                for item in emails:
+                    requests[str(item.get("date") or "")[:10]] += 1
+                totals.update(pending=len(emails), drafts=status["draft"], blocked=blocked, answered=answered,
+                              customers=len(conversations),
+                              attention=status["uncertain"] + status["error"] + status["sending"])
+                last_read = max([stamp for stamp in (last_read, data.get("last_read_at")) if stamp], default=None)
+                listing = profiles[ref]["property"] if ref else {}
+                properties.append({"property_ref": ref, "pending": len(emails), "drafts": status["draft"],
+                                   "blocked": blocked, "answered": answered, "customers": len(conversations),
+                                   "last_read_at": data.get("last_read_at"), "description": listing.get("description"),
+                                   "listing_url": listing.get("listing_url"),
+                                   "advertised_rent_eur": listing.get("advertised_rent_eur"),
+                                   "photo": bool(ref) and find_photo(self.folder, ref) is not None})
+            sent, waited = Counter(), []
+            for event in load_events(self.folder):
+                if event.get("event") == "send" and event.get("status") == "sent":
+                    sent[str(event.get("at") or "")[:10]] += 1
+                    if isinstance(event.get("waited_hours"), (int, float)):
+                        waited.append(event["waited_hours"])
+            return {"account": account, "last_read_at": last_read, "properties": properties,
+                    "totals": {key: totals[key] for key in
+                               ("pending", "drafts", "blocked", "attention", "answered", "customers")},
+                    "by_day": [{"day": day, "requests": requests.get(day, 0), "sent": sent.get(day, 0)}
+                               for day in days],
+                    "reply_hours": round(sum(waited) / len(waited), 1) if waited else None,
+                    "setup": {"account": bool(account), "app_password": has_app_password(self.folder, account),
+                              "voice": self.voice_ready(), "properties": len(profiles)}}
+
     def settings(self):
         """Voice choices and property profiles for the local page; works while the voice is incomplete."""
         with locked(self.folder):
@@ -402,6 +491,8 @@ class MailService:
                                        for name, option in ((style.get(key) or {}).get("options") or {}).items()}}
                      for key in ("greeting", "languages", "closing")}
             voice["signature"] = (style.get("signature") or {}).get("text") or ""
+            voice["sender_name"] = (style.get("sender_name") or {}).get("text") or ""
+            voice["reply_subject"] = (style.get("reply_subject") or {}).get("text") or SUBJECT_DEFAULT
             properties = []
             for ref, profile in load_profiles(self.folder, account).items():
                 prompts = profile.get("reply", {}).get("prompts", {})
@@ -409,10 +500,24 @@ class MailService:
                                    "prompts": {name: (prompts.get(key) or {}).get(field) or ""
                                                for name, (key, field) in PROMPT_FIELDS.items()},
                                    "knowledge_files": [part["file"] for part in profile["_knowledge"]],
+                                   "photo": find_photo(self.folder, ref) is not None,
                                    **{key: profile["property"].get(key) for key in (
                                        "reference", "listing_id", "listing_url", "advertiser", "description",
                                        "advertised_rent_eur")}})
             return {"account": account, "voice": voice, "properties": properties}
+
+    def save_photo(self, ref, image):
+        """The property's photo for the page: the owner's own file, kept in its private folder."""
+        kind, data = photo_of(image)
+        with locked(self.folder):
+            if ref not in load_profiles(self.folder, self.config()["account"]):
+                raise ValueError("Imóvel desconhecido.")
+            write_photo(self.folder, ref, kind, data)
+            self.log("photo_saved", reference=ref)
+
+    def photo(self, ref):
+        """(bytes, media type) of a property's photo, or None."""
+        return read_photo(self.folder, ref)
 
     def save_voice(self, choices):
         with locked(self.folder):
@@ -429,6 +534,15 @@ class MailService:
             if not signature or len(signature) > 200:
                 raise ValueError("A assinatura é obrigatória (até 200 caracteres).")
             style["signature"].update(text=signature, status="configured")
+            # Both go into the headers: one line only, never a newline the page could smuggle in.
+            name = " ".join(str(choices.get("sender_name") or "").split())
+            if len(name) > 100:
+                raise ValueError("O nome do remetente é demasiado longo (até 100 caracteres).")
+            style.setdefault("sender_name", {}).update(text=name, status="configured" if name else "not_configured")
+            subject = " ".join(str(choices.get("reply_subject") or "").split()) or SUBJECT_DEFAULT
+            if len(subject) > 200:
+                raise ValueError("O assunto é demasiado longo (até 200 caracteres).")
+            style.setdefault("reply_subject", {}).update(text=subject, status="configured")
             save_json(path, voice)
             self.log("voice_saved")
 

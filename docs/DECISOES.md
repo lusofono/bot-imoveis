@@ -3,6 +3,69 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 21/09/2026, mais tarde: lembretes, visitas fechadas e contactos com RGPD
+
+Ainda por construir; a forma está nos próximos passos do `docs/PLANO-VERSAO-LOCAL.md`.
+
+**Decisão.**
+- **Lembretes aos 2 e aos 4 dias sem resposta do cliente**, na mesma conversa: uma frase da voz por cima
+  do texto que enviámos. Não se tenta saber se o cliente leu: nem píxeis de leitura, nem recibos.
+- **Aviso de «visitas fechadas»** a todos os clientes de um anúncio, com o texto na voz e um botão por
+  imóvel. Um email por pessoa, nunca todos no mesmo email.
+- **Registo de contactos** em `data/contactos.csv`, com email, nome, telefone, data do primeiro contacto,
+  imóvel, fonte e o estado do RGPD, e um **pedido de consentimento** por email, com o texto na voz.
+- **Tudo preparado pelo programa e enviado num clique**, depois da pré-visualização do lote. A regra de
+  aprovar cada envio mantém-se.
+- **Os contactos sem consentimento guardam-se 6 meses** depois do último contacto.
+
+**Porquê.**
+- **Sem saber se leram.** Os píxeis de leitura exigem consentimento pelas regras europeias (ePrivacy) e o
+  Apple Mail abre-os sozinho, o que dá leituras falsas; os recibos dependem de o cliente aceitar.
+- **Um clique em vez de automático.** O programa não sabe se o cliente respondeu por telefone ou
+  WhatsApp; enviar sem olhar mandava lembretes a quem já tinha resposta.
+- **RGPD.** Guardar os contactos para tratar do pedido não precisa de consentimento, mas precisa de prazo;
+  usá-los para outros imóveis ou novidades precisa. O prazo e o texto do pedido confirmam-se com quem
+  aconselha em RGPD.
+
+## 21/09/2026: uso real antes das interfaces; painel, fotografias e know-how comum
+
+**Decisão.**
+- **A etapa 3 (uso real) passa à frente da etapa 2 (interfaces).**
+- **O assunto e o remetente das respostas vêm da voz** (`voice.json`, editável em «Voz e estilo»):
+  - resposta a um pedido do portal: sem «Re:», com um assunto próprio. Por omissão é a descrição do
+    imóvel; o modelo aceita `{imovel}` e `{referencia}`;
+  - resposta a um email do próprio cliente: «Re: » e o assunto dele, para não partir a conversa;
+  - nome do remetente vazio por agora: vai só o endereço.
+- **A assinatura é «Equipa APalace Imobiliária».** Fecha a pendência de 18/09.
+- **A App Password só entra pelo terminal** (`mac/password.command`), e só fica guardada depois de o login
+  IMAP funcionar.
+- **A página tem um Painel com métricas**, que nunca levam dados de clientes.
+- **A fotografia de cada imóvel é carregada pelo dono.** O Idealista recusa acessos automáticos (proteção
+  DataDome, HTTP 403): nunca se contorna essa proteção nem se descarrega nada do anúncio.
+- **Há um know-how comum da agência** em `data/knowledge/*.md`, que entra nas instruções de todos os
+  imóveis. Se um imóvel disser outra coisa, prevalece o imóvel.
+- **Ferramentas de interface ou outros assistentes trabalham com dados de demonstração**
+  (`bot-mail demo <pasta>`), nunca com `data/`, onde estão os clientes reais.
+- **Um agente de cada vez nesta pasta.**
+- **Arrancar a página outra vez fecha a anterior da mesma pasta** (`.page.pid`), sem tocar noutros
+  programas.
+
+**Porquê.**
+- **Etapa 3 primeiro.** A ferramenta nunca tinha corrido contra o Gmail real; o risco maior estava aí, não
+  na arquitetura. A primeira leitura real (21/09) trouxe 35 pedidos, de 07/09 a 20/09, com nome, telefone
+  e mensagem extraídos em todos, nenhum bloqueado e nenhum aviso.
+- **Assunto.** O cliente nunca viu o aviso do portal: esse assunto foi escrito para o proprietário e leva
+  emoji, a referência interna e o anunciante.
+- **App Password no terminal.** Não passa pelo browser, e uma password errada nunca fica gravada.
+- **Um agente de cada vez.** A 21/09 duas sessões do Claude editaram os mesmos ficheiros ao mesmo tempo:
+  o comando `demo` ficou duplicado e o `bot-mail` deixou de arrancar.
+
+**Consequências.**
+- 63 testes, todos com dados fictícios.
+- A página mostra a fotografia, mas ainda não tem o botão para a carregar (a API já aceita:
+  `POST /api/property/photo`).
+- O primeiro envio real continua por fazer: é o que fecha a etapa 3.
+
 ## 19/09/2026: etapa 1 feita; Starlette em vez de FastAPI; dados em `data/`
 
 **Decisão.**

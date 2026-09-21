@@ -129,6 +129,11 @@ def meta_from_fetch(meta: bytes):
 
 def read_messages(account, password, subject_contains, date_from, date_to,
                   mailbox="all", incoming_only=True, accept=None):
+    """Messages between two dates, as dicts: (messages, number scanned, mailbox).
+
+    Headers first; accept(item) decides on them, so mail that is not ours never has its text fetched.
+    Everything is read with BODY.PEEK: nothing is marked as read, and read or unread does not matter.
+    """
     start = datetime.strptime(date_from, "%Y-%m-%d")
     end = datetime.strptime(date_to, "%Y-%m-%d")
     if end < start:
@@ -357,6 +362,7 @@ def html_to_text(markup):
 
 
 def fetch_text_only(mail, uid, structure_bytes):
+    """The text parts only (plain, or HTML turned into text), never attachments; long texts are cut and flagged."""
     sections = body_sections(parse_structure(structure_bytes))
     texts = []
     truncated = len(sections) > 10
@@ -400,7 +406,8 @@ def choose_recipient(item, account):
         raise GmailReplyError("O destinatário calculado é a própria conta.")
     return name, address
 
-def build_reply(item, account):
+def build_reply(item, account, sender_name="", subject=None):
+    """The reply to one email. The From name and, for a portal lead, the subject come from the voice."""
     text = str(item.get("reply_text", "")).strip()
     if not text:
         raise GmailReplyError("reply_text vazio.")
@@ -412,13 +419,17 @@ def build_reply(item, account):
             raise GmailReplyError("Sem destinatário válido; revê manualmente.")
     else:
         name, recipient = choose_recipient(item, account)
-    subject = str(item.get("subject", "")).strip()
-    if not subject.lower().startswith("re:"):
-        subject = "Re: " + subject if subject else "Re:"
+    if subject is None:
+        # Answering under the customer's own subject: keep their thread.
+        subject = str(item.get("subject", "")).strip()
+        if not subject.lower().startswith("re:"):
+            subject = "Re: " + subject if subject else "Re:"
+    else:
+        subject = " ".join(str(subject).split())
 
     msg = EmailMessage()
     msg["Date"] = formatdate(localtime=True)
-    msg["From"] = account
+    msg["From"] = formataddr((sender_name, account)) if sender_name else account
     msg["To"] = formataddr((name, recipient)) if name else recipient
     msg["Subject"] = subject
     msg["Message-ID"] = make_msgid(domain="gmail.com")

@@ -21,6 +21,8 @@ def ask(label, default=""):
 
 
 def main(argv=None):
+    """bot-mail [--instance PASTA] setup | password | read | pending | send | resolve | replicate | demo |
+    web | stdio. Errors are printed as ERRO: … and return 1, never a traceback."""
     parser = argparse.ArgumentParser(description="bot_mail — uma conta, uma pasta, um JSON")
     parser.add_argument("--instance", type=Path, default=Path(os.environ.get("BOT_MAIL_INSTANCE", ROOT / "data")),
                         help="pasta de dados (por omissão, data/)")
@@ -28,6 +30,7 @@ def main(argv=None):
     for name in ("setup", "read"):
         commands.add_parser(name)
     commands.add_parser("stdio", help="MCP local por stdio, para um assistente neste computador")
+    commands.add_parser("password", help="guarda só a App Password do Gmail, sem repetir o resto do setup")
     for name in ("pending", "send"):
         commands.add_parser(name).add_argument("--property", dest="property_ref", help="referência do imóvel")
     resolve = commands.add_parser("resolve")
@@ -36,6 +39,8 @@ def main(argv=None):
     resolve.add_argument("--property", dest="property_ref", help="referência do imóvel")
     replicate = commands.add_parser("replicate")
     replicate.add_argument("destination", type=Path)
+    demo = commands.add_parser("demo", help="pasta de dados com imóveis e clientes fictícios, para trabalhar na página")
+    demo.add_argument("destination", type=Path)
     web = commands.add_parser("web", help="página local, sem MCP: copiar e colar no ChatGPT")
     web.add_argument("--port", type=int, default=8765)
     web.add_argument("--no-browser", action="store_true")
@@ -80,6 +85,16 @@ def main(argv=None):
                 configure_voice(folder)
                 configure_properties(folder, account)
             print("Configuração guardada. Nenhum email lido ou enviado.")
+        elif args.action == "password":
+            from .mail import connect
+            account = service.config()["account"]
+            password = getpass.getpass(f"Google App Password de {account} (não aparece no ecrã): ")
+            if not password.strip():
+                raise ValueError("Nada guardado: não escreveste nenhuma password.")
+            # Try the login first: a wrong password is never stored.
+            connect(account, password.strip().replace(" ", "")).logout()
+            save_password(folder, account, password)
+            print("Login IMAP confirmado e App Password guardada no Keychain. Não ficou em nenhum ficheiro do projeto.")
         elif args.action == "read":
             result = service.read()
             if "properties" in result:
@@ -104,6 +119,10 @@ def main(argv=None):
         elif args.action == "resolve":
             service.resolve(args.message_id, args.was_sent == "yes", args.property_ref)
             print("Resultado confirmado e JSON atualizado.")
+        elif args.action == "demo":
+            from .demo import create_demo
+            destination = create_demo(args.destination)
+            print(f"Demonstração criada: {destination}. Apenas dados fictícios.")
         elif args.action == "web":
             from .api import serve
             service.config()  # needs the account; the page itself shows what else is missing

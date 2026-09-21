@@ -7,60 +7,83 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header>
-  <strong>bot_mail</strong>
-  <span id="account" class="muted small"></span>
-  <span id="busy" class="muted" hidden>A trabalhar…</span>
-  <nav>
-    <button class="tab active" data-tab="replies">Respostas</button>
-    <button class="tab" data-tab="properties">Imóveis</button>
-    <button class="tab" data-tab="voice">Voz e estilo</button>
+<a class="skip-link" href="#main">Saltar para o conteúdo</a>
+<header class="sidebar">
+  <div class="brand"><span class="brand-mark" aria-hidden="true">b.</span><strong>bot<span>mail</span></strong></div>
+  <p class="nav-label">ESPAÇO DE TRABALHO</p>
+  <nav aria-label="Navegação principal">
+    <button class="tab active" data-tab="dashboard" aria-current="page"><span aria-hidden="true">◫</span>Painel</button>
+    <button class="tab" data-tab="replies"><span aria-hidden="true">↗</span>Respostas <span id="nav-count" class="nav-count">0</span></button>
+    <button class="tab" data-tab="properties"><span aria-hidden="true">▤</span>Imóveis</button>
+    <button class="tab" data-tab="voice"><span aria-hidden="true">≋</span>Voz e estilo</button>
   </nav>
+  <div class="sidebar-note"><span class="status-dot"></span> Ambiente local<p>O envio fica sempre<br>sob o teu controlo.</p></div>
+  <div class="account-card"><span class="avatar" aria-hidden="true">@</span><div><span class="small muted">A tua conta</span><span id="account"></span></div></div>
 </header>
-<main>
-  <p id="error" class="alert bad" hidden></p>
+<div class="workspace">
+<div class="topbar"><span>Workspace <span class="breadcrumb">/</span> <strong id="page-label">Painel</strong></span><span id="busy" role="status" hidden>A trabalhar…</span><label class="theme-control" for="theme-select"><span>Tema</span><select id="theme-select" aria-label="Tema visual"><option value="night">Noite</option><option value="day">Dia</option><option value="indigo">Índigo</option><option value="amber">Âmbar</option></select></label><span class="local-label"><span class="status-dot"></span> Local</span></div>
+<main id="main">
 
-  <section id="tab-replies">
+  <p id="error" class="alert bad" role="alert" hidden></p>
+
+  <section id="tab-dashboard" aria-label="Painel">
+    <div class="page-heading"><div><p class="eyebrow">VISÃO GERAL</p><h1>O teu dia, em perspetiva.</h1><p class="step">Contactos, respostas e imóveis. Tudo no mesmo lugar.</p></div><button class="primary" data-tab="replies">Tratar respostas <span aria-hidden="true">↗</span></button></div>
+    <div class="metrics" id="metric-cards"></div>
+    <p id="dashboard-read" class="muted small"></p>
+
+    <div class="dashboard-grid"><article class="card activity-card"><div class="section-heading"><div><p class="eyebrow">ATIVIDADE</p><h2>O ritmo dos teus contactos</h2></div><span class="tag">Últimos 14 dias</span></div>
+      <div id="dashboard-chart"></div>
+      <div class="legend"><span class="requests">Pedidos recebidos</span><span class="sent">Respostas enviadas</span></div>
+    </article>
+
+    <article class="card setup-card"><p class="eyebrow">O TEU ESPAÇO</p><h2>Pronto para trabalhar</h2><ul class="checks" id="dashboard-setup"></ul><button class="link" data-tab="voice">Ajustar preferências →</button></article></div>
+    <div class="section-heading portfolio-heading"><div><p class="eyebrow">POR IMÓVEL</p><h2>A tua carteira</h2></div><button data-tab="properties">Gerir imóveis →</button></div>
+    <div id="dashboard-properties" class="portfolio-grid"></div>
+  </section>
+
+  <section id="tab-replies" hidden>
+    <div class="page-heading"><div><p class="eyebrow">COMUNICAÇÃO</p><h1>Uma boa resposta começa aqui.</h1><p class="step">Prepara em lote. Revê cada conversa. Envia quando estiver tudo certo.</p></div></div>
+    <ol class="workflow"><li><a href="#inbox-step"><span>01</span> Selecionar</a></li><li><a href="#prepare-step"><span>02</span> Preparar</a></li><li><a href="#import-step"><span>03</span> Importar</a></li><li><a href="#send-step"><span>04</span> Rever e enviar</a></li></ol>
     <div class="row">
       <label class="muted">Imóvel <select id="queue"></select></label>
       <button id="read" class="primary">Ler emails do Gmail</button>
       <span id="last-read" class="muted small"></span>
     </div>
 
-    <h2>1. Emails pendentes</h2>
+    <div class="reply-layout"><div class="inbox-column" id="inbox-step"><div class="section-heading"><h2>Emails pendentes</h2><span id="selection-count" class="tag" aria-live="polite"></span></div>
     <p class="step">Seleciona os emails a tratar. Os bloqueados não se podem enviar: trata-os à mão e retira-os da fila.</p>
     <div id="emails"></div>
     <details><summary class="muted small">Instruções deste imóvel (voz, contexto, interações)</summary><pre id="instructions"></pre></details>
 
-    <h2>2. Copiar para o ChatGPT</h2>
+    </div><aside class="batch-column" aria-label="Preparação do lote"><article class="card" id="prepare-step"><p class="eyebrow">PASSO 02</p><h2>Preparar no ChatGPT</h2>
     <p class="step">O prompt leva as instruções e as mensagens, sem o email nem o telefone dos clientes.</p>
-    <textarea id="extra" rows="2" placeholder="Instruções extra para este lote (opcional), ex.: sê breve"></textarea>
+    <textarea id="extra" aria-label="Instruções extra para o lote" rows="2" placeholder="Instruções extra para este lote (opcional), ex.: sê breve"></textarea>
     <div class="actions"><button id="copy-prompt" class="primary">Copiar prompt</button></div>
     <details id="prompt-box"><summary class="muted small">Ver o prompt</summary><pre id="prompt"></pre></details>
 
-    <h2>3. Colar a resposta do ChatGPT</h2>
-    <textarea id="answer" rows="6" placeholder="Cola aqui a resposta completa do ChatGPT (o bloco JSON)"></textarea>
+    </article><article class="card" id="import-step"><p class="eyebrow">PASSO 03</p><h2>Importar respostas</h2>
+    <textarea id="answer" aria-label="Resposta do ChatGPT" rows="6" placeholder="Cola aqui a resposta completa do ChatGPT (o bloco JSON)"></textarea>
     <div class="actions"><button id="paste" class="primary">Guardar rascunhos</button></div>
     <div id="notes"></div>
 
-    <h2>4. Rever e enviar</h2>
+    </article><article class="card" id="send-step"><p class="eyebrow">PASSO 04</p><h2>Rever e enviar</h2>
     <p class="step">Revê e corrige os rascunhos no passo 1. O envio mostra primeiro os destinatários e os textos finais.</p>
     <div class="actions"><button id="preview">Pré-visualizar envio dos selecionados</button></div>
-    <div id="preview-box"></div>
+    <div id="preview-box"></div></article></aside></div>
   </section>
 
   <section id="tab-properties" hidden>
-    <h2>Imóveis</h2>
+    <div class="page-heading"><div><p class="eyebrow">CARTEIRA</p><h1>Cada imóvel, o seu contexto.</h1><p class="step">Anúncios, conhecimento e instruções para respostas mais úteis.</p></div><a class="button primary" href="#property-editor">Adicionar imóvel +</a></div>
     <div id="property-list"></div>
-    <article class="card">
-      <h3>Novo imóvel ou dados do anúncio</h3>
+    <article class="card editor-card" id="property-editor">
+      <p class="eyebrow">FICHA DO IMÓVEL</p><h2>Novo imóvel ou dados do anúncio</h2>
       <p class="step">À mão, ou com o ChatGPT: cola o link do anúncio, copia o prompt, cola a resposta e revê os campos.</p>
       <div class="row">
-        <input id="listing-url" placeholder="https://www.idealista.pt/imovel/…">
+        <input id="listing-url" aria-label="Link do anúncio para importar" placeholder="https://www.idealista.pt/imovel/…">
         <button id="listing-prompt">Copiar prompt do anúncio</button>
       </div>
       <details id="listing-prompt-box"><summary class="muted small">Ver o prompt</summary><pre id="listing-prompt-text"></pre></details>
-      <textarea id="listing-answer" rows="4" placeholder="Cola aqui a resposta do ChatGPT"></textarea>
+      <textarea id="listing-answer" aria-label="Dados do anúncio do ChatGPT" rows="4" placeholder="Cola aqui a resposta do ChatGPT"></textarea>
       <div class="actions"><button id="listing-parse">Preencher com a resposta</button></div>
       <div class="grid">
         <label class="field">Referência (a que aparece nos avisos do portal)<input id="f-reference"></label>
@@ -77,12 +100,12 @@
   </section>
 
   <section id="tab-voice" hidden>
-    <h2>Voz e estilo</h2>
+    <div class="page-heading"><div><p class="eyebrow">PERSONALIZAÇÃO</p><h1>As tuas palavras. O teu estilo.</h1><p class="step">Define como te apresentas em cada resposta.</p></div></div>
     <p class="step">Comum a todos os imóveis. Sem estas escolhas, nenhuma resposta é preparada.</p>
     <article class="card" id="voice-form"></article>
   </section>
-</main>
-<div id="toast" hidden></div>
+</main></div>
+<div id="toast" role="status" aria-live="polite" hidden></div>
 
 <!-- The server writes a new token here at each start; app.js sends it with every API call. -->
 <script nonce="{{NONCE}}">const TOKEN = '{{TOKEN}}';</script>

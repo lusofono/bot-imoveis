@@ -79,6 +79,9 @@ def test_lead_is_extracted_into_its_property_queue_and_answered_at_reply_to(serv
 
     assert draft_and_send(service, "1")["remaining"] == 0
     assert SMTP.sent[0]["To"] == CUSTOMER and SMTP.sent[0]["In-Reply-To"] == "<1@portal.example>"
+    # The customer never saw the portal's subject, written for the owner; by default they get the property.
+    assert SMTP.sent[0]["Subject"] == "Apartamento T3 na Rua Exemplo, Localidade"
+    assert SMTP.sent[0]["From"] == "owner@example.com"
     conversation = service.load(REF)["conversations"][CUSTOMER]
     assert conversation["stage"] == 1 and conversation["thread_ids"] == ["t1"]
 
@@ -91,6 +94,32 @@ def test_lead_is_extracted_into_its_property_queue_and_answered_at_reply_to(serv
     assert (emails["3"]["kind"], emails["3"]["recipient"]["email"]) == ("follow_up", CUSTOMER)
     assert emails["3"]["customer"]["message"] == "Sou enfermeira."
     assert any("outro email pendente" in warning for warning in emails["3"]["warnings"])
+
+
+def test_sender_name_and_subject_come_from_the_voice(service):
+    service.save_voice({"greeting": "formal", "languages": "pt_en_fr", "closing": "cordial",
+                        "signature": "Equipa Teste", "sender_name": "APalace Imobiliária",
+                        "reply_subject": "Arrendamento: {imovel} ({referencia})"})
+    read(service, [lead("1")])
+    draft_and_send(service, "1")
+    assert SMTP.sent[0]["From"] == "APalace Imobiliária <owner@example.com>"
+    assert SMTP.sent[0]["Subject"] == "Arrendamento: Apartamento T3 na Rua Exemplo, Localidade (REF_IMOVEL)"
+
+    # A direct answer from the customer keeps their own subject, so the conversation stays together.
+    answer = {"gmail_message_id": "2", "from": [{"name": "Ana Exemplo", "email": CUSTOMER}],
+              "in_reply_to": str(SMTP.sent[0]["Message-ID"]), "subject": "Re: Arrendamento: Apartamento T3",
+              "body_text": "Posso visitar sábado?"}
+    read(service, [answer])
+    draft_and_send(service, "2", "Claro, Ana.")
+    assert SMTP.sent[0]["Subject"] == "Re: Arrendamento: Apartamento T3"
+
+    # An empty subject falls back to the property, never to the portal's own subject.
+    service.save_voice({"greeting": "formal", "languages": "pt_en_fr", "closing": "cordial",
+                        "signature": "Equipa Teste", "sender_name": "", "reply_subject": ""})
+    read(service, [lead("3")])
+    draft_and_send(service, "3")
+    assert SMTP.sent[0]["Subject"] == "Apartamento T3 na Rua Exemplo, Localidade"
+    assert SMTP.sent[0]["From"] == "owner@example.com"
 
 
 @pytest.mark.parametrize("reply_to, notice", [
@@ -210,3 +239,48 @@ def test_rent_in_portuguese_or_english_notation(rent, euros):
 def test_ambiguous_or_impossible_rent_is_refused(rent):
     with pytest.raises(ValueError, match="Renda"):
         clean_property({"reference": REF, "description": "T2", "advertised_rent_eur": rent})
+
+
+def test_dashboard_numbers_never_carry_customer_data(service):
+    read(service, [lead("1"), lead("2", reply_to=())])
+    with patch("backend.service.has_app_password", return_value=False):
+        metrics = service.metrics()
+    assert metrics["totals"] == {"pending": 2, "drafts": 0, "blocked": 1, "attention": 0, "answered": 0, "customers": 0}
+    assert metrics["setup"] == {"account": True, "app_password": False, "voice": True, "properties": 1}
+    assert [item["pending"] for item in metrics["properties"]] == [2]
+    text = json.dumps(metrics, ensure_ascii=False)
+    for private in (CUSTOMER, "900 000 001", "Ana Exemplo"):
+        assert private not in text
+
+    draft_and_send(service, "1")
+    with patch("backend.service.has_app_password", return_value=True):
+        after = service.metrics()
+    assert after["totals"]["answered"] == 1 and after["totals"]["pending"] == 1
+    assert after["by_day"][-1]["sent"] == 1  # the send was logged today
+
+
+def test_the_agency_knowhow_reaches_every_property(service):
+    (service.folder / "knowledge").mkdir()
+    (service.folder / "knowledge" / "know-how.md").write_text(
+        "# Know-how\n\n## Animais\n- Pergunta que animal é, o tamanho e quantos são.\n", encoding="utf-8")
+    profile = json.loads((service.folder / "properties" / REF / "profile.json").read_text(encoding="utf-8"))
+    profile["property"]["reference"] = profile["match"]["subject_property_reference_equals"] = "OUTRO"
+    save_json(service.folder / "properties" / "OUTRO" / "profile.json", profile)
+    queues = service.pending()["properties"]
+    assert len(queues) == 2 and all("Pergunta que animal é, o tamanho" in q["instructions"] for q in queues)
+    # Runtime only: saving the voice never writes the know-how into voice.json.
+    service.save_voice({"greeting": "formal", "languages": "pt_en_fr", "closing": "cordial", "signature": "Equipa"})
+    assert "_knowledge" not in json.loads((service.folder / "voice.json").read_text(encoding="utf-8"))
+
+
+@pytest.mark.parametrize("url", ["https://www.idealista.pt/12345678", "https://www.idealista.pt/imovel/12345678/",
+                                 "https://idealista.pt/imovel/12345678?xtmc=1"])
+def test_idealista_links_have_one_form_and_bring_the_listing_code(url):
+    fields = clean_property({"reference": REF, "description": "T2", "listing_url": url})
+    assert (fields["listing_url"], fields["listing_id"]) == ("https://www.idealista.pt/imovel/12345678/", "12345678")
+
+
+def test_a_listing_code_that_contradicts_the_link_is_refused():
+    with pytest.raises(ValueError, match="não corresponde"):
+        clean_property({"reference": REF, "description": "T2", "listing_id": "1",
+                        "listing_url": "https://www.idealista.pt/imovel/12345678/"})

@@ -15,6 +15,8 @@ def password_hash(password, salt):
 
 
 def app_password(folder, account):
+    """The Gmail App Password: a 600 file if one is set (BOT_MAIL_GMAIL_PASSWORD_FILE or secrets/), else the
+    Mac Keychain item "gmail_cycle" for this account. It is never logged nor given to the assistant."""
     secret_path = os.environ.get("BOT_MAIL_GMAIL_PASSWORD_FILE")
     path = Path(secret_path) if secret_path else Path(folder) / "secrets" / "gmail_app_password"
     if path.exists():
@@ -47,3 +49,11 @@ def save_password(folder, account, password):
         os.fchmod(fd, 0o600)
         with os.fdopen(fd, "w") as stream:
             stream.write(password + "\n")
+
+
+def has_app_password(folder, account):
+    """Whether the App Password is already stored. It never returns or logs the password itself."""
+    try:
+        return bool(app_password(folder, account))
+    except RuntimeError:
+        return False

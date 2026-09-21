@@ -2,18 +2,26 @@
 
 Para começar numa sessão nova. Lê primeiro o `docs/DECISOES.md`, onde a decisão mais recente está no topo.
 
-## Estado (19/09/2026)
+## Estado (21/09/2026)
 
-- **A etapa 1 está feita**, no ramo `versao-local` e ainda sem commit. A estrutura é a da secção
-  Arquitetura, com os mesmos formatos de ficheiros. Os 52 testes passam: 50 existentes, adaptados, e 2
-  novos (MCP local por stdio e os três ficheiros da página).
-- **A versão de referência** é o commit `ef74f54` (tag `referencia-python`), que só existe neste Mac. Tem o
-  código do servidor em pausa.
-- **Dados reais no Mac, fora do Git, em `data/`:** `config.json` (a conta Gmail), `voice.json` e
-  `properties/<REF>/profile.json` (o perfil do primeiro imóvel).
-- **Continua a faltar a App Password.** Ainda não está guardada no Keychain do Mac.
-- **Nunca correu contra o Gmail real** nem num servidor.
-- **Segue-se a etapa 2.**
+- **Etapa 1 feita e publicada:** commit `b2c61ee` no ramo `versao-local`, com push para o GitHub. A
+  referência é o commit `ef74f54` (tag `referencia-python`, só local), com o código do servidor em pausa.
+- **Etapa 3 (uso real) em curso, à frente da etapa 2.** Ainda sem commit:
+  - App Password guardada no Keychain com `mac/password.command`, que confirma o login antes de guardar;
+  - **primeira leitura real a 21/09:** 35 pedidos, de 07/09 a 20/09, com nome, telefone e mensagem
+    extraídos em todos, nenhum bloqueado e nenhum aviso;
+  - assunto e nome do remetente configuráveis na voz;
+  - **falta o primeiro envio real**, aprovado na página e confirmado nos Enviados do Gmail.
+- **Feito também, fora das etapas:**
+  - Painel com métricas (pendentes, rascunhos, bloqueados, enviados, tempo até resposta, 14 dias);
+  - a página redesenhada, com quatro temas visuais;
+  - fotografia de cada imóvel (a API aceita-a; falta o botão para a carregar na página);
+  - know-how comum da agência em `data/knowledge/`;
+  - `bot-mail demo <pasta>`, para trabalhar na página só com dados fictícios;
+  - arrancar a página outra vez fecha a anterior da mesma pasta.
+- **63 testes passam**, todos com dados fictícios.
+- **Dados reais no Mac, fora do Git, em `data/`:** a conta, a voz, o know-how, o perfil e a fila do
+  primeiro imóvel, com 35 pendentes.
 
 ## Ponto de partida (18/09/2026)
 
@@ -48,6 +56,7 @@ Lead_Imoveis/             (repositório bot-imoveis; o nome decide-se com a .app
 │   ├── api.py            Starlette: uma rota por chamada
 │   ├── mcp.py            MCP por stdio: uma ferramenta por chamada
 │   ├── cli.py            os comandos bot-mail
+│   ├── demo.py           pasta de demonstração com dados fictícios
 │   ├── configure.py      a configuração no terminal
 │   └── templates/        exemplos publicados: config, voz e perfil de imóvel (dados fictícios)
 ├── frontend/
@@ -55,7 +64,7 @@ Lead_Imoveis/             (repositório bot-imoveis; o nome decide-se com a .app
 │   ├── app.js
 │   └── style.css
 ├── mac/                  atalhos de duplo clique e o agendamento do READ (launchd)
-├── data/                 fora do Git: config.json, voice.json, properties/<REF>/…
+├── data/                 fora do Git: config.json, voice.json, knowledge/, properties/<REF>/…, logs/
 ├── tests/
 └── main.py               arranque local: a página em 127.0.0.1 e o browser; mais tarde, a .app
 ```
@@ -123,27 +132,37 @@ Lead_Imoveis/             (repositório bot-imoveis; o nome decide-se com a .app
 - **O contrato das 6 ferramentas MCP:** `read_emails`, `list_pending`, `save_replies`, `preview_send`,
   `send_replies`, `dismiss_emails`, com `property_ref` e as mesmas anotações (verificado em
   `tests/test_mcp.py`).
-- **O que a página já faz:** os 3 separadores e o fluxo de copiar/colar.
+- **O que a página já faz:** os 4 separadores (Painel, Respostas, Imóveis, Voz e estilo) e o fluxo
+  de copiar/colar em lote.
 
 ## Decisões
 
-Tomadas a 19/09/2026 (o porquê está no `docs/DECISOES.md`):
+O porquê está no `docs/DECISOES.md`.
+
+Tomadas a 19/09/2026:
 1. **Nome:** mantém-se `bot_mail` até à .app.
 2. **Assistente do MCP local:** primeiro o Claude Desktop; o Codex usa o mesmo comando. O ChatGPT continua
    pela página de copiar/colar até haver AWS.
 3. **Dados locais:** em `data/`, toda ignorada pelo Git, com o caminho configurável.
 4. **A pasta `php/`:** saiu do repositório para `~/work/Lead_Imoveis-php-arquivo/`, sem ser apagada.
-5. **A versão de referência:** commit `ef74f54`, com a tag `referencia-python`. A reestruturação está no
-   ramo `versao-local`.
+5. **A versão de referência:** commit `ef74f54`, com a tag `referencia-python`.
 6. **Backend:** Starlette; o FastAPI fica para quando houver login ou outros clientes da API.
 
-Continuam em aberto as duas pendências do proprietário:
-- qual é a assinatura certa, «Equipa APalace Imobiliária» ou «Equipa Imobiliária APalace»;
-- o prompt da 2.ª interação.
+Tomadas a 21/09/2026:
+7. **A etapa 3 passa à frente da etapa 2.**
+8. **Assinatura:** «Equipa APalace Imobiliária».
+9. **Assunto e remetente na voz;** pedidos do portal sem «Re:».
+10. **Fotografias carregadas pelo dono;** nunca descarregadas do Idealista, que bloqueia robôs.
+11. **Um agente de cada vez nesta pasta;** ferramentas de fora só com dados de demonstração.
+12. **Lembretes, visitas fechadas e pedido de consentimento:** preparados pelo programa e enviados num
+    clique. Lembretes aos 2 e aos 4 dias sem resposta, sem tentar saber se leram.
+13. **Contactos:** registo em `data/contactos.csv`; sem consentimento, guardam-se 6 meses.
+
+Continua em aberto: **o prompt da 2.ª interação**, que o proprietário ainda vai escrever.
 
 ## Etapas
 
-### 1. Reestruturar sem mudar o comportamento (feita a 19/09/2026)
+### 1. Reestruturar sem mudar o comportamento (feita a 19/09/2026, commit `b2c61ee`)
 - Criar `backend/`, `frontend/`, `data/` e `main.py`; separar o `web.html` em três ficheiros.
 - **Ficou pronta:** os testes passam, adaptados nos imports e nos caminhos dos exemplos, e a página
   funciona igual em `127.0.0.1`: os 3 separadores foram percorridos no browser, com dados fictícios.
@@ -154,9 +173,9 @@ Continuam em aberto as duas pendências do proprietário:
   implementação em memória.
 - **Fica pronta quando:** só `store.py` abre ficheiros de dados e só `secrets.py` chama o Keychain.
 
-### 3. Uso real no Mac
-- Guardar a App Password e fazer a primeira leitura real do Gmail. Responder ao email de exemplo.
-- Tornar configuráveis o assunto da resposta e o nome do remetente; acrescentar o prompt da 2.ª interação.
+### 3. Uso real no Mac (em curso; passou à frente da 2)
+- Feito: App Password guardada; primeira leitura real (35 pedidos); assunto e remetente configuráveis.
+- Falta: o primeiro envio real; o prompt da 2.ª interação, quando o proprietário o escrever.
 - **Fica pronta quando:** uma resposta real sai depois de aprovação e aparece nos Enviados do Gmail.
 
 ### 4. MCP local
@@ -170,15 +189,43 @@ Continuam em aberto as duas pendências do proprietário:
 - A .app.
 - A AWS: Lambda, S3 ou DynamoDB, Secrets Manager, EventBridge, CloudFront e login.
 
+## Próximos passos, por esta ordem
+
+Regra comum: o programa prepara, e nada sai sem a pré-visualização do lote e uma confirmação.
+
+1. **O primeiro envio real**, que fecha a etapa 3.
+2. **Registo de contactos** em `data/contactos.csv` (permissões 600, fora do Git), atualizado em cada
+   leitura. Colunas: `email`, `nome`, `telefone`, `primeiro_contacto`, `imovel`, `fonte` (Idealista),
+   `rgpd` (`por_pedir`, `pedido`, `sim` ou `nao`), `rgpd_data` e `rgpd_prova` (o Message-ID da resposta em
+   que o cliente disse sim). Os contactos sem `sim` apagam-se 6 meses depois do último contacto. Quem
+   pedir para ser apagado sai do CSV, da fila e das conversas.
+3. **Visitas fechadas:** o texto fica na voz. Um botão por imóvel prepara um email para cada cliente desse
+   anúncio, pendentes e já respondidos com endereço válido: um email por pessoa. Depois do envio, o imóvel
+   fica «fechado», os pendentes saem da fila e os pedidos novos desse anúncio chegam com o texto preparado.
+4. **Lembretes aos 2 e aos 4 dias sem resposta:** duas frases na voz. Em cada leitura, preparam-se na
+   mesma conversa (`Re:`, `In-Reply-To` do nosso último envio): a frase por cima do último texto que
+   enviámos, que passa a ficar guardado na conversa. Param se o cliente responder, se as visitas fecharem ou
+   se o email for retirado; no máximo dois.
+5. **Pedido de consentimento:** o texto fica na voz, e há um botão por imóvel para todos os que
+   responderam. Nas respostas que começam por «sim», «yes» ou «oui», a página sugere `sim` e o proprietário
+   confirma com um clique; guarda-se a prova.
+6. **O botão para carregar a fotografia** no separador Imóveis (a API já existe).
+7. **Um JSON por run, para o Codex ou o Claude trabalharem sem copiar/colar:** cada run numa pasta
+   `data/runs/<data-e-hora>/` com `pedidos.json` (o que o agente lê) e `respostas.json` (o que escreve), e
+   um comando `bot-mail drafts` que aplica as respostas com as mesmas verificações.
+8. **Separador Definições:** conta, dias de leitura, pasta do Gmail e agendamento, hoje só no terminal.
+9. **Ícone no Desktop:** uma app sem janela de Terminal, com o código de acesso guardado em `data/` para
+   não mudar a cada arranque.
+10. Etapa 2 (interfaces) e etapa 4 (MCP no Claude Desktop).
+
 ## Pendentes que passam para a nova versão
 
-- Assunto da resposta e nome do remetente configuráveis. Hoje o assunto é «Re: » mais o assunto do aviso
-  do portal, e o remetente vai sem nome.
 - Alerta de pedidos novos.
 - Aproveitar os dados «com perfil» do Idealista, para não repetir perguntas.
 - Alojamento local: famílias de emails de outras plataformas (Airbnb, Booking).
-- Prazo de retenção das conversas.
-- O primeiro teste com o Gmail real.
+- Prazo de retenção das conversas e das filas (o dos contactos está decidido: 6 meses).
+- A `lookback_days` está em 3. Numa leitura depois de muitos dias parado, sobe-a antes: sem isso, os
+  pedidos mais antigos ficam de fora.
 
 ## Como começar a sessão nova
 
@@ -189,25 +236,24 @@ Estás na pasta do projeto bot_mail («bot de imóveis»). Não tens contexto an
 
 Antes de fazer qualquer coisa, lê por esta ordem:
 1. docs/DECISOES.md: as decisões tomadas e porquê. A mais recente está no topo.
-2. docs/PLANO-VERSAO-LOCAL.md: o plano desta fase, com a arquitetura e o estado.
-3. README.md e docs/OPERATIONS.md: como funciona a versão atual e o formato dos ficheiros.
+2. docs/PLANO-VERSAO-LOCAL.md: o estado, a arquitetura e os próximos passos.
+3. README.md e docs/OPERATIONS.md: como funciona e o formato dos ficheiros.
 4. O código em backend/ e frontend/ e os testes em tests/.
 
 Contexto:
 - Sou consultor imobiliário (BigLearn). Respondo a pedidos de arrendamento que chegam por email dos portais, para já do Idealista. Escrevo em português de Portugal; responde-me em pt-PT.
-- A versão local no Mac está a ser reestruturada no ramo versao-local: backend em Python (Starlette), interface em HTML, CSS e JS em ficheiros separados e MCP local por stdio. A etapa 1 está feita.
-- As chamadas (casos de uso) têm de ficar separadas de onde correm, para mais tarde irem para a AWS Lambda sem reescrever. Um dia, tudo numa .app.
+- A versão local corre no Mac (ramo versao-local): backend em Python (Starlette), página em HTML/CSS/JS e MCP local por stdio. A etapa 1 está feita; a etapa 3 (uso real) está em curso: a App Password está guardada e a primeira leitura real trouxe 35 pedidos. Falta o primeiro envio real.
+- As chamadas (casos de uso) ficam separadas de onde correm, para mais tarde irem para a AWS Lambda sem reescrever. Um dia, tudo numa .app.
 - O servidor HTTPS alojado está em pausa; localmente basta HTTP em 127.0.0.1.
-- Nunca correu contra o Gmail real.
 
 Regras de trabalho:
 - O repositório é público (github.com/lusofono/bot-imoveis). Nunca ponhas no Git dados reais: perfis dos imóveis, conta de email, filas, segredos, nomes ou contactos de clientes. Os dados reais estão em data/, que o Git ignora. Nos testes, só dados fictícios.
+- Não abras nem mostres dados de clientes sem precisar: para verificar, usa contagens. Para trabalhar na página, usa uma pasta de demonstração (bot-mail demo <pasta>).
 - Não faças commit nem push sem eu pedir.
 - Não escrevas nem guardes passwords (por exemplo, a App Password do Gmail): sou eu que as introduzo.
-- Pode haver outra sessão a trabalhar nesta pasta: relê os ficheiros antes de os alterar.
+- Um agente de cada vez nesta pasta. Se vires ficheiros a mudar sem teres sido tu, para e avisa-me.
 - Mantém os formatos dos ficheiros JSON que já existem.
+- O envio de emails exige sempre a minha aprovação, depois da pré-visualização.
 
-Continuamos pela etapa 2 do plano: interfaces para o exterior (store, secrets, mail e o relógio), com a implementação local e uma em memória para os testes. Os testes existentes têm de continuar a passar.
-
-Antes de mexer no código, mostra-me em poucas linhas como vais fazer a etapa 2.
+Continuamos pelos próximos passos do plano, pela ordem indicada. Antes de mexer no código, mostra-me em poucas linhas como vais fazer o passo seguinte.
 ```

@@ -1,11 +1,11 @@
 # bot_mail
 
-> **Estado a 19/09/2026.** Etapa 1 do plano feita: a versão local no Mac tem o backend em Python
-> (Starlette), a interface em HTML, CSS e JS e o MCP local por stdio. As chamadas ficam separadas de onde
-> correm, para mais tarde irem para a AWS Lambda e para uma .app. Segue-se a etapa 2 (interfaces para o
-> exterior). O plano está em [docs/PLANO-VERSAO-LOCAL.md](docs/PLANO-VERSAO-LOCAL.md) e as decisões em
-> [docs/DECISOES.md](docs/DECISOES.md). O servidor HTTPS alojado está em pausa: o código dele está na tag
-> `referencia-python`.
+> **Estado a 21/09/2026.** A versão local corre no Mac: backend em Python (Starlette), página em HTML,
+> CSS e JS com um painel de métricas, e MCP local por stdio. Já leu o Gmail real (35 pedidos, todos
+> extraídos sem erros); falta o primeiro envio real. As chamadas ficam separadas de onde correm, para mais
+> tarde irem para a AWS Lambda e para uma .app. O estado e os próximos passos estão em
+> [docs/PLANO-VERSAO-LOCAL.md](docs/PLANO-VERSAO-LOCAL.md) e as decisões em [docs/DECISOES.md](docs/DECISOES.md).
+> O servidor HTTPS alojado está em pausa: o código dele está na tag `referencia-python`.
 
 Ferramenta pessoal para responder em lote, com o teu assistente, aos pedidos de arrendamento que chegam
 por email dos portais. Há duas formas:
@@ -29,23 +29,33 @@ Não apaga rascunhos. A primeira leitura usa os dias definidos na configuração
 Os identificadores já respondidos ficam no JSON para não voltarem a entrar.
 Uma nova mensagem na mesma conversa tem outro ID e entra normalmente.
 
-## Sem MCP: página local com copiar/colar
+## A página local
 
-Para quem não pode ou não quer ligar um assistente por MCP (o ChatGPT só aceita MCP por um endereço
-público, que ainda não existe).
+É o painel do dia a dia e o caminho sem MCP: serve qualquer assistente, incluindo o ChatGPT, por
+copiar/colar (o ChatGPT só aceita MCP por um endereço público, que ainda não existe).
 
 ```bash
 ./mac/web.command
 ```
 
-Abre `http://127.0.0.1:8765` com um código que muda a cada arranque; só funciona neste computador.
-É o mesmo que `.venv/bin/python main.py`.
+Abre `http://127.0.0.1:8765` no browser, já com o link certo. É o mesmo que `.venv/bin/python main.py`.
+- **O link muda a cada arranque**, de propósito: o código no fim garante que só abre a página quem a
+  arrancou, e nenhum outro site aberto no browser consegue ler a fila ou enviar emails por trás.
+- **Arrancar outra vez fecha a página anterior** da mesma pasta de dados; nunca mexe noutros programas.
+- Tem quatro separadores: **Painel** (métricas dos últimos 14 dias, imóveis e estado da configuração),
+  **Respostas**, **Imóveis** e **Voz e estilo**, com quatro temas visuais (Noite, Dia, Índigo e Âmbar).
+
+No separador **Respostas**, o fluxo é em lote:
 
 1. **Ler emails do Gmail** e escolher os emails a tratar.
-2. **Copiar prompt** e colá-lo numa conversa normal do ChatGPT. Leva a voz, o contexto do imóvel e as
-   mensagens, sem o email nem o telefone dos clientes.
-3. Colar a resposta do ChatGPT (um bloco JSON) e **Guardar rascunhos**. Os rascunhos podem ser corrigidos à mão.
-4. **Pré-visualizar** destinatários e textos finais e confirmar o envio.
+2. **Copiar prompt**: um só prompt para todos os selecionados, que colas numa conversa normal do ChatGPT.
+   Leva a voz, o contexto do imóvel e as mensagens, sem o email nem o telefone dos clientes.
+3. Colar a resposta do ChatGPT, um só bloco JSON com todas as respostas, e **Guardar rascunhos**. Os
+   rascunhos podem ser corrigidos à mão.
+4. **Pré-visualizar** destinatários e textos finais e enviar o lote com uma só confirmação.
+
+Lotes de 5 a 10 emails dão melhores respostas do que dezenas de uma vez: com muitos, o ChatGPT corta a
+resposta ou troca ids.
 
 Os emails bloqueados não entram no prompt nem no envio: trata-os à mão e retira-os da fila.
 No separador **Imóveis** crias ou atualizas um imóvel à mão ou a partir do link do anúncio: a página
@@ -53,11 +63,16 @@ dá-te o prompt, o ChatGPT extrai os dados e tu revês os campos antes de guarda
 as regras de resposta nunca vêm do texto colado. As características vão para a base de conhecimento
 (`knowledge/anuncio.md`). Aí editas também os prompts de cada interação; em **Voz e estilo**, a voz comum.
 
+A fotografia de cada imóvel fica em `data/properties/<REF>/foto.jpg` (ou `.png`, `.webp`) e aparece no
+painel. É carregada pelo dono: o Idealista bloqueia acessos automáticos, por isso nada é descarregado do
+anúncio. A página ainda não tem o botão para a carregar; a API já aceita (`POST /api/property/photo`).
+
 ## Imóveis: uma família de emails por imóvel
 
 Cada imóvel tem uma pasta privada `data/properties/<REF>/` com `profile.json` (regras e prompts) e o seu
 `queue.json`. A voz é da pessoa ou equipa, comum a todos os imóveis: `data/voice.json` (saudação, idiomas,
-fecho e assinatura), escolhida sempre pelo `selected` de cada opção. Com imóveis, sem voz completa
+fecho, assinatura, nome do remetente e assunto das respostas), escolhida sempre pelo `selected` de cada
+opção e editável no separador **Voz e estilo**. Com imóveis, sem voz completa
 nada arranca: o MCP recusa iniciar e as operações indicam o que falta. Uma pasta com `voice.json`
 e sem perfis também recusa: nunca passa a ler o correio todo por engano. Para um imóvel novo, usa o
 separador **Imóveis** da página ou `mac/setup.command`; à mão, copia
@@ -70,6 +85,12 @@ Com pelo menos um perfil, o READ só guarda:
 
 O resto do correio é ignorado, sem descarregar o texto.
 
+**O assunto e o remetente das respostas.** O cliente nunca viu o aviso do portal, escrito para o
+proprietário, com emoji, a referência interna e o anunciante. Por isso a resposta a um pedido do portal
+leva o assunto definido na voz, que por omissão é a descrição do imóvel (`{imovel}` e `{referencia}` são
+substituídos). Quando é o cliente que responde a um email nosso, mantém-se «Re: » e o assunto dele, para
+não partir a conversa. O nome do remetente ao lado do endereço também vem da voz; vazio, vai só o endereço.
+
 Em cada aviso é extraído o nome, o email (do Reply-To), o telefone e a mensagem do cliente, sem os
 blocos do portal. Calcula-se também a interação (1.ª, 2.ª…) pelas respostas já enviadas a esse cliente.
 A etapa só avança depois de um envio com sucesso e fica em `conversations`, mesmo depois de o email
@@ -77,6 +98,10 @@ sair da fila. A resposta vai só para o Reply-To, sem alternativa. Sem Reply-To,
 com um endereço proibido (`never_reply_to`), o email fica `blocked`: não pode ser enviado e o assistente
 avisa-te. Conflitos (outro código de anúncio, outro email no corpo) aparecem em `warnings`.
 Cada imóvel devolve `instructions`: voz comum + contexto do imóvel + prompt de cada interação.
+
+**Know-how comum da agência.** O que vale para todos os imóveis (como marcas visitas, que documentos
+pedes, prazos habituais) escreve-se em `data/knowledge/*.md` e entra nas instruções de todos. Se o
+conhecimento de um imóvel disser outra coisa, prevalece o do imóvel.
 
 ## Estrutura
 
@@ -91,18 +116,22 @@ backend/                   o código Python
   api.py                   a página local: uma rota por chamada (Starlette)
   mcp.py                   o MCP local por stdio: uma ferramenta por chamada
   cli.py, configure.py     os comandos bot-mail e a configuração no terminal
+  demo.py                  pasta de demonstração, só com dados fictícios
   templates/               exemplos publicados, com dados fictícios: config, voz e perfil de imóvel
 frontend/                  a página: index.html, app.js, style.css (só fala com a API)
-mac/                       atalhos de duplo clique: web, setup, read, send, agendar e desagendar o READ
+mac/                       atalhos de duplo clique: web, setup, password, read, send e o agendamento do READ
 main.py                    arranque local: a página em 127.0.0.1 e o browser; mais tarde, a .app
 data/                      os teus dados (local, ignorado pelo Git)
   config.json              conta e filtros
   voice.json               voz e estilo comuns a todos os imóveis
+  knowledge/*.md           know-how comum da agência, para todos os imóveis
   properties/<REF>/profile.json     perfil real do imóvel
   properties/<REF>/queue.json       fila do imóvel: pendentes, rascunhos, IDs e etapas das conversas
   properties/<REF>/knowledge/*.md   base de conhecimento do imóvel (RAG)
+  properties/<REF>/foto.*           fotografia do imóvel, para o painel
   queue.json               fila única, só quando não há imóveis (criado no READ)
   logs/events.jsonl        registos sem conteúdo dos emails
+  .page.pid                a página que está a correr, para o arranque seguinte a fechar
 docs/                      decisões, plano e operação
 tests/                     testes sem Gmail real
 ```
@@ -120,7 +149,25 @@ Requer Python 3.11 ou superior.
 Os dados ficam em `data/`. Para usar outra pasta, define `BOT_MAIL_INSTANCE` ou passa
 `--instance <pasta>` ao comando `bot-mail`.
 
-A App Password do Gmail fica no Keychain. Não a partilhes com o assistente.
+Para trabalhar na página, ou mostrá-la a outra ferramenta, sem os clientes reais:
+
+```bash
+.venv/bin/bot-mail demo ~/bot-mail-demo
+.venv/bin/bot-mail --instance ~/bot-mail-demo web --port 8766
+```
+
+A demonstração tem dois imóveis e clientes fictícios. Nunca apontes uma ferramenta de design ou outro
+assistente à pasta `data/`: tem os nomes, emails e telefones dos clientes reais.
+
+A App Password do Gmail fica no Keychain. Não a partilhes com o assistente. Para a guardar ou trocar sem
+repetir o resto da configuração:
+
+```bash
+./mac/password.command
+```
+
+Cria-a na Conta Google, em Segurança → Palavras-passe de aplicações; exige a verificação em dois passos.
+O comando confirma o login IMAP antes de guardar, por isso uma password errada nunca fica gravada.
 
 Os comandos locais READ/SEND continuam independentes. Para SEND local, preenche `reply_text`, marca
 `send_reply: true` no JSON e executa `mac/send.command`. O terminal mostra o lote e pede `ENVIAR`.
@@ -190,9 +237,10 @@ de ferramentas de escrita ativa no assistente e não autorizes envio automático
 .venv/bin/python -m pytest -q
 ```
 
-Testes de lotes, persistência, falhas SMTP, deduplicação, anexos, leitura IMAP simulada, regras dos
-imóveis, página local e MCP local por stdio, sempre com dados fictícios.
-Nenhum teste lê uma caixa real ou envia emails. O primeiro teste com o Gmail real é a etapa 3 do plano.
+63 testes: lotes, persistência, falhas SMTP, deduplicação, anexos, leitura IMAP simulada, regras dos
+imóveis, assunto e remetente, links do Idealista, métricas sem dados de clientes, fotografias, página local, MCP local por
+stdio e comandos do terminal, sempre com dados fictícios. Nenhum teste lê uma caixa real ou envia emails.
+A primeira leitura do Gmail real foi feita à mão a 21/09/2026; o primeiro envio real ainda não.
 
 Código de leitura e construção de respostas adaptado do ZIP original `gmail_cycle_mac.zip`.
 O ZIP, configurações pessoais, emails e segredos não são publicados no Git.

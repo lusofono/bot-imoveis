@@ -5,6 +5,20 @@ const FIELDS = ['reference', 'sender', 'listing_id', 'listing_url', 'advertiser'
 const $ = id => document.getElementById(id);
 let state = {properties: []}, settings = null, preview = null;
 
+// Only the visual preference is stored locally; never account or email content.
+const THEMES = ['night', 'day', 'indigo', 'amber'];
+function applyTheme(theme) {
+  const chosen = THEMES.includes(theme) ? theme : 'night';
+  document.documentElement.dataset.theme = chosen;
+  $('theme-select').value = chosen;
+}
+try { applyTheme(localStorage.getItem('bot-mail-theme')); }
+catch { applyTheme('night'); }
+$('theme-select').addEventListener('change', event => {
+  applyTheme(event.target.value);
+  try { localStorage.setItem('bot-mail-theme', event.target.value); } catch { /* Storage may be unavailable. */ }
+});
+
 // Emails are untrusted: every value goes in as text, never as HTML.
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
@@ -13,7 +27,7 @@ function el(tag, attrs = {}, ...children) {
     else if (key.startsWith('on')) node.addEventListener(key.slice(2), value);
     else if (value !== false && value != null) node.setAttribute(key, value === true ? '' : value);
   }
-  for (const child of children.flat()) if (child != null && child !== false && child !== '') node.append(child);
+  for (const child of children.flat(Infinity)) if (child != null && child !== false && child !== '') node.append(child);
   return node;
 }
 
@@ -43,8 +57,23 @@ async function copyText(text, done, fallbackBox) {
 }
 
 function showTab(name) {
-  document.querySelectorAll('[data-tab]').forEach(button => button.classList.toggle('active', button.dataset.tab === name));
-  for (const tab of ['replies', 'properties', 'voice']) $('tab-' + tab).hidden = tab !== name;
+  document.querySelectorAll('nav [data-tab]').forEach(button => {
+    button.classList.toggle('active', button.dataset.tab === name);
+    if (button.dataset.tab === name) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  });
+  $('page-label').textContent = {dashboard: 'Painel', replies: 'Respostas', properties: 'Imóveis', voice: 'Voz e estilo'}[name];
+  for (const tab of ['dashboard', 'replies', 'properties', 'voice']) $('tab-' + tab).hidden = tab !== name;
+  window.scrollTo({top: 0, behavior: 'instant'});
+  if (name === 'dashboard') run(loadMetrics);
+}
+
+// The chart is drawn by hand: the page may not load anything from outside.
+function svg(tag, attrs = {}, ...children) {
+  const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
+  node.append(...children.flat(Infinity).filter(child => child != null));
+  return node;
 }
 
 function when(value) { return value ? new Date(value).toLocaleString('pt-PT', {dateStyle: 'short', timeStyle: 'short'}) : ''; }
@@ -60,6 +89,7 @@ function nameOf(id) {
 
 function renderState() {
   $('account').textContent = state.account || '';
+  $('nav-count').textContent = state.properties.reduce((n, q) => n + q.emails.length, 0);
   $('error').hidden = !state.error; $('error').textContent = state.error || '';
   const select = $('queue'), chosen = select.value;
   select.replaceChildren(...state.properties.map(queue => el('option', {value: queue.property_ref ?? ''}, queue.property_ref ?? 'Todos')));
@@ -68,21 +98,29 @@ function renderState() {
   $('last-read').textContent = queue?.last_read_at ? 'Última leitura: ' + when(queue.last_read_at) : '';
   const emails = queue?.emails || [];
   $('emails').replaceChildren(...(emails.length ? emails.map(card)
-    : [el('p', {class: 'muted'}, state.error ? '' : 'Não há emails pendentes. Usa «Ler emails do Gmail».')]));
+    : [el('div', {class: 'empty-state'}, el('strong', {}, state.error ? 'Configuração pendente' : 'Tudo em dia.'), state.error ? 'Verifica o aviso acima para continuar.' : 'Não há emails pendentes. Faz uma nova leitura quando quiseres.')]));
   $('instructions').textContent = queue?.instructions || '';
   preview = null; $('preview-box').replaceChildren();
+  updateSelection();
+}
+
+function updateSelection() {
+  const count = selectedIds().length;
+  $('selection-count').textContent = `${count} selecionado(s)`;
+  $('copy-prompt').disabled = !count;
+  $('preview').disabled = !count;
 }
 
 function card(email) {
   const customer = email.customer || {}, sender = (email.from || [])[0] || {};
-  const draft = el('textarea', {rows: 7, placeholder: 'Rascunho: cola a resposta do ChatGPT no passo 3 ou escreve aqui.'}, email.reply_text || '');
+  const draft = el('textarea', {'aria-label': 'Rascunho da resposta', rows: 7, placeholder: 'Rascunho: cola a resposta do ChatGPT no passo 3 ou escreve aqui.'}, email.reply_text || '');
   const contact = [customer.email || (email.recipient || {}).email, customer.phone].filter(Boolean).join(' · ');
-  return el('article', {class: 'card' + (email.blocked ? ' blocked' : '')},
+  return el('article', {class: 'card email-card' + (email.blocked ? ' blocked' : '')},
     el('div', {class: 'card-head'},
       el('label', {class: 'who'}, el('input', {type: 'checkbox', class: 'pick', 'data-id': email.id, checked: !email.blocked, disabled: !!email.blocked}),
         el('strong', {}, customer.name || sender.name || sender.email || 'Sem nome')),
       email.interaction && el('span', {class: 'tag'}, email.interaction + '.ª interação'),
-      el('span', {class: 'tag'}, STATUS[email.reply_status] || email.reply_status || ''),
+      el('span', {class: 'tag' + (email.reply_status === 'draft' ? ' draft' : '')}, STATUS[email.reply_status] || email.reply_status || ''),
       el('span', {class: 'muted small'}, when(email.date))),
     contact && el('div', {class: 'muted small'}, contact),
     email.blocked && el('p', {class: 'alert bad'}, email.blocked),
@@ -122,6 +160,74 @@ function renderPreview() {
       el('button', {class: 'link', onclick: () => { preview = null; box.replaceChildren(); }}, 'Cancelar')));
 }
 
+function ago(value) {
+  if (!value) return 'ainda não houve leitura';
+  const hours = (Date.now() - new Date(value).getTime()) / 3600000;
+  if (hours < 1) return `há ${Math.max(1, Math.round(hours * 60))} min`;
+  if (hours < 24) return `há ${Math.round(hours)} h`;
+  return `há ${Math.round(hours / 24)} dia(s)`;
+}
+
+function metricCard(value, label, kind) {
+  return el('article', {class: 'metric' + (kind && value ? ' ' + kind : '')},
+    el('div', {class: 'value'}, String(value)), el('div', {class: 'label'}, label));
+}
+
+function chart(days) {
+  const width = 640, height = 150, base = height - 22, top = 12;
+  const most = Math.max(1, ...days.map(day => Math.max(day.requests, day.sent)));
+  const slot = width / days.length, bar = slot / 2 - 3;
+  const column = (value, x, cls) => value
+    ? svg('rect', {x, y: base - Math.max(3, (base - top) * value / most), width: bar,
+                   height: Math.max(3, (base - top) * value / most), rx: 2, class: cls})
+    : null;
+  return svg('svg', {viewBox: `0 0 ${width} ${height}`, class: 'chart', role: 'img',
+                     'aria-label': 'Pedidos recebidos e respostas enviadas por dia'},
+    svg('line', {x1: 0, y1: base, x2: width, y2: base, class: 'grid-line'}),
+    days.map((day, i) => [
+      column(day.requests, i * slot + 2, 'bar-requests'),
+      column(day.sent, i * slot + slot / 2 + 1, 'bar-sent'),
+      svg('text', {x: i * slot + slot / 2, y: height - 6, class: 'bar-label'}, day.day.slice(8) + '/' + day.day.slice(5, 7))]));
+}
+
+function renderDashboard(data) {
+  const totals = data.totals;
+  $('metric-cards').replaceChildren(
+    metricCard(totals.pending, 'Pedidos por responder'),
+    metricCard(totals.drafts, 'Rascunhos prontos', 'ok'),
+    metricCard(totals.blocked, 'Bloqueados', 'warn'),
+    metricCard(totals.attention, 'A precisar de atenção', 'bad'),
+    metricCard(totals.answered, 'Respostas enviadas'),
+    metricCard(data.reply_hours == null ? '—' : data.reply_hours + ' h', 'Tempo médio até resposta'));
+  $('dashboard-read').textContent = `Última leitura ${ago(data.last_read_at)}`
+    + (data.last_read_at ? ` (${when(data.last_read_at)})` : '') + ` · conta ${data.account}`;
+  $('dashboard-chart').replaceChildren(chart(data.by_day));
+  $('dashboard-properties').replaceChildren(...(data.properties.length ? data.properties.map(item =>
+    el('article', {class: 'card property-tile'},
+      propertyCover(item.property_ref, item.photo),
+      el('div', {class: 'property-body'},
+        el('span', {class: 'property-ref'}, item.property_ref || 'Fila única'),
+        el('h3', {class: 'property-title'}, item.description || 'Mensagens da conta'),
+        el('div', {class: 'property-stats'},
+          ...[[item.pending, 'Pendentes'], [item.drafts, 'Rascunhos'], [item.blocked, 'Bloqueados'], [item.answered, 'Respondidos']]
+            .map(([value, label]) => el('div', {}, el('strong', {}, String(value)), el('span', {}, label)))),
+        el('div', {class: 'property-footer'},
+          el('span', {class: 'muted small'}, item.advertised_rent_eur != null ? new Intl.NumberFormat('pt-PT', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0}).format(item.advertised_rent_eur) : 'Renda não definida'),
+          el('button', {class: 'link', onclick: () => {
+            $('queue').value = item.property_ref || ''; renderState(); showTab('replies');
+          }}, 'Ver respostas →'))))) : [el('div', {class: 'empty-state'}, 'Ainda não há imóveis configurados. Adiciona o primeiro em Imóveis.')]));
+  const check = (ok, label, hint) => el('li', {},
+    el('span', {class: 'dot' + (ok ? '' : ' missing')}), el('span', {}, label,
+      !ok && hint ? el('span', {class: 'muted small'}, ' — ' + hint) : ''));
+  $('dashboard-setup').replaceChildren(
+    check(data.setup.account, 'Conta de email configurada', 'corre mac/setup.command'),
+    check(data.setup.app_password, 'App Password guardada no Keychain', 'corre mac/password.command'),
+    check(data.setup.voice, 'Voz completa', 'preenche o separador Voz e estilo'),
+    check(data.setup.properties > 0, `Imóveis configurados: ${data.setup.properties}`, 'cria um no separador Imóveis'));
+}
+
+async function loadMetrics() { renderDashboard(await call('api/metrics')); }
+
 async function refreshState() { state = await call('api/state'); renderState(); }
 async function loadSettings() { settings = await call('api/settings'); renderSettings(); }
 
@@ -130,6 +236,14 @@ function renderSettings() {
   $('property-list').replaceChildren(...(settings.properties.length ? settings.properties.map(propertyCard)
     : [el('p', {class: 'muted'}, 'Ainda não há imóveis: cria o primeiro abaixo.')]));
   if (!$('f-sender').value) $('f-sender').value = settings.properties[0]?.sender || 'reply@idealista.pt';
+}
+
+function propertyCover(ref, hasPhoto) {
+  const cover = el('div', {class: 'property-cover'});
+  const fallback = () => cover.replaceChildren(el('span', {class: 'property-monogram', 'aria-hidden': 'true'}, '⌂'));
+  if (hasPhoto && ref) cover.append(el('img', {src: 'photo/' + encodeURIComponent(ref), alt: 'Fotografia do imóvel ' + ref, loading: 'lazy', onerror: fallback}));
+  else fallback();
+  return cover;
 }
 
 function propertyCard(property) {
@@ -141,6 +255,7 @@ function propertyCard(property) {
   const link = /^https:\/\//.test(property.listing_url || '')
     && el('a', {href: property.listing_url, target: '_blank', rel: 'noopener noreferrer'}, property.listing_url);
   return el('article', {class: 'card'},
+    propertyCover(property.reference, property.photo),
     el('div', {class: 'card-head'}, el('strong', {}, property.reference), el('span', {}, property.description || ''),
       property.advertised_rent_eur != null && el('span', {class: 'tag'}, property.advertised_rent_eur + ' €')),
     el('div', {class: 'muted small'}, [property.sender, property.listing_id && 'anúncio ' + property.listing_id,
@@ -170,23 +285,35 @@ function renderVoice() {
   const selects = {};
   const choice = (key, label) => {
     const voice = settings.voice[key];
-    selects[key] = el('select', {}, el('option', {value: ''}, '— escolhe —'),
-      Object.entries(voice.options).map(([name, text]) => el('option', {value: name}, `${name}: ${text}`)));
+    const labels = {normal: 'Habitual', formal: 'Formal', cordial: 'Cordial', multilingual: 'Idioma do cliente', pt_en_fr: 'Português, inglês ou francês'};
+    const hint = el('span', {class: 'choice-hint', id: 'hint-' + key});
+    selects[key] = el('select', {'aria-describedby': 'hint-' + key}, el('option', {value: ''}, '— escolhe —'),
+      Object.entries(voice.options).map(([name, text]) => el('option', {value: name, title: text}, labels[name] || name)));
     selects[key].value = voice.selected || '';
-    return el('label', {class: 'field'}, label, selects[key]);
+    const updateHint = () => { hint.textContent = voice.options[selects[key].value] || ''; };
+    selects[key].addEventListener('change', updateHint); updateHint();
+    return el('label', {class: 'field'}, label, selects[key], hint);
   };
   const signature = el('input', {value: settings.voice.signature || ''});
+  const senderName = el('input', {value: settings.voice.sender_name || '', placeholder: 'vazio: só o endereço de email'});
+  const replySubject = el('input', {value: settings.voice.reply_subject || ''});
   $('voice-form').replaceChildren(choice('greeting', 'Saudação'), choice('languages', 'Idiomas'), choice('closing', 'Fecho'),
     el('label', {class: 'field'}, 'Assinatura (sempre igual, sem tradução)', signature),
+    el('label', {class: 'field'}, 'Nome do remetente, ao lado do endereço', senderName),
+    el('label', {class: 'field'},
+      'Assunto das respostas a pedidos do portal ({imovel} e {referencia}). Nas respostas do próprio cliente mantém-se o assunto dele.',
+      replySubject),
     el('div', {class: 'actions'}, el('button', {class: 'primary', onclick: () => run(async () => {
       const choices = Object.fromEntries(Object.entries(selects).map(([key, select]) => [key, select.value]));
-      settings = await call('api/voice', {...choices, signature: signature.value});
+      settings = await call('api/voice', {...choices, signature: signature.value,
+        sender_name: senderName.value, reply_subject: replySubject.value});
       renderSettings(); await refreshState(); toast('Voz guardada.');
     })}, 'Guardar voz')));
 }
 
 document.querySelectorAll('[data-tab]').forEach(button => button.addEventListener('click', () => showTab(button.dataset.tab)));
 $('queue').addEventListener('change', renderState);
+$('emails').addEventListener('change', updateSelection);
 $('read').addEventListener('click', () => run(async () => {
   state = await call('api/read', {}); renderState();
   toast(state.added ? `${state.added} email(s) novo(s).` : 'Leitura concluída: nada de novo.');
@@ -229,4 +356,4 @@ $('property-save').addEventListener('click', () => run(async () => {
   toast(`Imóvel ${result.reference} ${result.created ? 'criado' : 'atualizado'}. Revê a base de conhecimento na pasta do imóvel.`);
 }));
 
-run(async () => { await refreshState(); await loadSettings(); });
+run(async () => { await loadMetrics(); await refreshState(); await loadSettings(); });

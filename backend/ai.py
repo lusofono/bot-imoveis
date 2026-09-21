@@ -64,6 +64,10 @@ def instructions(profile, voice):
         voice.get("application_instructions") and f"- {voice['application_instructions']}",
     ]
     out += [line for line in extra if line]
+    if voice.get("_knowledge"):
+        out += ["", "Know-how da agência, comum a todos os imóveis (se o imóvel disser outra coisa, prevalece o imóvel):"]
+        for part in voice["_knowledge"]:
+            out += [f"[{part['file']}]", part["text"]]
     facts = [f"{prop.get('reference')}: {prop.get('description')}"]
     if prop.get("advertised_rent_eur"):
         facts.append(f"renda anunciada: {prop['advertised_rent_eur']} €")

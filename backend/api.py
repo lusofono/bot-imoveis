@@ -5,8 +5,12 @@ printed link and then keeps in an HttpOnly cookie; every API call repeats it in 
 site can read the queue or send. The page itself is in frontend/ and only talks to this API.
 The hosted mode (a login on a server) is paused; it returns with AWS.
 """
+import os
 import secrets
+import signal
+import subprocess
 import threading
+import time
 from pathlib import Path
 from urllib.parse import urlsplit
 from starlette.applications import Starlette
@@ -36,6 +40,7 @@ def ids_of(body):
 
 
 def web_app(folder, token):
+    """The page and its API for one data folder; every API call must carry this start's token."""
     service = MailService(folder)
 
     def state():
@@ -167,23 +172,67 @@ def web_app(folder, token):
             return Response((FRONTEND / name).read_bytes(), media_type=ASSETS[name], headers=HEADERS)
         return endpoint
 
+    async def photo(request):
+        # An <img> cannot send the token header, so the photo asks for the page's cookie instead.
+        if not same(request.cookies.get(COOKIE), token):
+            return PlainTextResponse("Abre o link mostrado no terminal ao iniciar a página.", 403)
+        try:
+            found = await run_in_threadpool(service.photo, request.path_params["ref"])
+        except ValueError:
+            found = None
+        if not found:
+            return PlainTextResponse("Sem fotografia.", 404)
+        return Response(found[0], media_type=found[1], headers=HEADERS)
+
+    def property_photo(body):
+        service.save_photo(str(body.get("reference") or ""), body.get("image"))
+        return service.settings()
+
     handlers = {"state": ("GET", lambda body: state()), "read": ("POST", read), "prompt": ("POST", prompt),
                 "paste": ("POST", paste), "drafts": ("POST", drafts), "preview": ("POST", preview),
                 "send": ("POST", send), "dismiss": ("POST", dismiss),
+                "metrics": ("GET", lambda body: service.metrics()),
                 "settings": ("GET", lambda body: service.settings()), "voice": ("POST", voice),
                 "property/prompt": ("POST", property_prompt),
                 "property/parse": ("POST", lambda body: {"fields": parse_listing(str(body.get("text") or ""))}),
-                "property/save": ("POST", property_save), "property/prompts": ("POST", property_prompts)}
-    routes = ([Route("/", page)] + [Route(f"/{name}", asset(name)) for name in ASSETS]
+                "property/save": ("POST", property_save), "property/prompts": ("POST", property_prompts),
+                "property/photo": ("POST", property_photo)}
+    routes = ([Route("/", page), Route("/photo/{ref}", photo)] + [Route(f"/{name}", asset(name)) for name in ASSETS]
               + [Route(f"/api/{name}", api(handler), methods=[method]) for name, (method, handler) in handlers.items()])
     app = Starlette(routes=routes)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
     return app
 
 
+def ours(pid):
+    """Whether a process is this page (and not something else that happens to be running)."""
+    command = subprocess.run(["ps", "-o", "command=", "-p", str(pid)], capture_output=True, text=True).stdout
+    return "main.py" in command or ("backend.cli" in command or "bot-mail" in command) and " web" in command
+
+
+def stop_previous(folder):
+    """A page left running for this folder is stopped first, so starting it again always just works."""
+    try:
+        pid = int((Path(folder) / ".page.pid").read_text().strip())
+    except (OSError, ValueError):
+        return
+    if pid == os.getpid() or not ours(pid):
+        return  # gone already, or the number now belongs to another program: never touch it
+    os.kill(pid, signal.SIGTERM)
+    for _ in range(40):  # up to 10 s for the old page to close
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return
+        time.sleep(0.25)
+
+
 def serve(folder, port=8765, open_browser=True):
+    """Starts the page on 127.0.0.1 with a new token and opens the browser at the one link that works."""
     import uvicorn
     import webbrowser
+    stop_previous(folder)
+    (Path(folder) / ".page.pid").write_text(str(os.getpid()))
     token = secrets.token_urlsafe(24)
     url = f"http://127.0.0.1:{port}/?t={token}"
     print(f"Página do bot_mail: {url}\nO link muda a cada arranque. Ctrl+C para parar.", flush=True)

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Removes the daily READ from launchd. The data folder is not touched."""
 from pathlib import Path
 import subprocess
 

@@ -22,6 +22,23 @@ Com imóveis, cada `properties/<REF>/queue.json` tem o mesmo formato, mais:
 pendentes e os resultados das operações, nunca segredos. O antigo `state.json` deixa de ser necessário e
 não é consultado.
 
+Os outros ficheiros da pasta de dados:
+- `voice.json`: a voz comum, incluindo `sender_name` (nome do remetente) e `reply_subject` (assunto das
+  respostas a pedidos do portal, com `{imovel}` e `{referencia}`).
+- `knowledge/*.md`: o know-how comum da agência, para todos os imóveis.
+- `properties/<REF>/foto.jpg`, `.png` ou `.webp`: a fotografia do imóvel, com permissões 600.
+- `.page.pid` e `.queue.lock`: ficheiros técnicos da página e do bloqueio. Não se editam.
+
+## Leitura do Gmail
+
+A leitura procura por datas na pasta «Todos» (ou na Caixa de entrada, conforme `mailbox`), ignora os IDs
+que já estão na fila, respondidos ou retirados, e lê com `BODY.PEEK`: não marca nada como lido, e estar
+lido ou não lido não conta. A primeira leitura recua `lookback_days`; as seguintes recuam até à anterior.
+Depois de muitos dias parado, sobe `lookback_days` em `config.json` antes de ler e volta a baixá-lo a
+seguir, porque o valor alarga todas as leituras.
+
+A App Password guarda-se ou troca-se com `mac/password.command`, que confirma o login antes de guardar.
+
 ## Envios incertos
 
 Se a ligação SMTP cair, pode não ser possível saber se o Gmail aceitou a resposta.
@@ -40,7 +57,8 @@ Se houver mais do que um imóvel, acrescenta `--property REF`. Com `yes`, a etap
 
 ## Logs e backups
 
-`logs/events.jsonl` guarda datas, operações, IDs e resultados, sem corpos ou credenciais.
+`logs/events.jsonl` guarda datas, operações, IDs e resultados, sem corpos ou credenciais. Em cada envio
+guarda também quantas horas o cliente esperou, para o tempo médio do painel.
 Faz backups privados da pasta de dados se precisares de recuperação. Não publiques backups no repositório.
 Não há backups automáticos diários de queues; evita retenção indefinida de corpos já respondidos.
 Localmente, não há rotação automática dos logs.
@@ -54,7 +72,12 @@ O lock protege as operações quando coincidem com um pedido MCP ou da página.
 
 ## Atualizar e replicar
 
-Atualiza o código sem mexer na pasta `data/`. Reinicia a página depois de atualizar.
+Atualiza o código sem mexer na pasta `data/`. Reinicia a página depois de atualizar: correr outra vez
+`mac/web.command` fecha a anterior.
+
+Para trabalhar na página com outra ferramenta ou outro assistente, usa uma pasta de demonstração
+(`bot-mail demo <pasta>`), nunca `data/`. E um agente de cada vez nesta pasta: dois a editar os mesmos
+ficheiros estragam o trabalho um do outro.
 Não copies dados privados para criar outra conta; o comando `replicate` só cria uma pasta de dados vazia.
 As pastas novas usam o ambiente Python da instalação que as criou. Para mover para outra máquina,
 instala um clone completo e configura a pasta de dados de novo.

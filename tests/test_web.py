@@ -138,3 +138,38 @@ def test_voice_is_edited_on_the_page(service, page):
     assert settings["voice"]["greeting"]["selected"] == "cordial" and settings["voice"]["signature"] == "Equipa Teste"
     status, state = call("/api/state")
     assert "Equipa Teste" in state["properties"][0]["instructions"]
+
+
+def test_starting_the_page_again_never_stops_another_program(tmp_path):
+    from backend.api import stop_previous
+    import os, subprocess, sys
+    stop_previous(tmp_path)  # no earlier page: nothing to do
+    other = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    try:
+        (tmp_path / ".page.pid").write_text(str(other.pid))
+        stop_previous(tmp_path)  # a pid that is not this page is left alone
+        assert other.poll() is None
+        (tmp_path / ".page.pid").write_text(str(os.getpid()))
+        stop_previous(tmp_path)  # and the page never stops itself
+    finally:
+        other.kill()
+
+
+def test_property_photo_is_the_owners_file_and_needs_the_page(service, page):
+    import base64
+    from backend.demo import picture
+    client, call = page
+    as_data_url = lambda data: "data:image/png;base64," + base64.b64encode(data).decode()
+    status, error = call("/api/property/photo", {"reference": REF, "image": as_data_url(b"not an image")})
+    assert status == 400 and "não é uma fotografia" in error["error"]
+    status, error = call("/api/property/photo", {"reference": "OUTRO", "image": as_data_url(picture((1, 2, 3), 4, 3))})
+    assert status == 400 and "desconhecido" in error["error"]
+    status, settings = call("/api/property/photo", {"reference": REF, "image": as_data_url(picture((1, 2, 3), 4, 3))})
+    assert status == 200 and settings["properties"][0]["photo"] is True
+    assert (service.folder / "properties" / REF / "foto.png").stat().st_mode & 0o077 == 0
+    # An <img> cannot send the token header, so the photo needs the page's cookie.
+    assert client.get(f"/photo/{REF}").status_code == 403
+    client.get(f"/?t={TOKEN}")
+    served = client.get(f"/photo/{REF}")
+    assert served.status_code == 200 and served.headers["content-type"] == "image/png"
+    assert client.get("/photo/..%2Fconfig.json").status_code == 404
