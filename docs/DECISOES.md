@@ -3,6 +3,37 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 22/09/2026, mais tarde: lembretes, visitas fechadas e pedido de consentimento construídos
+
+Já construído (83 testes). Fecha a maior parte da decisão de 21/09 «lembretes, visitas fechadas e
+contactos com RGPD»; falta ainda a purga aos 6 meses e apagar um contacto a pedido.
+
+**Decisão.**
+- **«Sem resposta» nos lembretes é sempre o silêncio do cliente, nunca uma deteção de leitura.** Confirmado
+  ao retomar este trabalho: mantém-se a decisão de 21/09 de não usar píxeis nem recibos de leitura. Os
+  lembretes aos 2 e aos 4 dias contam sempre a partir do último envio real (nunca de um lembrete anterior),
+  e o segundo só é preparado depois de o primeiro ter sido efetivamente enviado.
+- **Lembretes, pedido de consentimento e o email de visitas fechadas nunca contam como uma das quatro
+  interações** nem mexem no relógio dos lembretes: só o envio real (a primeira resposta, a confirmação, a
+  proposta de visita e a marcação) o faz. Ficam guardados como `last_text` na conversa, para o lembrete
+  seguinte poder repetir «a frase por cima do último texto enviado» tal como descrito no plano.
+- **Visitas fechadas fica marcado ao clicar no botão**, não só depois de os emails saírem: mais simples e
+  mais seguro do que amarrar o estado a um envio em lote que pode falhar a meio; o botão já é, por si só,
+  uma ação deliberada do proprietário. A partir daí, os pedidos novos desse anúncio recebem o texto de
+  fecho automaticamente, como rascunho pronto a rever.
+- **O pedido de consentimento marca-se como «já pedido» ao clicar**, não ao enviar, para o botão nunca
+  repetir o pedido à mesma pessoa. A deteção do «sim» só sugere; o proprietário confirma sempre com um
+  clique antes de `contactos.csv` mudar.
+- Todos os três continuam a regra geral: preparados pelo programa (nunca pelo ChatGPT), aparecem como
+  rascunhos comuns na fila de Respostas e nada sai sem pré-visualização e confirmação.
+
+**Porquê.**
+- Reafirmar a not-tracking dos lembretes evita reabrir, sem querer, a discussão de 21/09 sobre píxeis de
+  leitura (ePrivacy, falsos positivos do Apple Mail) só porque a frase «se leram» apareceu num pedido novo.
+- Marcar o fecho e o pedido de consentimento no clique, em vez de esperar pelo envio, evita ter de amarrar
+  este estado ao resultado, por vezes parcial, de um lote de SMTP — mais simples e mais previsível para o
+  proprietário perceber o que aconteceu.
+
 ## 21/09/2026, à noite: quatro interações até à visita; tudo editável na página
 
 Já construído (71 testes).
@@ -35,7 +66,9 @@ Já construído (71 testes).
 
 ## 21/09/2026, mais tarde: lembretes, visitas fechadas e contactos com RGPD
 
-Ainda por construir; a forma está nos próximos passos do `docs/PLANO-VERSAO-LOCAL.md`.
+**Tudo construído a 22/09/2026** (registo de contactos, lembretes, visitas fechadas e pedido de
+consentimento; 83 testes) — ver a entrada «lembretes, visitas fechadas e pedido de consentimento
+construídos», no topo. Falta a purga aos 6 meses e apagar um contacto a pedido.
 
 **Decisão.**
 - **Lembretes aos 2 e aos 4 dias sem resposta do cliente**, na mesma conversa: uma frase da voz por cima

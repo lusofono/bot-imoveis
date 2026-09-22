@@ -14,17 +14,23 @@ import os
 from .ai import KNOWLEDGE_RULE, describe, instructions
 from .configure import STARTER, example_profile
 from .mail import build_reply, read_messages
-from .rules import (KNOWLEDGE_FILE, SUBJECT_DEFAULT, VISIT_SLOT_DEFAULT, VISIT_STATES, build_profile, check_profile,
-                    check_slot, check_window, clean_property, free_times, knowledge, photo_of, prepare, route,
-                    subject_of)
+from .rules import (DAY, KNOWLEDGE_FILE, SUBJECT_DEFAULT, VISIT_SLOT_DEFAULT, VISIT_STATES, build_profile,
+                    check_profile, check_slot, check_window, clean_property, consent_yes, free_times, knowledge,
+                    photo_of, prepare, route, subject_of)
 from .secrets import app_password, has_app_password
-from .store import (add_note, find_photo, knowledge_files, load_events, load_knowledge, load_visits, locked,
-                    load_json, load_profiles, load_voice, property_folder, read_photo, save_json, save_text,
-                    save_visits, write_photo)
+from .store import (add_contacts, add_note, find_photo, knowledge_files, load_contacts, load_events, load_knowledge,
+                    load_visits, locked, load_json, load_profiles, load_voice, property_folder, read_photo,
+                    save_contacts, save_json, save_text, save_visits, write_photo)
+
+CONTACT_SOURCE = "Idealista"  # today's only portal; see README for the family of emails it accepts.
+# Sent automatically or by a one-click button, in the customer's conversation, but never counted as one
+# of the four interactions and never resetting the clock the 2/4-day reminders are measured from.
+AUX_KINDS = {"reminder", "consent_request", "visits_closed"}
+REMINDER_HOURS = {"2d": 48, "4d": 96}
 
 VIEW_FIELDS = ("id", "kind", "date", "subject", "customer", "recipient", "blocked", "body_text", "body_truncated",
                "reply_text", "reply_status", "reply_error", "reply_message_id", "visit_window", "visit_slot",
-               "visit_status")
+               "visit_status", "reminder", "closing", "consent_suggested", "consent_confirmed")
 # Page field → (profile prompt, key), the same prompts the terminal setup asks for.
 PROMPT_FIELDS = {"general": ("general", "text"), "first": ("first_interaction", "text"),
                  "first_template": ("first_interaction", "reply_template"), "second": ("second_interaction", "text"),
@@ -51,6 +57,12 @@ def waited_hours(item):
     if arrived.tzinfo is None:
         arrived = arrived.replace(tzinfo=timezone.utc)
     return round((datetime.now(timezone.utc) - arrived).total_seconds() / 3600, 1)
+
+
+def contact_day(item):
+    """The email's own date for primeiro_contacto, or today when it has none usable."""
+    day = str(item.get("date") or "")[:10]
+    return day if DAY.fullmatch(day) else date.today().isoformat()
 
 
 def message_key(item):
@@ -186,6 +198,13 @@ class MailService:
             cfg = self.config()
             profiles = self.profiles()
             refs = list(profiles) or [None]
+            closed_refs = {ref for ref in refs if ref and load_visits(self.folder, ref).get("closed_at")}
+            voice_ok = None
+            if profiles:
+                try:
+                    voice_ok = load_voice(self.folder)
+                except ValueError:
+                    pass  # incomplete voice: the read still runs, just without auto-drafts this time
             queues = {ref: self.load(ref) for ref in refs}
             start_at = now()
             back = days if days is not None else max(0, int(cfg.get("lookback_days", 7)))
@@ -208,7 +227,7 @@ class MailService:
                 datetime.now(timezone.utc).date().isoformat(),
                 mailbox=cfg.get("mailbox", "all"), incoming_only=bool(profiles) or cfg.get("incoming_only", True),
                 accept=accept)
-            added, ambiguous = dict.fromkeys(refs, 0), 0
+            added, ambiguous, contacts = dict.fromkeys(refs, 0), 0, []
             for item in messages:
                 ref, kind, customer = route(item, profiles, queues) if profiles else (None, "general", None)
                 if kind == "ambiguous":
@@ -220,13 +239,31 @@ class MailService:
                     continue
                 if profiles:
                     item.update(prepare(item, kind, customer, profiles[ref], cfg["account"]), kind=kind)
+                    email = str(item["customer"].get("email") or "").strip().casefold()
+                    if email:
+                        contacts.append({"email": email, "nome": item["customer"].get("name") or "",
+                                         "telefone": item["customer"].get("phone") or "",
+                                         "primeiro_contacto": contact_day(item), "imovel": ref,
+                                         "fonte": CONTACT_SOURCE})
                 item.update(id=key, reply_text="", send_reply=False, reply_status="pending")
+                if profiles and ref in closed_refs and not item.get("blocked") and voice_ok:
+                    closing = ((voice_ok.get("style") or {}).get("visits_closed") or {}).get("text") or ""
+                    if closing:
+                        item.update(reply_text=closing, reply_status="draft", closing=True)
+                elif profiles and kind == "follow_up":
+                    conversation = queues[ref].get("conversations", {}).get(customer, {})
+                    if (conversation.get("consent_asked") and not conversation.get("consent")
+                            and consent_yes(item["customer"].get("message"))):
+                        item["consent_suggested"] = True
                 queues[ref]["emails"].append(item)
                 known[ref].add(key)
                 added[ref] += 1
+            add_contacts(self.folder, contacts)
             for ref, data in queues.items():
                 data["last_read_at"] = start_at
                 data["stats"] = {"new_this_read": added[ref], "scanned": scanned, "mailbox": mailbox}
+                if ref and voice_ok:
+                    self.schedule_reminders(ref, data, voice_ok)
                 self.save(data, ref)
             self.log("read", added=sum(added.values()), ambiguous=ambiguous,
                      pending=sum(len(data["emails"]) for data in queues.values()))
@@ -305,13 +342,22 @@ class MailService:
 
     @staticmethod
     def advance(data, item):
-        """After a successful send: the customer's conversation moves to the next interaction."""
-        # The stage outlives the email in the queue. Kept: address, name, our last subject, IDs, dates and
-        # the visit status; never a body. A visit proposal is always the 3rd interaction, whatever came before.
+        """After a successful send: the customer's conversation moves to the next interaction.
+
+        A reminder, a consent request or a visits-closed notice never counts as an interaction and never
+        resets last_sent_at: the 2/4-day reminders keep measuring from the last real exchange.
+        """
+        # The stage outlives the email in the queue. Kept: address, name, our last subject, IDs, dates,
+        # the last text sent (so a reminder can quote it) and the visit status. A visit proposal is
+        # always the 3rd interaction, whatever came before.
         conversation = data["conversations"].setdefault(
             item["recipient"]["email"].casefold(), {"stage": 0, "sent_message_ids": [], "thread_ids": []})
-        stage = conversation["stage"] + 1
-        conversation["stage"] = max(stage, 3) if item.get("kind") == "visit_proposal" else stage
+        aux = item.get("kind") in AUX_KINDS
+        if not aux:
+            stage = conversation["stage"] + 1
+            conversation["stage"] = max(stage, 3) if item.get("kind") == "visit_proposal" else stage
+        if item.get("kind") == "reminder" and item.get("reminder"):
+            conversation.setdefault("reminders_sent", []).append(item["reminder"])
         name = (item.get("recipient") or {}).get("name") or (item.get("customer") or {}).get("name")
         if name:
             conversation["name"] = name
@@ -322,7 +368,62 @@ class MailService:
         conversation["sent_message_ids"].append(item["reply_message_id"])
         if item.get("thread_id") and item["thread_id"] not in conversation["thread_ids"]:
             conversation["thread_ids"].append(item["thread_id"])
-        conversation["last_sent_at"] = now()
+        if item.get("reply_text"):
+            conversation["last_text"] = item["reply_text"]
+        if not aux:
+            conversation["last_sent_at"] = now()
+
+    @staticmethod
+    def aux_item(key, kind, email, conversation, text, **extra):
+        """A program-prepared draft in an existing conversation: reminder, consent request or closing notice.
+
+        It answers our last message to this customer (Re:, In-Reply-To), never a body the customer sent.
+        """
+        sent = conversation.get("sent_message_ids") or []
+        return {"id": key, "gmail_message_id": key, "kind": kind, "date": now(),
+               "subject": conversation.get("subject") or "", "message_id": sent[-1] if sent else "",
+               "references": " ".join(sent[:-1]), "thread_id": (conversation.get("thread_ids") or [""])[-1],
+               "recipient": {"name": conversation.get("name") or "", "email": email},
+               "customer": {"name": conversation.get("name") or None, "email": email, "phone": None, "message": None},
+               "blocked": None, "warnings": [], "reply_text": text, "send_reply": False, "reply_status": "draft",
+               **extra}
+
+    def schedule_reminders(self, ref, data, voice):
+        """One draft per customer at 2 and at 4 days without an answer, capped at two, in order.
+
+        Stops for a customer who answered (a pending email from them), whose reminder was dismissed, or
+        once visits are closed. The phrase comes from the voice; the body under it is the last text sent.
+        """
+        if load_visits(self.folder, ref).get("closed_at"):
+            return 0
+        phrases = (voice.get("style", {}).get("reminders") or {})
+        text = {key: (phrases.get(key) or {}).get("text") or "" for key in ("day2", "day4")}
+        if not text["day2"] and not text["day4"]:
+            return 0
+        waiting = {((item.get("recipient") or {}).get("email") or "").casefold() for item in data["emails"]}
+        already = {(((item.get("recipient") or {}).get("email") or "").casefold(), item.get("reminder"))
+                  for item in data["emails"] if item.get("kind") == "reminder"}
+        created = 0
+        for email, conversation in data.get("conversations", {}).items():
+            if email in waiting or conversation.get("reminders_stopped") or not conversation.get("last_sent_at"):
+                continue
+            sent = set(conversation.get("reminders_sent") or [])
+            hours = (datetime.now(timezone.utc)
+                    - datetime.fromisoformat(conversation["last_sent_at"])).total_seconds() / 3600
+            if "2d" not in sent and text["day2"] and hours >= REMINDER_HOURS["2d"]:
+                threshold = "2d"
+            elif "2d" in sent and "4d" not in sent and text["day4"] and hours >= REMINDER_HOURS["4d"]:
+                threshold = "4d"
+            else:
+                continue
+            if (email, threshold) in already:
+                continue
+            phrase = text["day2"] if threshold == "2d" else text["day4"]
+            body = f"{phrase}\n\n{conversation['last_text']}" if conversation.get("last_text") else phrase
+            key = f"lembrete-{threshold}-{hashlib.sha256(email.encode()).hexdigest()[:8]}"
+            data["emails"].append(self.aux_item(key, "reminder", email, conversation, body, reminder=threshold))
+            created += 1
+        return created
 
     @staticmethod
     def snapshot(data, ids):
@@ -443,6 +544,12 @@ class MailService:
             for item in self.selected(data, ids):
                 data["emails"].remove(item)
                 data["dismissed_message_ids"].append(item["id"])
+                if item.get("kind") == "reminder":
+                    # The owner chose not to send this reminder: no more are prepared for this customer.
+                    email = ((item.get("recipient") or {}).get("email") or "").casefold()
+                    conversation = data.get("conversations", {}).get(email)
+                    if conversation is not None:
+                        conversation["reminders_stopped"] = True
             data.pop("send_preview", None)
             self.save(data, ref)
             self.log("dismissed", count=len(ids))
@@ -542,6 +649,8 @@ class MailService:
             ref = self.pick(self.profiles(), property_ref)
             if not ref:
                 raise ValueError("As visitas só existem com imóveis.")
+            if load_visits(self.folder, ref).get("closed_at"):
+                raise ValueError("Este imóvel já tem as visitas fechadas.")
             return {"property_ref": ref, "customers": self.candidates(ref, self.load(ref))}
 
     def propose_visits(self, property_ref, day, start, end, emails):
@@ -560,6 +669,8 @@ class MailService:
             ref = self.pick(profiles, property_ref)
             if not ref:
                 raise ValueError("As visitas só existem com imóveis.")
+            if load_visits(self.folder, ref).get("closed_at"):
+                raise ValueError("Este imóvel já tem as visitas fechadas.")
             data = self.load(ref)
             customers = {customer["email"]: customer for customer in self.candidates(ref, data)}
             for email in chosen:
@@ -597,6 +708,100 @@ class MailService:
             self.save(data, ref)
             self.log("visits_proposed", reference=ref, created=created)
             return {"property_ref": ref, "created": created, "window": window}
+
+    def close_visits(self, property_ref=None):
+        """One closing draft per customer of this property (pending and already answered), then closes it.
+
+        Closing happens now, at the click, not only once every draft is actually sent: it also switches
+        on the auto-reply that the next READ gives to any new lead for this property.
+        """
+        with locked(self.folder):
+            profiles = self.profiles()
+            ref = self.pick(profiles, property_ref)
+            if not ref:
+                raise ValueError("As visitas fechadas só existem com imóveis.")
+            agenda = load_visits(self.folder, ref)
+            if agenda.get("closed_at"):
+                raise ValueError("Este imóvel já tem as visitas fechadas.")
+            text = (load_voice(self.folder).get("style", {}).get("visits_closed") or {}).get("text") or ""
+            if not text:
+                raise ValueError("Escreve o texto de «Visitas fechadas» em Voz e estilo antes de usar este botão.")
+            data = self.load(ref)
+            drafted, handled = 0, set()
+            for item in data["emails"]:
+                email = ((item.get("recipient") or {}).get("email") or "").casefold()
+                if not email:
+                    continue
+                if item.get("reply_status") in ("sending", "uncertain"):
+                    # Leave it: resolve the uncertain send first, and never draft a second email on top of it.
+                    handled.add(email)
+                    continue
+                if item.get("blocked"):
+                    continue
+                item.update(reply_text=text, reply_status="draft", closing=True)
+                handled.add(email)
+                drafted += 1
+            for email, conversation in data.get("conversations", {}).items():
+                if email in handled or not (conversation.get("sent_message_ids") or []):
+                    continue
+                key = f"fecho-{hashlib.sha256(email.encode()).hexdigest()[:8]}"
+                if any(item["id"] == key for item in data["emails"]):
+                    continue
+                data["emails"].append(self.aux_item(key, "visits_closed", email, conversation, text, closing=True))
+                drafted += 1
+            agenda["closed_at"] = now()
+            save_visits(self.folder, ref, agenda)
+            self.save(data, ref)
+            self.log("visits_closed", reference=ref, drafted=drafted)
+            return {"property_ref": ref, "drafted": drafted}
+
+    def request_consent(self, property_ref=None):
+        """One consent-request draft per customer who already has a conversation and hasn't been asked."""
+        with locked(self.folder):
+            ref = self.pick(self.profiles(), property_ref)
+            if not ref:
+                raise ValueError("O pedido de consentimento só existe com imóveis.")
+            text = (load_voice(self.folder).get("style", {}).get("consent_request") or {}).get("text") or ""
+            if not text:
+                raise ValueError("Escreve o texto do pedido de consentimento em Voz e estilo antes de usar este botão.")
+            data = self.load(ref)
+            waiting = {((item.get("recipient") or {}).get("email") or "").casefold() for item in data["emails"]}
+            drafted = 0
+            for email, conversation in data.get("conversations", {}).items():
+                if email in waiting or conversation.get("consent_asked") or not (conversation.get("sent_message_ids") or []):
+                    continue
+                key = f"consentimento-{hashlib.sha256(email.encode()).hexdigest()[:8]}"
+                if any(item["id"] == key for item in data["emails"]):
+                    continue
+                data["emails"].append(self.aux_item(key, "consent_request", email, conversation, text))
+                conversation["consent_asked"] = True
+                drafted += 1
+            self.save(data, ref)
+            self.log("consent_requested", reference=ref, drafted=drafted)
+            return {"property_ref": ref, "drafted": drafted}
+
+    def confirm_consent(self, message_id, property_ref=None):
+        """One click on a suggested "sim/yes/oui" reply: marks the contact's RGPD row and the conversation."""
+        with locked(self.folder):
+            ref = self.pick(self.profiles(), property_ref)
+            data = self.load(ref)
+            item = next((e for e in data["emails"] if e["id"] == message_id), None)
+            if not item or not item.get("consent_suggested"):
+                raise ValueError("Este email não tem um consentimento por confirmar.")
+            email = ((item.get("recipient") or {}).get("email") or "").casefold()
+            contacts = load_contacts(self.folder)
+            row = contacts.get((email, ref))
+            if not row:
+                raise ValueError("Contacto não encontrado no registo (data/contactos.csv).")
+            row.update(rgpd="sim", rgpd_data=date.today().isoformat(), rgpd_prova=str(item.get("message_id") or message_id))
+            save_contacts(self.folder, contacts)
+            conversation = data.get("conversations", {}).get(email)
+            if conversation is not None:
+                conversation["consent"] = "sim"
+            item.update(consent_suggested=False, consent_confirmed=True)
+            self.save(data, ref)
+            self.log("consent_confirmed", reference=ref)
+            return {"property_ref": ref}
 
     def voice_ready(self):
         try:
@@ -665,6 +870,10 @@ class MailService:
             visits = style.get("visits") or {}
             voice["visits"] = {"slot_minutes": visits.get("slot_minutes") or VISIT_SLOT_DEFAULT,
                                "rental": visits.get("rental") or "", "sale": visits.get("sale") or ""}
+            reminders = style.get("reminders") or {}
+            voice["reminders"] = {key: (reminders.get(key) or {}).get("text") or "" for key in ("day2", "day4")}
+            voice["visits_closed"] = (style.get("visits_closed") or {}).get("text") or ""
+            voice["consent_request"] = (style.get("consent_request") or {}).get("text") or ""
             today = date.today().isoformat()
             properties = []
             for ref, profile in load_profiles(self.folder, account).items():
@@ -677,7 +886,8 @@ class MailService:
                                    "visits": {"windows": [window for window in load_visits(self.folder, ref)["windows"]
                                                           if window["day"] >= today],
                                               "slots": sorted((slot for slot in load_visits(self.folder, ref)["slots"]
-                                                               if slot["at"][:10] >= today), key=lambda s: s["at"])},
+                                                               if slot["at"][:10] >= today), key=lambda s: s["at"]),
+                                              "closed_at": load_visits(self.folder, ref)["closed_at"]},
                                    **{key: profile["property"].get(key) for key in (
                                        "reference", "listing_id", "listing_url", "advertiser", "description",
                                        "advertised_rent_eur")}})
@@ -740,6 +950,22 @@ class MailService:
                 if any(len(value) > 80 for value in texts.values()):
                     raise ValueError("A duração das visitas é demasiado longa (até 80 caracteres).")
                 style["visits"] = {"slot_minutes": slot, **texts, "status": "configured"}
+            reminders = choices.get("reminders")
+            if reminders is not None:
+                if not isinstance(reminders, dict):
+                    raise ValueError("Lembretes inválidos.")
+                texts = {key: " ".join(str(reminders.get(key) or "").split()) for key in ("day2", "day4")}
+                if any(len(value) > 300 for value in texts.values()):
+                    raise ValueError("A frase do lembrete é demasiado longa (até 300 caracteres).")
+                for key, text in texts.items():
+                    style.setdefault("reminders", {}).setdefault(key, {}).update(
+                        text=text, status="configured" if text else "not_configured")
+            for key in ("visits_closed", "consent_request"):
+                if key in choices:
+                    text = str(choices.get(key) or "").strip()
+                    if len(text) > 3000:
+                        raise ValueError("Texto demasiado longo (até 3000 caracteres).")
+                    style.setdefault(key, {}).update(text=text, status="configured" if text else "not_configured")
             save_json(path, voice)
             self.log("voice_saved")
 

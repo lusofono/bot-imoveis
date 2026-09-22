@@ -132,6 +132,21 @@ def web_app(folder, token):
                                         body.get("end"), emails)
         return {**result, "state": state(), "settings": service.settings()}
 
+    def visits_close(body):
+        result = service.close_visits(body.get("property_ref") or None)
+        return {**result, "state": state(), "settings": service.settings()}
+
+    def consent_request(body):
+        result = service.request_consent(body.get("property_ref") or None)
+        return {**result, "state": state()}
+
+    def consent_confirm(body):
+        message_id = str(body.get("id") or "")
+        if not message_id:
+            raise ValueError("Indica o email.")
+        result = service.confirm_consent(message_id, body.get("property_ref") or None)
+        return {**result, "state": state()}
+
     def property_prompts(body):
         service.save_prompts(str(body.get("reference") or ""), body.get("prompts") or {})
         return service.settings()
@@ -224,6 +239,8 @@ def web_app(folder, token):
                 "property/save": ("POST", property_save), "property/prompts": ("POST", property_prompts),
                 "property/photo": ("POST", property_photo),
                 "visits/candidates": ("POST", visit_candidates), "visits/propose": ("POST", visit_propose),
+                "visits/close": ("POST", visits_close),
+                "consent/request": ("POST", consent_request), "consent/confirm": ("POST", consent_confirm),
                 "knowledge": ("POST", lambda body: service.knowledge(body.get("property_ref") or None)),
                 "knowledge/note": ("POST", note), "knowledge/save": ("POST", knowledge_save)}
     routes = ([Route("/", page), Route("/photo/{ref}", photo)] + [Route(f"/{name}", asset(name)) for name in ASSETS]

@@ -131,6 +131,38 @@ imóvel mostra em «Conhecimento» exatamente o que o assistente recebe, das dua
 Em qualquer interação, se o cliente disser que não quer visitar ou que só pode noutra data, o assistente
 marca-o no campo `visita_estado` (`nao_quer` ou `outra_data`), e a próxima proposta já o deixa de fora.
 
+## Registo de contactos
+
+Cada leitura atualiza `data/contactos.csv` (600, fora do Git): uma linha por par cliente/imóvel, com
+`email`, `nome`, `telefone`, `primeiro_contacto`, `imovel`, `fonte` (por agora sempre `Idealista`) e o
+estado do RGPD (`rgpd`: `por_pedir`, `pedido`, `sim` ou `nao`, com `rgpd_data` e `rgpd_prova`). Um contacto
+novo entra com `rgpd: por_pedir`; uma leitura seguinte do mesmo par só preenche o nome ou o telefone que
+faltavam, nunca a data do primeiro contacto nem o estado do RGPD já registado. A purga aos 6 meses sem
+`sim` e apagar um contacto a pedido ainda estão por fazer (ver `docs/PLANO-VERSAO-LOCAL.md`).
+
+## Lembretes, visitas fechadas e pedido de consentimento
+
+Três emails que o próprio programa prepara — nunca o ChatGPT — e que entram na fila de **Respostas** como
+qualquer outro rascunho: revês, editas se quiseres, e só saem depois da pré-visualização e de confirmares
+o envio, tal como todos os outros.
+
+- **Lembretes aos 2 e aos 4 dias sem resposta.** Duas frases em **Voz e estilo**. Em cada leitura,
+  preparam-se automaticamente na mesma conversa (`Re:`, `In-Reply-To` do teu último envio real): a frase
+  fica por cima do último texto que enviaste a essa pessoa. Contam sempre a partir desse último envio real
+  — nunca a partir de um lembrete anterior — e o dos 4 dias só é preparado depois de o dos 2 dias ter
+  saído. Param se o cliente responder entretanto, se fechares as visitas do imóvel, ou se retirares o
+  rascunho do lembrete da fila sem o enviar; no máximo dois por pessoa. «Sem resposta» é sempre o silêncio
+  do cliente: nunca se tenta saber se ele abriu o email (sem píxeis nem recibos de leitura, como já estava
+  decidido para todo o resto).
+- **Visitas fechadas.** Um texto em **Voz e estilo** e, em **Imóveis → Visitas**, o botão «Fechar visitas e
+  agradecer a todos»: prepara um rascunho de agradecimento para cada cliente desse anúncio, pendente ou já
+  respondido. O imóvel fica fechado logo ao clicares (não só depois de enviares) e, a partir daí, qualquer
+  pedido novo desse anúncio chega já com o texto de fecho pronto, como rascunho.
+- **Pedido de consentimento RGPD.** Um texto em **Voz e estilo** e o botão «Pedir consentimento RGPD a
+  quem respondeu», para todos os que já têm conversa e ainda não foram convidados. Quando a resposta do
+  cliente começa por «sim», «yes» ou «oui», a página assinala-o no email; um clique em «Confirmar
+  consentimento» grava `rgpd: sim`, a data e o email de prova em `contactos.csv`.
+
 ## Estrutura
 
 ```text
@@ -152,12 +184,13 @@ main.py                    arranque local: a página em 127.0.0.1 e o browser; m
 data/                      os teus dados (local, ignorado pelo Git)
   config.json              conta e filtros
   voice.json               voz e estilo comuns a todos os imóveis
+  contactos.csv            registo de contactos (RGPD), atualizado em cada leitura
   knowledge/*.md           know-how comum da agência, para todos os imóveis
   properties/<REF>/profile.json     perfil real do imóvel
   properties/<REF>/queue.json       fila do imóvel: pendentes, rascunhos, IDs e etapas das conversas
   properties/<REF>/knowledge/*.md   base de conhecimento do imóvel (RAG)
   properties/<REF>/foto.*           fotografia do imóvel, para o painel
-  properties/<REF>/visitas.json     intervalos propostos e visitas marcadas
+  properties/<REF>/visitas.json     intervalos propostos, visitas marcadas e se o imóvel está fechado
   queue.json               fila única, só quando não há imóveis (criado no READ)
   logs/events.jsonl        registos sem conteúdo dos emails
   .page.pid                a página que está a correr, para o arranque seguinte a fechar
@@ -267,9 +300,10 @@ de ferramentas de escrita ativa no assistente e não autorizes envio automático
 .venv/bin/python -m pytest -q
 ```
 
-71 testes: lotes, persistência, falhas SMTP, deduplicação, anexos, leitura IMAP simulada, regras dos
-imóveis, assunto e remetente, links do Idealista, métricas sem dados de clientes, fotografias, página local, MCP local por
-stdio e comandos do terminal, sempre com dados fictícios. Nenhum teste lê uma caixa real ou envia emails.
+83 testes: lotes, persistência, falhas SMTP, deduplicação, anexos, leitura IMAP simulada, regras dos
+imóveis, assunto e remetente, links do Idealista, registo de contactos, lembretes, visitas fechadas,
+pedido de consentimento, métricas sem dados de clientes, fotografias, página local, MCP local por stdio e
+comandos do terminal, sempre com dados fictícios. Nenhum teste lê uma caixa real ou envia emails.
 A primeira leitura do Gmail real e os primeiros envios reais foram feitos à mão a 21/09/2026.
 
 Código de leitura e construção de respostas adaptado do ZIP original `gmail_cycle_mac.zip`.

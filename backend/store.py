@@ -5,6 +5,7 @@ Layout of the folder: config.json, voice.json, properties/<REF>/{profile.json, q
 logs/events.jsonl. It stays out of Git.
 """
 from contextlib import contextmanager
+import csv
 import fcntl
 import json
 import os
@@ -13,6 +14,8 @@ import tempfile
 from .rules import KNOWLEDGE_LIMIT, REFERENCE, check_profile, check_voice, knowledge
 
 PHOTO_TYPES = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
+CONTACT_FIELDS = ("email", "nome", "telefone", "primeiro_contacto", "imovel", "fonte",
+                  "rgpd", "rgpd_data", "rgpd_prova")
 # The file where facts added from the page go, one per line; the assistant reads the text under the title.
 NOTES_HEADING = ("# Notas do proprietário\n\n"
                  "Acrescentadas ao rever as respostas. Se contradisserem o resto, valem estas.\n\n")
@@ -181,9 +184,62 @@ def add_note(base, text, day):
     save_text(path, current + f"- {text} <!-- {day:%d/%m/%Y} -->\n")
 
 
+def load_contacts(folder):
+    """<folder>/contactos.csv, keyed by (email, imovel); empty when nothing has been registered yet."""
+    path = Path(folder) / "contactos.csv"
+    if not path.exists():
+        return {}
+    with path.open(encoding="utf-8", newline="") as stream:
+        return {(row["email"], row["imovel"]): row for row in csv.DictReader(stream)}
+
+
+def save_contacts(folder, contacts):
+    """Atomic write of contactos.csv, private (600) like the rest of data/, sorted by email then imóvel."""
+    path = Path(folder) / "contactos.csv"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=".write-", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as stream:
+            writer = csv.DictWriter(stream, fieldnames=CONTACT_FIELDS)
+            writer.writeheader()
+            for row in sorted(contacts.values(), key=lambda r: (r["email"], r["imovel"])):
+                writer.writerow(row)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+
+def add_contacts(folder, entries):
+    """Adds or updates rows for READ-extracted contacts: (email, nome, telefone, primeiro_contacto, imovel, fonte).
+
+    A pair (email, imóvel) not seen before gets a new row, RGPD "por_pedir". A known pair only fills a
+    blank name or phone: primeiro_contacto and the RGPD fields already recorded are never touched.
+    """
+    if not entries:
+        return
+    contacts = load_contacts(folder)
+    for entry in entries:
+        key = (entry["email"], entry["imovel"])
+        row = contacts.get(key)
+        if row is None:
+            contacts[key] = {"email": entry["email"], "nome": entry["nome"] or "",
+                             "telefone": entry["telefone"] or "", "primeiro_contacto": entry["primeiro_contacto"],
+                             "imovel": entry["imovel"], "fonte": entry["fonte"],
+                             "rgpd": "por_pedir", "rgpd_data": "", "rgpd_prova": ""}
+        else:
+            row["nome"] = row["nome"] or entry["nome"] or ""
+            row["telefone"] = row["telefone"] or entry["telefone"] or ""
+    save_contacts(folder, contacts)
+
+
 def load_visits(folder, ref):
-    """properties/<REF>/visitas.json: the windows the owner proposed and the times already booked."""
-    return load_json(property_folder(folder, ref) / "visitas.json", {"windows": [], "slots": []})
+    """properties/<REF>/visitas.json: the windows proposed, the times booked, and whether visits are closed."""
+    agenda = load_json(property_folder(folder, ref) / "visitas.json", {"windows": [], "slots": []})
+    agenda.setdefault("closed_at", None)
+    return agenda
 
 
 def save_visits(folder, ref, agenda):

@@ -91,6 +91,28 @@
       "rental": "15 a 20 minutos",
       "sale": "30 a 40 minutos",
       "status": "configured"
+    },
+    "reminders": {
+      "day2": {
+        "text": "",
+        "status": "not_configured",
+        "description": "Frase para o lembrete aos 2 dias sem resposta, por cima do último texto enviado."
+      },
+      "day4": {
+        "text": "",
+        "status": "not_configured",
+        "description": "Frase para o lembrete aos 4 dias sem resposta (o segundo e último)."
+      }
+    },
+    "visits_closed": {
+      "text": "",
+      "status": "not_configured",
+      "description": "Texto do email de visitas fechadas, para todos os clientes do imóvel."
+    },
+    "consent_request": {
+      "text": "",
+      "status": "not_configured",
+      "description": "Texto do pedido de consentimento RGPD, para quem já respondeu."
     }
   },
   "application_instructions": "Aplicar as opções de estilo selecionadas a todas as interações. A saudação e o fecho da configuração de estilo substituem os do texto base. Traduzir o conteúdo para o idioma escolhido, mantendo a assinatura exatamente como configurada. Não produzir várias versões linguísticas na mesma resposta, salvo pedido do proprietário.",

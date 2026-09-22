@@ -1,6 +1,7 @@
 // The page's logic. It only talks to the API (fetch); every rule is decided there.
 // TOKEN is written into index.html by the server at each start and goes with every API call.
 const STATUS ={pending: 'por responder', draft: 'rascunho', error: 'erro no envio', sending: 'a enviar', uncertain: 'envio incerto'};
+const AUX_KINDS = ['reminder', 'consent_request', 'visits_closed'];
 const FIELDS = ['reference', 'sender', 'listing_id', 'listing_url', 'advertiser', 'advertised_rent_eur', 'description'];
 const $ = id => document.getElementById(id);
 let state = {properties: []}, settings = null, preview = null;
@@ -49,7 +50,15 @@ function toast(text, kind = 'ok') {
   clearTimeout(toast.timer); toast.timer = setTimeout(() => { box.hidden = true; }, 7000);
 }
 
-async function run(action) { try { await action(); } catch (error) { toast(error.message, 'bad'); } }
+// button, when given, shows the click was received and is still running: disabled and relabelled
+// until the action settles, whether it succeeds or fails (the error itself goes to the toast).
+async function run(action, button) {
+  const original = button?.textContent;
+  if (button) { button.disabled = true; button.textContent = 'A trabalhar…'; }
+  try { await action(); }
+  catch (error) { toast(error.message, 'bad'); }
+  finally { if (button) { button.disabled = false; button.textContent = original; } }
+}
 
 async function copyText(text, done, fallbackBox) {
   try { await navigator.clipboard.writeText(text); toast(done); }
@@ -132,6 +141,10 @@ function card(email) {
       email.interaction && el('span', {class: 'tag'}, email.interaction + '.ª interação'),
       el('span', {class: 'tag' + (email.reply_status === 'draft' ? ' draft' : '')}, STATUS[email.reply_status] || email.reply_status || ''),
       email.kind === 'visit_proposal' && el('span', {class: 'tag visit'}, 'proposta de visita'),
+      email.kind === 'reminder' && el('span', {class: 'tag visit'}, email.reminder === '4d' ? 'lembrete aos 4 dias' : 'lembrete aos 2 dias'),
+      email.kind === 'consent_request' && el('span', {class: 'tag visit'}, 'pedido de consentimento'),
+      email.closing && el('span', {class: 'tag visit'}, 'visitas fechadas'),
+      email.consent_confirmed && el('span', {class: 'tag visit'}, 'consentimento: sim'),
       email.visit_slot && el('span', {class: 'tag visit'}, 'visita ' + slotLabel(email.visit_slot)),
       email.visit_status && el('span', {class: 'tag warn'}, VISIT_STATES[email.visit_status] || email.visit_status),
       el('span', {class: 'muted small'}, when(email.date))),
@@ -139,21 +152,28 @@ function card(email) {
     email.blocked && el('p', {class: 'alert bad'}, email.blocked),
     (email.warnings || []).map(warning => el('p', {class: 'alert warn'}, warning)),
     email.reply_error && el('p', {class: 'alert bad'}, email.reply_error),
+    email.consent_suggested && el('p', {class: 'alert warn'}, 'O cliente parece ter dito que sim: confirma para gravar em contactos.csv.'),
     el('blockquote', {}, email.visit_window
       ? `Proposta de visita: ${dayLabel(email.visit_window.day)}, das ${email.visit_window.start} às ${email.visit_window.end}.`
+      : AUX_KINDS.includes(email.kind) || email.closing ? '(sem mensagem nova do cliente: email preparado automaticamente, ver o rascunho abaixo)'
       : customer.message || email.body_text || ''),
-    !email.visit_window && el('details', {}, el('summary', {class: 'muted small'}, 'Email completo'), el('pre', {}, email.body_text || '')),
+    !email.visit_window && !AUX_KINDS.includes(email.kind) && !email.closing
+      && el('details', {}, el('summary', {class: 'muted small'}, 'Email completo'), el('pre', {}, email.body_text || '')),
     draft,
     el('div', {class: 'actions'},
-      el('button', {onclick: () => run(async () => {
+      el('button', {onclick: event => run(async () => {
         state = await call('api/drafts', {property_ref: queueRef(), replies: [{id: email.id, reply_text: draft.value}]});
         renderState(); toast('Rascunho guardado.');
-      })}, 'Guardar rascunho'),
-      el('button', {class: 'link danger', onclick: () => run(async () => {
+      }, event.currentTarget)}, 'Guardar rascunho'),
+      email.consent_suggested && el('button', {class: 'primary', onclick: event => run(async () => {
+        state = await call('api/consent/confirm', {property_ref: queueRef(), id: email.id});
+        renderState(); toast('Consentimento confirmado e registado em contactos.csv.');
+      }, event.currentTarget)}, 'Confirmar consentimento (RGPD)'),
+      el('button', {class: 'link danger', onclick: event => run(async () => {
         if (!confirm('Retirar este email da fila sem responder? O Gmail não é alterado e o email não volta a entrar.')) return;
         state = await call('api/dismiss', {property_ref: queueRef(), ids: [email.id]});
         renderState(); toast('Email retirado da fila.');
-      })}, 'Retirar da fila')),
+      }, event.currentTarget)}, 'Retirar da fila')),
     noteBox(queueRef()));
 }
 
@@ -176,7 +196,7 @@ function noteBox(ref, onSaved) {
   const scope = el('select', {'aria-label': 'Onde guardar'},
     el('option', {value: 'property'}, 'Só este imóvel'), el('option', {value: 'agency'}, 'Todos os imóveis (agência)'));
   return el('details', {class: 'note-box'}, el('summary', {class: 'muted small'}, '+ Acrescentar ao conhecimento'),
-    text, el('div', {class: 'actions'}, scope, el('button', {class: 'primary', onclick: () => run(async () => {
+    text, el('div', {class: 'actions'}, scope, el('button', {class: 'primary', onclick: event => run(async () => {
       const result = await call('api/knowledge/note', {property_ref: ref, scope: scope.value, text: text.value});
       text.value = '';
       state = result.state; renderState();
@@ -184,7 +204,7 @@ function noteBox(ref, onSaved) {
         + ' O próximo prompt já o leva.');
       if (onSaved) onSaved();
       else await loadSettings();  // the Imóveis tab lists the knowledge files: keep it current
-    })}, 'Guardar no conhecimento')));
+    }, event.currentTarget)}, 'Guardar no conhecimento')));
 }
 
 function renderPreview() {
@@ -195,14 +215,14 @@ function renderPreview() {
       el('div', {}, el('strong', {}, 'Para: '), reply.to), el('div', {}, el('strong', {}, 'Assunto: '), reply.subject),
       (reply.warnings || []).map(warning => el('p', {class: 'alert warn'}, warning)), el('pre', {}, reply.reply_text))),
     el('div', {class: 'actions'},
-      el('button', {class: 'primary', onclick: () => run(async () => {
+      el('button', {class: 'primary', onclick: event => run(async () => {
         if (!confirm(`Enviar agora ${count} email(s) reais?`)) return;
         const result = await call('api/send', {property_ref: queueRef(), preview_token: preview.preview_token, confirmed: true});
         const sent = result.results.filter(item => item.status === 'sent').length;
         state = await call('api/state'); renderState();
         toast(`Enviados: ${sent} de ${result.results.length}.` + (sent < result.results.length ? ' Vê os avisos nos que ficaram.' : ''),
           sent === result.results.length ? 'ok' : 'warn');
-      })}, `Enviar ${count} email(s)`),
+      }, event.currentTarget)}, `Enviar ${count} email(s)`),
       el('button', {class: 'link', onclick: () => { preview = null; box.replaceChildren(); }}, 'Cancelar')));
 }
 
@@ -320,11 +340,11 @@ function propertyCard(property) {
       area('third', '3.ª interação: proposta de visita', 3),
       area('fourth', '4.ª interação: marcar a visita', 3),
       area('knowledge', 'Como usar a base de conhecimento', 3),
-      el('button', {class: 'primary', onclick: () => run(async () => {
+      el('button', {class: 'primary', onclick: event => run(async () => {
         const prompts = Object.fromEntries(Object.entries(areas).map(([name, box]) => [name, box.value]));
         settings = await call('api/property/prompts', {reference: property.reference, prompts});
         renderSettings(); await refreshState(); toast('Prompts guardados.');
-      })}, 'Guardar prompts')),
+      }, event.currentTarget)}, 'Guardar prompts')),
     el('button', {class: 'link', onclick: () => fillProperty(property)}, 'Editar dados do anúncio'));
 }
 
@@ -341,15 +361,15 @@ function knowledgeEditor(scope, ref) {
   const box = el('div', {class: 'knowledge-editor'}, el('p', {class: 'muted small'}, 'A carregar…'));
   const load = () => run(async () => {
     const data = await call('api/knowledge', {property_ref: ref});
-    const save = (file, area) => run(async () => {
+    const save = (file, area, button) => run(async () => {
       const result = await call('api/knowledge/save', {scope, property_ref: ref, file, text: area.value});
       state = result.state; renderState(); load();
       toast(`${result.file} guardado. O próximo prompt já o leva.`);
-    });
+    }, button);
     const block = file => {
       const area = el('textarea', {rows: Math.min(18, Math.max(4, file.text.split('\n').length + 1)), 'aria-label': file.file}, file.text);
       return el('div', {class: 'knowledge-file'}, el('p', {class: 'eyebrow'}, file.file), area,
-        el('div', {class: 'actions'}, el('button', {class: 'primary', onclick: () => save(file.file, area)}, 'Guardar ' + file.file)));
+        el('div', {class: 'actions'}, el('button', {class: 'primary', onclick: event => save(file.file, area, event.currentTarget)}, 'Guardar ' + file.file)));
     };
     const name = el('input', {placeholder: 'novo-ficheiro.md', 'aria-label': 'Nome do ficheiro novo'});
     const text = el('textarea', {rows: 3, placeholder: '# Título\n- Um facto por linha.', 'aria-label': 'Texto do ficheiro novo'});
@@ -360,7 +380,7 @@ function knowledgeEditor(scope, ref) {
         : 'Só para este imóvel. O texto entre <!-- e --> fica para ti: não chega ao assistente.'),
       ...(files.length ? files.map(block) : [el('p', {class: 'muted small'}, 'Ainda não há ficheiros.')]),
       el('details', {}, el('summary', {class: 'muted small'}, '+ Novo ficheiro'), name, text,
-        el('div', {class: 'actions'}, el('button', {onclick: () => save(name.value.trim(), text)}, 'Criar ficheiro'))));
+        el('div', {class: 'actions'}, el('button', {onclick: event => save(name.value.trim(), text, event.currentTarget)}, 'Criar ficheiro'))));
   });
   load();
   return box;
@@ -368,13 +388,14 @@ function knowledgeEditor(scope, ref) {
 
 // Visits: the owner picks a day and a window; the proposal goes to every customer except who cannot or will not.
 function visitsPanel(property) {
-  const visits = property.visits || {windows: [], slots: []};
+  const visits = property.visits || {windows: [], slots: [], closed_at: null};
+  const closed = !!visits.closed_at;
   const slot = settings.voice.visits?.slot_minutes || 30;
   const day = el('input', {type: 'date', 'aria-label': 'Dia das visitas'});
   const start = el('input', {type: 'time', value: '17:00', step: slot * 60, 'aria-label': 'Hora de início'});
   const end = el('input', {type: 'time', value: '19:00', step: slot * 60, 'aria-label': 'Hora de fim'});
   const list = el('div', {class: 'visit-candidates'});
-  const choose = () => run(async () => {
+  const choose = event => run(async () => {
     const data = await call('api/visits/candidates', {property_ref: property.reference});
     const rows = data.customers.map(customer => el('label', {class: 'candidate'},
       el('input', {type: 'checkbox', 'data-email': customer.email, checked: customer.state === 'ok',
@@ -382,21 +403,35 @@ function visitsPanel(property) {
       el('span', {}, customer.name || customer.email),
       customer.reason && el('span', {class: 'muted small'}, '— ' + customer.reason)));
     list.replaceChildren(...(rows.length ? rows : [el('p', {class: 'muted small'}, 'Ainda não escrevemos a nenhum cliente deste imóvel.')]),
-      rows.length && el('div', {class: 'actions'}, el('button', {class: 'primary', onclick: () => run(async () => {
+      rows.length && el('div', {class: 'actions'}, el('button', {class: 'primary', onclick: event => run(async () => {
         const emails = [...list.querySelectorAll('input[type=checkbox]:checked')].map(box => box.dataset.email);
         const result = await call('api/visits/propose', {property_ref: property.reference, day: day.value,
           start: start.value, end: end.value, emails});
         state = result.state; settings = result.settings; renderState(); renderSettings();
         toast(`${result.created} proposta(s) de visita na fila de Respostas: prepara-as no ChatGPT como as outras.`);
-      })}, 'Criar propostas')));
-  });
-  return el('details', {class: 'visits-panel'}, el('summary', {class: 'muted small'}, 'Visitas: propor e marcar'),
-    ...(visits.windows.length
+      }, event.currentTarget)}, 'Criar propostas')));
+    toast(`${data.customers.length} cliente(s) encontrados.`);
+  }, event.currentTarget);
+  const closeVisits = el('button', {class: 'link danger', onclick: event => run(async () => {
+    if (!confirm(`Fechar as visitas de ${property.reference}? Prepara um email de agradecimento para cada cliente (pendentes e já respondidos) e os pedidos novos deste imóvel passam a ser respondidos automaticamente.`)) return;
+    const result = await call('api/visits/close', {property_ref: property.reference});
+    state = result.state; settings = result.settings; renderState(); renderSettings();
+    toast(`Visitas fechadas: ${result.drafted} rascunho(s) na fila de Respostas, prontos a rever e enviar.`);
+  }, event.currentTarget)}, 'Fechar visitas e agradecer a todos');
+  const requestConsent = el('button', {onclick: event => run(async () => {
+    const result = await call('api/consent/request', {property_ref: property.reference});
+    state = result.state; renderState();
+    toast(result.drafted ? `${result.drafted} pedido(s) de consentimento na fila de Respostas.` : 'Ninguém por pedir: já foi pedido a todos os que responderam.');
+  }, event.currentTarget)}, 'Pedir consentimento RGPD a quem respondeu');
+  return el('details', {class: 'visits-panel'}, el('summary', {class: 'muted small'}, 'Visitas: propor e marcar' + (closed ? ' (fechadas)' : '')),
+    closed && el('p', {class: 'alert warn'}, `Visitas fechadas em ${when(visits.closed_at)}. Novos pedidos deste imóvel recebem a resposta automática.`),
+    !closed && (visits.windows.length
       ? visits.windows.map(window => el('p', {class: 'small'}, `Proposta: ${dayLabel(window.day)}, das ${window.start} às ${window.end}`))
       : [el('p', {class: 'muted small'}, 'Sem visitas propostas.')]),
-    ...visits.slots.map(booked => el('p', {class: 'small'}, el('strong', {}, slotLabel(booked.at)), ' · ', booked.name || booked.customer)),
-    el('p', {class: 'step'}, `Escolhe o dia e o intervalo. Marcam-se de ${slot} em ${slot} minutos (em Voz e estilo).`),
-    el('div', {class: 'row'}, day, start, end, el('button', {onclick: choose}, 'Escolher clientes')), list);
+    !closed && visits.slots.map(booked => el('p', {class: 'small'}, el('strong', {}, slotLabel(booked.at)), ' · ', booked.name || booked.customer)),
+    !closed && el('p', {class: 'step'}, `Escolhe o dia e o intervalo. Marcam-se de ${slot} em ${slot} minutos (em Voz e estilo).`),
+    !closed && el('div', {class: 'row'}, day, start, end, el('button', {onclick: choose}, 'Escolher clientes')), !closed && list,
+    el('div', {class: 'actions'}, !closed && closeVisits, requestConsent));
 }
 
 function fillProperty(fields) {
@@ -426,6 +461,11 @@ function renderVoice() {
   const rental = el('input', {value: visits.rental || '', placeholder: 'ex.: 15 a 20 minutos'});
   const sale = el('input', {value: visits.sale || '', placeholder: 'ex.: 30 a 40 minutos'});
   const behaviour = el('textarea', {rows: 4}, settings.voice.application_instructions || '');
+  const reminders = settings.voice.reminders || {day2: '', day4: ''};
+  const reminderDay2 = el('textarea', {rows: 2, placeholder: 'ex.: Ainda precisa de alguma informação sobre o imóvel?'}, reminders.day2 || '');
+  const reminderDay4 = el('textarea', {rows: 2, placeholder: 'ex.: Ficamos à disposição se ainda tiver interesse em visitar.'}, reminders.day4 || '');
+  const visitsClosed = el('textarea', {rows: 4, placeholder: 'ex.: Agradecemos o interesse. As visitas a este imóvel já estão fechadas.'}, settings.voice.visits_closed || '');
+  const consentRequest = el('textarea', {rows: 4, placeholder: 'ex.: Podemos guardar o seu contacto para futuras oportunidades semelhantes? Responda "sim" se concordar.'}, settings.voice.consent_request || '');
   $('voice-form').replaceChildren(el('p', {class: 'eyebrow'}, 'VOZ ', kind('voice')),
     choice('greeting', 'Saudação'), choice('languages', 'Idiomas'), choice('closing', 'Fecho'),
     el('label', {class: 'field'}, 'Assinatura (sempre igual, sem tradução)', signature),
@@ -438,59 +478,69 @@ function renderVoice() {
       el('label', {class: 'field'}, 'Marcar visitas de quantos em quantos minutos', slot),
       el('label', {class: 'field'}, 'Uma visita de arrendamento dura', rental),
       el('label', {class: 'field'}, 'Uma visita de compra dura', sale)),
-    el('div', {class: 'actions'}, el('button', {class: 'primary', onclick: () => run(async () => {
+    el('p', {class: 'eyebrow voice-section'}, 'LEMBRETES, VISITAS FECHADAS E CONSENTIMENTO ', kind('voice')),
+    el('p', {class: 'step voice-section'},
+      'Preparados pelo programa (sem ChatGPT) e enviados só depois de reveres e confirmares, como qualquer outro rascunho.'),
+    el('label', {class: 'field'}, 'Lembrete aos 2 dias sem resposta (fica por cima do último texto enviado)', reminderDay2),
+    el('label', {class: 'field'}, 'Lembrete aos 4 dias sem resposta (o segundo e último)', reminderDay4),
+    el('label', {class: 'field'}, 'Email de «visitas fechadas», para todos os clientes do imóvel', visitsClosed),
+    el('label', {class: 'field'}, 'Pedido de consentimento RGPD, para quem já respondeu', consentRequest),
+    el('div', {class: 'actions'}, el('button', {class: 'primary', onclick: event => run(async () => {
       const choices = Object.fromEntries(Object.entries(selects).map(([key, select]) => [key, select.value]));
       settings = await call('api/voice', {...choices, signature: signature.value,
         sender_name: senderName.value, reply_subject: replySubject.value, application_instructions: behaviour.value,
-        visits: {slot_minutes: Number(slot.value), rental: rental.value, sale: sale.value}});
+        visits: {slot_minutes: Number(slot.value), rental: rental.value, sale: sale.value},
+        reminders: {day2: reminderDay2.value, day4: reminderDay4.value},
+        visits_closed: visitsClosed.value, consent_request: consentRequest.value});
       renderSettings(); await refreshState(); toast('Voz guardada.');
-    })}, 'Guardar voz')));
+    }, event.currentTarget)}, 'Guardar voz')));
 }
 
 document.querySelectorAll('[data-tab]').forEach(button => button.addEventListener('click', () => showTab(button.dataset.tab)));
 $('queue').addEventListener('change', renderState);
 $('emails').addEventListener('change', updateSelection);
-$('read').addEventListener('click', () => run(async () => {
+$('read').addEventListener('click', event => run(async () => {
   state = await call('api/read', {days: Number($('days').value) || undefined}); renderState();
   toast(state.added ? `${state.added} email(s) novo(s).` : 'Leitura concluída: nada de novo.');
-}));
-$('copy-prompt').addEventListener('click', () => run(async () => {
+}, event.currentTarget));
+$('copy-prompt').addEventListener('click', event => run(async () => {
   const ids = selectedIds();
   if (!ids.length) throw new Error('Seleciona pelo menos um email.');
   const {prompt} = await call('api/prompt', {property_ref: queueRef(), ids, extra: $('extra').value});
   $('prompt').textContent = prompt;
   await copyText(prompt, `Prompt copiado (${ids.length} email(s)). Cola-o numa conversa do ChatGPT.`, $('prompt-box'));
-}));
-$('paste').addEventListener('click', () => run(async () => {
+}, event.currentTarget));
+$('paste').addEventListener('click', event => run(async () => {
   const result = await call('api/paste', {property_ref: queueRef(), text: $('answer').value});
   state = result.state; renderState();
   $('notes').replaceChildren(...result.notes.map(note => el('p', {class: 'alert warn'}, `Nota do ChatGPT sobre ${nameOf(note.id)}: ${note.nota}`)));
   $('answer').value = '';
   toast(`${result.saved} rascunho(s) guardado(s)` + (result.visits ? ` e ${result.visits} marcação(ões) de visita` : '')
     + '. Revê-os no passo 1 antes de enviar.');
-}));
-$('preview').addEventListener('click', () => run(async () => {
+}, event.currentTarget));
+$('preview').addEventListener('click', event => run(async () => {
   const ids = selectedIds();
   if (!ids.length) throw new Error('Seleciona pelo menos um email.');
   preview = await call('api/preview', {property_ref: queueRef(), ids});
   renderPreview();
-}));
-$('listing-prompt').addEventListener('click', () => run(async () => {
+  toast(`Pré-visualização pronta: ${preview.replies.length} email(s) por rever antes de enviar.`);
+}, event.currentTarget));
+$('listing-prompt').addEventListener('click', event => run(async () => {
   const {prompt} = await call('api/property/prompt', {listing_url: $('listing-url').value});
   $('listing-prompt-text').textContent = prompt;
   await copyText(prompt, 'Prompt copiado. Cola-o no ChatGPT e traz a resposta.', $('listing-prompt-box'));
-}));
-$('listing-parse').addEventListener('click', () => run(async () => {
+}, event.currentTarget));
+$('listing-parse').addEventListener('click', event => run(async () => {
   const {fields} = await call('api/property/parse', {text: $('listing-answer').value});
   fillProperty({...fields, sender: null});
   toast('Campos preenchidos: revê-os antes de guardar.', 'warn');
-}));
-$('property-save').addEventListener('click', () => run(async () => {
+}, event.currentTarget));
+$('property-save').addEventListener('click', event => run(async () => {
   const fields = Object.fromEntries(FIELDS.map(name => [name, $('f-' + name).value.trim() || null]));
   fields.facts = $('f-facts').value;
   const result = await call('api/property/save', {fields});
   settings = result.settings; renderSettings(); await refreshState();
   toast(`Imóvel ${result.reference} ${result.created ? 'criado' : 'atualizado'}. Revê a base de conhecimento na pasta do imóvel.`);
-}));
+}, event.currentTarget));
 
 run(async () => { await loadMetrics(); await refreshState(); await loadSettings(); });
