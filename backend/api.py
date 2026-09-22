@@ -18,7 +18,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from starlette.routing import Route
-from .ai import listing_prompt, parse_listing, parse_replies, reply_prompt, short_id
+from .ai import listing_prompt, parse_listing, parse_replies, parse_visits, reply_prompt, short_id
 from .service import MailService
 
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
@@ -66,7 +66,7 @@ def web_app(folder, token):
         return found
 
     def read(body):
-        result = service.read()
+        result = service.read(body.get("days"))
         current = state()
         current["added"] = sum(item.get("added", 0) for item in result.get("properties", [])) or result.get("added", 0)
         return current
@@ -76,9 +76,13 @@ def web_app(folder, token):
 
     def paste(body):
         current = queue(body.get("property_ref"))
-        replies, notes = parse_replies(str(body.get("text") or ""), current)
-        saved = service.drafts(replies, current["revision"], current["property_ref"])["saved"] if replies else 0
-        return {"saved": saved, "notes": notes, "state": state()}
+        text = str(body.get("text") or "")
+        replies, notes = parse_replies(text, current)
+        visits = parse_visits(text, current)
+        saved = 0
+        if replies or visits:
+            saved = service.drafts(replies, current["revision"], current["property_ref"], visits)["saved"]
+        return {"saved": saved, "notes": notes, "visits": len(visits), "state": state()}
 
     def drafts(body):
         current = queue(body.get("property_ref"))
@@ -116,6 +120,17 @@ def web_app(folder, token):
 
     def property_save(body):
         return {**service.save_property(body.get("fields") or {}), "settings": service.settings()}
+
+    def visit_candidates(body):
+        return service.visit_candidates(body.get("property_ref") or None)
+
+    def visit_propose(body):
+        emails = body.get("emails")
+        if not isinstance(emails, list) or not all(isinstance(email, str) for email in emails):
+            raise ValueError("Escolhe os clientes.")
+        result = service.propose_visits(body.get("property_ref") or None, body.get("day"), body.get("start"),
+                                        body.get("end"), emails)
+        return {**result, "state": state(), "settings": service.settings()}
 
     def property_prompts(body):
         service.save_prompts(str(body.get("reference") or ""), body.get("prompts") or {})
@@ -188,6 +203,17 @@ def web_app(folder, token):
         service.save_photo(str(body.get("reference") or ""), body.get("image"))
         return service.settings()
 
+    def knowledge_save(body):
+        ref = body.get("property_ref") or None
+        result = service.save_knowledge(ref, body.get("file"), body.get("text"), str(body.get("scope") or "property"))
+        return {**result, "knowledge": service.knowledge(ref), "state": state()}
+
+    def note(body):
+        ref = body.get("property_ref") or None
+        result = service.add_note(ref, body.get("text"), str(body.get("scope") or "property"))
+        # The page shows the new knowledge at once, and the next prompt already carries it.
+        return {**result, "knowledge": service.knowledge(ref), "state": state()}
+
     handlers = {"state": ("GET", lambda body: state()), "read": ("POST", read), "prompt": ("POST", prompt),
                 "paste": ("POST", paste), "drafts": ("POST", drafts), "preview": ("POST", preview),
                 "send": ("POST", send), "dismiss": ("POST", dismiss),
@@ -196,7 +222,10 @@ def web_app(folder, token):
                 "property/prompt": ("POST", property_prompt),
                 "property/parse": ("POST", lambda body: {"fields": parse_listing(str(body.get("text") or ""))}),
                 "property/save": ("POST", property_save), "property/prompts": ("POST", property_prompts),
-                "property/photo": ("POST", property_photo)}
+                "property/photo": ("POST", property_photo),
+                "visits/candidates": ("POST", visit_candidates), "visits/propose": ("POST", visit_propose),
+                "knowledge": ("POST", lambda body: service.knowledge(body.get("property_ref") or None)),
+                "knowledge/note": ("POST", note), "knowledge/save": ("POST", knowledge_save)}
     routes = ([Route("/", page), Route("/photo/{ref}", photo)] + [Route(f"/{name}", asset(name)) for name in ASSETS]
               + [Route(f"/api/{name}", api(handler), methods=[method]) for name, (method, handler) in handlers.items()])
     app = Starlette(routes=routes)

@@ -85,6 +85,12 @@
       "text": "{imovel}",
       "status": "configured",
       "description": "Assunto das respostas a pedidos do portal: {imovel} é a descrição do imóvel e {referencia} a referência. Nas respostas diretas do cliente mantém-se «Re: » e o assunto dele."
+    },
+    "visits": {
+      "slot_minutes": 30,
+      "rental": "15 a 20 minutos",
+      "sale": "30 a 40 minutos",
+      "status": "configured"
     }
   },
   "application_instructions": "Aplicar as opções de estilo selecionadas a todas as interações. A saudação e o fecho da configuração de estilo substituem os do texto base. Traduzir o conteúdo para o idioma escolhido, mantendo a assinatura exatamente como configurada. Não produzir várias versões linguísticas na mesma resposta, salvo pedido do proprietário.",

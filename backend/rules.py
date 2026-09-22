@@ -289,3 +289,49 @@ def prepare(item, kind, customer, profile, account):
     fields = {"name": name, "email": recipient["email"] if recipient else None,
               "phone": head[phone_at] if phone_at is not None else None, "message": message or None}
     return {"customer": fields, "recipient": recipient, "blocked": blocked, "warnings": warnings}
+
+
+# Visits: the owner proposes a day and a time window; slots start every `slot` minutes from its start.
+VISIT_SLOT_DEFAULT = 30
+KNOWLEDGE_FILE = re.compile(r"[A-Za-z0-9_-]{1,40}\.md")
+VISIT_STATES = {"nao_quer": "não quer visitar", "outra_data": "só pode noutra data"}
+DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
+CLOCK = re.compile(r"([01]\d|2[0-3]):[0-5]\d")
+
+
+def minutes(clock):
+    hours, mins = clock.split(":")
+    return int(hours) * 60 + int(mins)
+
+
+def check_window(day, start, end):
+    """A proposed visit window: one day, from start to end, as typed by the owner (YYYY-MM-DD, HH:MM)."""
+    day, start, end = (str(value or "").strip() for value in (day, start, end))
+    if not DAY.fullmatch(day) or not CLOCK.fullmatch(start) or not CLOCK.fullmatch(end):
+        raise ValueError("Indica o dia (AAAA-MM-DD) e as horas de início e de fim (HH:MM).")
+    if minutes(end) <= minutes(start):
+        raise ValueError("A hora de fim tem de ser depois da hora de início.")
+    return {"day": day, "start": start, "end": end}
+
+
+def visit_times(window, slot):
+    """The start times inside a window, every `slot` minutes: 17:00, 17:30… (the last one starts before the end)."""
+    first, last = minutes(window["start"]), minutes(window["end"])
+    return [f"{value // 60:02d}:{value % 60:02d}" for value in range(first, last, max(5, int(slot)))]
+
+
+def free_times(window, slot, booked):
+    """The window's times that nobody has yet; booked holds "YYYY-MM-DD HH:MM" values."""
+    return [time for time in visit_times(window, slot) if f"{window['day']} {time}" not in booked]
+
+
+def check_slot(value, windows, slot, booked):
+    """A visit time the assistant proposed: on a window's grid and still free. Returns the window."""
+    value = " ".join(str(value or "").split())
+    day, _, time = value.partition(" ")
+    for window in windows:
+        if window["day"] == day and time in visit_times(window, slot):
+            if value in booked:
+                raise ValueError(f"A hora {time} de {day} já está marcada para outra pessoa.")
+            return window
+    raise ValueError(f"A hora «{value}» não está em nenhum intervalo proposto (de {slot} em {slot} minutos).")

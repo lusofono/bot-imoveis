@@ -88,6 +88,14 @@
       "knowledge": {
         "status": "configured",
         "text": "Usa esta base para responder às perguntas do cliente sobre o imóvel. Responde só com o que aqui está; se a resposta não estiver aqui, diz que vais confirmar e avisa o proprietário."
+      },
+      "third_interaction": {
+        "status": "configured",
+        "text": "Na terceira interação, envias a proposta de visita. Propõe ao cliente o dia e o intervalo indicados na proposta do email e pede-lhe que diga a hora que lhe dá mais jeito dentro desse intervalo. Lembra que as visitas são presenciais. Ainda não marques uma hora concreta. Aplica a saudação, o idioma, o fecho e a assinatura do perfil comum de voz."
+      },
+      "fourth_interaction": {
+        "status": "configured",
+        "text": "Na quarta interação, o cliente respondeu à proposta de visita. Marca-lhe uma hora concreta, só entre as horas livres indicadas em VISITAS e compatível com o que o cliente disse, juntando as visitas no mesmo dia a começar pelas primeiras horas livres. Confirma o dia e a hora no email e põe a hora no campo \"visita\" do JSON. Se o cliente não puder no intervalo, não marques: agradece, diz que vais propor outra data e marca visita_estado outra_data. Se já não quiser visitar, agradece e marca visita_estado nao_quer. Aplica a saudação, o idioma, o fecho e a assinatura do perfil comum de voz."
       }
     },
     "interaction_tracking": {

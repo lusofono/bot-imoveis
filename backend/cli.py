@@ -27,8 +27,9 @@ def main(argv=None):
     parser.add_argument("--instance", type=Path, default=Path(os.environ.get("BOT_MAIL_INSTANCE", ROOT / "data")),
                         help="pasta de dados (por omissão, data/)")
     commands = parser.add_subparsers(dest="action", required=True)
-    for name in ("setup", "read"):
-        commands.add_parser(name)
+    commands.add_parser("setup")
+    commands.add_parser("read").add_argument("--days", type=int,
+                                             help="dias para trás nesta leitura (por omissão, lookback_days)")
     commands.add_parser("stdio", help="MCP local por stdio, para um assistente neste computador")
     commands.add_parser("password", help="guarda só a App Password do Gmail, sem repetir o resto do setup")
     for name in ("pending", "send"):
@@ -96,7 +97,7 @@ def main(argv=None):
             save_password(folder, account, password)
             print("Login IMAP confirmado e App Password guardada no Keychain. Não ficou em nenhum ficheiro do projeto.")
         elif args.action == "read":
-            result = service.read()
+            result = service.read(args.days)
             if "properties" in result:
                 summary = {queue["property_ref"]: {"added": queue["added"], "pending": len(queue["emails"])}
                            for queue in result["properties"]}

@@ -76,6 +76,16 @@ function svg(tag, attrs = {}, ...children) {
   return node;
 }
 
+// What each field is: RAG facts, a prompt, the voice, or text carried to and from ChatGPT.
+const KINDS = {rag: ['RAG', 'Factos que o assistente consulta para responder'], prompt: ['Prompt', 'Instruções de como responder'],
+  voice: ['Voz', 'Estilo comum a todos os imóveis'], copy: ['Copiar/colar', 'Texto que levas e trazes do ChatGPT']};
+function kind(type) { const [label, title] = KINDS[type]; return el('span', {class: 'kind kind-' + type, title}, label); }
+const VISIT_STATES = {nao_quer: 'não quer visitar', outra_data: 'só pode noutra data'};
+function dayLabel(day) {
+  return new Date(day + 'T12:00:00').toLocaleDateString('pt-PT', {weekday: 'long', day: '2-digit', month: '2-digit'});
+}
+function slotLabel(value) { const [day, time] = String(value).split(' '); return `${dayLabel(day)}, ${time}`; }
+
 function when(value) { return value ? new Date(value).toLocaleString('pt-PT', {dateStyle: 'short', timeStyle: 'short'}) : ''; }
 function currentQueue() {
   return state.properties.find(queue => String(queue.property_ref ?? '') === $('queue').value) || state.properties[0];
@@ -121,13 +131,18 @@ function card(email) {
         el('strong', {}, customer.name || sender.name || sender.email || 'Sem nome')),
       email.interaction && el('span', {class: 'tag'}, email.interaction + '.ª interação'),
       el('span', {class: 'tag' + (email.reply_status === 'draft' ? ' draft' : '')}, STATUS[email.reply_status] || email.reply_status || ''),
+      email.kind === 'visit_proposal' && el('span', {class: 'tag visit'}, 'proposta de visita'),
+      email.visit_slot && el('span', {class: 'tag visit'}, 'visita ' + slotLabel(email.visit_slot)),
+      email.visit_status && el('span', {class: 'tag warn'}, VISIT_STATES[email.visit_status] || email.visit_status),
       el('span', {class: 'muted small'}, when(email.date))),
     contact && el('div', {class: 'muted small'}, contact),
     email.blocked && el('p', {class: 'alert bad'}, email.blocked),
     (email.warnings || []).map(warning => el('p', {class: 'alert warn'}, warning)),
     email.reply_error && el('p', {class: 'alert bad'}, email.reply_error),
-    el('blockquote', {}, customer.message || email.body_text || ''),
-    el('details', {}, el('summary', {class: 'muted small'}, 'Email completo'), el('pre', {}, email.body_text || '')),
+    el('blockquote', {}, email.visit_window
+      ? `Proposta de visita: ${dayLabel(email.visit_window.day)}, das ${email.visit_window.start} às ${email.visit_window.end}.`
+      : customer.message || email.body_text || ''),
+    !email.visit_window && el('details', {}, el('summary', {class: 'muted small'}, 'Email completo'), el('pre', {}, email.body_text || '')),
     draft,
     el('div', {class: 'actions'},
       el('button', {onclick: () => run(async () => {
@@ -138,7 +153,38 @@ function card(email) {
         if (!confirm('Retirar este email da fila sem responder? O Gmail não é alterado e o email não volta a entrar.')) return;
         state = await call('api/dismiss', {property_ref: queueRef(), ids: [email.id]});
         renderState(); toast('Email retirado da fila.');
-      })}, 'Retirar da fila')));
+      })}, 'Retirar da fila')),
+    noteBox(queueRef()));
+}
+
+// What the assistant knows about a property, exactly as it gets it: the property's base and the agency's.
+function knowledgeView(ref) {
+  const box = el('div', {class: 'knowledge-view'}, el('p', {class: 'muted small'}, 'A carregar…'));
+  run(async () => {
+    const data = await call('api/knowledge', {property_ref: ref});
+    const block = (title, parts) => el('div', {class: 'knowledge-block'}, el('p', {class: 'eyebrow'}, title),
+      parts.length ? parts.map(part => el('pre', {}, part.text)) : el('p', {class: 'muted small'}, 'Ainda vazio.'));
+    box.replaceChildren(block('Deste imóvel', data.property), block('Da agência, para todos os imóveis', data.agency));
+  });
+  return box;
+}
+
+// One more fact while reviewing a reply: it goes to notas.md and the next prompt already carries it.
+function noteBox(ref, onSaved) {
+  const text = el('textarea', {rows: 2, 'aria-label': 'Informação a acrescentar ao conhecimento',
+    placeholder: 'Ex.: Não tem arrecadação, mas pode guardar algumas coisas no lugar de garagem.'});
+  const scope = el('select', {'aria-label': 'Onde guardar'},
+    el('option', {value: 'property'}, 'Só este imóvel'), el('option', {value: 'agency'}, 'Todos os imóveis (agência)'));
+  return el('details', {class: 'note-box'}, el('summary', {class: 'muted small'}, '+ Acrescentar ao conhecimento'),
+    text, el('div', {class: 'actions'}, scope, el('button', {class: 'primary', onclick: () => run(async () => {
+      const result = await call('api/knowledge/note', {property_ref: ref, scope: scope.value, text: text.value});
+      text.value = '';
+      state = result.state; renderState();
+      toast((result.scope === 'agency' ? 'Guardado no know-how da agência.' : 'Guardado no conhecimento do imóvel.')
+        + ' O próximo prompt já o leva.');
+      if (onSaved) onSaved();
+      else await loadSettings();  // the Imóveis tab lists the knowledge files: keep it current
+    })}, 'Guardar no conhecimento')));
 }
 
 function renderPreview() {
@@ -233,6 +279,9 @@ async function loadSettings() { settings = await call('api/settings'); renderSet
 
 function renderSettings() {
   renderVoice();
+  $('agency-knowledge').replaceChildren(el('p', {class: 'eyebrow'}, 'KNOW-HOW DA AGÊNCIA ', kind('rag')),
+    el('h2', {}, 'Conhecimento comum a todos os imóveis'), knowledgeEditor('agency', null));
+  if (!$('days').value) $('days').value = settings.lookback_days || 7;
   $('property-list').replaceChildren(...(settings.properties.length ? settings.properties.map(propertyCard)
     : [el('p', {class: 'muted'}, 'Ainda não há imóveis: cria o primeiro abaixo.')]));
   if (!$('f-sender').value) $('f-sender').value = settings.properties[0]?.sender || 'reply@idealista.pt';
@@ -250,7 +299,7 @@ function propertyCard(property) {
   const areas = {};
   const area = (name, label, rows) => {
     areas[name] = el('textarea', {rows}, property.prompts[name] || '');
-    return el('label', {class: 'field'}, label, areas[name]);
+    return el('label', {class: 'field'}, el('span', {}, label, kind('prompt')), areas[name]);
   };
   const link = /^https:\/\//.test(property.listing_url || '')
     && el('a', {href: property.listing_url, target: '_blank', rel: 'noopener noreferrer'}, property.listing_url);
@@ -262,17 +311,92 @@ function propertyCard(property) {
       property.knowledge_files.length ? 'conhecimento: ' + property.knowledge_files.join(', ') : 'base de conhecimento vazia']
       .filter(Boolean).join(' · ')),
     link,
-    el('details', {}, el('summary', {class: 'muted small'}, 'Prompts deste imóvel'),
+    knowledgeDetails(property.reference),
+    visitsPanel(property),
+    el('details', {}, el('summary', {class: 'muted small'}, 'Prompts deste imóvel ', kind('prompt')),
       area('general', 'Prompt base: contexto do imóvel', 4),
-      area('first', '1.ª interação', 4), area('first_template', 'Texto base da 1.ª resposta (opcional)', 4),
-      area('second', '2.ª interação (vazio: o ChatGPT avisa-te e aguarda)', 3),
-      area('knowledge', 'Como usar a base de conhecimento (RAG)', 3),
+      area('first', '1.ª interação: primeira resposta', 4), area('first_template', 'Texto base da 1.ª resposta (opcional)', 4),
+      area('second', '2.ª interação: confirmar e pedir o que falta', 3),
+      area('third', '3.ª interação: proposta de visita', 3),
+      area('fourth', '4.ª interação: marcar a visita', 3),
+      area('knowledge', 'Como usar a base de conhecimento', 3),
       el('button', {class: 'primary', onclick: () => run(async () => {
         const prompts = Object.fromEntries(Object.entries(areas).map(([name, box]) => [name, box.value]));
         settings = await call('api/property/prompts', {reference: property.reference, prompts});
         renderSettings(); await refreshState(); toast('Prompts guardados.');
       })}, 'Guardar prompts')),
     el('button', {class: 'link', onclick: () => fillProperty(property)}, 'Editar dados do anúncio'));
+}
+
+function knowledgeDetails(ref) {
+  const view = el('div', {});
+  const show = () => view.replaceChildren(knowledgeEditor('property', ref));
+  return el('details', {ontoggle: event => { if (event.target.open) show(); }},
+    el('summary', {class: 'muted small'}, 'Conhecimento deste imóvel ', kind('rag')),
+    view, noteBox(ref, show));
+}
+
+// The knowledge files as the owner wrote them: each one editable whole, and new ones can be added.
+function knowledgeEditor(scope, ref) {
+  const box = el('div', {class: 'knowledge-editor'}, el('p', {class: 'muted small'}, 'A carregar…'));
+  const load = () => run(async () => {
+    const data = await call('api/knowledge', {property_ref: ref});
+    const save = (file, area) => run(async () => {
+      const result = await call('api/knowledge/save', {scope, property_ref: ref, file, text: area.value});
+      state = result.state; renderState(); load();
+      toast(`${result.file} guardado. O próximo prompt já o leva.`);
+    });
+    const block = file => {
+      const area = el('textarea', {rows: Math.min(18, Math.max(4, file.text.split('\n').length + 1)), 'aria-label': file.file}, file.text);
+      return el('div', {class: 'knowledge-file'}, el('p', {class: 'eyebrow'}, file.file), area,
+        el('div', {class: 'actions'}, el('button', {class: 'primary', onclick: () => save(file.file, area)}, 'Guardar ' + file.file)));
+    };
+    const name = el('input', {placeholder: 'novo-ficheiro.md', 'aria-label': 'Nome do ficheiro novo'});
+    const text = el('textarea', {rows: 3, placeholder: '# Título\n- Um facto por linha.', 'aria-label': 'Texto do ficheiro novo'});
+    const files = data.files[scope] || [];
+    box.replaceChildren(
+      el('p', {class: 'step'}, scope === 'agency'
+        ? 'Vale para todos os imóveis; se o conhecimento de um imóvel disser outra coisa, prevalece o do imóvel.'
+        : 'Só para este imóvel. O texto entre <!-- e --> fica para ti: não chega ao assistente.'),
+      ...(files.length ? files.map(block) : [el('p', {class: 'muted small'}, 'Ainda não há ficheiros.')]),
+      el('details', {}, el('summary', {class: 'muted small'}, '+ Novo ficheiro'), name, text,
+        el('div', {class: 'actions'}, el('button', {onclick: () => save(name.value.trim(), text)}, 'Criar ficheiro'))));
+  });
+  load();
+  return box;
+}
+
+// Visits: the owner picks a day and a window; the proposal goes to every customer except who cannot or will not.
+function visitsPanel(property) {
+  const visits = property.visits || {windows: [], slots: []};
+  const slot = settings.voice.visits?.slot_minutes || 30;
+  const day = el('input', {type: 'date', 'aria-label': 'Dia das visitas'});
+  const start = el('input', {type: 'time', value: '17:00', step: slot * 60, 'aria-label': 'Hora de início'});
+  const end = el('input', {type: 'time', value: '19:00', step: slot * 60, 'aria-label': 'Hora de fim'});
+  const list = el('div', {class: 'visit-candidates'});
+  const choose = () => run(async () => {
+    const data = await call('api/visits/candidates', {property_ref: property.reference});
+    const rows = data.customers.map(customer => el('label', {class: 'candidate'},
+      el('input', {type: 'checkbox', 'data-email': customer.email, checked: customer.state === 'ok',
+        disabled: customer.state === 'pending' || customer.state === 'booked'}),
+      el('span', {}, customer.name || customer.email),
+      customer.reason && el('span', {class: 'muted small'}, '— ' + customer.reason)));
+    list.replaceChildren(...(rows.length ? rows : [el('p', {class: 'muted small'}, 'Ainda não escrevemos a nenhum cliente deste imóvel.')]),
+      rows.length && el('div', {class: 'actions'}, el('button', {class: 'primary', onclick: () => run(async () => {
+        const emails = [...list.querySelectorAll('input[type=checkbox]:checked')].map(box => box.dataset.email);
+        const result = await call('api/visits/propose', {property_ref: property.reference, day: day.value,
+          start: start.value, end: end.value, emails});
+        state = result.state; settings = result.settings; renderState(); renderSettings();
+        toast(`${result.created} proposta(s) de visita na fila de Respostas: prepara-as no ChatGPT como as outras.`);
+      })}, 'Criar propostas')));
+  });
+  return el('details', {class: 'visits-panel'}, el('summary', {class: 'muted small'}, 'Visitas: propor e marcar'),
+    ...(visits.windows.length
+      ? visits.windows.map(window => el('p', {class: 'small'}, `Proposta: ${dayLabel(window.day)}, das ${window.start} às ${window.end}`))
+      : [el('p', {class: 'muted small'}, 'Sem visitas propostas.')]),
+    ...visits.slots.map(booked => el('p', {class: 'small'}, el('strong', {}, slotLabel(booked.at)), ' · ', booked.name || booked.customer)),
+    el('p', {class: 'step'}, `Escolhe o dia e o intervalo. Marcam-se de ${slot} em ${slot} minutos (em Voz e estilo).`),
+    el('div', {class: 'row'}, day, start, end, el('button', {onclick: choose}, 'Escolher clientes')), list);
 }
 
 function fillProperty(fields) {
@@ -297,16 +421,28 @@ function renderVoice() {
   const signature = el('input', {value: settings.voice.signature || ''});
   const senderName = el('input', {value: settings.voice.sender_name || '', placeholder: 'vazio: só o endereço de email'});
   const replySubject = el('input', {value: settings.voice.reply_subject || ''});
-  $('voice-form').replaceChildren(choice('greeting', 'Saudação'), choice('languages', 'Idiomas'), choice('closing', 'Fecho'),
+  const visits = settings.voice.visits || {};
+  const slot = el('input', {type: 'number', min: 10, max: 180, step: 5, value: visits.slot_minutes || 30});
+  const rental = el('input', {value: visits.rental || '', placeholder: 'ex.: 15 a 20 minutos'});
+  const sale = el('input', {value: visits.sale || '', placeholder: 'ex.: 30 a 40 minutos'});
+  const behaviour = el('textarea', {rows: 4}, settings.voice.application_instructions || '');
+  $('voice-form').replaceChildren(el('p', {class: 'eyebrow'}, 'VOZ ', kind('voice')),
+    choice('greeting', 'Saudação'), choice('languages', 'Idiomas'), choice('closing', 'Fecho'),
     el('label', {class: 'field'}, 'Assinatura (sempre igual, sem tradução)', signature),
     el('label', {class: 'field'}, 'Nome do remetente, ao lado do endereço', senderName),
     el('label', {class: 'field'},
       'Assunto das respostas a pedidos do portal ({imovel} e {referencia}). Nas respostas do próprio cliente mantém-se o assunto dele.',
       replySubject),
+    el('label', {class: 'field'}, el('span', {}, 'Comportamento geral: como aplicar a voz em todas as respostas', kind('prompt')), behaviour),
+    el('div', {class: 'grid'},
+      el('label', {class: 'field'}, 'Marcar visitas de quantos em quantos minutos', slot),
+      el('label', {class: 'field'}, 'Uma visita de arrendamento dura', rental),
+      el('label', {class: 'field'}, 'Uma visita de compra dura', sale)),
     el('div', {class: 'actions'}, el('button', {class: 'primary', onclick: () => run(async () => {
       const choices = Object.fromEntries(Object.entries(selects).map(([key, select]) => [key, select.value]));
       settings = await call('api/voice', {...choices, signature: signature.value,
-        sender_name: senderName.value, reply_subject: replySubject.value});
+        sender_name: senderName.value, reply_subject: replySubject.value, application_instructions: behaviour.value,
+        visits: {slot_minutes: Number(slot.value), rental: rental.value, sale: sale.value}});
       renderSettings(); await refreshState(); toast('Voz guardada.');
     })}, 'Guardar voz')));
 }
@@ -315,7 +451,7 @@ document.querySelectorAll('[data-tab]').forEach(button => button.addEventListene
 $('queue').addEventListener('change', renderState);
 $('emails').addEventListener('change', updateSelection);
 $('read').addEventListener('click', () => run(async () => {
-  state = await call('api/read', {}); renderState();
+  state = await call('api/read', {days: Number($('days').value) || undefined}); renderState();
   toast(state.added ? `${state.added} email(s) novo(s).` : 'Leitura concluída: nada de novo.');
 }));
 $('copy-prompt').addEventListener('click', () => run(async () => {
@@ -330,7 +466,8 @@ $('paste').addEventListener('click', () => run(async () => {
   state = result.state; renderState();
   $('notes').replaceChildren(...result.notes.map(note => el('p', {class: 'alert warn'}, `Nota do ChatGPT sobre ${nameOf(note.id)}: ${note.nota}`)));
   $('answer').value = '';
-  toast(`${result.saved} rascunho(s) guardado(s). Revê-os no passo 1 antes de enviar.`);
+  toast(`${result.saved} rascunho(s) guardado(s)` + (result.visits ? ` e ${result.visits} marcação(ões) de visita` : '')
+    + '. Revê-os no passo 1 antes de enviar.');
 }));
 $('preview').addEventListener('click', () => run(async () => {
   const ids = selectedIds();

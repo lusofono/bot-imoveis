@@ -2,16 +2,22 @@
 
 Para começar numa sessão nova. Lê primeiro o `docs/DECISOES.md`, onde a decisão mais recente está no topo.
 
-## Estado (21/09/2026)
+## Estado (22/09/2026)
 
 - **Etapa 1 feita e publicada:** commit `b2c61ee` no ramo `versao-local`, com push para o GitHub. A
   referência é o commit `ef74f54` (tag `referencia-python`, só local), com o código do servidor em pausa.
-- **Etapa 3 (uso real) em curso, à frente da etapa 2.** Ainda sem commit:
+- **Etapa 3 (uso real) feita, à frente da etapa 2.** Está em commit (`864c16d` e o seguinte, de 22/09):
   - App Password guardada no Keychain com `mac/password.command`, que confirma o login antes de guardar;
-  - **primeira leitura real a 21/09:** 35 pedidos, de 07/09 a 20/09, com nome, telefone e mensagem
-    extraídos em todos, nenhum bloqueado e nenhum aviso;
+  - **primeira leitura real a 21/09:** 35 pedidos, com nome, telefone e mensagem extraídos em todos;
+  - **primeiros envios reais:** até 22/09, 44 respostas enviadas depois de aprovadas, a 38 clientes de
+    dois imóveis; 6 clientes já vão na 2.ª interação;
   - assunto e nome do remetente configuráveis na voz;
-  - **falta o primeiro envio real**, aprovado na página e confirmado nos Enviados do Gmail.
+  - **nome do cliente em cada conversa:** o código novo guarda-o em cada envio; nas conversas anteriores,
+    foi preenchido a 22/09 a partir do assunto dos avisos do Idealista (só cabeçalhos). Uma página aberta
+    antes de 21/09 à noite corre o código antigo, que não o guarda: reinicia-a com `./mac/web.command`.
+- **As quatro interações até à visita** (ver `docs/DECISOES.md`, 21/09 à noite): proposta de visita a
+  todos, com exceções, marcação de 30 em 30 minutos na agenda do imóvel, e dias à escolha em cada leitura.
+- **Tudo o que orienta as respostas edita-se na página**, com etiquetas RAG, Prompt, Voz e Copiar/colar.
 - **Feito também, fora das etapas:**
   - Painel com métricas (pendentes, rascunhos, bloqueados, enviados, tempo até resposta, 14 dias);
   - a página redesenhada, com quatro temas visuais;
@@ -19,9 +25,10 @@ Para começar numa sessão nova. Lê primeiro o `docs/DECISOES.md`, onde a decis
   - know-how comum da agência em `data/knowledge/`;
   - `bot-mail demo <pasta>`, para trabalhar na página só com dados fictícios;
   - arrancar a página outra vez fecha a anterior da mesma pasta.
-- **63 testes passam**, todos com dados fictícios.
-- **Dados reais no Mac, fora do Git, em `data/`:** a conta, a voz, o know-how, o perfil e a fila do
-  primeiro imóvel, com 35 pendentes.
+- **71 testes passam**, todos com dados fictícios.
+- **Dados reais no Mac, fora do Git, em `data/`:** a conta, a voz, o know-how, e dois imóveis com o
+  perfil, o conhecimento e a fila de cada um.
+- **Por agora usa-se só copiar/colar;** o MCP fica para depois.
 
 ## Ponto de partida (18/09/2026)
 
@@ -173,9 +180,9 @@ Continua em aberto: **o prompt da 2.ª interação**, que o proprietário ainda 
   implementação em memória.
 - **Fica pronta quando:** só `store.py` abre ficheiros de dados e só `secrets.py` chama o Keychain.
 
-### 3. Uso real no Mac (em curso; passou à frente da 2)
-- Feito: App Password guardada; primeira leitura real (35 pedidos); assunto e remetente configuráveis.
-- Falta: o primeiro envio real; o prompt da 2.ª interação, quando o proprietário o escrever.
+### 3. Uso real no Mac (feita a 21/09/2026; passou à frente da 2)
+- Feito: App Password guardada; primeira leitura real (35 pedidos); primeiros envios reais; assunto e
+  remetente configuráveis; prompts das quatro interações.
 - **Fica pronta quando:** uma resposta real sai depois de aprovação e aparece nos Enviados do Gmail.
 
 ### 4. MCP local
@@ -193,30 +200,30 @@ Continua em aberto: **o prompt da 2.ª interação**, que o proprietário ainda 
 
 Regra comum: o programa prepara, e nada sai sem a pré-visualização do lote e uma confirmação.
 
-1. **O primeiro envio real**, que fecha a etapa 3.
-2. **Registo de contactos** em `data/contactos.csv` (permissões 600, fora do Git), atualizado em cada
+1. **Registo de contactos** em `data/contactos.csv` (permissões 600, fora do Git), atualizado em cada
    leitura. Colunas: `email`, `nome`, `telefone`, `primeiro_contacto`, `imovel`, `fonte` (Idealista),
    `rgpd` (`por_pedir`, `pedido`, `sim` ou `nao`), `rgpd_data` e `rgpd_prova` (o Message-ID da resposta em
    que o cliente disse sim). Os contactos sem `sim` apagam-se 6 meses depois do último contacto. Quem
    pedir para ser apagado sai do CSV, da fila e das conversas.
-3. **Visitas fechadas:** o texto fica na voz. Um botão por imóvel prepara um email para cada cliente desse
+2. **Visitas fechadas:** o texto fica na voz. Um botão por imóvel prepara um email para cada cliente desse
    anúncio, pendentes e já respondidos com endereço válido: um email por pessoa. Depois do envio, o imóvel
    fica «fechado», os pendentes saem da fila e os pedidos novos desse anúncio chegam com o texto preparado.
-4. **Lembretes aos 2 e aos 4 dias sem resposta:** duas frases na voz. Em cada leitura, preparam-se na
+3. **Lembretes aos 2 e aos 4 dias sem resposta:** duas frases na voz. Em cada leitura, preparam-se na
    mesma conversa (`Re:`, `In-Reply-To` do nosso último envio): a frase por cima do último texto que
    enviámos, que passa a ficar guardado na conversa. Param se o cliente responder, se as visitas fecharem ou
    se o email for retirado; no máximo dois.
-5. **Pedido de consentimento:** o texto fica na voz, e há um botão por imóvel para todos os que
+4. **Pedido de consentimento:** o texto fica na voz, e há um botão por imóvel para todos os que
    responderam. Nas respostas que começam por «sim», «yes» ou «oui», a página sugere `sim` e o proprietário
    confirma com um clique; guarda-se a prova.
-6. **O botão para carregar a fotografia** no separador Imóveis (a API já existe).
-7. **Um JSON por run, para o Codex ou o Claude trabalharem sem copiar/colar:** cada run numa pasta
+5. **O botão para carregar a fotografia** no separador Imóveis (a API já existe).
+6. **Um JSON por run, para o Codex ou o Claude trabalharem sem copiar/colar:** cada run numa pasta
    `data/runs/<data-e-hora>/` com `pedidos.json` (o que o agente lê) e `respostas.json` (o que escreve), e
    um comando `bot-mail drafts` que aplica as respostas com as mesmas verificações.
-8. **Separador Definições:** conta, dias de leitura, pasta do Gmail e agendamento, hoje só no terminal.
-9. **Ícone no Desktop:** uma app sem janela de Terminal, com o código de acesso guardado em `data/` para
+7. **Separador Definições:** conta, dias de leitura por omissão, pasta do Gmail e agendamento, hoje só no
+   terminal.
+8. **Ícone no Desktop:** uma app sem janela de Terminal, com o código de acesso guardado em `data/` para
    não mudar a cada arranque.
-10. Etapa 2 (interfaces) e etapa 4 (MCP no Claude Desktop).
+9. Etapa 2 (interfaces) e etapa 4 (MCP no Claude Desktop), quando se voltar a usar MCP.
 
 ## Pendentes que passam para a nova versão
 
@@ -224,8 +231,6 @@ Regra comum: o programa prepara, e nada sai sem a pré-visualização do lote e 
 - Aproveitar os dados «com perfil» do Idealista, para não repetir perguntas.
 - Alojamento local: famílias de emails de outras plataformas (Airbnb, Booking).
 - Prazo de retenção das conversas e das filas (o dos contactos está decidido: 6 meses).
-- A `lookback_days` está em 3. Numa leitura depois de muitos dias parado, sobe-a antes: sem isso, os
-  pedidos mais antigos ficam de fora.
 
 ## Como começar a sessão nova
 
@@ -242,7 +247,7 @@ Antes de fazer qualquer coisa, lê por esta ordem:
 
 Contexto:
 - Sou consultor imobiliário (BigLearn). Respondo a pedidos de arrendamento que chegam por email dos portais, para já do Idealista. Escrevo em português de Portugal; responde-me em pt-PT.
-- A versão local corre no Mac (ramo versao-local): backend em Python (Starlette), página em HTML/CSS/JS e MCP local por stdio. A etapa 1 está feita; a etapa 3 (uso real) está em curso: a App Password está guardada e a primeira leitura real trouxe 35 pedidos. Falta o primeiro envio real.
+- A versão local corre no Mac (ramo versao-local): backend em Python (Starlette), página em HTML/CSS/JS e MCP local por stdio. As etapas 1 e 3 (uso real) estão feitas: a App Password está guardada, a primeira leitura real trouxe 35 pedidos e já saíram as primeiras respostas reais, aprovadas na página. Por agora trabalha-se só por copiar/colar na página; o MCP fica para depois.
 - As chamadas (casos de uso) ficam separadas de onde correm, para mais tarde irem para a AWS Lambda sem reescrever. Um dia, tudo numa .app.
 - O servidor HTTPS alojado está em pausa; localmente basta HTTP em 127.0.0.1.
 

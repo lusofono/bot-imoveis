@@ -1,9 +1,9 @@
 # bot_mail
 
-> **Estado a 21/09/2026.** A versão local corre no Mac: backend em Python (Starlette), página em HTML,
+> **Estado a 22/09/2026.** A versão local corre no Mac: backend em Python (Starlette), página em HTML,
 > CSS e JS com um painel de métricas, e MCP local por stdio. Já leu o Gmail real (35 pedidos, todos
-> extraídos sem erros); falta o primeiro envio real. As chamadas ficam separadas de onde correm, para mais
-> tarde irem para a AWS Lambda e para uma .app. O estado e os próximos passos estão em
+> extraídos sem erros) e já envia respostas reais, aprovadas na página. As chamadas ficam separadas de onde
+> correm, para mais tarde irem para a AWS Lambda e para uma .app. O estado e os próximos passos estão em
 > [docs/PLANO-VERSAO-LOCAL.md](docs/PLANO-VERSAO-LOCAL.md) e as decisões em [docs/DECISOES.md](docs/DECISOES.md).
 > O servidor HTTPS alojado está em pausa: o código dele está na tag `referencia-python`.
 
@@ -45,7 +45,12 @@ Abre `http://127.0.0.1:8765` no browser, já com o link certo. É o mesmo que `.
 - Tem quatro separadores: **Painel** (métricas dos últimos 14 dias, imóveis e estado da configuração),
   **Respostas**, **Imóveis** e **Voz e estilo**, com quatro temas visuais (Noite, Dia, Índigo e Âmbar).
 
-No separador **Respostas**, o fluxo é em lote:
+Tudo o que orienta as respostas edita-se na página, e cada campo diz o que é: **RAG** (factos que o
+assistente consulta: o know-how da agência, em «Voz e estilo», e o conhecimento de cada imóvel, em
+«Imóveis»), **Prompt** (instruções: o comportamento geral e cada interação), **Voz** (estilo comum) e
+**Copiar/colar** (o que levas e trazes do ChatGPT). Por agora usa-se só copiar/colar; o MCP fica para depois.
+
+No separador **Respostas**, o fluxo é em lote. Antes de ler, escolhes quantos dias recuar (7 por omissão):
 
 1. **Ler emails do Gmail** e escolher os emails a tratar.
 2. **Copiar prompt**: um só prompt para todos os selecionados, que colas numa conversa normal do ChatGPT.
@@ -103,6 +108,29 @@ Cada imóvel devolve `instructions`: voz comum + contexto do imóvel + prompt de
 pedes, prazos habituais) escreve-se em `data/knowledge/*.md` e entra nas instruções de todos. Se o
 conhecimento de um imóvel disser outra coisa, prevalece o do imóvel.
 
+**Acrescentar conhecimento a partir da página.** Em cada email de **Respostas** há «+ Acrescentar ao
+conhecimento»: escreves a informação (por exemplo, «Não tem arrecadação, mas pode guardar algumas coisas no
+lugar de garagem.») e escolhes se é só deste imóvel ou de todos. Vai para `knowledge/notas.md` do imóvel ou
+da agência, sem apagar nada do que lá está, e o próximo prompt já a leva. No separador **Imóveis**, cada
+imóvel mostra em «Conhecimento» exatamente o que o assistente recebe, das duas camadas.
+
+## As quatro interações e as visitas
+
+1. **Primeira resposta:** as perguntas do imóvel e ainda quando o cliente gostaria de visitar e qual é a
+   disponibilidade habitual.
+2. **Segunda:** confirma o que o cliente respondeu e volta a pedir só o que falta, sem propor horas.
+3. **Proposta de visita:** em «Imóveis → Visitas», escolhes o dia e o intervalo e depois os clientes. Por
+   omissão vão todos os clientes a quem já escrevemos, exceto quem disse que não quer visitar ou que só pode
+   noutra data (aparecem desmarcados, com o motivo; podes marcá-los), quem tem um email por responder e quem
+   já tem visita. Ficam rascunhos na fila de Respostas, preparados no ChatGPT como os outros.
+4. **Marcação:** quando respondem, o prompt leva as horas livres. O assistente marca uma hora de 30 em 30
+   minutos (definido em «Voz e estilo»), juntando as visitas no mesmo dia, e devolve-a no campo `visita` do
+   JSON. A página recusa horas fora do intervalo ou já ocupadas, e a hora só fica na agenda do imóvel
+   (`properties/<REF>/visitas.json`) depois de o email sair.
+
+Em qualquer interação, se o cliente disser que não quer visitar ou que só pode noutra data, o assistente
+marca-o no campo `visita_estado` (`nao_quer` ou `outra_data`), e a próxima proposta já o deixa de fora.
+
 ## Estrutura
 
 ```text
@@ -129,6 +157,7 @@ data/                      os teus dados (local, ignorado pelo Git)
   properties/<REF>/queue.json       fila do imóvel: pendentes, rascunhos, IDs e etapas das conversas
   properties/<REF>/knowledge/*.md   base de conhecimento do imóvel (RAG)
   properties/<REF>/foto.*           fotografia do imóvel, para o painel
+  properties/<REF>/visitas.json     intervalos propostos e visitas marcadas
   queue.json               fila única, só quando não há imóveis (criado no READ)
   logs/events.jsonl        registos sem conteúdo dos emails
   .page.pid                a página que está a correr, para o arranque seguinte a fechar
@@ -209,6 +238,7 @@ Não copies uma pasta já configurada com os seus segredos.
 | `dismiss_emails` | Retira emails da fila sem responder (o Gmail não é alterado) |
 
 Com mais do que um imóvel, as operações sobre uma fila recebem `property_ref`. Com um só, é opcional.
+Por agora não se usa: o trabalho faz-se por copiar/colar na página.
 
 O assistente tem de mostrar a pré-visualização e obter confirmação humana. A ferramenta de envio está
 marcada como destrutiva e externa para que o cliente peça aprovação. O booleano de confirmação é
@@ -237,10 +267,10 @@ de ferramentas de escrita ativa no assistente e não autorizes envio automático
 .venv/bin/python -m pytest -q
 ```
 
-63 testes: lotes, persistência, falhas SMTP, deduplicação, anexos, leitura IMAP simulada, regras dos
+71 testes: lotes, persistência, falhas SMTP, deduplicação, anexos, leitura IMAP simulada, regras dos
 imóveis, assunto e remetente, links do Idealista, métricas sem dados de clientes, fotografias, página local, MCP local por
 stdio e comandos do terminal, sempre com dados fictícios. Nenhum teste lê uma caixa real ou envia emails.
-A primeira leitura do Gmail real foi feita à mão a 21/09/2026; o primeiro envio real ainda não.
+A primeira leitura do Gmail real e os primeiros envios reais foram feitos à mão a 21/09/2026.
 
 Código de leitura e construção de respostas adaptado do ZIP original `gmail_cycle_mac.zip`.
 O ZIP, configurações pessoais, emails e segredos não são publicados no Git.

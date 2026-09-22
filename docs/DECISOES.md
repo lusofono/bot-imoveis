@@ -3,6 +3,36 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 21/09/2026, à noite: quatro interações até à visita; tudo editável na página
+
+Já construído (71 testes).
+
+**Decisão.**
+- **As quatro interações de cada cliente:**
+  1. a primeira resposta pergunta também quando gostaria de visitar e qual é a disponibilidade habitual;
+  2. a segunda confirma o que o cliente respondeu e volta a pedir só o que falta, sem propor horas;
+  3. a terceira é a **proposta de visita**: o proprietário escolhe o dia e o intervalo, e a proposta vai
+     para todos os clientes do imóvel, **exceto** quem disse que não quer visitar, quem só pode noutra data
+     (esses aparecem desmarcados e podem ser incluídos), quem tem um email por responder e quem já tem visita;
+  4. a quarta **marca a visita**: horas de 30 em 30 minutos dentro do intervalo, juntas no mesmo dia, nunca
+     duas pessoas à mesma hora. A hora fica na agenda do imóvel (`properties/<REF>/visitas.json`) só depois
+     de o email sair.
+- **As visitas ficam na voz:** de quantos em quantos minutos se marcam, e quanto dura uma visita de
+  arrendamento (15 a 20 minutos) e uma de compra (30 a 40). O proprietário espera ou aperta o horário.
+- **O assistente marca no JSON colado** a hora (`visita`) e o que o cliente disse sobre visitar
+  (`visita_estado`: `nao_quer` ou `outra_data`). O programa não lê os emails sozinho.
+- **Cada leitura escolhe quantos dias recua**, com 7 por omissão.
+- **Tudo o que orienta as respostas edita-se na página**, com uma etiqueta que diz o que é: **RAG** (os
+  factos: know-how da agência e conhecimento de cada imóvel), **Prompt** (instruções: comportamento geral e
+  cada interação), **Voz** (estilo comum) e **Copiar/colar** (o que se leva e traz do ChatGPT).
+- **Por agora usa-se só copiar/colar;** o MCP fica para depois.
+
+**Porquê.**
+- As visitas são o objetivo das conversas, e juntá-las no mesmo dia poupa deslocações.
+- Quem já disse que não pode ou não quer não deve receber a proposta; mas o proprietário decide, por isso
+  aparecem desmarcados em vez de escondidos.
+- A hora só fica marcada depois de o email sair: um rascunho apagado ou um envio falhado nunca ocupa horas.
+
 ## 21/09/2026, mais tarde: lembretes, visitas fechadas e contactos com RGPD
 
 Ainda por construir; a forma está nos próximos passos do `docs/PLANO-VERSAO-LOCAL.md`.

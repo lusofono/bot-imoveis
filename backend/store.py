@@ -10,9 +10,12 @@ import json
 import os
 from pathlib import Path
 import tempfile
-from .rules import REFERENCE, check_profile, check_voice, knowledge
+from .rules import KNOWLEDGE_LIMIT, REFERENCE, check_profile, check_voice, knowledge
 
 PHOTO_TYPES = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
+# The file where facts added from the page go, one per line; the assistant reads the text under the title.
+NOTES_HEADING = ("# Notas do proprietário\n\n"
+                 "Acrescentadas ao rever as respostas. Se contradisserem o resto, valem estas.\n\n")
 
 
 def load_json(path, default):
@@ -61,6 +64,11 @@ def locked(folder, name="queue"):
 
 def load_knowledge(folder):
     """The owner-written .md/.txt files in the property's knowledge/, whole, in name order."""
+    return knowledge(knowledge_files(folder))
+
+
+def knowledge_files(folder):
+    """(name, text) of each file in <folder>/knowledge/, exactly as written, comments included."""
     base = Path(folder) / "knowledge"
     files = []
     for path in sorted(base.iterdir()) if base.is_dir() else []:
@@ -69,7 +77,7 @@ def load_knowledge(folder):
         if not path.resolve().is_relative_to(base.resolve()):
             raise ValueError(f"{path.name} aponta para fora da pasta knowledge.")
         files.append((path.name, path.read_text(encoding="utf-8")))
-    return knowledge(files)
+    return files
 
 
 def load_profiles(folder, account):
@@ -141,3 +149,42 @@ def read_photo(folder, ref):
     """(bytes, media type) of the property's photo, or None."""
     found = find_photo(folder, ref)
     return (found[0].read_bytes(), found[1]) if found else None
+
+
+def save_text(path, text):
+    """Written like save_json: whole or not at all, and private (600)."""
+    path = Path(path)
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=".write-", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            stream.write(text)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+
+def add_note(base, text, day):
+    """One fact at the end of <base>/knowledge/notas.md, if the whole base stays within its limit.
+
+    The date goes in an HTML comment: the owner sees it in the file, the assistant never does.
+    """
+    size = sum(len(part["text"]) for part in load_knowledge(base))
+    if size + len(text) > KNOWLEDGE_LIMIT:
+        raise ValueError(f"A base de conhecimento já tem {size} caracteres; o limite é {KNOWLEDGE_LIMIT}. "
+                         "Resume os ficheiros antes de acrescentar.")
+    path = Path(base) / "knowledge" / "notas.md"
+    current = path.read_text(encoding="utf-8").rstrip("\n") + "\n" if path.exists() else NOTES_HEADING
+    save_text(path, current + f"- {text} <!-- {day:%d/%m/%Y} -->\n")
+
+
+def load_visits(folder, ref):
+    """properties/<REF>/visitas.json: the windows the owner proposed and the times already booked."""
+    return load_json(property_folder(folder, ref) / "visitas.json", {"windows": [], "slots": []})
+
+
+def save_visits(folder, ref, agenda):
+    save_json(property_folder(folder, ref) / "visitas.json", agenda)

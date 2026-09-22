@@ -4,7 +4,7 @@ import pytest
 from starlette.testclient import TestClient
 from backend.ai import parse_replies, short_id
 from backend.api import web_app
-from test_properties import CUSTOMER, REF, SMTP, lead, read, service  # noqa: F401 (service is a fixture)
+from test_properties import CUSTOMER, REF, SMTP, draft_and_send, lead, read, service  # noqa: F401 (service is a fixture)
 
 TOKEN = "test-token"
 
@@ -173,3 +173,56 @@ def test_property_photo_is_the_owners_file_and_needs_the_page(service, page):
     served = client.get(f"/photo/{REF}")
     assert served.status_code == 200 and served.headers["content-type"] == "image/png"
     assert client.get("/photo/..%2Fconfig.json").status_code == 404
+
+
+def test_the_owner_adds_knowledge_while_reviewing_replies(service, page):
+    _, call = page
+    read(service, [lead("1")])
+    status, known = call("/api/knowledge", {"property_ref": REF})
+    assert status == 200 and (known["property"], known["agency"]) == ([], [])
+    status, result = call("/api/knowledge/note", {"property_ref": REF, "scope": "property",
+                                                  "text": "Não tem arrecadação,\n mas pode usar a garagem."})
+    assert status == 200 and result["scope"] == "property"
+    assert "Não tem arrecadação, mas pode usar a garagem." in result["state"]["properties"][0]["instructions"]
+    [notes] = result["knowledge"]["property"]
+    # The owner sees the date in the file; the assistant gets the note and the rule, never the comment.
+    assert notes["file"] == "notas.md" and "valem estas" in notes["text"] and "<!--" not in notes["text"]
+    assert (service.folder / "properties" / REF / "knowledge" / "notas.md").stat().st_mode & 0o077 == 0
+    status, result = call("/api/knowledge/note", {"property_ref": REF, "scope": "agency", "text": "Visitas só por email."})
+    assert "Visitas só por email." in result["knowledge"]["agency"][0]["text"]
+    for bad in ({"property_ref": REF, "scope": "property", "text": "  "},
+                {"property_ref": REF, "scope": "outro", "text": "x"},
+                {"property_ref": "../fora", "scope": "property", "text": "x"}):
+        assert call("/api/knowledge/note", bad)[0] == 400
+    assert not (service.folder / "fora").exists()
+
+
+def test_visits_and_knowledge_are_edited_on_the_page(service, page):
+    from datetime import date, timedelta
+    _, call = page
+    day = (date.today() + timedelta(days=1)).isoformat()
+    read(service, [lead("1")])
+    draft_and_send(service, "1")
+    status, data = call("/api/visits/candidates", {"property_ref": REF})
+    assert status == 200 and [(c["email"], c["state"]) for c in data["customers"]] == [(CUSTOMER, "ok")]
+    status, result = call("/api/visits/propose", {"property_ref": REF, "day": day, "start": "17:00", "end": "18:00",
+                                                  "emails": [CUSTOMER]})
+    assert status == 200 and result["created"] == 1
+    [proposal] = [e for e in result["state"]["properties"][0]["emails"] if e.get("kind") == "visit_proposal"]
+    assert proposal["interaction"] == 3 and proposal["visit_window"]["day"] == day
+
+    # Knowledge (RAG) files are saved whole, in the property or for the whole agency; a bad name is refused.
+    status, saved = call("/api/knowledge/save", {"scope": "property", "property_ref": REF, "file": "visitas.md",
+                                                 "text": "# Visitas\n- Só presenciais."})
+    assert status == 200 and any(f["file"] == "visitas.md" for f in saved["knowledge"]["files"]["property"])
+    status, error = call("/api/knowledge/save", {"scope": "agency", "file": "../fora.md", "text": "x"})
+    assert status == 400 and not (service.folder / "fora.md").exists()
+    status, saved = call("/api/knowledge/save", {"scope": "agency", "file": "know-how.md",
+                                                 "text": "# Know-how\n- Visitas presenciais."})
+    assert status == 200 and "Visitas presenciais" in json.dumps(saved["knowledge"]["agency"], ensure_ascii=False)
+
+    # Each read can look further back than the default.
+    with patch("backend.service.app_password", return_value="fake"), patch(
+            "backend.service.read_messages", return_value=([], 0, "INBOX")) as fetch:
+        status, _ = call("/api/read", {"days": 30})
+    assert status == 200 and fetch.call_args.args[3] == (date.today() - timedelta(days=30)).isoformat()

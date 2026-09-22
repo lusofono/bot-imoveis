@@ -284,3 +284,12 @@ def test_a_listing_code_that_contradicts_the_link_is_refused():
     with pytest.raises(ValueError, match="não corresponde"):
         clean_property({"reference": REF, "description": "T2", "listing_id": "1",
                         "listing_url": "https://www.idealista.pt/imovel/12345678/"})
+
+
+def test_notes_never_push_the_knowledge_past_its_limit(service):
+    base = service.folder / "properties" / REF / "knowledge"
+    base.mkdir()
+    (base / "grande.md").write_text("# Grande\n- " + "x" * 29980 + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="limite"):
+        service.add_note(REF, "Mais uma informação útil.")
+    assert not (base / "notas.md").exists()

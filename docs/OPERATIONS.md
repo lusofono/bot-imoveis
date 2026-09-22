@@ -27,15 +27,18 @@ Os outros ficheiros da pasta de dados:
   respostas a pedidos do portal, com `{imovel}` e `{referencia}`).
 - `knowledge/*.md`: o know-how comum da agência, para todos os imóveis.
 - `properties/<REF>/foto.jpg`, `.png` ou `.webp`: a fotografia do imóvel, com permissões 600.
+- `properties/<REF>/visitas.json`: os intervalos de visita propostos e as visitas marcadas (dia e hora,
+  email e nome do cliente). Uma hora só entra aqui depois de o email que a marca sair.
 - `.page.pid` e `.queue.lock`: ficheiros técnicos da página e do bloqueio. Não se editam.
 
 ## Leitura do Gmail
 
 A leitura procura por datas na pasta «Todos» (ou na Caixa de entrada, conforme `mailbox`), ignora os IDs
 que já estão na fila, respondidos ou retirados, e lê com `BODY.PEEK`: não marca nada como lido, e estar
-lido ou não lido não conta. A primeira leitura recua `lookback_days`; as seguintes recuam até à anterior.
-Depois de muitos dias parado, sobe `lookback_days` em `config.json` antes de ler e volta a baixá-lo a
-seguir, porque o valor alarga todas as leituras.
+lido ou não lido não conta. Cada leitura recua os dias que escolheres, na página ou com
+`bot-mail read --days N`; por omissão, os `lookback_days` da configuração (7). Nunca recua menos do que até
+à leitura anterior, por isso, depois de muitos dias parado, não se perde nada. Para ir buscar pedidos mais
+antigos (por exemplo, de um imóvel acabado de configurar), escolhe mais dias só nessa leitura.
 
 A App Password guarda-se ou troca-se com `mac/password.command`, que confirma o login antes de guardar.
 

@@ -46,6 +46,7 @@
     <ol class="workflow"><li><a href="#inbox-step"><span>01</span> Selecionar</a></li><li><a href="#prepare-step"><span>02</span> Preparar</a></li><li><a href="#import-step"><span>03</span> Importar</a></li><li><a href="#send-step"><span>04</span> Rever e enviar</a></li></ol>
     <div class="row">
       <label class="muted">Imóvel <select id="queue"></select></label>
+      <label class="muted">Dias para trás <input id="days" class="days-input" type="number" min="1" max="365" aria-label="Dias para trás nesta leitura"></label>
       <button id="read" class="primary">Ler emails do Gmail</button>
       <span id="last-read" class="muted small"></span>
     </div>
@@ -55,13 +56,13 @@
     <div id="emails"></div>
     <details><summary class="muted small">Instruções deste imóvel (voz, contexto, interações)</summary><pre id="instructions"></pre></details>
 
-    </div><aside class="batch-column" aria-label="Preparação do lote"><article class="card" id="prepare-step"><p class="eyebrow">PASSO 02</p><h2>Preparar no ChatGPT</h2>
+    </div><aside class="batch-column" aria-label="Preparação do lote"><article class="card" id="prepare-step"><p class="eyebrow">PASSO 02</p><h2>Preparar no ChatGPT <span class="kind kind-copy">Copiar/colar</span></h2>
     <p class="step">O prompt leva as instruções e as mensagens, sem o email nem o telefone dos clientes.</p>
     <textarea id="extra" aria-label="Instruções extra para o lote" rows="2" placeholder="Instruções extra para este lote (opcional), ex.: sê breve"></textarea>
     <div class="actions"><button id="copy-prompt" class="primary">Copiar prompt</button></div>
     <details id="prompt-box"><summary class="muted small">Ver o prompt</summary><pre id="prompt"></pre></details>
 
-    </article><article class="card" id="import-step"><p class="eyebrow">PASSO 03</p><h2>Importar respostas</h2>
+    </article><article class="card" id="import-step"><p class="eyebrow">PASSO 03</p><h2>Importar respostas <span class="kind kind-copy">Copiar/colar</span></h2>
     <textarea id="answer" aria-label="Resposta do ChatGPT" rows="6" placeholder="Cola aqui a resposta completa do ChatGPT (o bloco JSON)"></textarea>
     <div class="actions"><button id="paste" class="primary">Guardar rascunhos</button></div>
     <div id="notes"></div>
@@ -74,9 +75,10 @@
 
   <section id="tab-properties" hidden>
     <div class="page-heading"><div><p class="eyebrow">CARTEIRA</p><h1>Cada imóvel, o seu contexto.</h1><p class="step">Anúncios, conhecimento e instruções para respostas mais úteis.</p></div><a class="button primary" href="#property-editor">Adicionar imóvel +</a></div>
+    <p class="kind-legend"><span class="kind kind-rag">RAG</span> factos que o assistente consulta · <span class="kind kind-prompt">Prompt</span> instruções de como responder · <span class="kind kind-voice">Voz</span> estilo comum · <span class="kind kind-copy">Copiar/colar</span> texto que levas e trazes do ChatGPT</p>
     <div id="property-list"></div>
     <article class="card editor-card" id="property-editor">
-      <p class="eyebrow">FICHA DO IMÓVEL</p><h2>Novo imóvel ou dados do anúncio</h2>
+      <p class="eyebrow">FICHA DO IMÓVEL</p><h2>Novo imóvel ou dados do anúncio <span class="kind kind-copy">Copiar/colar</span></h2>
       <p class="step">À mão, ou com o ChatGPT: cola o link do anúncio, copia o prompt, cola a resposta e revê os campos.</p>
       <div class="row">
         <input id="listing-url" aria-label="Link do anúncio para importar" placeholder="https://www.idealista.pt/imovel/…">
@@ -94,7 +96,7 @@
         <label class="field">Renda anunciada (€)<input id="f-advertised_rent_eur"></label>
       </div>
       <label class="field">Descrição curta<input id="f-description" placeholder="Apartamento T3 na Rua …, Localidade"></label>
-      <label class="field">Características do anúncio, uma por linha (vão para a base de conhecimento)<textarea id="f-facts" rows="5"></textarea></label>
+      <label class="field"><span>Características do anúncio <span class="kind kind-rag">RAG</span></span> Uma por linha (substituem as anteriores; para juntar uma informação, usa «Acrescentar ao conhecimento»)<textarea id="f-facts" rows="5"></textarea></label>
       <div class="actions"><button id="property-save" class="primary">Guardar imóvel</button></div>
     </article>
   </section>
@@ -102,7 +104,9 @@
   <section id="tab-voice" hidden>
     <div class="page-heading"><div><p class="eyebrow">PERSONALIZAÇÃO</p><h1>As tuas palavras. O teu estilo.</h1><p class="step">Define como te apresentas em cada resposta.</p></div></div>
     <p class="step">Comum a todos os imóveis. Sem estas escolhas, nenhuma resposta é preparada.</p>
+    <p class="kind-legend"><span class="kind kind-rag">RAG</span> factos que o assistente consulta · <span class="kind kind-prompt">Prompt</span> instruções de como responder · <span class="kind kind-voice">Voz</span> estilo comum · <span class="kind kind-copy">Copiar/colar</span> texto que levas e trazes do ChatGPT</p>
     <article class="card" id="voice-form"></article>
+    <article class="card" id="agency-knowledge"></article>
   </section>
 </main></div>
 <div id="toast" role="status" aria-live="polite" hidden></div>

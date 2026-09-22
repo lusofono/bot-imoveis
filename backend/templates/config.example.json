@@ -2,6 +2,6 @@
   "account": "",
   "subject_contains": "",
   "mailbox": "all",
-  "lookback_days": 2,
+  "lookback_days": 7,
   "incoming_only": true
 }

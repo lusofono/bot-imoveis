@@ -39,10 +39,11 @@ def create_server(folder):
         return await anyio.to_thread.run_sync(partial(function, *args))
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True))
-    async def read_emails() -> dict:
-        """Consulta Gmail e acrescenta emails novos (uma fila por imóvel, se houver perfis).
-        Devolve os pendentes e as instruções de cada imóvel. Não envia."""
-        return await run(service.read)
+    async def read_emails(days: int | None = None) -> dict:
+        """Consulta Gmail e acrescenta emails novos (uma fila por imóvel, se houver perfis). days: quantos dias
+        para trás nesta leitura (por omissão, os da configuração). Devolve os pendentes e as instruções de cada
+        imóvel. Não envia."""
+        return await run(service.read, days)
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False))
     async def list_pending(property_ref: str | None = None) -> dict:
