@@ -122,6 +122,20 @@ def test_sender_name_and_subject_come_from_the_voice(service):
     assert SMTP.sent[0]["From"] == "owner@example.com"
 
 
+def test_preview_without_a_draft_says_which_step_is_missing(service):
+    read(service, [lead("1")])
+    with pytest.raises(ValueError, match="ainda sem rascunho \\(Ana Exemplo\\).*passos 02 e 03"):
+        service.preview(["1"])
+
+
+def test_language_option_adds_an_english_translation_below_portuguese_english_spanish(service):
+    service.save_voice({"greeting": "formal", "languages": "multilingual_en_backup", "closing": "cordial",
+                        "signature": "Equipa Teste"})
+    instructions = read(service, [lead("1")])["properties"][0]["instructions"]
+    assert "não for" in instructions and "português, inglês nem espanhol" in instructions
+    assert "tradução completa em inglês" in instructions
+
+
 @pytest.mark.parametrize("reply_to, notice", [
     ((), "não tem Reply-To"),
     (("a@example.com", "b@example.com"), "não identifica um único"),
@@ -241,7 +255,7 @@ def test_ambiguous_or_impossible_rent_is_refused(rent):
         clean_property({"reference": REF, "description": "T2", "advertised_rent_eur": rent})
 
 
-def test_dashboard_numbers_never_carry_customer_data(service):
+def test_dashboard_carries_first_names_only_never_contacts(service):
     read(service, [lead("1"), lead("2", reply_to=())])
     with patch("backend.service.has_app_password", return_value=False):
         metrics = service.metrics()
@@ -257,6 +271,13 @@ def test_dashboard_numbers_never_carry_customer_data(service):
         after = service.metrics()
     assert after["totals"]["answered"] == 1 and after["totals"]["pending"] == 1
     assert after["by_day"][-1]["sent"] == 1  # the send was logged today
+    # The one exception (22/09): who was answered, by first name, for the hover of «Respostas enviadas».
+    today = after["by_day"][-1]["day"]
+    assert after["properties"][0]["answered_customers"] == [
+        {"name": "Ana", "first_contact": today, "last_reply": today, "interactions": 1}]
+    text = json.dumps(after, ensure_ascii=False)
+    for private in (CUSTOMER, "900 000 001", "Ana Exemplo"):
+        assert private not in text
 
 
 def test_the_agency_knowhow_reaches_every_property(service):

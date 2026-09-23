@@ -11,6 +11,7 @@ import signal
 import subprocess
 import threading
 import time
+import tomllib
 from pathlib import Path
 from urllib.parse import urlsplit
 from starlette.applications import Starlette
@@ -26,6 +27,8 @@ COOKIE = "bot_mail_web"
 # The page's own files. index.html is only served at "/", with the token written into it.
 ASSETS = {"app.js": "text/javascript", "style.css": "text/css"}
 HEADERS = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
+# pyproject.toml is the one place the version is written; CHANGELOG.md logs what changed at each one.
+VERSION = tomllib.loads((Path(__file__).resolve().parents[1] / "pyproject.toml").read_text())["project"]["version"]
 
 
 def same(supplied, token):
@@ -151,6 +154,21 @@ def web_app(folder, token):
         service.save_prompts(str(body.get("reference") or ""), body.get("prompts") or {})
         return service.settings()
 
+    def contact_save(body):
+        return {**service.save_contact(body.get("contact") or {}), **service.contacts()}
+
+    def contact_delete(body):
+        result = service.delete_contact(body.get("email"), body.get("imovel") or None)
+        return {**result, **service.contacts(), "state": state()}
+
+    def digest_save(body):
+        return service.save_digest_text(body.get("text"))
+
+    def digest_send(body):
+        if body.get("confirmed") is not True:
+            raise ValueError("Confirma o envio na página.")
+        return service.send_digest(True)
+
     # One operation at a time from this page: a second click waits instead of failing on the
     # file lock. Other processes (MCP, terminal) still meet the file lock.
     serial = threading.Lock()
@@ -189,7 +207,7 @@ def web_app(folder, token):
             return PlainTextResponse("Abre o link mostrado no terminal ao iniciar a página.", 403)
         nonce = secrets.token_urlsafe(16)
         text = (FRONTEND / "index.html").read_text(encoding="utf-8")
-        for name, value in (("TOKEN", token), ("NONCE", nonce)):
+        for name, value in (("TOKEN", token), ("NONCE", nonce), ("VERSION", VERSION)):
             text = text.replace("{{" + name + "}}", value)
         return HTMLResponse(text, headers={
             **HEADERS, "Referrer-Policy": "no-referrer",
@@ -214,6 +232,17 @@ def web_app(folder, token):
             return PlainTextResponse("Sem fotografia.", 404)
         return Response(found[0], media_type=found[1], headers=HEADERS)
 
+    async def contacts_csv(request):
+        # A download link cannot send the token header either: the page's cookie is the proof, as for photos.
+        if not same(request.cookies.get(COOKIE), token):
+            return PlainTextResponse("Abre o link mostrado no terminal ao iniciar a página.", 403)
+        try:
+            data = await run_in_threadpool(one_at_a_time, lambda body: service.contacts_csv(), {})
+        except (ValueError, RuntimeError) as exc:
+            return PlainTextResponse(str(exc), 400)
+        return Response(data, media_type="text/csv; charset=utf-8",
+                        headers={**HEADERS, "Content-Disposition": 'attachment; filename="contactos.csv"'})
+
     def property_photo(body):
         service.save_photo(str(body.get("reference") or ""), body.get("image"))
         return service.settings()
@@ -232,7 +261,7 @@ def web_app(folder, token):
     handlers = {"state": ("GET", lambda body: state()), "read": ("POST", read), "prompt": ("POST", prompt),
                 "paste": ("POST", paste), "drafts": ("POST", drafts), "preview": ("POST", preview),
                 "send": ("POST", send), "dismiss": ("POST", dismiss),
-                "metrics": ("GET", lambda body: service.metrics()),
+                "metrics": ("POST", lambda body: service.metrics(int(body.get("days") or 14))),
                 "settings": ("GET", lambda body: service.settings()), "voice": ("POST", voice),
                 "property/prompt": ("POST", property_prompt),
                 "property/parse": ("POST", lambda body: {"fields": parse_listing(str(body.get("text") or ""))}),
@@ -241,9 +270,14 @@ def web_app(folder, token):
                 "visits/candidates": ("POST", visit_candidates), "visits/propose": ("POST", visit_propose),
                 "visits/close": ("POST", visits_close),
                 "consent/request": ("POST", consent_request), "consent/confirm": ("POST", consent_confirm),
+                "contacts": ("GET", lambda body: service.contacts()),
+                "contacts/save": ("POST", contact_save), "contacts/delete": ("POST", contact_delete),
+                "digest": ("GET", lambda body: service.digest_view()),
+                "digest/save": ("POST", digest_save), "digest/send": ("POST", digest_send),
                 "knowledge": ("POST", lambda body: service.knowledge(body.get("property_ref") or None)),
                 "knowledge/note": ("POST", note), "knowledge/save": ("POST", knowledge_save)}
-    routes = ([Route("/", page), Route("/photo/{ref}", photo)] + [Route(f"/{name}", asset(name)) for name in ASSETS]
+    routes = ([Route("/", page), Route("/photo/{ref}", photo), Route("/contactos.csv", contacts_csv)]
+              + [Route(f"/{name}", asset(name)) for name in ASSETS]
               + [Route(f"/api/{name}", api(handler), methods=[method]) for name, (method, handler) in handlers.items()])
     app = Starlette(routes=routes)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
@@ -281,7 +315,7 @@ def serve(folder, port=8765, open_browser=True):
     (Path(folder) / ".page.pid").write_text(str(os.getpid()))
     token = secrets.token_urlsafe(24)
     url = f"http://127.0.0.1:{port}/?t={token}"
-    print(f"Página do bot_mail: {url}\nO link muda a cada arranque. Ctrl+C para parar.", flush=True)
+    print(f"Real Estate AI Assistant v{VERSION}: {url}\nO link muda a cada arranque. Ctrl+C para parar.", flush=True)
     if open_browser:
         threading.Timer(1.0, webbrowser.open, [url]).start()
     uvicorn.run(web_app(folder, token), host="127.0.0.1", port=port, access_log=False, log_level="warning")

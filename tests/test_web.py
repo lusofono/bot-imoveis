@@ -3,7 +3,7 @@ from unittest.mock import patch
 import pytest
 from starlette.testclient import TestClient
 from backend.ai import parse_replies, short_id
-from backend.api import web_app
+from backend.api import VERSION, web_app
 from test_properties import CUSTOMER, REF, SMTP, draft_and_send, lead, read, service  # noqa: F401 (service is a fixture)
 
 TOKEN = "test-token"
@@ -29,6 +29,7 @@ def test_page_needs_the_start_link_and_the_api_needs_the_token(page):
     assert html.status_code == 200 and TOKEN in html.text
     nonce = html.headers["content-security-policy"].split("'nonce-")[1].split("'")[0]
     assert f'<script nonce="{nonce}">' in html.text and "{{" not in html.text
+    assert f"v{VERSION}" in html.text  # the version shown on the page is pyproject.toml's
     assert client.get("/api/state").status_code == 403
     assert client.post("/api/send", json={"confirmed": True}, headers={"X-Bot-Mail-Token": "wrong"}).status_code == 403
     assert client.get("/", headers={"Host": "evil.example"}).status_code == 400
@@ -226,3 +227,13 @@ def test_visits_and_knowledge_are_edited_on_the_page(service, page):
             "backend.service.read_messages", return_value=([], 0, "INBOX")) as fetch:
         status, _ = call("/api/read", {"days": 30})
     assert status == 200 and fetch.call_args.args[3] == (date.today() - timedelta(days=30)).isoformat()
+
+
+def test_the_contacts_csv_downloads_only_with_the_page_cookie(service, page):
+    client, _ = page
+    assert client.get("/contactos.csv").status_code == 403
+    client.get(f"/?t={TOKEN}")
+    read(service, [lead("1")])
+    response = client.get("/contactos.csv")
+    assert response.status_code == 200 and response.headers["content-type"].startswith("text/csv")
+    assert response.content.startswith(b"\xef\xbb\xbf") and CUSTOMER in response.text

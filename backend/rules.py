@@ -297,6 +297,7 @@ KNOWLEDGE_FILE = re.compile(r"[A-Za-z0-9_-]{1,40}\.md")
 VISIT_STATES = {"nao_quer": "não quer visitar", "outra_data": "só pode noutra data"}
 DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
 CLOCK = re.compile(r"([01]\d|2[0-3]):[0-5]\d")
+RGPD_STATES = {"por_pedir": "por pedir", "pedido": "pedido", "sim": "sim", "nao": "não"}
 # A reply to the consent request: the customer's own words, checked only for a leading yes.
 CONSENT_YES = re.compile(r"^\s*(sim|yes|oui)\b", re.I)
 

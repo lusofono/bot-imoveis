@@ -3,18 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>bot_mail</title>
+<title>Real Estate AI Assistant</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <a class="skip-link" href="#main">Saltar para o conteúdo</a>
 <header class="sidebar">
-  <div class="brand"><span class="brand-mark" aria-hidden="true">b.</span><strong>bot<span>mail</span></strong></div>
+  <div class="brand"><span class="brand-mark" aria-hidden="true">⌂</span><div class="brand-text"><strong class="brand-name">Real Estate <span>AI Assistant</span></strong><span class="brand-by">by BigLearn PT</span><span class="app-version" title="Versão da aplicação (ver CHANGELOG.md)">v{{VERSION}}</span></div></div>
   <p class="nav-label">ESPAÇO DE TRABALHO</p>
   <nav aria-label="Navegação principal">
     <button class="tab active" data-tab="dashboard" aria-current="page"><span aria-hidden="true">◫</span>Painel</button>
     <button class="tab" data-tab="replies"><span aria-hidden="true">↗</span>Respostas <span id="nav-count" class="nav-count">0</span></button>
     <button class="tab" data-tab="properties"><span aria-hidden="true">▤</span>Imóveis</button>
+    <button class="tab" data-tab="contacts"><span aria-hidden="true">◎</span>Contactos</button>
     <button class="tab" data-tab="voice"><span aria-hidden="true">≋</span>Voz e estilo</button>
   </nav>
   <div class="sidebar-note"><span class="status-dot"></span> Ambiente local<p>O envio fica sempre<br>sob o teu controlo.</p></div>
@@ -31,9 +32,14 @@
     <div class="metrics" id="metric-cards"></div>
     <p id="dashboard-read" class="muted small"></p>
 
-    <div class="dashboard-grid"><article class="card activity-card"><div class="section-heading"><div><p class="eyebrow">ATIVIDADE</p><h2>O ritmo dos teus contactos</h2></div><span class="tag">Últimos 14 dias</span></div>
+    <div id="digest-panel"></div>
+
+    <div class="dashboard-grid"><article class="card activity-card"><div class="section-heading"><div><p class="eyebrow">ATIVIDADE</p><h2>O ritmo dos teus contactos</h2></div><select id="chart-period" class="period-select" aria-label="Período do gráfico">
+        <option value="3">Últimos 3 dias</option><option value="7">Última semana</option>
+        <option value="14" selected>Últimas 2 semanas</option><option value="30">Último mês</option>
+        <option value="90">Últimos 3 meses</option></select></div>
       <div id="dashboard-chart"></div>
-      <div class="legend"><span class="requests">Pedidos recebidos</span><span class="sent">Respostas enviadas</span></div>
+      <div class="legend"><span class="requests">Pedidos recebidos</span><span class="sent">Respostas enviadas</span><span id="chart-note" class="muted"></span></div>
     </article>
 
     <article class="card setup-card"><p class="eyebrow">O TEU ESPAÇO</p><h2>Pronto para trabalhar</h2><ul class="checks" id="dashboard-setup"></ul><button class="link" data-tab="voice">Ajustar preferências →</button></article></div>
@@ -43,7 +49,12 @@
 
   <section id="tab-replies" hidden>
     <div class="page-heading"><div><p class="eyebrow">COMUNICAÇÃO</p><h1>Uma boa resposta começa aqui.</h1><p class="step">Prepara em lote. Revê cada conversa. Envia quando estiver tudo certo.</p></div></div>
-    <ol class="workflow"><li><a href="#inbox-step"><span>01</span> Selecionar</a></li><li><a href="#prepare-step"><span>02</span> Preparar</a></li><li><a href="#import-step"><span>03</span> Importar</a></li><li><a href="#send-step"><span>04</span> Rever e enviar</a></li></ol>
+    <ol class="workflow">
+      <li data-step="inbox-step"><a href="#inbox-step"><span class="num">01</span><span class="done-mark" aria-hidden="true">✓</span> Selecionar</a></li>
+      <li data-step="prepare-step"><a href="#prepare-step"><span class="num">02</span><span class="done-mark" aria-hidden="true">✓</span> Preparar</a></li>
+      <li data-step="import-step"><a href="#import-step"><span class="num">03</span><span class="done-mark" aria-hidden="true">✓</span> Importar</a></li>
+      <li data-step="send-step"><a href="#send-step"><span class="num">04</span><span class="done-mark" aria-hidden="true">✓</span> Rever e enviar</a></li>
+    </ol>
     <div class="row">
       <label class="muted">Imóvel <select id="queue"></select></label>
       <label class="muted">Dias para trás <input id="days" class="days-input" type="number" min="1" max="365" aria-label="Dias para trás nesta leitura"></label>
@@ -59,12 +70,13 @@
     </div><aside class="batch-column" aria-label="Preparação do lote"><article class="card" id="prepare-step"><p class="eyebrow">PASSO 02</p><h2>Preparar no ChatGPT <span class="kind kind-copy">Copiar/colar</span></h2>
     <p class="step">O prompt leva as instruções e as mensagens, sem o email nem o telefone dos clientes.</p>
     <textarea id="extra" aria-label="Instruções extra para o lote" rows="2" placeholder="Instruções extra para este lote (opcional), ex.: sê breve"></textarea>
-    <div class="actions"><button id="copy-prompt" class="primary">Copiar prompt</button></div>
-    <details id="prompt-box"><summary class="muted small">Ver o prompt</summary><pre id="prompt"></pre></details>
+    <div class="actions"><button id="build-prompt" class="primary">Criar prompt</button><button id="copy-prompt" disabled>Copiar</button></div>
+    <details id="prompt-box"><summary class="muted small">Prompt criado</summary><pre id="prompt"></pre></details>
 
     </article><article class="card" id="import-step"><p class="eyebrow">PASSO 03</p><h2>Importar respostas <span class="kind kind-copy">Copiar/colar</span></h2>
     <textarea id="answer" aria-label="Resposta do ChatGPT" rows="6" placeholder="Cola aqui a resposta completa do ChatGPT (o bloco JSON)"></textarea>
     <div class="actions"><button id="paste" class="primary">Guardar rascunhos</button></div>
+    <p id="import-status" class="alert ok" hidden></p>
     <div id="notes"></div>
 
     </article><article class="card" id="send-step"><p class="eyebrow">PASSO 04</p><h2>Rever e enviar</h2>
@@ -98,6 +110,34 @@
       <label class="field">Descrição curta<input id="f-description" placeholder="Apartamento T3 na Rua …, Localidade"></label>
       <label class="field"><span>Características do anúncio <span class="kind kind-rag">RAG</span></span> Uma por linha (substituem as anteriores; para juntar uma informação, usa «Acrescentar ao conhecimento»)<textarea id="f-facts" rows="5"></textarea></label>
       <div class="actions"><button id="property-save" class="primary">Guardar imóvel</button></div>
+    </article>
+  </section>
+
+  <section id="tab-contacts" hidden>
+    <div class="page-heading"><div><p class="eyebrow">CONTACTOS</p><h1>Quem te escreveu, num só registo.</h1><p class="step">É o <code>data/contactos.csv</code>: cada leitura acrescenta os clientes novos, e aqui corriges, acrescentas à mão ou apagas a pedido do cliente.</p></div><a class="button" href="contactos.csv">Descarregar CSV</a></div>
+    <div class="row contacts-filters">
+      <label class="muted">Imóvel <select id="contacts-property"><option value="">Todos</option></select></label>
+      <label class="muted">RGPD <select id="contacts-rgpd"><option value="">Todos</option></select></label>
+      <input id="contacts-search" type="search" placeholder="Procurar nome, email ou telefone" aria-label="Procurar contactos">
+      <span id="contacts-count" class="tag" aria-live="polite"></span>
+    </div>
+    <div class="table-wrap"><table class="contacts-table">
+      <thead><tr><th>Nome</th><th>Email</th><th>Telefone</th><th>Imóvel</th><th>1.º contacto</th><th>Respostas</th><th>RGPD</th><th><span class="sr-only">Ações</span></th></tr></thead>
+      <tbody id="contacts-body"></tbody>
+    </table></div>
+    <article class="card editor-card" id="contact-editor">
+      <p class="eyebrow">NOVO CONTACTO</p><h2>Acrescentar à mão</h2>
+      <p class="step">Para quem te contactou por telefone ou pessoalmente. Fica no mesmo CSV, com a fonte que indicares.</p>
+      <div class="grid">
+        <label class="field">Email<input id="c-email" type="email" placeholder="nome@exemplo.com"></label>
+        <label class="field">Nome<input id="c-nome"></label>
+        <label class="field">Telefone<input id="c-telefone"></label>
+        <label class="field">Imóvel<select id="c-imovel"></select></label>
+        <label class="field">Fonte<input id="c-fonte" placeholder="ex.: Telefone, Presencial"></label>
+        <label class="field">Primeiro contacto<input id="c-primeiro" type="date"></label>
+        <label class="field">RGPD<select id="c-rgpd"></select></label>
+      </div>
+      <div class="actions"><button id="contact-add" class="primary">Acrescentar contacto</button></div>
     </article>
   </section>
 

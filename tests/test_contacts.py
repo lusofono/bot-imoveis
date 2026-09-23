@@ -1,9 +1,11 @@
 import json
+from datetime import date, timedelta
 from pathlib import Path
 from unittest.mock import patch
 import pytest
 from backend.service import MailService
-from backend.store import add_contacts, load_contacts, save_contacts, save_json
+from backend.store import add_contacts, load_contacts, load_visits, save_contacts, save_json, save_visits
+from test_properties import draft_and_send
 
 ROOT = Path(__file__).resolve().parent.parent
 TEMPLATES = ROOT / "backend" / "templates"
@@ -97,3 +99,47 @@ def test_add_contacts_fills_blank_fields_without_overwriting(tmp_path):
 def test_add_contacts_with_no_entries_leaves_no_file(tmp_path):
     add_contacts(tmp_path, [])
     assert not (tmp_path / "contactos.csv").exists()
+
+
+def test_customers_answered_before_the_csv_existed_are_brought_in(service):
+    read(service, [lead("1")])
+    draft_and_send(service, "1")
+    (service.folder / "contactos.csv").unlink()  # as for the customers answered before 22/09
+    [row] = service.contacts()["contacts"]
+    assert (row["email"], row["nome"], row["imovel"], row["primeiro_contacto"], row["interactions"]) == (
+        CUSTOMER, "Ana Exemplo", REF, "", 1)
+
+
+def test_a_contact_added_by_hand_and_its_rgpd_change_are_dated(service):
+    result = service.save_contact({"email": "Rui@Example.com", "nome": " Rui  Telefone ", "telefone": "910 000 000",
+                                   "imovel": REF, "fonte": "Telefone", "primeiro_contacto": "2026-09-20"})
+    assert result["created"] is True
+    row = load_contacts(service.folder)[("rui@example.com", REF)]
+    assert (row["nome"], row["fonte"], row["primeiro_contacto"], row["rgpd"]) == ("Rui Telefone", "Telefone",
+                                                                                 "2026-09-20", "por_pedir")
+    assert service.save_contact({**row, "rgpd": "sim"})["created"] is False
+    row = load_contacts(service.folder)[("rui@example.com", REF)]
+    assert (row["rgpd"], row["rgpd_data"], row["rgpd_prova"]) == ("sim", date.today().isoformat(),
+                                                                  "alterado à mão na página")
+    for wrong, message in (({"email": "não"}, "email válido"), ({"email": "a@example.com", "imovel": "X"}, "imóvel"),
+                           ({"email": "a@example.com", "imovel": REF, "rgpd": "talvez"}, "RGPD")):
+        with pytest.raises(ValueError, match=message):
+            service.save_contact(wrong)
+
+
+def test_erasure_removes_the_row_the_conversation_the_queue_and_the_visits(service):
+    read(service, [lead("1")])
+    draft_and_send(service, "1")
+    read(service, [lead("2")])  # the same customer writes again: pending
+    day = (date.today() + timedelta(days=1)).isoformat()
+    save_visits(service.folder, REF, {"windows": [], "slots": [{"at": f"{day} 17:00", "customer": CUSTOMER,
+                                                                "name": "Ana"}]})
+    result = service.delete_contact(CUSTOMER, REF)
+    assert (result["pending_removed"], result["conversation_removed"]) == (1, True)
+    assert (CUSTOMER, REF) not in load_contacts(service.folder)
+    queue = service.load(REF)
+    assert CUSTOMER not in queue["conversations"] and not queue["emails"] and "2" in queue["dismissed_message_ids"]
+    assert load_visits(service.folder, REF)["slots"] == []
+    assert read(service, [lead("1"), lead("2")])["properties"][0]["added"] == 0  # never imported again
+    with pytest.raises(ValueError, match="não encontrado"):
+        service.delete_contact(CUSTOMER, REF)

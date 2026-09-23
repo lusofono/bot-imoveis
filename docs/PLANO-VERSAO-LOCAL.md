@@ -21,17 +21,23 @@ Para começar numa sessão nova. Lê primeiro o `docs/DECISOES.md`, onde a decis
 - **Feito também, fora das etapas:**
   - Painel com métricas (pendentes, rascunhos, bloqueados, enviados, tempo até resposta, 14 dias);
   - a página redesenhada, com quatro temas visuais;
-  - fotografia de cada imóvel (a API aceita-a; falta o botão para a carregar na página);
   - know-how comum da agência em `data/knowledge/`;
   - `bot-mail demo <pasta>`, para trabalhar na página só com dados fictícios;
   - arrancar a página outra vez fecha a anterior da mesma pasta.
 - **Registo de contactos (22/09):** `data/contactos.csv` (600, fora do Git), atualizado em cada leitura;
-  uma linha por par cliente/imóvel, com `rgpd: por_pedir` num contacto novo. Falta ainda a purga aos 6
-  meses e apagar a pedido (ver «Próximos passos»).
+  uma linha por par cliente/imóvel, com `rgpd: por_pedir` num contacto novo. Desde 23/09 (v0.11.0) há o
+  separador «Contactos» para o gerir e apagar a pedido. Falta a purga aos 6 meses (ver «Próximos passos»).
 - **Lembretes, visitas fechadas e pedido de consentimento (22/09):** ver `docs/DECISOES.md`
   (22/09/2026). Os três são preparados pelo programa, nunca pelo ChatGPT, e entram na fila de Respostas
   como qualquer outro rascunho: nada sai sem a pré-visualização e a confirmação do costume.
-- **83 testes passam**, todos com dados fictícios.
+- **Ponto de situação diário (22/09, à noite):** um resumo automático de todos os imóveis, uma vez por dia,
+  para o email pessoal do proprietário; painel novo no Painel, com «Guardar» e «Enviar» (mesma regra de aprovação).
+- **Sem fotografias por agora (22/09, à noite):** a página deixou de reservar espaço para uma fotografia
+  que normalmente não existe; ver `docs/DECISOES.md`.
+- **Nova opção de idioma (22/09, à noite):** «Idioma do cliente + tradução em inglês», escolhida por
+  omissão — responde na língua do cliente e acrescenta uma tradução em inglês quando essa língua não é
+  português, inglês nem espanhol.
+- **91 testes passam**, todos com dados fictícios.
 - **Dados reais no Mac, fora do Git, em `data/`:** a conta, a voz, o know-how, e dois imóveis com o
   perfil, o conhecimento e a fila de cada um.
 - **Por agora usa-se só copiar/colar;** o MCP fica para depois.
@@ -208,9 +214,9 @@ Regra comum: o programa prepara, e nada sai sem a pré-visualização do lote e 
 
 1. **Registo de contactos (feito a 22/09):** `data/contactos.csv` (permissões 600, fora do Git), atualizado
    em cada leitura, com `email`, `nome`, `telefone`, `primeiro_contacto`, `imovel`, `fonte` (Idealista) e
-   `rgpd` (`por_pedir`, `pedido`, `sim` ou `nao`, com `rgpd_data` e `rgpd_prova`). **Ainda por fazer:** a
-   purga automática dos contactos sem `sim` 6 meses depois do último contacto; e apagar quem pedir isso do
-   CSV, da fila e das conversas.
+   `rgpd` (`por_pedir`, `pedido`, `sim` ou `nao`, com `rgpd_data` e `rgpd_prova`). Apagar a pedido (do CSV,
+   da fila, das conversas e das visitas) está feito no separador «Contactos» (23/09). **Ainda por fazer:** a
+   purga automática dos contactos sem `sim` 6 meses depois do último contacto.
 2. **Visitas fechadas (feito a 22/09):** o texto fica na voz. Um botão por imóvel («Imóveis» → Visitas)
    prepara um email para cada cliente desse anúncio, pendentes e já respondidos com endereço válido: um
    email por pessoa, como rascunho pronto a rever e enviar. O imóvel fica «fechado» logo ao clicar (não só
@@ -226,7 +232,9 @@ Regra comum: o programa prepara, e nada sai sem a pré-visualização do lote e 
    que já têm conversa e ainda não foram convidados. Nas respostas que começam por «sim», «yes» ou «oui», a
    página sugere confirmar; um clique grava `rgpd: sim`, a data e o Message-ID como prova em
    `contactos.csv`.
-5. **O botão para carregar a fotografia** no separador Imóveis (a API já existe).
+5. **Ponto de situação diário (feito a 22/09, à noite):** ver `docs/DECISOES.md`. Ainda por fazer:
+   histórico dos pontos de situação já enviados (hoje só existe o de hoje) e um destinatário por omissão
+   escolhido no `mac/setup.command`, em vez de só na página.
 6. **Um JSON por run, para o Codex ou o Claude trabalharem sem copiar/colar:** cada run numa pasta
    `data/runs/<data-e-hora>/` com `pedidos.json` (o que o agente lê) e `respostas.json` (o que escreve), e
    um comando `bot-mail drafts` que aplica as respostas com as mesmas verificações.
@@ -235,6 +243,10 @@ Regra comum: o programa prepara, e nada sai sem a pré-visualização do lote e 
 8. **Ícone no Desktop:** uma app sem janela de Terminal, com o código de acesso guardado em `data/` para
    não mudar a cada arranque.
 9. Etapa 2 (interfaces) e etapa 4 (MCP no Claude Desktop), quando se voltar a usar MCP.
+
+**Fora do plano por agora:** o botão para carregar a fotografia do imóvel. A API aceita-a
+(`POST /api/property/photo`) e a página mostra-a quando existe, mas extrair fotos do Idealista à mão não é
+viável no dia a dia deste utilizador (ver `docs/DECISOES.md`, 22/09, à noite).
 
 ## Pendentes que passam para a nova versão
 

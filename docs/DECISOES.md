@@ -3,6 +3,76 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 23/09/2026: separador Contactos (v0.11.0)
+
+**Decisão.**
+- **O `contactos.csv` gere-se na página**, num separador próprio: editar nome, telefone e RGPD, acrescentar
+  contactos à mão (telefone, presencial) e descarregar o ficheiro. O email e o imóvel são a chave e não se
+  editam: um email errado apaga-se e acrescenta-se de novo.
+- **«Apagar» é o apagamento completo pedido pelo cliente:** o CSV, a conversa, os emails por responder e as
+  visitas marcadas desse imóvel. Ficam só os IDs do Gmail, que não identificam ninguém, para os mesmos emails
+  não voltarem a entrar. Para quem só não quer ser contactado para outros imóveis, o estado RGPD é `nao`.
+- **Os clientes respondidos antes de 22/09 entram no CSV** ao abrir o separador (nome e imóvel das conversas;
+  telefone se ainda houver um email deles na fila). O dia do primeiro contacto fica em branco.
+
+**Porquê.** O registo só começou a 22/09: 31 dos 39 clientes não estavam lá, e sem página não havia como
+corrigir um nome, marcar um consentimento dado por telefone ou cumprir um pedido de apagamento.
+
+## 22/09/2026, fim do dia: nome «Real Estate AI Assistant, by BigLearn PT» e versões
+
+**Decisão.**
+- **O nome visível passa a «Real Estate AI Assistant», by BigLearn PT** (na página e no terminal). O pacote
+  Python continua `bot_mail` e o repositório `bot-imoveis`, como decidido a 19/09, até à .app.
+- **Cada pedido que muda a página ou o backend sobe a versão:** PATCH para afinações, MENOR para uma
+  funcionalidade nova, MAIOR para uma mudança grande. A versão vive só em `pyproject.toml`, a página lê-a
+  daí, e cada versão fica descrita em `CHANGELOG.md`. Ponto de partida: 0.6.0.
+
+**Porquê.** Com várias mudanças por dia, a versão no canto diz logo se a página aberta já tem a última
+alteração (o servidor tem de ser reiniciado para o backend novo) e o changelog diz o que mudou em cada uma.
+
+**Exceção à regra de 21/09 «o Painel nunca leva dados de clientes» (pedido do utilizador, v0.10.0):** o hover
+de «Respostas enviadas» mostra o primeiro nome, datas e número de interações de quem foi respondido. Nunca
+o email, o telefone nem o nome completo; o teste do Painel continua a garantir isso.
+
+**Pedidos recebidos (v0.10.1):** cada leitura passa a registar em `logs/events.jsonl` o dia de chegada de
+cada email (só o ID e a data). Os emails já respondidos antes disso são datados pela hora do envio menos as
+horas que o cliente esperou, que já ficavam registadas. Os que foram retirados da fila antes desta versão não
+têm data e ficam de fora.
+
+## 22/09/2026, à noite: ponto de situação diário, sem fotografias, tradução automática e afinações de uso
+
+Já construído (91 testes).
+
+**Decisão.**
+- **Ponto de situação diário**, para o email pessoal do proprietário (em `voice.json`, fora do Git): preparado sozinho a seguir a cada leitura
+  (uma vez por dia; uma segunda leitura no mesmo dia não o repara), com o resumo por imóvel (conversas,
+  pendentes, quem ainda não tem rascunho) e um total geral. Fica em `data/digest.json`, fora do Git, editável
+  na página (novo painel no Painel) e só sai com um clique de confirmação — sem exceção à regra de
+  aprovação humana antes de qualquer envio.
+- **Sem fotografias, por agora.** Extrair fotos do Idealista à mão não é viável no dia a dia. A página deixa
+  de reservar espaço com um placeholder quando não há foto: o cartão do imóvel só mostra a fotografia
+  quando ela existe mesmo. A funcionalidade de carregar fotografia mantém-se possível (a API já aceita),
+  mas sai da lista de próximos passos.
+- **Nova opção de idioma: «Idioma do cliente + tradução em inglês».** Responde sempre na língua da
+  mensagem do cliente; se essa língua não for português, inglês nem espanhol, acrescenta no fim da mesma
+  resposta, claramente separada, uma tradução completa em inglês. Passa a ser a opção escolhida por
+  omissão; as duas opções anteriores (idioma do cliente sem tradução; só português/inglês/francês)
+  continuam disponíveis no separador Voz e estilo.
+- **«Criar prompt» e «Copiar» separados,** no passo 2 das Respostas: antes, um só clique gerava o prompt no
+  servidor e tentava copiá-lo, e uma falha silenciosa da cópia (ou o clique ter sido demasiado cedo, antes
+  da página acabar de carregar) podia parecer que nada tinha acontecido. Agora «Criar prompt» mostra sempre
+  o texto (a secção abre-se sozinha) antes de qualquer cópia, e «Copiar» só copia o que já está visível.
+  Muda a seleção de emails ou o texto de instruções extra e o botão «Copiar» desativa-se, para nunca copiar
+  um prompt desatualizado.
+
+**Porquê.**
+- O ponto de situação existia manualmente (eu a ler `queue.json` e a escrever um resumo à mão); passou a
+  ser o mesmo programa a calculá-lo, sem inventar números.
+- O botão de fotografia nunca chegou a ser construído, e mantê-lo nos «próximos passos» estava a sugerir um
+  trabalho que não vale a pena para este utilizador em concreto.
+- A confusão do «Copiar prompt» apareceu em uso real: parecia vazio quando, na verdade, ou ainda não tinha
+  sido gerado, ou a cópia para a área de transferência tinha falhado sem aviso claro.
+
 ## 22/09/2026, mais tarde: lembretes, visitas fechadas e pedido de consentimento construídos
 
 Já construído (83 testes). Fecha a maior parte da decisão de 21/09 «lembretes, visitas fechadas e

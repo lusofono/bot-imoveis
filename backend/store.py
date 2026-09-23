@@ -235,6 +235,15 @@ def add_contacts(folder, entries):
     save_contacts(folder, contacts)
 
 
+def load_digest(folder):
+    """<folder>/digest.json: today's status digest for the owner's own inbox, or None before the first READ."""
+    return load_json(Path(folder) / "digest.json", None)
+
+
+def save_digest(folder, digest):
+    save_json(Path(folder) / "digest.json", digest)
+
+
 def load_visits(folder, ref):
     """properties/<REF>/visitas.json: the windows proposed, the times booked, and whether visits are closed."""
     agenda = load_json(property_folder(folder, ref) / "visitas.json", {"windows": [], "slots": []})

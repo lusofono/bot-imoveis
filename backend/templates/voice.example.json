@@ -35,7 +35,7 @@
       "missing_name": "Omitir o nome sem inventar tratamento ou identidade."
     },
     "languages": {
-      "selected": "pt_en_fr",
+      "selected": "multilingual_en_backup",
       "status": "configured",
       "options": {
         "multilingual": {
@@ -48,6 +48,13 @@
             "en",
             "fr"
           ]
+        },
+        "multilingual_en_backup": {
+          "description": "Responde sempre na língua da mensagem do cliente, seja ela qual for. Se essa língua não for português, inglês nem espanhol, acrescenta no fim da mesma resposta — depois da saudação, do texto e do fecho, separada por uma linha em branco e o título \"English translation:\" — uma tradução completa em inglês de tudo o que escreveste na língua do cliente. Português, inglês e espanhol não levam tradução a seguir.",
+          "examples": {
+            "pt": "Responde em português, sem tradução a seguir.",
+            "de": "Responde em alemão e acrescenta a tradução completa em inglês, separada por uma linha em branco."
+          }
         }
       },
       "portuguese_locale": "pt-PT",
@@ -113,6 +120,11 @@
       "text": "",
       "status": "not_configured",
       "description": "Texto do pedido de consentimento RGPD, para quem já respondeu."
+    },
+    "digest_recipient": {
+      "text": "",
+      "status": "not_configured",
+      "description": "Endereço que recebe o ponto de situação diário (rascunho, precisa de confirmação para sair)."
     }
   },
   "application_instructions": "Aplicar as opções de estilo selecionadas a todas as interações. A saudação e o fecho da configuração de estilo substituem os do texto base. Traduzir o conteúdo para o idioma escolhido, mantendo a assinatura exatamente como configurada. Não produzir várias versões linguísticas na mesma resposta, salvo pedido do proprietário.",

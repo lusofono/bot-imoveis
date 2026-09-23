@@ -13,20 +13,24 @@ import time
 import os
 from .ai import KNOWLEDGE_RULE, describe, instructions
 from .configure import STARTER, example_profile
-from .mail import build_reply, read_messages
-from .rules import (DAY, KNOWLEDGE_FILE, SUBJECT_DEFAULT, VISIT_SLOT_DEFAULT, VISIT_STATES, build_profile,
-                    check_profile, check_slot, check_window, clean_property, consent_yes, free_times, knowledge,
-                    photo_of, prepare, route, subject_of)
+from .mail import build_digest, build_reply, read_messages
+from .rules import (DAY, EMAIL, KNOWLEDGE_FILE, RGPD_STATES, SUBJECT_DEFAULT, VISIT_SLOT_DEFAULT, VISIT_STATES,
+                    build_profile, check_profile, check_slot, check_window, clean_property, consent_yes, free_times,
+                    knowledge, photo_of, prepare, route, subject_of)
 from .secrets import app_password, has_app_password
-from .store import (add_contacts, add_note, find_photo, knowledge_files, load_contacts, load_events, load_knowledge,
-                    load_visits, locked, load_json, load_profiles, load_voice, property_folder, read_photo,
-                    save_contacts, save_json, save_text, save_visits, write_photo)
+from .store import (CONTACT_FIELDS, add_contacts, add_note, find_photo, knowledge_files, load_contacts, load_digest,
+                    load_events, load_knowledge, load_visits, locked, load_json, load_profiles, load_voice,
+                    property_folder, read_photo, save_contacts, save_digest, save_json, save_text, save_visits,
+                    write_photo)
 
 CONTACT_SOURCE = "Idealista"  # today's only portal; see README for the family of emails it accepts.
 # Sent automatically or by a one-click button, in the customer's conversation, but never counted as one
 # of the four interactions and never resetting the clock the 2/4-day reminders are measured from.
 AUX_KINDS = {"reminder", "consent_request", "visits_closed"}
+PROGRAM_KINDS = AUX_KINDS | {"visit_proposal"}  # drafts the program creates; not an email a customer sent
 REMINDER_HOURS = {"2d": 48, "4d": 96}
+# Dashboard chart: period in days → days per bar (90 days per day would be 90 unreadable bars).
+CHART_PERIODS = {3: 1, 7: 1, 14: 1, 30: 1, 90: 7}
 
 VIEW_FIELDS = ("id", "kind", "date", "subject", "customer", "recipient", "blocked", "body_text", "body_truncated",
                "reply_text", "reply_status", "reply_error", "reply_message_id", "visit_window", "visit_slot",
@@ -227,7 +231,7 @@ class MailService:
                 datetime.now(timezone.utc).date().isoformat(),
                 mailbox=cfg.get("mailbox", "all"), incoming_only=bool(profiles) or cfg.get("incoming_only", True),
                 accept=accept)
-            added, ambiguous, contacts = dict.fromkeys(refs, 0), 0, []
+            added, ambiguous, contacts, received = dict.fromkeys(refs, 0), 0, [], {}
             for item in messages:
                 ref, kind, customer = route(item, profiles, queues) if profiles else (None, "general", None)
                 if kind == "ambiguous":
@@ -258,6 +262,7 @@ class MailService:
                 queues[ref]["emails"].append(item)
                 known[ref].add(key)
                 added[ref] += 1
+                received[key] = contact_day(item)
             add_contacts(self.folder, contacts)
             for ref, data in queues.items():
                 data["last_read_at"] = start_at
@@ -265,8 +270,12 @@ class MailService:
                 if ref and voice_ok:
                     self.schedule_reminders(ref, data, voice_ok)
                 self.save(data, ref)
+            if profiles:
+                self.prepare_digest(profiles, queues)
+            # received: message ID → the day the customer's email arrived, so the dashboard still counts it
+            # after it is answered or dismissed and leaves the queue. IDs and dates only, never an address.
             self.log("read", added=sum(added.values()), ambiguous=ambiguous,
-                     pending=sum(len(data["emails"]) for data in queues.values()))
+                     pending=sum(len(data["emails"]) for data in queues.values()), received=received)
             if not profiles:
                 data = queues[None]
                 return {"added": added[None], "revision": data["revision"], "emails": data["emails"]}
@@ -425,6 +434,96 @@ class MailService:
             created += 1
         return created
 
+    def digest_recipient(self):
+        """The address that gets the daily status digest, from voice.json; leniently, not the full voice."""
+        style = load_json(self.folder / "voice.json", {}).get("style") or {}
+        return (style.get("digest_recipient") or {}).get("text") or ""
+
+    @staticmethod
+    def digest_text(profiles, queues, today):
+        """One property per block: conversations, pending count, and who still needs a reply prepared."""
+        lines = [f"Ponto de situação, {today}", ""]
+        totals = Counter()
+        for ref, profile in profiles.items():
+            data = queues[ref]
+            emails = data["emails"]
+            conversations = data.get("conversations", {})
+            drafted = sum(1 for item in emails if item.get("reply_status") == "draft")
+            awaiting = [item for item in emails if item.get("reply_status") not in ("draft", "sent")]
+            lines.append(f"{ref} — {profile['property'].get('description') or ref}")
+            lines.append(f"- {len(conversations)} conversas; {len(emails)} pendentes na fila "
+                         f"({drafted} com rascunho pronto, {len(awaiting)} por preparar).")
+            if awaiting:
+                names = ", ".join((item.get("customer") or {}).get("name")
+                                  or (item.get("recipient") or {}).get("name") or "sem nome" for item in awaiting)
+                lines.append(f"- Por preparar: {names}.")
+            lines.append("")
+            totals.update(conversas=len(conversations), pendentes=len(emails), por_preparar=len(awaiting))
+        lines.append(f"No total: {totals['conversas']} conversas, {totals['pendentes']} pendentes, "
+                     f"{totals['por_preparar']} por preparar.")
+        return "\n".join(lines)
+
+    def prepare_digest(self, profiles, queues):
+        """Once a day, after a READ: today's status, as a draft only. Never sent without a click."""
+        if not self.digest_recipient():
+            return
+        today = date.today().isoformat()
+        existing = load_digest(self.folder)
+        if existing and existing.get("date") == today:
+            return
+        save_digest(self.folder, {"date": today, "reply_text": self.digest_text(profiles, queues, today),
+                                  "reply_status": "draft", "reply_error": None, "created_at": now(), "sent_at": None})
+
+    def digest_view(self):
+        with locked(self.folder):
+            return load_digest(self.folder)
+
+    def save_digest_text(self, text):
+        text = str(text or "")
+        if len(text) > 20000:
+            raise ValueError("Texto demasiado longo.")
+        with locked(self.folder):
+            digest = load_digest(self.folder)
+            if not digest:
+                raise ValueError("Ainda não há ponto de situação preparado.")
+            digest["reply_text"] = text
+            save_digest(self.folder, digest)
+            return digest
+
+    def send_digest(self, confirmed):
+        if confirmed is not True:
+            raise ValueError("É necessária confirmação explícita do utilizador após rever o texto.")
+        with locked(self.folder):
+            digest = load_digest(self.folder)
+            if not digest or digest.get("reply_status") not in ("draft", "error", "uncertain"):
+                raise ValueError("Não há ponto de situação por enviar.")
+            recipient = self.digest_recipient()
+            if not EMAIL.fullmatch(recipient):
+                raise ValueError("Configura um destinatário válido em Voz e estilo.")
+            cfg = self.config()
+            msg = build_digest(cfg["account"], recipient, f"Ponto de situação — {digest['date']}", digest["reply_text"])
+            password = app_password(self.folder, cfg["account"])
+            digest.update(reply_status="sending", reply_error=None)
+            save_digest(self.folder, digest)
+            try:
+                with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as smtp:
+                    smtp.login(cfg["account"], password)
+                    refused = smtp.send_message(msg)
+                    if refused:
+                        raise smtplib.SMTPRecipientsRefused(refused)
+            except smtplib.SMTPResponseException as exc:
+                digest.update(reply_status="error", reply_error=f"SMTP {exc.smtp_code}")
+            except smtplib.SMTPRecipientsRefused:
+                digest.update(reply_status="error", reply_error="Destinatário recusado pelo SMTP.")
+            except Exception:
+                digest.update(reply_status="uncertain",
+                              reply_error="Ligação interrompida; verifica Enviados no Gmail antes de repetir.")
+            else:
+                digest.update(reply_status="sent", sent_at=now())
+            save_digest(self.folder, digest)
+            self.log("digest_send", status=digest["reply_status"])
+            return {"status": digest["reply_status"]}
+
     @staticmethod
     def snapshot(data, ids):
         return hashlib.sha256(json.dumps(
@@ -448,8 +547,15 @@ class MailService:
             ref = self.pick(profiles, property_ref)
             data = self.load(ref)
             entries = self.selected(data, ids)
-            if ref:
+            if ref:  # a blocked email can never go out: say that before asking for its draft
                 self.check_recipients(entries, profiles[ref], data["account"])
+            missing = [item for item in entries if not str(item.get("reply_text") or "").strip()]
+            if missing:
+                names = ", ".join((item.get("customer") or {}).get("name") or (item.get("recipient") or {}).get("name")
+                                  or "sem nome" for item in missing)
+                raise ValueError(f"{len(missing)} email(s) selecionado(s) ainda sem rascunho ({names}). Prepara-os "
+                                 "nos passos 02 e 03, ou escreve o rascunho no próprio email e guarda-o, antes de "
+                                 "pré-visualizar.")
             compose = self.composer(profiles, ref, data["account"])
             replies = []
             for item in entries:
@@ -529,8 +635,10 @@ class MailService:
                     status = item["reply_status"]
                     results.append({"id": item["id"], "status": status})
                     # How long the customer waited, for the dashboard; no address, subject or text is logged.
-                    self.log("send", message_id=item["id"], status=status,
-                             waited_hours=None if item.get("kind") == "visit_proposal" else waited_hours(item))
+                    # Program-made emails (visit proposal, reminder, closing, consent) answer no customer email:
+                    # no waiting time, so they never skew the average or count as a request received.
+                    self.log("send", message_id=item["id"], status=status, kind=item.get("kind"),
+                             waited_hours=None if item.get("kind") in PROGRAM_KINDS else waited_hours(item))
                     if status == "uncertain":
                         break
             return {"results": results, "remaining": len(data["emails"])}
@@ -803,6 +911,110 @@ class MailService:
             self.log("consent_confirmed", reference=ref)
             return {"property_ref": ref}
 
+    def sync_contacts(self, profiles):
+        """Customers answered before contactos.csv existed get their row too: name and property, and the phone
+        when an email of theirs is still in the queue. Their first-contact day is unknown, so it stays blank."""
+        entries = []
+        for ref in profiles:
+            data = self.load(ref)
+            phones = {((item.get("recipient") or {}).get("email") or "").casefold(): (item.get("customer") or {}).get("phone")
+                      for item in data["emails"]}
+            entries += [{"email": email, "nome": conversation.get("name") or "", "telefone": phones.get(email) or "",
+                         "primeiro_contacto": "", "imovel": ref, "fonte": CONTACT_SOURCE}
+                        for email, conversation in data.get("conversations", {}).items()]
+        add_contacts(self.folder, entries)
+
+    def contacts(self):
+        """Every contact of contactos.csv, for the Contactos tab, with how many replies each one has had."""
+        with locked(self.folder):
+            profiles = self.profiles()
+            self.sync_contacts(profiles)
+            stages = {(email, ref): conversation.get("stage", 0)
+                      for ref in profiles for email, conversation in self.load(ref).get("conversations", {}).items()}
+            rows = sorted(({**row, "interactions": stages.get((row["email"], row["imovel"]), 0)}
+                           for row in load_contacts(self.folder).values()),
+                          key=lambda row: (row["imovel"], (row["nome"] or row["email"]).casefold()))
+            return {"contacts": rows, "properties": list(profiles), "rgpd_states": RGPD_STATES}
+
+    def save_contact(self, fields):
+        """Adds a contact by hand (a phone call, someone at the door) or edits one; the key is email + property.
+
+        A change of the RGPD state made here is dated, with "alterado à mão" as its proof; the proof of a
+        «sim» confirmed from an email (its Message-ID) is kept for as long as the state stays the same.
+        """
+        email = str(fields.get("email") or "").strip().casefold()
+        ref = str(fields.get("imovel") or "").strip()
+        if not EMAIL.fullmatch(email):
+            raise ValueError("Indica um email válido.")
+        clean = {}
+        for key, limit in (("nome", 120), ("telefone", 40), ("fonte", 40)):
+            clean[key] = " ".join(str(fields.get(key) or "").split())
+            if len(clean[key]) > limit:
+                raise ValueError(f"Campo demasiado longo: {key}.")
+        rgpd = str(fields.get("rgpd") or "por_pedir")
+        if rgpd not in RGPD_STATES:
+            raise ValueError("Estado RGPD inválido.")
+        first = str(fields.get("primeiro_contacto") or "").strip()
+        if first and not DAY.fullmatch(first):
+            raise ValueError("A data do primeiro contacto tem de ser AAAA-MM-DD.")
+        with locked(self.folder):
+            if ref not in self.profiles():
+                raise ValueError("Escolhe o imóvel do contacto.")
+            contacts = load_contacts(self.folder)
+            row = contacts.get((email, ref))
+            created = row is None
+            if created:
+                row = contacts[(email, ref)] = {"email": email, "imovel": ref, "rgpd": "por_pedir", "rgpd_data": "",
+                                                "rgpd_prova": "", "primeiro_contacto": date.today().isoformat()}
+            if first:
+                row["primeiro_contacto"] = first
+            row.update(nome=clean["nome"], telefone=clean["telefone"], fonte=clean["fonte"] or row.get("fonte") or "Manual")
+            if rgpd != row["rgpd"]:
+                row.update(rgpd=rgpd, rgpd_data=date.today().isoformat(), rgpd_prova="alterado à mão na página")
+            save_contacts(self.folder, contacts)
+            self.log("contact_saved", reference=ref, created=created)
+            return {"created": created}
+
+    def delete_contact(self, email, property_ref):
+        """The right to erasure: the contact's row, conversation, emails in the queue and booked visits all go.
+
+        The Gmail IDs already seen stay (they identify no one), so the same emails are never imported again;
+        a new request from the same person starts a new contact, as it should.
+        """
+        email = str(email or "").strip().casefold()
+        with locked(self.folder):
+            ref = self.pick(self.profiles(), property_ref)
+            contacts = load_contacts(self.folder)
+            row = contacts.pop((email, ref), None)
+            data = self.load(ref)
+            conversation = data.get("conversations", {}).pop(email, None)
+            pending = [item for item in data["emails"]
+                       if ((item.get("recipient") or {}).get("email") or (item.get("customer") or {}).get("email")
+                           or "").casefold() == email]
+            if row is None and conversation is None and not pending:
+                raise ValueError("Contacto não encontrado.")
+            for item in pending:
+                data["emails"].remove(item)
+                data["dismissed_message_ids"].append(item["id"])
+            agenda = load_visits(self.folder, ref)
+            slots = [slot for slot in agenda["slots"] if slot.get("customer") != email]
+            if len(slots) != len(agenda["slots"]):
+                agenda["slots"] = slots
+                save_visits(self.folder, ref, agenda)
+            data.pop("send_preview", None)
+            save_contacts(self.folder, contacts)
+            self.save(data, ref)
+            self.log("contact_deleted", reference=ref, pending=len(pending))
+            return {"pending_removed": len(pending), "conversation_removed": conversation is not None}
+
+    def contacts_csv(self):
+        """contactos.csv as it is on disk, for the page's download button (after bringing in older customers)."""
+        with locked(self.folder):
+            self.sync_contacts(self.profiles())
+            path = self.folder / "contactos.csv"
+            text = path.read_bytes() if path.exists() else (",".join(CONTACT_FIELDS) + "\r\n").encode()
+            return b"\xef\xbb\xbf" + text  # the UTF-8 mark, so Excel shows accents (ç, ã) right
+
     def voice_ready(self):
         try:
             load_voice(self.folder)
@@ -810,15 +1022,35 @@ class MailService:
         except ValueError:
             return False
 
-    def metrics(self):
-        """Numbers for the dashboard. Nothing that identifies a customer leaves this call."""
+    def metrics(self, days=14):
+        """Numbers for the dashboard. Of the customers, only first names leave this call: no address or phone.
+
+        days: the chart's period, one of CHART_PERIODS; 3 months are drawn one bar per week, not per day.
+        """
+        if days not in CHART_PERIODS:
+            raise ValueError("Período inválido: escolhe 3, 7, 14, 30 ou 90 dias.")
+        step = CHART_PERIODS[days]
+        today = datetime.now(timezone.utc).date()
+        first = today - timedelta(days=days - 1)
+
+        def bucket(value):
+            try:
+                day = date.fromisoformat(str(value or "")[:10])
+            except ValueError:
+                return None
+            if not first <= day <= today:
+                return None
+            return (first + timedelta(days=(day - first).days // step * step)).isoformat()
+
         with locked(self.folder):
             account = self.config()["account"]
             profiles = load_profiles(self.folder, account)
             refs = list(profiles) or [None]
-            first = datetime.now(timezone.utc).date() - timedelta(days=13)
-            days = [(first + timedelta(days=n)).isoformat() for n in range(14)]
-            requests, totals, properties, last_read = Counter(), Counter(), [], None
+            contacts = load_contacts(self.folder)
+            # A customer email, by message ID → the day it arrived. Three sources, most exact first:
+            # the day logged at READ; the email still in the queue; a sent reply's time minus the hours the
+            # customer waited (older emails that left the queue before READ logged the day).
+            arrived, derived, totals, properties, last_read = {}, {}, Counter(), [], None
             for ref in refs:
                 data = self.load(ref)
                 emails = data["emails"]
@@ -827,7 +1059,16 @@ class MailService:
                 conversations = data.get("conversations", {})
                 answered = sum(conversation.get("stage", 0) for conversation in conversations.values())
                 for item in emails:
-                    requests[str(item.get("date") or "")[:10]] += 1
+                    if item.get("kind") not in PROGRAM_KINDS:
+                        derived.setdefault(item["id"], str(item.get("date") or "")[:10])
+                # The one exception to "no customer data" on the dashboard (22/09): first name, dates and
+                # how many replies, for the hover of «Respostas enviadas». Never an address or a phone.
+                customers = sorted(({"name": ((conversation.get("name") or "").split() or ["(sem nome)"])[0],
+                                     "first_contact": (contacts.get((email, ref)) or {}).get("primeiro_contacto") or None,
+                                     "last_reply": str(conversation.get("last_sent_at") or "")[:10] or None,
+                                     "interactions": conversation.get("stage", 0)}
+                                    for email, conversation in conversations.items() if conversation.get("stage")),
+                                   key=lambda customer: customer["last_reply"] or "", reverse=True)
                 totals.update(pending=len(emails), drafts=status["draft"], blocked=blocked, answered=answered,
                               customers=len(conversations),
                               attention=status["uncertain"] + status["error"] + status["sending"])
@@ -835,21 +1076,33 @@ class MailService:
                 listing = profiles[ref]["property"] if ref else {}
                 properties.append({"property_ref": ref, "pending": len(emails), "drafts": status["draft"],
                                    "blocked": blocked, "answered": answered, "customers": len(conversations),
+                                   "answered_customers": customers,
                                    "last_read_at": data.get("last_read_at"), "description": listing.get("description"),
                                    "listing_url": listing.get("listing_url"),
                                    "advertised_rent_eur": listing.get("advertised_rent_eur"),
                                    "photo": bool(ref) and find_photo(self.folder, ref) is not None})
             sent, waited = Counter(), []
-            for event in load_events(self.folder):
-                if event.get("event") == "send" and event.get("status") == "sent":
-                    sent[str(event.get("at") or "")[:10]] += 1
-                    if isinstance(event.get("waited_hours"), (int, float)):
-                        waited.append(event["waited_hours"])
+            for event in load_events(self.folder, limit=100000):
+                if event.get("event") == "read" and isinstance(event.get("received"), dict):
+                    arrived.update(event["received"])
+                elif event.get("event") == "send" and event.get("status") == "sent":
+                    sent[bucket(event.get("at"))] += 1
+                    hours = event.get("waited_hours")
+                    if isinstance(hours, (int, float)) and event.get("kind") not in PROGRAM_KINDS:
+                        waited.append(hours)
+                        try:
+                            day = (datetime.fromisoformat(event["at"]) - timedelta(hours=hours)).date().isoformat()
+                        except (KeyError, TypeError, ValueError):
+                            continue
+                        derived.setdefault(str(event.get("message_id")), day)
+            requests = Counter(bucket(day) for day in {**derived, **arrived}.values())
+            starts = [(first + timedelta(days=n)).isoformat() for n in range(0, days, step)]
             return {"account": account, "last_read_at": last_read, "properties": properties,
                     "totals": {key: totals[key] for key in
                                ("pending", "drafts", "blocked", "attention", "answered", "customers")},
+                    "period_days": days, "bucket_days": step,
                     "by_day": [{"day": day, "requests": requests.get(day, 0), "sent": sent.get(day, 0)}
-                               for day in days],
+                               for day in starts],
                     "reply_hours": round(sum(waited) / len(waited), 1) if waited else None,
                     "setup": {"account": bool(account), "app_password": has_app_password(self.folder, account),
                               "voice": self.voice_ready(), "properties": len(profiles)}}
@@ -874,6 +1127,7 @@ class MailService:
             voice["reminders"] = {key: (reminders.get(key) or {}).get("text") or "" for key in ("day2", "day4")}
             voice["visits_closed"] = (style.get("visits_closed") or {}).get("text") or ""
             voice["consent_request"] = (style.get("consent_request") or {}).get("text") or ""
+            voice["digest_recipient"] = (style.get("digest_recipient") or {}).get("text") or ""
             today = date.today().isoformat()
             properties = []
             for ref, profile in load_profiles(self.folder, account).items():
@@ -966,6 +1220,12 @@ class MailService:
                     if len(text) > 3000:
                         raise ValueError("Texto demasiado longo (até 3000 caracteres).")
                     style.setdefault(key, {}).update(text=text, status="configured" if text else "not_configured")
+            if "digest_recipient" in choices:
+                recipient = str(choices.get("digest_recipient") or "").strip()
+                if recipient and not EMAIL.fullmatch(recipient):
+                    raise ValueError("O destinatário do ponto de situação tem de ser um endereço de email.")
+                style.setdefault("digest_recipient", {}).update(
+                    text=recipient, status="configured" if recipient else "not_configured")
             save_json(path, voice)
             self.log("voice_saved")
 

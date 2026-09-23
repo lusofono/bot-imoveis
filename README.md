@@ -68,9 +68,11 @@ dá-te o prompt, o ChatGPT extrai os dados e tu revês os campos antes de guarda
 as regras de resposta nunca vêm do texto colado. As características vão para a base de conhecimento
 (`knowledge/anuncio.md`). Aí editas também os prompts de cada interação; em **Voz e estilo**, a voz comum.
 
-A fotografia de cada imóvel fica em `data/properties/<REF>/foto.jpg` (ou `.png`, `.webp`) e aparece no
-painel. É carregada pelo dono: o Idealista bloqueia acessos automáticos, por isso nada é descarregado do
-anúncio. A página ainda não tem o botão para a carregar; a API já aceita (`POST /api/property/photo`).
+A fotografia de cada imóvel é opcional. Se existir, fica em `data/properties/<REF>/foto.jpg` (ou `.png`,
+`.webp`) e aparece no painel; sem ela, o cartão do imóvel não reserva espaço nenhum para uma imagem. É
+carregada pelo dono: o Idealista bloqueia acessos automáticos, por isso nada é descarregado do anúncio. A
+página ainda não tem o botão para a carregar; a API já aceita (`POST /api/property/photo`), mas por agora
+não é uma prioridade (ver `docs/DECISOES.md`).
 
 ## Imóveis: uma família de emails por imóvel
 
@@ -137,8 +139,13 @@ Cada leitura atualiza `data/contactos.csv` (600, fora do Git): uma linha por par
 `email`, `nome`, `telefone`, `primeiro_contacto`, `imovel`, `fonte` (por agora sempre `Idealista`) e o
 estado do RGPD (`rgpd`: `por_pedir`, `pedido`, `sim` ou `nao`, com `rgpd_data` e `rgpd_prova`). Um contacto
 novo entra com `rgpd: por_pedir`; uma leitura seguinte do mesmo par só preenche o nome ou o telefone que
-faltavam, nunca a data do primeiro contacto nem o estado do RGPD já registado. A purga aos 6 meses sem
-`sim` e apagar um contacto a pedido ainda estão por fazer (ver `docs/PLANO-VERSAO-LOCAL.md`).
+faltavam, nunca a data do primeiro contacto nem o estado do RGPD já registado.
+
+O separador **Contactos** mostra este CSV numa tabela: filtras por imóvel, RGPD ou texto, corriges nome,
+telefone e estado RGPD, acrescentas contactos à mão (telefone, presencial) e descarregas o ficheiro.
+«Apagar» é o direito ao apagamento: o contacto sai do CSV, da conversa, dos emails por responder e das
+visitas marcadas do imóvel. Os clientes respondidos antes de 22/09 entram ao abrir o separador, sem o dia do
+primeiro contacto. A purga aos 6 meses sem `sim` ainda está por fazer (ver `docs/PLANO-VERSAO-LOCAL.md`).
 
 ## Lembretes, visitas fechadas e pedido de consentimento
 
@@ -162,6 +169,14 @@ o envio, tal como todos os outros.
   quem respondeu», para todos os que já têm conversa e ainda não foram convidados. Quando a resposta do
   cliente começa por «sim», «yes» ou «oui», a página assinala-o no email; um clique em «Confirmar
   consentimento» grava `rgpd: sim`, a data e o email de prova em `contactos.csv`.
+
+## Ponto de situação diário
+
+A cada leitura, se tiveres um destinatário configurado em **Voz e estilo** («Destinatário do ponto de
+situação diário»), a página prepara um resumo de todos os imóveis (conversas, pendentes e quem ainda não
+tem rascunho) uma vez por dia. Aparece no **Painel**, editável antes de enviar; «Guardar» grava o texto,
+«Enviar» pede confirmação e manda-o pelo Gmail — a mesma regra de aprovação humana de sempre. Uma segunda
+leitura no mesmo dia não repara o resumo já preparado.
 
 ## Estrutura
 
@@ -300,10 +315,11 @@ de ferramentas de escrita ativa no assistente e não autorizes envio automático
 .venv/bin/python -m pytest -q
 ```
 
-83 testes: lotes, persistência, falhas SMTP, deduplicação, anexos, leitura IMAP simulada, regras dos
+91 testes: lotes, persistência, falhas SMTP, deduplicação, anexos, leitura IMAP simulada, regras dos
 imóveis, assunto e remetente, links do Idealista, registo de contactos, lembretes, visitas fechadas,
-pedido de consentimento, métricas sem dados de clientes, fotografias, página local, MCP local por stdio e
-comandos do terminal, sempre com dados fictícios. Nenhum teste lê uma caixa real ou envia emails.
+pedido de consentimento, ponto de situação diário, métricas sem dados de clientes, fotografias, página
+local, MCP local por stdio e comandos do terminal, sempre com dados fictícios. Nenhum teste lê uma caixa
+real ou envia emails.
 A primeira leitura do Gmail real e os primeiros envios reais foram feitos à mão a 21/09/2026.
 
 Código de leitura e construção de respostas adaptado do ZIP original `gmail_cycle_mac.zip`.

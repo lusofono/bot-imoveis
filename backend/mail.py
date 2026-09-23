@@ -445,3 +445,22 @@ def build_reply(item, account, sender_name="", subject=None):
 
     msg.set_content(text)
     return msg, recipient
+
+
+def build_digest(account, recipient, subject, text):
+    """The daily status digest: a plain new message from the account to the owner's own address.
+
+    Never a reply (no In-Reply-To/References): it is not part of any customer's conversation.
+    """
+    if not text.strip():
+        raise GmailReplyError("reply_text vazio.")
+    if recipient.casefold() == account.casefold():
+        raise GmailReplyError("O destinatário calculado é a própria conta.")
+    msg = EmailMessage()
+    msg["Date"] = formatdate(localtime=True)
+    msg["From"] = account
+    msg["To"] = recipient
+    msg["Subject"] = subject
+    msg["Message-ID"] = make_msgid(domain="gmail.com")
+    msg.set_content(text)
+    return msg

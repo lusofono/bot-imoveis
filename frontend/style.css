@@ -46,3 +46,55 @@
 .tag.visit{color:var(--accent);border-color:var(--accent)}
 .tag.warn{color:var(--warn)}
 .days-input{width:5.5em}
+
+/* Brand: the name on two lines (the product, then what it is), the maker below, the version as a pill. */
+.brand{align-items:flex-start}
+.brand .brand-mark{flex:none;font-size:22px;margin-top:2px}
+.brand-text{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0}
+.brand .brand-name{font-size:17px;line-height:1.15;letter-spacing:-.4px;font-weight:700}
+.brand .brand-name span{display:block;font-weight:400;color:var(--muted)}
+.brand-by{font-size:11px;letter-spacing:.3px;color:var(--muted)}
+.app-version{padding:1px 8px;border:1px solid var(--brand-border);border-radius:99px;background:var(--accent-tint);
+  color:var(--accent);font:10px/1.7 ui-monospace,SFMono-Regular,monospace;letter-spacing:.5px}
+@media(max-width:760px){
+  .brand{align-items:center}
+  .brand-text{flex-direction:row;flex-wrap:wrap;align-items:baseline;gap:2px 8px}
+  .brand .brand-name{font-size:16px}
+  .brand .brand-name span{display:inline}
+}
+
+/* Contactos: the CSV as a table; wide, so it scrolls sideways inside its box on a small screen. */
+.contacts-filters{margin-bottom:16px}
+.contacts-filters input[type=search]{flex:1 1 240px;width:auto}
+.table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--card)}
+.contacts-table{width:100%;border-collapse:collapse;font-size:13px}
+.contacts-table th{text-align:left;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);
+  font-weight:600;padding:12px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.contacts-table td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.contacts-table tr:last-child td{border-bottom:0}
+.contacts-table td.email{overflow-wrap:anywhere;min-width:150px;font-size:12px;padding-top:14px}
+.contacts-table input,.contacts-table select{min-width:96px;padding:7px 8px;font-size:12px}
+.contacts-table button{min-height:32px;padding:5px 10px;font-size:12px}
+.contacts-table td.actions-cell{display:flex;gap:6px;align-items:center}
+.contacts-table td.nowrap{white-space:nowrap}
+.mono{font-family:ui-monospace,SFMono-Regular,monospace}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* Chart period: a small select where the fixed "Últimos 14 dias" tag used to be. */
+.period-select{width:auto;min-height:34px;padding:5px 28px 5px 10px;font-size:12px;border-radius:8px}
+.legend #chart-note{margin-left:auto}
+.legend #chart-note:before{display:none}
+
+/* Dashboard numbers that lead somewhere: the pointer and the border say so before the click. */
+.metric.clickable{cursor:pointer;transition:border-color .18s,transform .18s}
+.metric.clickable:hover,.metric.clickable:focus-visible{border-color:var(--hover-border);transform:translateY(-1px)}
+.metric[title]{cursor:help}
+.metric.clickable[title]{cursor:pointer}
+
+/* Workflow steps 01-04: a checkmark and a tinted background replace the number once that step is done,
+   so "done" never looks like the same blank state the step started in. */
+.workflow .done-mark{display:none}
+.workflow li.done{background:var(--ok-bg)}
+.workflow li.done .num{display:none}
+.workflow li.done .done-mark{display:inline;color:var(--ok);font-weight:700}
+.workflow li.done a{color:var(--ok)}

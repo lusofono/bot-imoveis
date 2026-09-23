@@ -71,10 +71,12 @@ function showTab(name) {
     if (button.dataset.tab === name) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   });
-  $('page-label').textContent = {dashboard: 'Painel', replies: 'Respostas', properties: 'Imóveis', voice: 'Voz e estilo'}[name];
-  for (const tab of ['dashboard', 'replies', 'properties', 'voice']) $('tab-' + tab).hidden = tab !== name;
+  $('page-label').textContent = {dashboard: 'Painel', replies: 'Respostas', properties: 'Imóveis', contacts: 'Contactos',
+    voice: 'Voz e estilo'}[name];
+  for (const tab of ['dashboard', 'replies', 'properties', 'contacts', 'voice']) $('tab-' + tab).hidden = tab !== name;
   window.scrollTo({top: 0, behavior: 'instant'});
-  if (name === 'dashboard') run(loadMetrics);
+  if (name === 'dashboard') { run(loadMetrics); run(loadDigest); }
+  if (name === 'contacts') run(loadContacts);
 }
 
 // The chart is drawn by hand: the page may not load anything from outside.
@@ -106,6 +108,20 @@ function nameOf(id) {
   return (email.customer || {}).name || id;
 }
 
+// Workflow steps 01-04: a step only ever looks "done" through this call, never by coincidence (e.g. an
+// empty textarea after saving looks exactly like one nobody has touched yet, unless something marks it).
+function markStep(id, done) {
+  const li = document.querySelector(`.workflow li[data-step="${id}"]`);
+  if (li) li.classList.toggle('done', done);
+}
+// Saving drafts or sending redraws the queue, which resets the steps; the earlier steps of the same
+// batch were still done, so they keep their mark.
+function keepSteps(redraw) {
+  const done = [...document.querySelectorAll('.workflow li.done')].map(li => li.dataset.step);
+  redraw();
+  done.forEach(step => markStep(step, true));
+}
+
 function renderState() {
   $('account').textContent = state.account || '';
   $('nav-count').textContent = state.properties.reduce((n, q) => n + q.emails.length, 0);
@@ -120,14 +136,21 @@ function renderState() {
     : [el('div', {class: 'empty-state'}, el('strong', {}, state.error ? 'Configuração pendente' : 'Tudo em dia.'), state.error ? 'Verifica o aviso acima para continuar.' : 'Não há emails pendentes. Faz uma nova leitura quando quiseres.')]));
   $('instructions').textContent = queue?.instructions || '';
   preview = null; $('preview-box').replaceChildren();
+  // A fresh batch of emails makes any earlier "done" (import, send) stale: back to work, not finished.
+  $('import-status').hidden = true; markStep('import-step', false); markStep('send-step', false);
   updateSelection();
 }
 
 function updateSelection() {
   const count = selectedIds().length;
   $('selection-count').textContent = `${count} selecionado(s)`;
-  $('copy-prompt').disabled = !count;
+  $('build-prompt').disabled = !count;
   $('preview').disabled = !count;
+  markStep('inbox-step', count > 0);
+  // A prompt already created stops matching once the selection (or the extra instructions) changes.
+  $('copy-prompt').disabled = true;
+  $('prompt').textContent = ''; $('prompt-box').open = false;
+  markStep('prepare-step', false);
 }
 
 function card(email) {
@@ -219,7 +242,11 @@ function renderPreview() {
         if (!confirm(`Enviar agora ${count} email(s) reais?`)) return;
         const result = await call('api/send', {property_ref: queueRef(), preview_token: preview.preview_token, confirmed: true});
         const sent = result.results.filter(item => item.status === 'sent').length;
-        state = await call('api/state'); renderState();
+        state = await call('api/state'); keepSteps(renderState);  // renderState clears preview-box first
+        $('preview-box').replaceChildren(el('p', {class: 'alert ' + (sent === result.results.length ? 'ok' : 'warn')},
+          `✓ Enviados ${sent} de ${result.results.length} email(s).`
+          + (sent < result.results.length ? ' Vê os avisos nos que ficaram.' : ' Passa ao próximo lote no passo 01.')));
+        markStep('send-step', true);
         toast(`Enviados: ${sent} de ${result.results.length}.` + (sent < result.results.length ? ' Vê os avisos nos que ficaram.' : ''),
           sent === result.results.length ? 'ok' : 'warn');
       }, event.currentTarget)}, `Enviar ${count} email(s)`),
@@ -234,40 +261,76 @@ function ago(value) {
   return `há ${Math.round(hours / 24)} dia(s)`;
 }
 
-function metricCard(value, label, kind) {
-  return el('article', {class: 'metric' + (kind && value ? ' ' + kind : '')},
+// open: what a click does (the number leads to the emails behind it); title: the per-property split on hover.
+function metricCard(value, label, kind, {open, title} = {}) {
+  const go = open && (event => { if (event.type === 'click' || event.key === 'Enter' || event.key === ' ') { event.preventDefault(); open(); } });
+  return el('article', {class: 'metric' + (kind && value ? ' ' + kind : '') + (open ? ' clickable' : ''), title,
+      role: open ? 'button' : null, tabindex: open ? '0' : null, onclick: go || null, onkeydown: go || null},
     el('div', {class: 'value'}, String(value)), el('div', {class: 'label'}, label));
 }
 
-function chart(days) {
+// Short, readable labels however many bars there are: every bar up to 14, fewer after that.
+function chart(days, bucketDays) {
   const width = 640, height = 150, base = height - 22, top = 12;
   const most = Math.max(1, ...days.map(day => Math.max(day.requests, day.sent)));
-  const slot = width / days.length, bar = slot / 2 - 3;
-  const column = (value, x, cls) => value
+  const slot = width / days.length, bar = Math.max(2, slot / 2 - 3);
+  const every = Math.ceil(days.length / 14);
+  const column = (value, x, cls, day, what) => value
     ? svg('rect', {x, y: base - Math.max(3, (base - top) * value / most), width: bar,
-                   height: Math.max(3, (base - top) * value / most), rx: 2, class: cls})
+                   height: Math.max(3, (base - top) * value / most), rx: 2, class: cls},
+          svg('title', {}, `${bucketDays > 1 ? 'Semana de ' : ''}${day.day.slice(8)}/${day.day.slice(5, 7)}: ${value} ${what}`))
     : null;
   return svg('svg', {viewBox: `0 0 ${width} ${height}`, class: 'chart', role: 'img',
-                     'aria-label': 'Pedidos recebidos e respostas enviadas por dia'},
+                     'aria-label': 'Pedidos recebidos e respostas enviadas por ' + (bucketDays > 1 ? 'semana' : 'dia')},
     svg('line', {x1: 0, y1: base, x2: width, y2: base, class: 'grid-line'}),
     days.map((day, i) => [
-      column(day.requests, i * slot + 2, 'bar-requests'),
-      column(day.sent, i * slot + slot / 2 + 1, 'bar-sent'),
-      svg('text', {x: i * slot + slot / 2, y: height - 6, class: 'bar-label'}, day.day.slice(8) + '/' + day.day.slice(5, 7))]));
+      column(day.requests, i * slot + 2, 'bar-requests', day, 'pedido(s) recebido(s)'),
+      column(day.sent, i * slot + slot / 2 + 1, 'bar-sent', day, 'resposta(s) enviada(s)'),
+      // null, not false: svg() only skips null children, and false would be drawn as the text "false".
+      i % every === 0 || i === days.length - 1
+        ? svg('text', {x: i * slot + slot / 2, y: height - 6, class: 'bar-label'}, day.day.slice(8) + '/' + day.day.slice(5, 7))
+        : null]));
 }
 
 function renderDashboard(data) {
   const totals = data.totals;
+  // The dashboard carries no customer data, only counts: a click opens the property's queue, where they are.
+  const openQueue = field => {
+    const target = data.properties.find(item => item[field] > 0);
+    if (!target) return undefined;
+    return () => {
+      $('queue').value = target.property_ref || ''; renderState(); showTab('replies');
+      $('inbox-step').scrollIntoView({behavior: 'smooth', block: 'start'});
+    };
+  };
+  const split = field => data.properties.length > 1
+    ? data.properties.map(item => `${item.property_ref || 'Fila única'}: ${item[field]}`).join('\n') : undefined;
+  const dm = day => day ? day.slice(8, 10) + '/' + day.slice(5, 7) : '?';
+  // Who was answered: first name, the day they first wrote (when known), our last reply and how many.
+  const answeredList = () => {
+    const lines = [`${totals.customers} cliente(s) · ${totals.answered} resposta(s)`];
+    for (const item of data.properties) {
+      const people = item.answered_customers || [];
+      if (!people.length) continue;
+      if (data.properties.length > 1) lines.push('', item.property_ref || 'Fila única');
+      for (const person of people) {
+        lines.push(`${person.name} · ${person.first_contact ? 'pedido ' + dm(person.first_contact) + ' · ' : ''}`
+          + `respondido ${dm(person.last_reply)} · ${person.interactions} interaç${person.interactions === 1 ? 'ão' : 'ões'}`);
+      }
+    }
+    return lines.join('\n');
+  };
   $('metric-cards').replaceChildren(
-    metricCard(totals.pending, 'Pedidos por responder'),
-    metricCard(totals.drafts, 'Rascunhos prontos', 'ok'),
-    metricCard(totals.blocked, 'Bloqueados', 'warn'),
-    metricCard(totals.attention, 'A precisar de atenção', 'bad'),
-    metricCard(totals.answered, 'Respostas enviadas'),
+    metricCard(totals.pending, 'Pedidos por responder', null, {open: openQueue('pending'), title: split('pending')}),
+    metricCard(totals.drafts, 'Rascunhos prontos', 'ok', {open: openQueue('drafts'), title: split('drafts')}),
+    metricCard(totals.blocked, 'Bloqueados', 'warn', {open: openQueue('blocked'), title: split('blocked')}),
+    metricCard(totals.attention, 'A precisar de atenção', 'bad', {open: totals.attention ? openQueue('pending') : undefined}),
+    metricCard(totals.answered, 'Respostas enviadas', null, {title: answeredList()}),
     metricCard(data.reply_hours == null ? '—' : data.reply_hours + ' h', 'Tempo médio até resposta'));
   $('dashboard-read').textContent = `Última leitura ${ago(data.last_read_at)}`
     + (data.last_read_at ? ` (${when(data.last_read_at)})` : '') + ` · conta ${data.account}`;
-  $('dashboard-chart').replaceChildren(chart(data.by_day));
+  $('dashboard-chart').replaceChildren(chart(data.by_day, data.bucket_days || 1));
+  $('chart-note').textContent = data.bucket_days > 1 ? 'Cada barra soma uma semana.' : '';
   $('dashboard-properties').replaceChildren(...(data.properties.length ? data.properties.map(item =>
     el('article', {class: 'card property-tile'},
       propertyCover(item.property_ref, item.photo),
@@ -292,7 +355,115 @@ function renderDashboard(data) {
     check(data.setup.properties > 0, `Imóveis configurados: ${data.setup.properties}`, 'cria um no separador Imóveis'));
 }
 
-async function loadMetrics() { renderDashboard(await call('api/metrics')); }
+async function loadMetrics() { renderDashboard(await call('api/metrics', {days: Number($('chart-period').value) || 14})); }
+try { $('chart-period').value = localStorage.getItem('bot-mail-period') || '14'; } catch { /* Storage may be unavailable. */ }
+$('chart-period').addEventListener('change', event => {
+  try { localStorage.setItem('bot-mail-period', event.target.value); } catch { /* Storage may be unavailable. */ }
+  run(loadMetrics);
+});
+
+const DIGEST_STATUS = {draft: 'rascunho', sending: 'a enviar', sent: 'enviado',
+  error: 'erro no envio', uncertain: 'envio incerto'};
+
+// The daily status digest: prepared by itself at each READ, for the owner's own inbox. Never sent
+// without this "Enviar" click, however many days it has been sitting there as a draft.
+function renderDigest(digest) {
+  const box = $('digest-panel');
+  if (!digest) { box.replaceChildren(); return; }
+  const sent = digest.reply_status === 'sent';
+  const text = el('textarea', {rows: 10, 'aria-label': 'Ponto de situação diário', readonly: sent}, digest.reply_text);
+  box.replaceChildren(el('article', {class: 'card'},
+    el('div', {class: 'section-heading'},
+      el('div', {}, el('p', {class: 'eyebrow'}, 'PONTO DE SITUAÇÃO DIÁRIO'), el('h2', {}, `Rascunho de ${digest.date}`)),
+      el('span', {class: 'tag' + (digest.reply_status === 'draft' ? ' draft' : '')},
+        DIGEST_STATUS[digest.reply_status] || digest.reply_status)),
+    digest.reply_error && el('p', {class: 'alert bad'}, digest.reply_error),
+    sent && digest.sent_at && el('p', {class: 'muted small'}, 'Enviado em ' + when(digest.sent_at)),
+    text,
+    !sent && el('div', {class: 'actions'},
+      el('button', {onclick: event => run(async () => {
+        renderDigest(await call('api/digest/save', {text: text.value})); toast('Ponto de situação guardado.');
+      }, event.currentTarget)}, 'Guardar'),
+      el('button', {class: 'primary', onclick: event => run(async () => {
+        if (!confirm('Enviar agora o ponto de situação de hoje?')) return;
+        await call('api/digest/save', {text: text.value});
+        const result = await call('api/digest/send', {confirmed: true});
+        renderDigest(await call('api/digest'));
+        toast(result.status === 'sent' ? 'Ponto de situação enviado.'
+          : 'Envio incerto: verifica Enviados no Gmail antes de repetir.', result.status === 'sent' ? 'ok' : 'warn');
+      }, event.currentTarget)}, 'Enviar'))));
+}
+
+async function loadDigest() { renderDigest(await call('api/digest')); }
+
+// Contactos: contactos.csv as a table. The filters run here (it is one small file); every change goes to the API.
+let contactsData = {contacts: [], properties: [], rgpd_states: {}};
+const fullDay = day => day ? day.split('-').reverse().join('/') : '—';
+
+function fillSelect(select, options, first) {
+  const chosen = select.value;
+  select.replaceChildren(...(first ? [el('option', {value: ''}, first)] : []),
+    ...Object.entries(options).map(([value, label]) => el('option', {value}, label)));
+  if ([...select.options].some(option => option.value === chosen)) select.value = chosen;
+}
+
+function contactRow(contact) {
+  const nome = el('input', {value: contact.nome, 'aria-label': 'Nome'});
+  const telefone = el('input', {value: contact.telefone, 'aria-label': 'Telefone'});
+  const rgpd = el('select', {'aria-label': 'Estado RGPD'},
+    Object.entries(contactsData.rgpd_states).map(([value, label]) => el('option', {value}, label)));
+  rgpd.value = contact.rgpd;
+  // The proof of a «sim» confirmed from an email is its Message-ID; one changed here says so itself.
+  const proof = contact.rgpd_data && el('div', {class: 'muted small'},
+    fullDay(contact.rgpd_data) + ' · ' + (contact.rgpd_prova.startsWith('<') ? 'por email' : contact.rgpd_prova || '—'));
+  return el('tr', {},
+    el('td', {}, nome), el('td', {class: 'email'}, contact.email), el('td', {}, telefone),
+    el('td', {class: 'mono small'}, contact.imovel), el('td', {class: 'nowrap'}, fullDay(contact.primeiro_contacto)),
+    el('td', {}, String(contact.interactions)), el('td', {}, rgpd, proof),
+    el('td', {class: 'actions-cell'},
+      el('button', {onclick: event => run(async () => {
+        contactsData = await call('api/contacts/save', {contact: {...contact, nome: nome.value, telefone: telefone.value,
+          rgpd: rgpd.value}});
+        renderContacts(); toast('Contacto guardado no CSV.');
+      }, event.currentTarget)}, 'Guardar'),
+      el('button', {class: 'link danger', onclick: event => run(async () => {
+        if (!confirm(`Apagar ${contact.nome || contact.email} (${contact.imovel})? Sai do registo de contactos e também da `
+          + 'conversa, dos emails por responder e das visitas marcadas deste imóvel. Não se pode desfazer.')) return;
+        const result = await call('api/contacts/delete', {email: contact.email, imovel: contact.imovel});
+        contactsData = result; state = result.state; renderState(); renderContacts();
+        toast('Contacto apagado' + (result.pending_removed ? `, e ${result.pending_removed} email(s) retirado(s) da fila` : '') + '.');
+      }, event.currentTarget)}, 'Apagar')));
+}
+
+function renderContacts() {
+  const properties = Object.fromEntries(contactsData.properties.map(ref => [ref, ref]));
+  fillSelect($('contacts-property'), properties, 'Todos');
+  fillSelect($('contacts-rgpd'), contactsData.rgpd_states, 'Todos');
+  fillSelect($('c-imovel'), properties);
+  fillSelect($('c-rgpd'), contactsData.rgpd_states);
+  if (!$('c-primeiro').value) $('c-primeiro').value = new Date().toLocaleDateString('sv-SE');  // AAAA-MM-DD, local day
+  const ref = $('contacts-property').value, rgpd = $('contacts-rgpd').value;
+  const text = $('contacts-search').value.trim().toLowerCase();
+  const shown = contactsData.contacts.filter(contact => (!ref || contact.imovel === ref) && (!rgpd || contact.rgpd === rgpd)
+    && (!text || [contact.nome, contact.email, contact.telefone].some(value => (value || '').toLowerCase().includes(text))));
+  $('contacts-count').textContent = `${shown.length} de ${contactsData.contacts.length}`;
+  $('contacts-body').replaceChildren(...(shown.length ? shown.map(contactRow)
+    : [el('tr', {}, el('td', {colspan: 8, class: 'muted'}, contactsData.contacts.length
+      ? 'Nenhum contacto com estes filtros.' : 'Ainda não há contactos: entram aqui a cada leitura.'))]));
+}
+
+async function loadContacts() { contactsData = await call('api/contacts'); renderContacts(); }
+$('contacts-property').addEventListener('change', renderContacts);
+$('contacts-rgpd').addEventListener('change', renderContacts);
+$('contacts-search').addEventListener('input', renderContacts);
+$('contact-add').addEventListener('click', event => run(async () => {
+  const contact = Object.fromEntries(['email', 'nome', 'telefone', 'imovel', 'fonte', 'rgpd'].map(key => [key, $('c-' + key).value]));
+  contact.primeiro_contacto = $('c-primeiro').value;
+  contactsData = await call('api/contacts/save', {contact});
+  for (const key of ['email', 'nome', 'telefone', 'fonte']) $('c-' + key).value = '';
+  renderContacts();
+  toast(contactsData.created ? 'Contacto acrescentado ao CSV.' : 'Esse contacto já existia neste imóvel: foi atualizado.');
+}, event.currentTarget));
 
 async function refreshState() { state = await call('api/state'); renderState(); }
 async function loadSettings() { settings = await call('api/settings'); renderSettings(); }
@@ -307,11 +478,13 @@ function renderSettings() {
   if (!$('f-sender').value) $('f-sender').value = settings.properties[0]?.sender || 'reply@idealista.pt';
 }
 
+// No photo is the normal case here (nothing is fetched from the Idealista listing): skip the cover
+// entirely instead of a placeholder that would show on almost every card. Only a real photo gets one.
 function propertyCover(ref, hasPhoto) {
+  if (!hasPhoto || !ref) return false;
   const cover = el('div', {class: 'property-cover'});
-  const fallback = () => cover.replaceChildren(el('span', {class: 'property-monogram', 'aria-hidden': 'true'}, '⌂'));
-  if (hasPhoto && ref) cover.append(el('img', {src: 'photo/' + encodeURIComponent(ref), alt: 'Fotografia do imóvel ' + ref, loading: 'lazy', onerror: fallback}));
-  else fallback();
+  cover.append(el('img', {src: 'photo/' + encodeURIComponent(ref), alt: 'Fotografia do imóvel ' + ref,
+    loading: 'lazy', onerror: () => cover.remove()}));
   return cover;
 }
 
@@ -444,7 +617,8 @@ function renderVoice() {
   const selects = {};
   const choice = (key, label) => {
     const voice = settings.voice[key];
-    const labels = {normal: 'Habitual', formal: 'Formal', cordial: 'Cordial', multilingual: 'Idioma do cliente', pt_en_fr: 'Português, inglês ou francês'};
+    const labels = {normal: 'Habitual', formal: 'Formal', cordial: 'Cordial', multilingual: 'Idioma do cliente',
+      pt_en_fr: 'Português, inglês ou francês', multilingual_en_backup: 'Idioma do cliente + tradução em inglês'};
     const hint = el('span', {class: 'choice-hint', id: 'hint-' + key});
     selects[key] = el('select', {'aria-describedby': 'hint-' + key}, el('option', {value: ''}, '— escolhe —'),
       Object.entries(voice.options).map(([name, text]) => el('option', {value: name, title: text}, labels[name] || name)));
@@ -503,24 +677,45 @@ $('read').addEventListener('click', event => run(async () => {
   state = await call('api/read', {days: Number($('days').value) || undefined}); renderState();
   toast(state.added ? `${state.added} email(s) novo(s).` : 'Leitura concluída: nada de novo.');
 }, event.currentTarget));
-$('copy-prompt').addEventListener('click', event => run(async () => {
+$('build-prompt').addEventListener('click', event => run(async () => {
   const ids = selectedIds();
   if (!ids.length) throw new Error('Seleciona pelo menos um email.');
   const {prompt} = await call('api/prompt', {property_ref: queueRef(), ids, extra: $('extra').value});
   $('prompt').textContent = prompt;
-  await copyText(prompt, `Prompt copiado (${ids.length} email(s)). Cola-o numa conversa do ChatGPT.`, $('prompt-box'));
+  $('prompt-box').open = true;
+  $('copy-prompt').disabled = false;
+  markStep('prepare-step', true);
+  toast(`Prompt criado (${ids.length} email(s)): revê abaixo e depois copia.`);
 }, event.currentTarget));
+$('copy-prompt').addEventListener('click', event => run(async () => {
+  const text = $('prompt').textContent;
+  if (!text) throw new Error('Cria o prompt primeiro.');
+  await copyText(text, 'Prompt copiado. Cola-o numa conversa do ChatGPT.', $('prompt-box'));
+}, event.currentTarget));
+$('extra').addEventListener('input', () => { $('copy-prompt').disabled = true; });
 $('paste').addEventListener('click', event => run(async () => {
-  const result = await call('api/paste', {property_ref: queueRef(), text: $('answer').value});
-  state = result.state; renderState();
+  const text = $('answer').value;
+  if (!text.trim()) throw new Error('Cola primeiro a resposta do ChatGPT.');
+  const result = await call('api/paste', {property_ref: queueRef(), text});
+  state = result.state; keepSteps(renderState);
   $('notes').replaceChildren(...result.notes.map(note => el('p', {class: 'alert warn'}, `Nota do ChatGPT sobre ${nameOf(note.id)}: ${note.nota}`)));
   $('answer').value = '';
-  toast(`${result.saved} rascunho(s) guardado(s)` + (result.visits ? ` e ${result.visits} marcação(ões) de visita` : '')
-    + '. Revê-os no passo 1 antes de enviar.');
+  const summary = `${result.saved} rascunho(s) guardado(s)` + (result.visits ? ` e ${result.visits} marcação(ões) de visita` : '') + '.';
+  $('import-status').hidden = false;
+  $('import-status').textContent = `✓ ${summary} Revê-os no passo 01, ou cola outra resposta aqui para acrescentar mais.`;
+  markStep('import-step', true);
+  toast(summary + ' Revê-os no passo 01 antes de enviar.');
 }, event.currentTarget));
+$('answer').addEventListener('input', () => { $('import-status').hidden = true; markStep('import-step', false); });
 $('preview').addEventListener('click', event => run(async () => {
   const ids = selectedIds();
   if (!ids.length) throw new Error('Seleciona pelo menos um email.');
+  if ($('answer').value.trim()) {
+    // Only the page knows this: the server never sees a paste until "Guardar rascunhos".
+    $('import-step').scrollIntoView({behavior: 'smooth', block: 'center'});
+    throw new Error('Tens uma resposta colada no passo 03 que ainda não foi guardada. Carrega em «Guardar rascunhos» '
+      + '(ou apaga-a) antes de pré-visualizar.');
+  }
   preview = await call('api/preview', {property_ref: queueRef(), ids});
   renderPreview();
   toast(`Pré-visualização pronta: ${preview.replies.length} email(s) por rever antes de enviar.`);
@@ -543,4 +738,4 @@ $('property-save').addEventListener('click', event => run(async () => {
   toast(`Imóvel ${result.reference} ${result.created ? 'criado' : 'atualizado'}. Revê a base de conhecimento na pasta do imóvel.`);
 }, event.currentTarget));
 
-run(async () => { await loadMetrics(); await refreshState(); await loadSettings(); });
+run(async () => { await loadMetrics(); await loadDigest(); await refreshState(); await loadSettings(); });
