@@ -2,7 +2,7 @@ import json
 from datetime import date, timedelta
 from unittest.mock import patch
 import pytest
-from backend.ai import parse_visits
+from backend.ai import parse_visits, reply_prompt
 from backend.store import load_visits
 from test_properties import REF, SMTP, draft_and_send, lead, read, service  # noqa: F401 (service is a fixture)
 
@@ -59,6 +59,112 @@ def test_the_proposal_goes_to_every_customer_except_who_declined_or_waits(servic
     assert service.load(REF)["conversations"]["a@example.com"]["stage"] == 3
 
 
+def test_the_proposal_carries_the_conversation_history_into_the_prompt(service):
+    read(service, [customer("1", "a@example.com")])
+    draft_and_send(service, "1", "Olá, claro, pode ser ao fim da tarde.")
+    service.propose_visits(REF, DAY, "17:00", "19:00", ["a@example.com"])
+    [proposal] = [e for e in service.pending()["properties"][0]["emails"] if e.get("kind") == "visit_proposal"]
+    assert proposal["history"] and proposal["history"][-1]["text"] == "Olá, claro, pode ser ao fim da tarde."
+    queue = service.pending()["properties"][0]
+    prompt = reply_prompt(queue, [proposal["id"]])
+    assert "Histórico desta conversa" in prompt and "Olá, claro, pode ser ao fim da tarde." in prompt
+    # Never "Mensagem nova": nothing new came from the client, it is us proposing the visit.
+    assert "Mensagem nova:" not in prompt and "Mensagem:" in prompt
+
+
+def test_the_round_summary_shows_who_it_went_to_and_where_each_one_stands(service):
+    for key, email in (("1", "a@example.com"), ("2", "b@example.com")):
+        read(service, [customer(key, email)])
+        draft_and_send(service, key, "Olá.")
+    service.propose_visits(REF, DAY, "17:00", "19:00", ["a@example.com", "b@example.com"])
+
+    summary = service.visit_round_summary(REF)
+    assert summary["window"]["day"] == DAY and summary["window"]["start"] == "17:00"
+    by_email = {r["email"]: r for r in summary["recipients"]}
+    assert set(by_email) == {"a@example.com", "b@example.com"}
+    # Not sent yet: the proposal itself is the "email por responder" candidates() sees.
+    assert by_email["a@example.com"]["state"] == "pending" and by_email["a@example.com"]["visit_at"] is None
+
+    proposal = next(e for e in service.pending()["properties"][0]["emails"]
+                    if e.get("kind") == "visit_proposal" and e["recipient"]["email"] == "a@example.com")
+    revision = service.pending()["properties"][0]["revision"]
+    service.drafts([{"id": proposal["id"], "reply_text": "Fica marcado."}], revision, REF,
+                   [{"id": proposal["id"], "visit_slot": f"{DAY} 17:30"}])
+    preview = service.preview([proposal["id"]], REF)
+    with patch("backend.service.app_password", return_value="fake"), patch("backend.service.smtplib.SMTP_SSL", SMTP):
+        service.send(preview["preview_token"], True, REF)
+
+    summary = service.visit_round_summary(REF)
+    by_email = {r["email"]: r for r in summary["recipients"]}
+    assert by_email["a@example.com"] == {"email": "a@example.com", "name": "Ana Exemplo", "state": "booked",
+                                         "reason": "já tem visita marcada", "visit_at": f"{DAY} 17:30"}
+    # B's own proposal is still an unsent draft: candidates() still sees it as "tem um email por responder".
+    assert by_email["b@example.com"]["state"] == "pending"
+
+
+def test_an_ignored_contact_is_never_a_candidate_and_new_messages_are_dropped(service):
+    read(service, [customer("1", "a@example.com")])
+    draft_and_send(service, "1", "Olá.")
+    assert {c["email"]: c["state"] for c in service.visit_candidates()["customers"]} == {"a@example.com": "ok"}
+
+    result = service.set_ignored(REF, "a@example.com")
+    assert result == {"property_ref": REF, "email": "a@example.com", "ignored": True, "removed": 0}
+    assert service.visit_candidates()["customers"] == []
+    assert service.ignored_contacts()["customers"] == [{"email": "a@example.com", "name": "Ana Exemplo", "reason": "",
+                                                        "kind": "black"}]
+
+    # They write again: silently dropped, never reaches the queue, whatever they say.
+    before = len(service.pending()["properties"][0]["emails"])
+    last = service.load(REF)["conversations"]["a@example.com"]["sent_message_ids"][-1]
+    read(service, [{"gmail_message_id": "again", "from": [{"email": "a@example.com"}], "in_reply_to": last,
+                    "subject": "Re: resposta", "body_text": "Ainda tenho interesse."}])
+    assert len(service.pending()["properties"][0]["emails"]) == before
+
+    # Un-ignoring restores them as a normal candidate.
+    service.set_ignored(REF, "a@example.com", False)
+    assert {c["email"] for c in service.visit_candidates()["customers"]} == {"a@example.com"}
+    assert service.ignored_contacts()["customers"] == []
+
+
+def test_the_ignore_reason_is_kept_to_explain_later_and_cleared_on_undo(service):
+    read(service, [customer("1", "a@example.com")])
+    draft_and_send(service, "1", "Olá.")
+    service.set_ignored(REF, "a@example.com", True, "  Cliente disse   que não tem interesse.  ")
+    [entry] = service.ignored_contacts()["customers"]
+    assert entry["reason"] == "Cliente disse que não tem interesse." and entry["kind"] == "grey"
+
+    service.set_ignored(REF, "a@example.com", False)
+    service.set_ignored(REF, "a@example.com", True)  # ignored again, no reason given this time
+    [entry] = service.ignored_contacts()["customers"]
+    assert entry["reason"] == "" and entry["kind"] == "black"
+    service.set_ignored(REF, "a@example.com", True, kind="grey")  # e.g. said so on the phone, no reason typed
+    assert service.ignored_contacts()["customers"][0]["kind"] == "grey"
+    assert service.metrics(14)["properties"][0]["ignored"] == {"black": 0, "grey": 1}
+
+
+def test_ignoring_clears_their_pending_email_and_skips_them_when_closing_visits(service):
+    read(service, [customer("1", "a@example.com")])
+    draft_and_send(service, "1", "Olá.")
+    read(service, [customer("2", "b@example.com")])  # still pending, never answered
+    assert len(service.pending()["properties"][0]["emails"]) == 1  # only b's own lead is pending
+
+    result = service.set_ignored(REF, "b@example.com")
+    assert result["removed"] == 1
+    assert service.pending()["properties"][0]["emails"] == []
+
+    service.save_voice({"greeting": "formal", "languages": "pt_en_fr", "closing": "cordial", "signature": "Equipa",
+                        "visits_closed": "As visitas a este imóvel já estão fechadas."})
+    result = service.close_visits(REF)
+    # Only A (never ignored, already answered) gets the closing email; B is on the ignore list.
+    recipients = {(item.get("recipient") or {}).get("email") for item in service.pending()["properties"][0]["emails"]}
+    assert recipients == {"a@example.com"}
+    assert result["drafted"] == 1
+
+
+def test_the_round_summary_is_empty_before_any_round_was_ever_proposed(service):
+    assert service.visit_round_summary(REF) == {"property_ref": REF, "window": None, "recipients": []}
+
+
 def test_booking_takes_free_times_on_the_grid_and_never_twice(service):
     for key, email in (("1", "a@example.com"), ("2", "b@example.com")):
         read(service, [customer(key, email)])
@@ -101,6 +207,38 @@ def test_the_pasted_answer_carries_visit_fields():
                                                  "visit_status": "nao_quer"}]
     with pytest.raises(ValueError, match="visita_estado"):
         parse_visits(json.dumps([{"id": "1843212345678901234", "visita_estado": "talvez"}]), queue)
+
+
+def test_analysis_prompt_carries_active_clients_history_never_json(service):
+    read(service, [customer("1", "a@example.com")])
+    draft_and_send(service, "1", "Olá, obrigado pelo contacto.")
+    last = service.load(REF)["conversations"]["a@example.com"]["sent_message_ids"][-1]
+    read(service, [{"gmail_message_id": "2", "from": [{"name": "A", "email": "a@example.com"}],
+                    "in_reply_to": last, "subject": "Re: resposta", "body_text": "Só posso ao fim de semana."}])
+    read(service, [customer("3", "b@example.com")])
+    draft_and_send(service, "3", "Olá.")
+    queue = service.load(REF)
+    queue["conversations"]["b@example.com"]["visit"] = "nao_quer"
+    service.save(queue, REF)
+
+    prompt = service.visit_analysis_prompt(REF)
+    assert "Só posso ao fim de semana." in prompt and "não uses JSON" in prompt
+    assert "b@example.com" not in prompt and "não quer" not in prompt.split("CLIENTES")[1].split("(estado")[0]
+
+
+def test_analyze_visits_uses_the_api_without_json_mode_and_logs_usage(service):
+    read(service, [customer("1", "a@example.com")])
+    draft_and_send(service, "1", "Olá.")
+    with pytest.raises(RuntimeError, match="mac/openai_key.command"):
+        service.analyze_visits(REF)
+    with patch("backend.service.openai_api_key", return_value="sk-test"), \
+         patch("backend.service.complete", return_value=("Resumo dos clientes.", {"prompt_tokens": 40, "completion_tokens": 15})) as complete:
+        result = service.analyze_visits(REF)
+    assert result == {"property_ref": REF, "summary": "Resumo dos clientes.",
+                      "tokens": {"prompt_tokens": 40, "completion_tokens": 15}, "fuel": service.api_fuel(REF)}
+    assert complete.call_args.kwargs == {"json_mode": False}
+    events = [json.loads(line) for line in (service.folder / "logs" / "events.jsonl").read_text().splitlines()]
+    assert any(e["event"] == "openai_usage" and e["prompt_tokens"] == 40 for e in events)
 
 
 def test_visit_settings_live_in_the_voice(service):

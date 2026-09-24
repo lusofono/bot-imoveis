@@ -94,6 +94,41 @@ def test_lead_is_extracted_into_its_property_queue_and_answered_at_reply_to(serv
     assert (emails["3"]["kind"], emails["3"]["recipient"]["email"]) == ("follow_up", CUSTOMER)
     assert emails["3"]["customer"]["message"] == "Sou enfermeira."
     assert any("outro email pendente" in warning for warning in emails["3"]["warnings"])
+    # Both a repeat portal lead and a direct follow_up from a known customer carry the prior exchange:
+    # what we sent, then what they wrote in their second message via the portal.
+    expected_history = [{"who": "nos", "text": "Olá, Ana.", "at": emails["2"]["history"][0]["at"]}]
+    assert emails["2"]["history"] == expected_history
+    assert emails["3"]["history"] == expected_history + [
+        {"who": "cliente", "text": "Bom dia, gostaria de visitar o imóvel.\nPode ser ao fim da tarde?",
+         "at": emails["3"]["history"][1]["at"]}]
+    # A brand-new customer (first message ever) starts with no history.
+    novo = lead("9", reply_to=("novo@example.com",), body_email="novo@example.com")
+    new_email = next(e for e in read(service, [novo])["properties"][0]["emails"] if e["id"] == "9")
+    assert new_email["history"] == []
+
+
+def test_history_reaches_the_prompt_and_is_capped(service):
+    from backend.ai import reply_prompt
+    from backend.service import HISTORY_LIMIT
+    read(service, [lead("1")])
+    draft_and_send(service, "1", "Primeira resposta.")
+    last = service.load(REF)["conversations"][CUSTOMER]["sent_message_ids"][-1]
+    follow_up = {"gmail_message_id": "2", "from": [{"name": "Ana Exemplo", "email": CUSTOMER}],
+                "in_reply_to": last, "subject": "Re: Nova mensagem", "body_text": "Sou enfermeira."}
+    queue = read(service, [follow_up])["properties"][0]
+    prompt = reply_prompt(queue, ["2"])
+    assert "Histórico desta conversa" in prompt and "Nós: Primeira resposta." in prompt
+    assert "Mensagem nova:" in prompt and "Sou enfermeira." in prompt
+
+    # More turns than the cap: only the most recent HISTORY_LIMIT survive, oldest dropped first.
+    data = service.load(REF)
+    data["conversations"][CUSTOMER]["history"] = [{"who": "nos", "text": f"turno {n}", "at": "2026-01-01"}
+                                                   for n in range(HISTORY_LIMIT + 5)]
+    service.save(data, REF)
+    service.append_history(data["conversations"][CUSTOMER], "cliente", "mais um", "2026-01-02")
+    assert len(data["conversations"][CUSTOMER]["history"]) == HISTORY_LIMIT
+    assert data["conversations"][CUSTOMER]["history"][0]["text"] == "turno 6"
+    assert data["conversations"][CUSTOMER]["history"][-1]["text"] == "mais um"
 
 
 def test_sender_name_and_subject_come_from_the_voice(service):
@@ -260,7 +295,8 @@ def test_dashboard_carries_first_names_only_never_contacts(service):
     with patch("backend.service.has_app_password", return_value=False):
         metrics = service.metrics()
     assert metrics["totals"] == {"pending": 2, "drafts": 0, "blocked": 1, "attention": 0, "answered": 0, "customers": 0}
-    assert metrics["setup"] == {"account": True, "app_password": False, "voice": True, "properties": 1}
+    assert metrics["setup"] == {"account": True, "app_password": False, "voice": True, "properties": 1,
+                                "openai_key": False}
     assert [item["pending"] for item in metrics["properties"]] == [2]
     text = json.dumps(metrics, ensure_ascii=False)
     for private in (CUSTOMER, "900 000 001", "Ana Exemplo"):

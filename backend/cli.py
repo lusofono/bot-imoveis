@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 import sys
 from .configure import TEMPLATES
-from .secrets import save_password
+from .secrets import save_openai_key, save_password
 from .service import MailService
 from .store import load_json, save_json
 
@@ -21,8 +21,8 @@ def ask(label, default=""):
 
 
 def main(argv=None):
-    """bot-mail [--instance PASTA] setup | password | read | pending | send | resolve | replicate | demo |
-    web | stdio. Errors are printed as ERRO: … and return 1, never a traceback."""
+    """bot-mail [--instance PASTA] setup | password | openai-key | read | pending | send | resolve |
+    replicate | demo | web | stdio. Errors are printed as ERRO: … and return 1, never a traceback."""
     parser = argparse.ArgumentParser(description="bot_mail — uma conta, uma pasta, um JSON")
     parser.add_argument("--instance", type=Path, default=Path(os.environ.get("BOT_MAIL_INSTANCE", ROOT / "data")),
                         help="pasta de dados (por omissão, data/)")
@@ -32,6 +32,7 @@ def main(argv=None):
                                              help="dias para trás nesta leitura (por omissão, lookback_days)")
     commands.add_parser("stdio", help="MCP local por stdio, para um assistente neste computador")
     commands.add_parser("password", help="guarda só a App Password do Gmail, sem repetir o resto do setup")
+    commands.add_parser("openai-key", help="guarda a chave OpenAI, opcional, para «Gerar respostas via API»")
     for name in ("pending", "send"):
         commands.add_parser(name).add_argument("--property", dest="property_ref", help="referência do imóvel")
     resolve = commands.add_parser("resolve")
@@ -96,6 +97,17 @@ def main(argv=None):
             connect(account, password.strip().replace(" ", "")).logout()
             save_password(folder, account, password)
             print("Login IMAP confirmado e App Password guardada no Keychain. Não ficou em nenhum ficheiro do projeto.")
+        elif args.action == "openai-key":
+            from .openai_client import check_key
+            account = service.config()["account"]
+            key = getpass.getpass("Chave OpenAI (sk-…, não aparece no ecrã): ")
+            if not key.strip():
+                raise ValueError("Nada guardado: não escreveste nenhuma chave.")
+            # Confirmed against the OpenAI API first: a wrong key is never stored.
+            check_key(key.strip())
+            save_openai_key(folder, account, key.strip())
+            print("Chave OpenAI confirmada e guardada no Keychain. Não ficou em nenhum ficheiro do projeto. "
+                 "«Gerar respostas via API» já pode ser usado no separador Respostas.")
         elif args.action == "read":
             result = service.read(args.days)
             if "properties" in result:

@@ -1,4 +1,5 @@
-"""The local page: the workflow without MCP, where ChatGPT is reached by copy and paste.
+"""The local page: the workflow without MCP, where ChatGPT is reached by copy and paste — or, optionally,
+by the OpenAI API, as an alternative that skips the copy/paste but still only produces drafts.
 
 It runs on 127.0.0.1 only. Each start creates a random token that the browser gets once from the
 printed link and then keeps in an HttpOnly cookie; every API call repeats it in a header, so no other
@@ -12,6 +13,7 @@ import subprocess
 import threading
 import time
 import tomllib
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlsplit
 from starlette.applications import Starlette
@@ -20,15 +22,22 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from starlette.routing import Route
 from .ai import listing_prompt, parse_listing, parse_replies, parse_visits, reply_prompt, short_id
+from .openai_client import MODEL_DEFAULT, complete, estimate_cost_usd
+from .secrets import openai_api_key
 from .service import MailService
 
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
 COOKIE = "bot_mail_web"
-# The page's own files. index.html is only served at "/", with the token written into it.
-ASSETS = {"app.js": "text/javascript", "style.css": "text/css"}
+# The page's own files. index.html is only served at "/", with the token written into it. A rich theme (a
+# "skin": 90's Ferrari now, more to come) keeps its stylesheet in frontend/themes/, listed once at start.
+ASSETS = {"app.js": "text/javascript", "style.css": "text/css",
+          **{f"themes/{sheet.name}": "text/css" for sheet in sorted((FRONTEND / "themes").glob("*.css"))}}
 HEADERS = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
 # pyproject.toml is the one place the version is written; CHANGELOG.md logs what changed at each one.
 VERSION = tomllib.loads((Path(__file__).resolve().parents[1] / "pyproject.toml").read_text())["project"]["version"]
+# pyproject.toml itself must stay a plain PEP 440 version (setuptools/pip parse it); the "0." that means
+# "not even 1.0 yet" is shown instead as "α." wherever a person reads it, so it reads as alpha at a glance.
+DISPLAY_VERSION = VERSION.replace("0.", "α.", 1) if VERSION.startswith("0.") else VERSION
 
 
 def same(supplied, token):
@@ -45,6 +54,8 @@ def ids_of(body):
 def web_app(folder, token):
     """The page and its API for one data folder; every API call must carry this start's token."""
     service = MailService(folder)
+    # When this process started running this code — not a compiled build, but the closest thing to one here.
+    build_at = datetime.now().astimezone().strftime("%d/%m/%Y, %H:%M")
 
     def state():
         try:
@@ -77,15 +88,36 @@ def web_app(folder, token):
     def prompt(body):
         return {"prompt": reply_prompt(queue(body.get("property_ref")), ids_of(body), str(body.get("extra") or ""))}
 
-    def paste(body):
-        current = queue(body.get("property_ref"))
-        text = str(body.get("text") or "")
+    def save_drafts_from(current, text):
+        # Shared by "paste" (the human's copy from ChatGPT) and "generate" (the OpenAI API): same parsing,
+        # same safety checks, same drafts-only save. Only where the text comes from differs.
         replies, notes = parse_replies(text, current)
         visits = parse_visits(text, current)
         saved = 0
         if replies or visits:
             saved = service.drafts(replies, current["revision"], current["property_ref"], visits)["saved"]
         return {"saved": saved, "notes": notes, "visits": len(visits), "state": state()}
+
+    def paste(body):
+        return save_drafts_from(queue(body.get("property_ref")), str(body.get("text") or ""))
+
+    def generate(body):
+        # The alternative to steps 02+03 by hand: the same prompt, answered by the OpenAI API instead of
+        # a human pasting it into ChatGPT. Everything after that — parsing, drafts, preview, send — is
+        # identical and needs the same review and confirmation before anything goes out.
+        current = queue(body.get("property_ref"))
+        service.require_fuel(current["property_ref"])
+        ids = ids_of(body)
+        prompt_text = reply_prompt(current, ids, str(body.get("extra") or ""))
+        cfg = service.config()
+        key = openai_api_key(service.folder, cfg["account"])
+        model = str(cfg.get("openai_model") or MODEL_DEFAULT)
+        answer, usage = complete(key, model, prompt_text)  # raises OpenAIError, shown to the owner like any other
+        # Tokens only: never the prompt or the answer, same rule as every other log entry.
+        service.log("openai_usage", model=model, **usage, reference=current["property_ref"],
+                    cost_usd=round(estimate_cost_usd(model, **{
+                        k: usage[k] for k in ("prompt_tokens", "completion_tokens")}), 6))
+        return {**save_drafts_from(current, answer), "tokens": usage, "fuel": service.api_fuel(current["property_ref"])}
 
     def drafts(body):
         current = queue(body.get("property_ref"))
@@ -127,6 +159,15 @@ def web_app(folder, token):
     def visit_candidates(body):
         return service.visit_candidates(body.get("property_ref") or None)
 
+    def visit_analysis_prompt(body):
+        return {"prompt": service.visit_analysis_prompt(body.get("property_ref") or None)}
+
+    def visit_round_summary(body):
+        return service.visit_round_summary(body.get("property_ref") or None)
+
+    def visit_analyze(body):
+        return service.analyze_visits(body.get("property_ref") or None)
+
     def visit_propose(body):
         emails = body.get("emails")
         if not isinstance(emails, list) or not all(isinstance(email, str) for email in emails):
@@ -160,6 +201,22 @@ def web_app(folder, token):
     def contact_delete(body):
         result = service.delete_contact(body.get("email"), body.get("imovel") or None)
         return {**result, **service.contacts(), "state": state()}
+
+    def contact_ignore(body):
+        result = service.set_ignored(body.get("property_ref") or None, body.get("email"),
+                                     bool(body.get("ignored", True)), str(body.get("reason") or ""),
+                                     body.get("kind") or None)
+        return {**result, "state": state()}
+
+    def fuel_fill(body):
+        return {"fuel": service.fill_fuel(body.get("property_ref") or None, body.get("capacity_eur"))}
+
+    def property_panel(body):
+        return {"panel": service.save_panel(body.get("property_ref") or None, body.get("reply_hours_max"),
+                                            body.get("distance_km"), body.get("l_per_100km"))}
+
+    def contacts_ignored(body):
+        return service.ignored_contacts(body.get("property_ref") or None)
 
     def digest_save(body):
         return service.save_digest_text(body.get("text"))
@@ -207,7 +264,7 @@ def web_app(folder, token):
             return PlainTextResponse("Abre o link mostrado no terminal ao iniciar a página.", 403)
         nonce = secrets.token_urlsafe(16)
         text = (FRONTEND / "index.html").read_text(encoding="utf-8")
-        for name, value in (("TOKEN", token), ("NONCE", nonce), ("VERSION", VERSION)):
+        for name, value in (("TOKEN", token), ("NONCE", nonce), ("VERSION", DISPLAY_VERSION), ("BUILD_AT", build_at)):
             text = text.replace("{{" + name + "}}", value)
         return HTMLResponse(text, headers={
             **HEADERS, "Referrer-Policy": "no-referrer",
@@ -259,6 +316,7 @@ def web_app(folder, token):
         return {**result, "knowledge": service.knowledge(ref), "state": state()}
 
     handlers = {"state": ("GET", lambda body: state()), "read": ("POST", read), "prompt": ("POST", prompt),
+                "prompt/generate": ("POST", generate),
                 "paste": ("POST", paste), "drafts": ("POST", drafts), "preview": ("POST", preview),
                 "send": ("POST", send), "dismiss": ("POST", dismiss),
                 "metrics": ("POST", lambda body: service.metrics(int(body.get("days") or 14))),
@@ -266,12 +324,15 @@ def web_app(folder, token):
                 "property/prompt": ("POST", property_prompt),
                 "property/parse": ("POST", lambda body: {"fields": parse_listing(str(body.get("text") or ""))}),
                 "property/save": ("POST", property_save), "property/prompts": ("POST", property_prompts),
-                "property/photo": ("POST", property_photo),
+                "property/photo": ("POST", property_photo), "property/panel": ("POST", property_panel),
                 "visits/candidates": ("POST", visit_candidates), "visits/propose": ("POST", visit_propose),
-                "visits/close": ("POST", visits_close),
+                "visits/analysis-prompt": ("POST", visit_analysis_prompt), "visits/analyze": ("POST", visit_analyze),
+                "visits/round-summary": ("POST", visit_round_summary), "visits/close": ("POST", visits_close),
                 "consent/request": ("POST", consent_request), "consent/confirm": ("POST", consent_confirm),
                 "contacts": ("GET", lambda body: service.contacts()),
                 "contacts/save": ("POST", contact_save), "contacts/delete": ("POST", contact_delete),
+                "contacts/ignore": ("POST", contact_ignore), "contacts/ignored": ("POST", contacts_ignored),
+                "fuel/fill": ("POST", fuel_fill),
                 "digest": ("GET", lambda body: service.digest_view()),
                 "digest/save": ("POST", digest_save), "digest/send": ("POST", digest_send),
                 "knowledge": ("POST", lambda body: service.knowledge(body.get("property_ref") or None)),
@@ -315,7 +376,7 @@ def serve(folder, port=8765, open_browser=True):
     (Path(folder) / ".page.pid").write_text(str(os.getpid()))
     token = secrets.token_urlsafe(24)
     url = f"http://127.0.0.1:{port}/?t={token}"
-    print(f"Real Estate AI Assistant v{VERSION}: {url}\nO link muda a cada arranque. Ctrl+C para parar.", flush=True)
+    print(f"Real Estate AI Assistant v{DISPLAY_VERSION}: {url}\nO link muda a cada arranque. Ctrl+C para parar.", flush=True)
     if open_browser:
         threading.Timer(1.0, webbrowser.open, [url]).start()
     uvicorn.run(web_app(folder, token), host="127.0.0.1", port=port, access_log=False, log_level="warning")

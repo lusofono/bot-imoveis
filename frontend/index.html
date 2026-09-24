@@ -5,36 +5,50 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Real Estate AI Assistant</title>
 <link rel="stylesheet" href="style.css">
+<!-- Rich themes ("skins") keep their own stylesheet: 90's Ferrari now; a yacht or a grand-luxury one fits the same slot. -->
+<link rel="stylesheet" href="themes/racing.css">
 </head>
 <body>
 <a class="skip-link" href="#main">Saltar para o conteúdo</a>
 <header class="sidebar">
-  <div class="brand"><span class="brand-mark" aria-hidden="true">⌂</span><div class="brand-text"><strong class="brand-name">Real Estate <span>AI Assistant</span></strong><span class="brand-by">by BigLearn PT</span><span class="app-version" title="Versão da aplicação (ver CHANGELOG.md)">v{{VERSION}}</span></div></div>
+  <div class="brand"><span class="brand-mark" aria-hidden="true">⌂</span><div class="brand-text"><strong class="brand-name">Real Estate <span>AI Assistant</span></strong><span class="brand-by">by BigLearn PT</span><span class="app-version" title="Versão da aplicação (ver CHANGELOG.md)">version: v{{VERSION}}</span><span class="app-build" title="Quando este processo arrancou com este código">{{BUILD_AT}}</span></div></div>
   <p class="nav-label">ESPAÇO DE TRABALHO</p>
   <nav aria-label="Navegação principal">
-    <button class="tab active" data-tab="dashboard" aria-current="page"><span aria-hidden="true">◫</span>Painel</button>
-    <button class="tab" data-tab="replies"><span aria-hidden="true">↗</span>Respostas <span id="nav-count" class="nav-count">0</span></button>
-    <button class="tab" data-tab="properties"><span aria-hidden="true">▤</span>Imóveis</button>
-    <button class="tab" data-tab="contacts"><span aria-hidden="true">◎</span>Contactos</button>
-    <button class="tab" data-tab="voice"><span aria-hidden="true">≋</span>Voz e estilo</button>
+    <button class="tab active" data-tab="dashboard" data-gear="1" aria-current="page"><span aria-hidden="true">◫</span>Painel</button>
+    <button class="tab" data-tab="replies" data-gear="2"><span aria-hidden="true">↗</span>Respostas <span id="nav-count" class="nav-count">0</span></button>
+    <button class="tab" data-tab="properties" data-gear="3"><span aria-hidden="true">▤</span>Imóveis</button>
+    <button class="tab" data-tab="contacts" data-gear="4"><span aria-hidden="true">◎</span>Contactos</button>
+    <button class="tab" data-tab="agenda" data-gear="5"><span aria-hidden="true">▦</span>Agenda</button>
+    <button class="tab" data-tab="voice" data-gear="6"><span aria-hidden="true">≋</span>Voz e estilo</button>
   </nav>
+  <!-- A skin's own tab selector (90's Ferrari: the gated gearbox); a copy of the nav above, for the mouse only. -->
+  <div id="skin-selector" class="skin-selector" aria-hidden="true"></div>
   <div class="sidebar-note"><span class="status-dot"></span> Ambiente local<p>O envio fica sempre<br>sob o teu controlo.</p></div>
   <div class="account-card"><span class="avatar" aria-hidden="true">@</span><div><span class="small muted">A tua conta</span><span id="account"></span></div></div>
 </header>
 <div class="workspace">
-<div class="topbar"><span>Workspace <span class="breadcrumb">/</span> <strong id="page-label">Painel</strong></span><span id="busy" role="status" hidden>A trabalhar…</span><label class="theme-control" for="theme-select"><span>Tema</span><select id="theme-select" aria-label="Tema visual"><option value="night">Noite</option><option value="day">Dia</option><option value="indigo">Índigo</option><option value="amber">Âmbar</option></select></label><span class="local-label"><span class="status-dot"></span> Local</span></div>
+<div class="topbar"><span>Workspace <span class="breadcrumb">/</span> <strong id="page-label">Painel</strong></span><span id="busy" role="status" hidden><span class="shift-lights" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>A trabalhar…</span><label class="theme-control" for="theme-select"><span>Tema</span><select id="theme-select" aria-label="Tema visual"><option value="night">Noite</option><option value="day">Dia</option><option value="indigo">Índigo</option><option value="amber">Âmbar</option><option value="racing">90's Ferrari</option></select></label><span class="local-label"><span class="status-dot"></span> Local</span></div>
 <main id="main">
 
   <p id="error" class="alert bad" role="alert" hidden></p>
 
   <section id="tab-dashboard" aria-label="Painel">
-    <div class="page-heading"><div><p class="eyebrow">VISÃO GERAL</p><h1>O teu dia, em perspetiva.</h1><p class="step">Contactos, respostas e imóveis. Tudo no mesmo lugar.</p></div><button class="primary" data-tab="replies">Tratar respostas <span aria-hidden="true">↗</span></button></div>
+    <div class="page-heading"><div><p class="eyebrow" data-word="dashboard.eyebrow">VISÃO GERAL</p><h1 data-word="dashboard.title">O teu dia, em perspetiva.</h1><p class="step" data-word="dashboard.step">Contactos, respostas e imóveis. Tudo no mesmo lugar.</p></div>
+      <div class="retro-widget" aria-label="Relógio e calendário">
+        <div class="retro-clock"><span id="clock-analog" class="clock-analog" aria-hidden="true"></span><span id="clock-time">--:--:--</span><span id="clock-date" class="retro-date"></span></div>
+        <div class="retro-calendar">
+          <p id="calendar-month" class="retro-cal-month"></p>
+          <div id="calendar-dow" class="retro-cal-grid"></div>
+          <div id="calendar-grid" class="retro-cal-grid"></div>
+        </div>
+      </div>
+      <button class="primary" data-tab="replies">Tratar respostas <span aria-hidden="true">↗</span></button></div>
     <div class="metrics" id="metric-cards"></div>
     <p id="dashboard-read" class="muted small"></p>
 
-    <div id="digest-panel"></div>
+    <div class="dashboard-grid digest-row"><div id="digest-panel"></div><div id="visits-round-panel"></div></div>
 
-    <div class="dashboard-grid"><article class="card activity-card"><div class="section-heading"><div><p class="eyebrow">ATIVIDADE</p><h2>O ritmo dos teus contactos</h2></div><select id="chart-period" class="period-select" aria-label="Período do gráfico">
+    <div class="dashboard-grid"><article class="card activity-card"><div class="section-heading"><div><p class="eyebrow" data-word="activity.eyebrow">ATIVIDADE</p><h2 data-word="activity.title">O ritmo dos teus contactos</h2></div><select id="chart-period" class="period-select" aria-label="Período do gráfico">
         <option value="3">Últimos 3 dias</option><option value="7">Última semana</option>
         <option value="14" selected>Últimas 2 semanas</option><option value="30">Último mês</option>
         <option value="90">Últimos 3 meses</option></select></div>
@@ -42,13 +56,20 @@
       <div class="legend"><span class="requests">Pedidos recebidos</span><span class="sent">Respostas enviadas</span><span id="chart-note" class="muted"></span></div>
     </article>
 
-    <article class="card setup-card"><p class="eyebrow">O TEU ESPAÇO</p><h2>Pronto para trabalhar</h2><ul class="checks" id="dashboard-setup"></ul><button class="link" data-tab="voice">Ajustar preferências →</button></article></div>
-    <div class="section-heading portfolio-heading"><div><p class="eyebrow">POR IMÓVEL</p><h2>A tua carteira</h2></div><button data-tab="properties">Gerir imóveis →</button></div>
+    <article class="card setup-card"><p class="eyebrow" data-word="setup.eyebrow">O TEU ESPAÇO</p><h2 data-word="setup.title">Pronto para trabalhar</h2><ul class="checks" id="dashboard-setup"></ul><button class="link" data-tab="voice">Ajustar preferências →</button></article>
+
+    <article class="card" id="openai-usage-card"><p class="eyebrow">DEPÓSITOS · API OPENAI</p><h2>Um depósito de tokens por imóvel</h2>
+      <div id="fuel-panel"></div>
+      <div class="usage-row"><span>No período escolhido acima</span><strong id="usage-period"></strong></div>
+      <div class="usage-row"><span>Desde sempre, nesta pasta</span><strong id="usage-all-time"></strong></div>
+      <p class="muted small">Estimativa a partir dos tokens exatos que a OpenAI devolve; os preços por token podem já
+        ter mudado. Confirma a fatura real em platform.openai.com/usage.</p></article></div>
+    <div class="section-heading portfolio-heading"><div><p class="eyebrow" data-word="portfolio.eyebrow">POR IMÓVEL</p><h2 data-word="portfolio.title">A tua carteira</h2></div><button data-tab="properties">Gerir imóveis →</button></div>
     <div id="dashboard-properties" class="portfolio-grid"></div>
   </section>
 
   <section id="tab-replies" hidden>
-    <div class="page-heading"><div><p class="eyebrow">COMUNICAÇÃO</p><h1>Uma boa resposta começa aqui.</h1><p class="step">Prepara em lote. Revê cada conversa. Envia quando estiver tudo certo.</p></div></div>
+    <div class="page-heading"><div><p class="eyebrow" data-word="replies.eyebrow">COMUNICAÇÃO</p><h1 data-word="replies.title">Uma boa resposta começa aqui.</h1><p class="step">Prepara em lote. Revê cada conversa. Envia quando estiver tudo certo.</p></div></div>
     <ol class="workflow">
       <li data-step="inbox-step"><a href="#inbox-step"><span class="num">01</span><span class="done-mark" aria-hidden="true">✓</span> Selecionar</a></li>
       <li data-step="prepare-step"><a href="#prepare-step"><span class="num">02</span><span class="done-mark" aria-hidden="true">✓</span> Preparar</a></li>
@@ -72,6 +93,10 @@
     <textarea id="extra" aria-label="Instruções extra para o lote" rows="2" placeholder="Instruções extra para este lote (opcional), ex.: sê breve"></textarea>
     <div class="actions"><button id="build-prompt" class="primary">Criar prompt</button><button id="copy-prompt" disabled>Copiar</button></div>
     <details id="prompt-box"><summary class="muted small">Prompt criado</summary><pre id="prompt"></pre></details>
+    <div class="api-generate"><p class="muted small">Ou, sem sair da página:</p>
+      <div class="actions"><button id="generate-api" class="needs-fuel">Gerar respostas via API</button></div>
+      <p id="api-hint" class="muted small" hidden></p>
+    </div>
 
     </article><article class="card" id="import-step"><p class="eyebrow">PASSO 03</p><h2>Importar respostas <span class="kind kind-copy">Copiar/colar</span></h2>
     <textarea id="answer" aria-label="Resposta do ChatGPT" rows="6" placeholder="Cola aqui a resposta completa do ChatGPT (o bloco JSON)"></textarea>
@@ -86,11 +111,20 @@
   </section>
 
   <section id="tab-properties" hidden>
-    <div class="page-heading"><div><p class="eyebrow">CARTEIRA</p><h1>Cada imóvel, o seu contexto.</h1><p class="step">Anúncios, conhecimento e instruções para respostas mais úteis.</p></div><a class="button primary" href="#property-editor">Adicionar imóvel +</a></div>
-    <p class="kind-legend"><span class="kind kind-rag">RAG</span> factos que o assistente consulta · <span class="kind kind-prompt">Prompt</span> instruções de como responder · <span class="kind kind-voice">Voz</span> estilo comum · <span class="kind kind-copy">Copiar/colar</span> texto que levas e trazes do ChatGPT</p>
-    <div id="property-list"></div>
+    <div class="page-heading"><div><p class="eyebrow" data-word="properties.eyebrow">CARTEIRA</p><h1 data-word="properties.title">Cada imóvel, o seu contexto.</h1><p class="step" data-word="properties.step">Anúncios, conhecimento e instruções para respostas mais úteis.</p></div>
+      <div class="segmented" role="group" aria-label="Vista de Imóveis">
+        <button id="view-properties" class="active" aria-pressed="true">Os teus imóveis</button>
+        <button id="view-new-property" aria-pressed="false">+ Novo imóvel</button>
+      </div></div>
+    <div id="properties-view">
+      <div id="property-slider" class="property-slider"></div>
+      <div id="property-dashboard" class="property-dashboard"></div>
+      <p class="kind-legend"><span class="kind kind-rag">RAG</span> factos que o assistente consulta · <span class="kind kind-prompt">Prompt</span> instruções de como responder · <span class="kind kind-voice">Voz</span> estilo comum · <span class="kind kind-copy">Copiar/colar</span> texto que levas e trazes do ChatGPT</p>
+      <div id="property-list"></div>
+    </div>
+    <div id="new-property-view" hidden>
     <article class="card editor-card" id="property-editor">
-      <p class="eyebrow">FICHA DO IMÓVEL</p><h2>Novo imóvel ou dados do anúncio <span class="kind kind-copy">Copiar/colar</span></h2>
+      <p class="eyebrow">FICHA DO IMÓVEL</p><h2><span id="editor-title">Novo imóvel</span> <span class="kind kind-copy">Copiar/colar</span></h2>
       <p class="step">À mão, ou com o ChatGPT: cola o link do anúncio, copia o prompt, cola a resposta e revê os campos.</p>
       <div class="row">
         <input id="listing-url" aria-label="Link do anúncio para importar" placeholder="https://www.idealista.pt/imovel/…">
@@ -111,10 +145,11 @@
       <label class="field"><span>Características do anúncio <span class="kind kind-rag">RAG</span></span> Uma por linha (substituem as anteriores; para juntar uma informação, usa «Acrescentar ao conhecimento»)<textarea id="f-facts" rows="5"></textarea></label>
       <div class="actions"><button id="property-save" class="primary">Guardar imóvel</button></div>
     </article>
+    </div>
   </section>
 
   <section id="tab-contacts" hidden>
-    <div class="page-heading"><div><p class="eyebrow">CONTACTOS</p><h1>Quem te escreveu, num só registo.</h1><p class="step">É o <code>data/contactos.csv</code>: cada leitura acrescenta os clientes novos, e aqui corriges, acrescentas à mão ou apagas a pedido do cliente.</p></div><a class="button" href="contactos.csv">Descarregar CSV</a></div>
+    <div class="page-heading"><div><p class="eyebrow" data-word="contacts.eyebrow">CONTACTOS</p><h1 data-word="contacts.title">Quem te escreveu, num só registo.</h1><p class="step">É o <code>data/contactos.csv</code>: cada leitura acrescenta os clientes novos, e aqui corriges, acrescentas à mão ou apagas a pedido do cliente.</p></div><a class="button" href="contactos.csv">Descarregar CSV</a></div>
     <div class="row contacts-filters">
       <label class="muted">Imóvel <select id="contacts-property"><option value="">Todos</option></select></label>
       <label class="muted">RGPD <select id="contacts-rgpd"><option value="">Todos</option></select></label>
@@ -141,8 +176,22 @@
     </article>
   </section>
 
+  <section id="tab-agenda" hidden>
+    <div class="page-heading"><div><p class="eyebrow" data-word="agenda.eyebrow">AGENDA</p><h1 data-word="agenda.title">A semana, à moda de agenda de papel.</h1><p class="step">As visitas propostas e marcadas, dia a dia. Por agora gere-se aqui; a exportação para o teu calendário fica para depois.</p></div></div>
+    <div class="row agenda-controls">
+      <label class="muted">Imóvel <select id="agenda-property"><option value="">Todos</option></select></label>
+      <div class="agenda-nav">
+        <button id="agenda-prev" class="link" type="button">← Semana anterior</button>
+        <button id="agenda-today" class="link" type="button">Esta semana</button>
+        <button id="agenda-next" class="link" type="button">Semana seguinte →</button>
+      </div>
+      <span id="agenda-range" class="muted small"></span>
+    </div>
+    <div id="agenda-week" class="filofax"></div>
+  </section>
+
   <section id="tab-voice" hidden>
-    <div class="page-heading"><div><p class="eyebrow">PERSONALIZAÇÃO</p><h1>As tuas palavras. O teu estilo.</h1><p class="step">Define como te apresentas em cada resposta.</p></div></div>
+    <div class="page-heading"><div><p class="eyebrow" data-word="voice.eyebrow">PERSONALIZAÇÃO</p><h1 data-word="voice.title">As tuas palavras. O teu estilo.</h1><p class="step">Define como te apresentas em cada resposta.</p></div></div>
     <p class="step">Comum a todos os imóveis. Sem estas escolhas, nenhuma resposta é preparada.</p>
     <p class="kind-legend"><span class="kind kind-rag">RAG</span> factos que o assistente consulta · <span class="kind kind-prompt">Prompt</span> instruções de como responder · <span class="kind kind-voice">Voz</span> estilo comum · <span class="kind kind-copy">Copiar/colar</span> texto que levas e trazes do ChatGPT</p>
     <article class="card" id="voice-form"></article>

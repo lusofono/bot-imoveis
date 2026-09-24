@@ -87,7 +87,7 @@
       },
       "knowledge": {
         "status": "configured",
-        "text": "Usa esta base para responder às perguntas do cliente sobre o imóvel. Responde só com o que aqui está; se a resposta não estiver aqui, diz que vais confirmar e avisa o proprietário."
+        "text": "Esta base tem dois tipos de conteúdo, os dois obrigatórios: factos sobre o imóvel (usa-os sempre que respondas a uma pergunta sobre eles, por pequenos que pareçam; se faltar um facto que precises, diz que vais confirmar, nunca o inventes) e regras de comportamento (o que não perguntares nem levantares por iniciativa própria, e só se o cliente o fizer primeiro — cumpre-as tal como cumpres as instruções de voz e das interações, não como um extra a lembrar só se vier a calhar)."
       },
       "third_interaction": {
         "status": "configured",

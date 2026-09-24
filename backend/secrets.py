@@ -57,3 +57,50 @@ def has_app_password(folder, account):
         return bool(app_password(folder, account))
     except RuntimeError:
         return False
+
+
+def openai_api_key(folder, account):
+    """The OpenAI API key: same pattern as the Gmail App Password (a 600 file, else the Mac Keychain item
+    "openai_api_key" for this account). Optional: without it, the API path for drafting replies is unused
+    and copy/paste with ChatGPT keeps working exactly as before."""
+    secret_path = os.environ.get("BOT_MAIL_OPENAI_KEY_FILE")
+    path = Path(secret_path) if secret_path else Path(folder) / "secrets" / "openai_api_key"
+    if path.exists():
+        if path.stat().st_mode & 0o077:
+            raise RuntimeError("O ficheiro da chave OpenAI deve ter permissões 600.")
+        key = path.read_text().strip()
+    elif sys.platform == "darwin":
+        result = subprocess.run(["security", "find-generic-password", "-a", account,
+                                 "-s", "openai_api_key", "-w"], capture_output=True, text=True)
+        key = result.stdout.strip() if result.returncode == 0 else ""
+    else:
+        key = ""
+    if not key:
+        raise RuntimeError("Configura a chave OpenAI com mac/openai_key.command para usar "
+                           "«Gerar respostas via API» — ou continua só com Criar prompt/Copiar.")
+    return key
+
+
+def save_openai_key(folder, account, key):
+    key = key.strip()
+    if not key:
+        raise ValueError("Chave OpenAI vazia.")
+    if sys.platform == "darwin":
+        subprocess.run(["security", "add-generic-password", "-U", "-a", account,
+                        "-s", "openai_api_key", "-w", key], check=True,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        path = Path(folder) / "secrets" / "openai_api_key"
+        path.parent.mkdir(mode=0o700, exist_ok=True)
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w") as stream:
+            stream.write(key + "\n")
+
+
+def has_openai_api_key(folder, account):
+    """Whether an OpenAI key is already stored. It never returns or logs the key itself."""
+    try:
+        return bool(openai_api_key(folder, account))
+    except RuntimeError:
+        return False

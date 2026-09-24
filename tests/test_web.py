@@ -3,7 +3,7 @@ from unittest.mock import patch
 import pytest
 from starlette.testclient import TestClient
 from backend.ai import parse_replies, short_id
-from backend.api import VERSION, web_app
+from backend.api import DISPLAY_VERSION, web_app
 from test_properties import CUSTOMER, REF, SMTP, draft_and_send, lead, read, service  # noqa: F401 (service is a fixture)
 
 TOKEN = "test-token"
@@ -29,13 +29,14 @@ def test_page_needs_the_start_link_and_the_api_needs_the_token(page):
     assert html.status_code == 200 and TOKEN in html.text
     nonce = html.headers["content-security-policy"].split("'nonce-")[1].split("'")[0]
     assert f'<script nonce="{nonce}">' in html.text and "{{" not in html.text
-    assert f"v{VERSION}" in html.text  # the version shown on the page is pyproject.toml's
+    assert f"v{DISPLAY_VERSION}" in html.text  # "0." shows as "α.": pyproject.toml stays plain semver
+    assert DISPLAY_VERSION.startswith("α.")  # this project is still 0.x
     assert client.get("/api/state").status_code == 403
     assert client.post("/api/send", json={"confirmed": True}, headers={"X-Bot-Mail-Token": "wrong"}).status_code == 403
     assert client.get("/", headers={"Host": "evil.example"}).status_code == 400
 
 
-def test_the_page_is_served_as_its_three_files(page):
+def test_the_page_is_served_as_its_own_files(page):
     client, _ = page
     client.get(f"/?t={TOKEN}")
     html = client.get("/")
@@ -47,8 +48,13 @@ def test_the_page_is_served_as_its_three_files(page):
     script, style = client.get("/app.js"), client.get("/style.css")
     assert script.headers["content-type"].startswith("text/javascript") and "X-Bot-Mail-Token" in script.text
     assert style.headers["content-type"].startswith("text/css") and "--accent" in style.text
-    # The template itself, with its placeholders, is never served.
+    # A rich theme keeps its own stylesheet in frontend/themes/, linked from the page and served as CSS.
+    assert '<link rel="stylesheet" href="themes/racing.css">' in html.text
+    racing = client.get("/themes/racing.css")
+    assert racing.headers["content-type"].startswith("text/css") and ':root[data-theme="racing"]' in racing.text
+    # The template itself, with its placeholders, is never served; nor is a theme that does not exist.
     assert client.get("/index.html").status_code == 404
+    assert client.get("/themes/nada.css").status_code == 404
 
 
 def test_copy_paste_flow_drafts_previews_and_sends(service, page):
@@ -237,3 +243,104 @@ def test_the_contacts_csv_downloads_only_with_the_page_cookie(service, page):
     response = client.get("/contactos.csv")
     assert response.status_code == 200 and response.headers["content-type"].startswith("text/csv")
     assert response.content.startswith(b"\xef\xbb\xbf") and CUSTOMER in response.text
+
+
+def test_generate_calls_the_api_and_saves_drafts_exactly_like_pasting(service, page):
+    _, call = page
+    read(service, [lead("1")])
+    status, result = call("/api/prompt", {"property_ref": REF, "ids": ["1"], "extra": ""})
+    answer = json.dumps({"respostas": [{"id": short_id("1"), "reply_text": "Cara Ana,\n\nObrigado.",
+                         "nota": "Confirma a data."}]})
+    usage = {"prompt_tokens": 100, "completion_tokens": 20, "total_tokens": 120}
+    with patch("backend.api.openai_api_key", return_value="sk-test"), \
+         patch("backend.api.complete", return_value=(answer, usage)) as complete:
+        status, generated = call("/api/prompt/generate", {"property_ref": REF, "ids": ["1"], "extra": "Sê breve."})
+    assert status == 200 and generated["saved"] == 1 and generated["notes"][0]["nota"] == "Confirma a data."
+    assert generated["state"]["properties"][0]["emails"][0]["reply_text"].startswith("Cara Ana")
+    assert generated["tokens"] == usage
+    prompt_sent = complete.call_args.args[2]
+    assert "Sê breve." in prompt_sent and CUSTOMER not in prompt_sent  # same prompt as copy/paste, no contacts
+    # Tokens (never the prompt or the answer) are logged for the dashboard's cost panel.
+    events = [json.loads(line) for line in (service.folder / "logs" / "events.jsonl").read_text().splitlines()]
+    usage_event = next(e for e in events if e["event"] == "openai_usage")
+    assert usage_event["model"] == "gpt-4o" and usage_event["prompt_tokens"] == 100 and usage_event["cost_usd"] > 0
+
+    # Without a key, the error tells the owner exactly what to do; ChatGPT copy/paste keeps working regardless.
+    status, error = call("/api/prompt/generate", {"property_ref": REF, "ids": ["1"]})
+    assert status == 400 and "mac/openai_key.command" in error["error"]
+
+
+def test_generate_surfaces_an_openai_error_without_touching_the_queue(service, page):
+    _, call = page
+    read(service, [lead("1")])
+    from backend.openai_client import OpenAIError
+    with patch("backend.api.openai_api_key", return_value="sk-test"), \
+         patch("backend.api.complete", side_effect=OpenAIError("Chave OpenAI inválida ou revogada.")):
+        status, error = call("/api/prompt/generate", {"property_ref": REF, "ids": ["1"]})
+    assert status == 400 and "inválida" in error["error"]
+    assert call("/api/state")[1]["properties"][0]["emails"][0]["reply_text"] == ""
+
+
+def test_visit_analysis_endpoints(service, page):
+    from test_visits import customer
+    _, call = page
+    read(service, [customer("1", "a@example.com")])
+    draft_and_send(service, "1", "Olá.")
+    status, result = call("/api/visits/analysis-prompt", {"property_ref": REF})
+    assert status == 200 and "não uses JSON" in result["prompt"] and CUSTOMER not in result["prompt"]
+
+    status, error = call("/api/visits/analyze", {"property_ref": REF})
+    assert status == 400 and "mac/openai_key.command" in error["error"]
+    with patch("backend.service.openai_api_key", return_value="sk-test"), \
+         patch("backend.service.complete", return_value=("Resumo.", {"prompt_tokens": 10, "completion_tokens": 5})):
+        status, analyzed = call("/api/visits/analyze", {"property_ref": REF})
+    assert status == 200 and analyzed["summary"] == "Resumo."
+
+
+def test_each_property_s_reply_time_limit_is_set_on_the_page(service, page):
+    _, call = page
+    read(service, [lead("1")])
+    status, result = call("/api/property/panel", {"property_ref": REF, "reply_hours_max": 8})
+    assert status == 200 and result["panel"]["reply_hours_max"] == 8
+    assert call("/api/metrics", {"days": 14})[1]["properties"][0]["reply_hours_max"] == 8
+    for bad in ({"property_ref": REF, "reply_hours_max": 0}, {"property_ref": REF},
+                {"property_ref": "../fora", "reply_hours_max": 8}):
+        assert call("/api/property/panel", bad)[0] == 400
+
+
+def test_each_property_s_api_tank_empties_with_its_spend_and_stops_its_api_until_refilled(service, page):
+    from test_dashboard import log_event
+    _, call = page
+    read(service, [lead("1")])
+    assert service.api_fuel(REF)["configured"] is False and service.api_fuel(REF)["empty"] is False  # no tank: no limit
+    log_event(service, 1, event="openai_usage", reference=REF, cost_usd=3.0)  # before the fill: never counts
+    status, filled = call("/api/fuel/fill", {"property_ref": REF, "capacity_eur": 1})
+    assert status == 200 and filled["fuel"]["remaining_eur"] == 1 and not filled["fuel"]["reserve"]
+    assert "usd_to_eur" not in filled["fuel"]  # 1 € = 1 US$ for this assistant: no rate anywhere
+    answer = json.dumps({"respostas": [{"id": short_id("1"), "reply_text": "Cara Ana,\n\nObrigado."}]})
+    with patch("backend.api.openai_api_key", return_value="sk-test"), \
+         patch("backend.api.complete", return_value=(answer, {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2})), \
+         patch("backend.api.estimate_cost_usd", return_value=0.95):  # 0,95 US$ spends 0,95 €
+        status, generated = call("/api/prompt/generate", {"property_ref": REF, "ids": ["1"]})
+        assert status == 200 and generated["fuel"]["spent_eur"] == 0.95 and generated["fuel"]["reserve"]
+        assert call("/api/settings")[1]["properties"][0]["api_fuel"]["remaining_eur"] == 0.05
+        status, _ = call("/api/prompt/generate", {"property_ref": REF, "ids": ["1"]})  # the last drop
+        status, refused = call("/api/prompt/generate", {"property_ref": REF, "ids": ["1"]})
+    assert status == 400 and f"depósito da API de {REF} está vazio" in refused["error"]
+    with pytest.raises(ValueError, match="está vazio"):
+        service.analyze_visits(REF)
+    assert call("/api/fuel/fill", {"property_ref": REF, "capacity_eur": 5})[1]["fuel"]["empty"] is False  # back on
+    for bad in ({"property_ref": REF, "capacity_eur": 0}, {"property_ref": REF, "capacity_eur": "cinco"},
+                {"property_ref": "OUTRO", "capacity_eur": 5}):
+        assert call("/api/fuel/fill", bad)[0] == 400
+
+
+def test_the_visits_petrol_is_set_on_the_property_s_panel(service, page):
+    _, call = page
+    read(service, [lead("1")])
+    status, result = call("/api/property/panel", {"property_ref": REF, "distance_km": "18", "l_per_100km": "6.5"})
+    assert status == 200 and result["panel"] == {"reply_hours_max": 24, "distance_km": 18, "l_per_100km": 6.5}
+    petrol = call("/api/metrics", {"days": 14})[1]["properties"][0]["petrol"]
+    assert (petrol["distance_km"], petrol["l_per_100km"], petrol["trips"], petrol["litres"]) == (18, 6.5, 0, 0)
+    for bad in ({"property_ref": REF, "distance_km": -1}, {"property_ref": REF, "l_per_100km": 90}):
+        assert call("/api/property/panel", bad)[0] == 400

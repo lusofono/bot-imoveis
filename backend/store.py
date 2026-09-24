@@ -253,3 +253,12 @@ def load_visits(folder, ref):
 
 def save_visits(folder, ref, agenda):
     save_json(property_folder(folder, ref) / "visitas.json", agenda)
+
+
+def load_panel(folder, ref):
+    """properties/<REF>/painel.json: how this property's instrument panel reads (its reply-time limit)."""
+    return load_json(property_folder(folder, ref) / "painel.json", {})
+
+
+def save_panel(folder, ref, panel):
+    save_json(property_folder(folder, ref) / "painel.json", panel)

@@ -37,7 +37,12 @@ Para começar numa sessão nova. Lê primeiro o `docs/DECISOES.md`, onde a decis
 - **Nova opção de idioma (22/09, à noite):** «Idioma do cliente + tradução em inglês», escolhida por
   omissão — responde na língua do cliente e acrescenta uma tradução em inglês quando essa língua não é
   português, inglês nem espanhol.
-- **91 testes passam**, todos com dados fictícios.
+- **Separador Contactos (23/09, v0.11.0):** gerir `contactos.csv` na página — editar, acrescentar à mão,
+  apagar a pedido (direito ao apagamento) e descarregar. Ver `docs/DECISOES.md`.
+- **Via alternativa por API da OpenAI (23/09, v0.12.0):** «Gerar respostas via API», ao lado de Criar
+  prompt/Copiar, no passo 02. Chave opcional no Keychain (`mac/openai_key.command`), modelo `gpt-4o`. Não
+  abre exceção à aprovação humana antes de enviar. Ver `docs/DECISOES.md`.
+- **117 testes passam**, todos com dados fictícios.
 - **Dados reais no Mac, fora do Git, em `data/`:** a conta, a voz, o know-how, e dois imóveis com o
   perfil, o conhecimento e a fila de cada um.
 - **Por agora usa-se só copiar/colar;** o MCP fica para depois.
@@ -243,6 +248,8 @@ Regra comum: o programa prepara, e nada sai sem a pré-visualização do lote e 
 8. **Ícone no Desktop:** uma app sem janela de Terminal, com o código de acesso guardado em `data/` para
    não mudar a cada arranque.
 9. Etapa 2 (interfaces) e etapa 4 (MCP no Claude Desktop), quando se voltar a usar MCP.
+10. **Temas ricos Yacht e Rolls-Royce (anunciados a 24/09):** os encaixes estão prontos desde a α.24.0
+    (`frontend/themes/<tema>.css` e uma entrada em `SKINS` no `app.js`; ver `docs/DECISOES.md`, 24/09).
 
 **Fora do plano por agora:** o botão para carregar a fotografia do imóvel. A API aceita-a
 (`POST /api/property/photo`) e a página mostra-a quando existe, mas extrair fotos do Idealista à mão não é

@@ -43,26 +43,48 @@ Abre `http://127.0.0.1:8765` no browser, já com o link certo. É o mesmo que `.
   arrancou, e nenhum outro site aberto no browser consegue ler a fila ou enviar emails por trás.
 - **Arrancar outra vez fecha a página anterior** da mesma pasta de dados; nunca mexe noutros programas.
 - Tem quatro separadores: **Painel** (métricas dos últimos 14 dias, imóveis e estado da configuração),
-  **Respostas**, **Imóveis** e **Voz e estilo**, com quatro temas visuais (Noite, Dia, Índigo e Âmbar).
+  **Respostas**, **Imóveis** e **Voz e estilo**, com quatro temas visuais simples (Noite, Dia, Índigo e Âmbar)
+  e um tema rico, o **90's Ferrari** (um cockpit de GT italiano dos anos 90: carbono, nogueira, pele, caixa de
+  velocidades como navegação e um quadro de instrumentos por imóvel). Os temas ricos vivem em
+  `frontend/themes/`, cada um com a sua folha de estilo e o seu registo em `SKINS` no `app.js`.
 
 Tudo o que orienta as respostas edita-se na página, e cada campo diz o que é: **RAG** (factos que o
 assistente consulta: o know-how da agência, em «Voz e estilo», e o conhecimento de cada imóvel, em
 «Imóveis»), **Prompt** (instruções: o comportamento geral e cada interação), **Voz** (estilo comum) e
-**Copiar/colar** (o que levas e trazes do ChatGPT). Por agora usa-se só copiar/colar; o MCP fica para depois.
+**Copiar/colar** (o que levas e trazes do ChatGPT). Por agora usa-se copiar/colar ou, opcionalmente, a API
+da OpenAI (ver «Via alternativa por API» abaixo); o MCP fica para depois.
 
 No separador **Respostas**, o fluxo é em lote. Antes de ler, escolhes quantos dias recuar (7 por omissão):
 
 1. **Ler emails do Gmail** e escolher os emails a tratar.
-2. **Copiar prompt**: um só prompt para todos os selecionados, que colas numa conversa normal do ChatGPT.
-   Leva a voz, o contexto do imóvel e as mensagens, sem o email nem o telefone dos clientes.
+2. **Criar prompt**: um só prompt para todos os selecionados, mostrado na página antes de qualquer cópia.
+   Leva a voz, o contexto do imóvel e as mensagens, sem o email nem o telefone dos clientes. **Copiar**
+   copia-o para colares numa conversa normal do ChatGPT — ou, com uma chave OpenAI guardada (opcional, ver
+   abaixo), **Gerar respostas via API** faz este passo e o seguinte de uma vez, sem saíres da página.
 3. Colar a resposta do ChatGPT, um só bloco JSON com todas as respostas, e **Guardar rascunhos**. Os
-   rascunhos podem ser corrigidos à mão.
-4. **Pré-visualizar** destinatários e textos finais e enviar o lote com uma só confirmação.
+   rascunhos podem ser corrigidos à mão. (Passo saltado quando usas a API.)
+4. **Pré-visualizar** destinatários e textos finais e enviar o lote com uma só confirmação — sempre, mesmo
+   com respostas geradas pela API.
 
 Lotes de 5 a 10 emails dão melhores respostas do que dezenas de uma vez: com muitos, o ChatGPT corta a
 resposta ou troca ids.
 
 Os emails bloqueados não entram no prompt nem no envio: trata-os à mão e retira-os da fila.
+
+## Via alternativa por API
+
+Além de Criar prompt/Copiar/Colar, o passo 02 tem **«Gerar respostas via API»**: usa a tua própria chave da
+OpenAI para gerar e guardar os rascunhos diretamente, sem passares pelo ChatGPT. É o mesmo prompt, a mesma
+validação e os mesmos rascunhos — muda só quem escreve a resposta. Opcional: sem chave configurada, o botão
+explica o que falta e o resto da página funciona exactamente como sempre.
+
+- **Guardar a chave:** `./mac/openai_key.command`, que a confirma contra a API da OpenAI antes de a guardar
+  no Keychain (uma chave errada nunca fica gravada). Nunca passa pela página nem por um ficheiro do projeto.
+- **Modelo:** `gpt-4o` por omissão; muda-se com `openai_model` em `config.json`.
+- **A aprovação humana não muda:** os rascunhos gerados pela API entram na fila tal como os colados à mão,
+  e o envio continua a exigir pré-visualização e confirmação.
+- **Custo:** os pedidos à API são cobrados à tua conta OpenAI, ao contrário do ChatGPT por assinatura.
+
 No separador **Imóveis** crias ou atualizas um imóvel à mão ou a partir do link do anúncio: a página
 dá-te o prompt, o ChatGPT extrai os dados e tu revês os campos antes de guardar. O remetente do portal e
 as regras de resposta nunca vêm do texto colado. As características vão para a base de conhecimento
@@ -187,14 +209,16 @@ backend/                   o código Python
   ai.py                    instruções para o assistente, prompts e respostas coladas (sem ficheiros nem rede)
   mail.py                  Gmail: ler (IMAP) e construir as respostas
   store.py                 a pasta de dados: JSON atómico, bloqueio, perfis, conhecimento e voz
-  secrets.py               a App Password (Keychain no Mac)
+  secrets.py               a App Password e a chave OpenAI, opcional (Keychain no Mac)
+  openai_client.py         a via alternativa por API da OpenAI (opcional, só urllib)
   api.py                   a página local: uma rota por chamada (Starlette)
   mcp.py                   o MCP local por stdio: uma ferramenta por chamada
   cli.py, configure.py     os comandos bot-mail e a configuração no terminal
   demo.py                  pasta de demonstração, só com dados fictícios
   templates/               exemplos publicados, com dados fictícios: config, voz e perfil de imóvel
 frontend/                  a página: index.html, app.js, style.css (só fala com a API)
-mac/                       atalhos de duplo clique: web, setup, password, read, send e o agendamento do READ
+  themes/<tema>.css        os temas ricos ("skins"), um ficheiro cada: racing.css (90's Ferrari)
+mac/                       atalhos de duplo clique: web, setup, password, openai_key, read, send e o agendamento do READ
 main.py                    arranque local: a página em 127.0.0.1 e o browser; mais tarde, a .app
 data/                      os teus dados (local, ignorado pelo Git)
   config.json              conta e filtros
@@ -206,6 +230,7 @@ data/                      os teus dados (local, ignorado pelo Git)
   properties/<REF>/knowledge/*.md   base de conhecimento do imóvel (RAG)
   properties/<REF>/foto.*           fotografia do imóvel, para o painel
   properties/<REF>/visitas.json     intervalos propostos, visitas marcadas e se o imóvel está fechado
+  properties/<REF>/painel.json      o painel do imóvel: tempo máximo de resposta, depósito da API, distância e consumo
   queue.json               fila única, só quando não há imóveis (criado no READ)
   logs/events.jsonl        registos sem conteúdo dos emails
   .page.pid                a página que está a correr, para o arranque seguinte a fechar
@@ -245,6 +270,15 @@ repetir o resto da configuração:
 
 Cria-a na Conta Google, em Segurança → Palavras-passe de aplicações; exige a verificação em dois passos.
 O comando confirma o login IMAP antes de guardar, por isso uma password errada nunca fica gravada.
+
+A chave OpenAI (opcional, para «Gerar respostas via API») segue o mesmo padrão, também no Keychain:
+
+```bash
+./mac/openai_key.command
+```
+
+Cria-a em platform.openai.com. O comando confirma-a contra a API antes de guardar; uma chave errada nunca
+fica gravada. Sem esta chave, o botão explica o que falta e o resto da página funciona na mesma.
 
 Os comandos locais READ/SEND continuam independentes. Para SEND local, preenche `reply_text`, marca
 `send_reply: true` no JSON e executa `mac/send.command`. O terminal mostra o lote e pede `ENVIAR`.
@@ -315,10 +349,11 @@ de ferramentas de escrita ativa no assistente e não autorizes envio automático
 .venv/bin/python -m pytest -q
 ```
 
-91 testes: lotes, persistência, falhas SMTP, deduplicação, anexos, leitura IMAP simulada, regras dos
-imóveis, assunto e remetente, links do Idealista, registo de contactos, lembretes, visitas fechadas,
-pedido de consentimento, ponto de situação diário, métricas sem dados de clientes, fotografias, página
-local, MCP local por stdio e comandos do terminal, sempre com dados fictícios. Nenhum teste lê uma caixa
+117 testes: lotes, persistência, falhas SMTP, deduplicação, anexos, leitura IMAP simulada, regras dos
+imóveis, assunto e remetente, links do Idealista, registo de contactos, gestão de contactos, lembretes,
+visitas fechadas, pedido de consentimento, ponto de situação diário, via API da OpenAI, métricas sem dados
+de clientes, fotografias, página local, MCP local por stdio e comandos do terminal, sempre com dados
+fictícios. Nenhum teste lê uma caixa
 real ou envia emails.
 A primeira leitura do Gmail real e os primeiros envios reais foram feitos à mão a 21/09/2026.
 

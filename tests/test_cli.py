@@ -56,3 +56,26 @@ def test_demo_command_creates_fictitious_data_without_overwriting(tmp_path):
     original = (destination / "config.json").read_bytes()
     assert main(["demo", str(destination)]) == 1
     assert (destination / "config.json").read_bytes() == original
+
+
+def test_openai_key_is_checked_against_the_api_before_being_stored(tmp_path, capsys):
+    save_json(tmp_path / "config.json", {"account": "owner@example.com"})
+    saved = []
+    with patch("backend.cli.getpass.getpass", return_value=" sk-test-123 "), \
+         patch("backend.openai_client.check_key") as check_key, \
+         patch("backend.cli.save_openai_key", side_effect=lambda *args: saved.append(args)):
+        assert main(["--instance", str(tmp_path), "openai-key"]) == 0
+    check_key.assert_called_once_with("sk-test-123")
+    assert saved == [(tmp_path, "owner@example.com", "sk-test-123")]
+    assert "Keychain" in capsys.readouterr().out
+
+    # An invalid key is never stored, and neither is an empty one.
+    with patch("backend.cli.getpass.getpass", return_value="sk-errada"), \
+         patch("backend.openai_client.check_key", side_effect=RuntimeError("Chave OpenAI inválida.")), \
+         patch("backend.cli.save_openai_key", side_effect=lambda *args: saved.append(args)):
+        assert main(["--instance", str(tmp_path), "openai-key"]) == 1
+    with patch("backend.cli.getpass.getpass", return_value="  "), \
+         patch("backend.cli.save_openai_key", side_effect=lambda *args: saved.append(args)):
+        assert main(["--instance", str(tmp_path), "openai-key"]) == 1
+    assert len(saved) == 1
+    assert "inválida" in capsys.readouterr().err

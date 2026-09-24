@@ -8,7 +8,238 @@ antigo:
 - **MENOR** (0.7 → 0.8): uma funcionalidade ou pedido novo;
 - **MAIOR** (0.x → 1.0, 1.x → 2.0): uma mudança grande no funcionamento.
 
+**Desde 23/09/2026, a versão mostra-se como «α.X.Y», não «0.X.Y»** (pedido do utilizador): o "0" inicial
+lia-se mal como zero absoluto; o símbolo α diz mais claramente "isto ainda é alfa". Só a apresentação muda —
+o `pyproject.toml` continua com o número normal (`0.X.Y`), que é o que as ferramentas Python exigem; este
+ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparece na página.
+
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
+
+## α.25.0 — 24/09/2026
+
+- **Um depósito de tokens por imóvel**, porque é aí que se controla melhor. Enche-se no painel de cada imóvel,
+  por baixo do mostrador do combustível («Encher»). Cada imóvel só gasta do seu e, vazio, só a API desse
+  imóvel se desliga (o servidor também recusa); o copiar/colar continua. O depósito comum que já tinhas (5 €)
+  passa a valer para cada imóvel, desde o mesmo momento, até encheres o de cada um. No Painel, o cartão
+  mostra agora os depósitos de todos os imóveis, cada um com o seu mostrador.
+- **€ = US$, sem conversões:** o câmbio desaparece da página, e os custos da OpenAI aparecem diretamente em
+  euros.
+- **Gasolina das visitas:** um mostrador pequeno ao lado do combustível, igual a ele, mas que só vai
+  somando litros. Por baixo dos mostradores, o **computador de bordo** guarda a distância da agência ao
+  imóvel (só ida) e o consumo do carro (7 L/100 km por omissão). Cada dia com visitas já começadas conta como
+  uma ida e volta; os dias marcados à frente aparecem à parte.
+- **O tema RedRacing passa a chamar-se «90's Ferrari».** A escolha fica guardada: quem o tinha escolhido
+  continua com ele.
+
+## α.24.0 — 24/09/2026
+
+- **Tema RedRacing, segunda versão: um cockpit de GT italiano dos anos 90.** Fibra de carbono no fundo, no
+  Painel e no quadro de instrumentos; nogueira lacada na barra lateral; pele preta com costura vermelha nos
+  cartões; alumínio escovado e cromados. Tudo desenhado na própria página: nada vem de fora.
+- **Botões como interruptores:** os normais são interruptores pretos que afundam ao clicar; os principais,
+  o botão vermelho de arranque num aro cromado; os que enviam emails («Enviar só este», «Enviar N
+  email(s)», o ponto de situação) têm a moldura amarela e preta de um interruptor protegido, para lembrar
+  que dali sai algo a sério. As caixas de seleção são interruptores de alavanca cromados, as listas têm um
+  botão rotativo serrilhado e as caixas de texto são de pele com costura.
+- **A navegação é uma caixa de velocidades:** cada separador é uma mudança (1 Painel … 6 Voz e estilo) e,
+  na barra lateral, uma grelha aberta com manete de nogueira muda de posição, passando pelo ponto morto,
+  quando mudas de separador. Também podes clicar na mudança.
+- **Dois mostradores novos no painel de cada imóvel.** A **temperatura** é o tempo médio de resposta, e o
+  seu máximo (o H) define-se imóvel a imóvel, por baixo do mostrador (24 h por omissão). Acima do máximo, a
+  agulha encosta ao H, o visor pisca e acende a luz «Sobreaquecido». O **velocímetro** mostra os pedidos
+  por dia no período escolhido. Ficam quatro: temperatura, conta-rotações, velocímetro e combustível.
+- Luzes de aviso com os símbolos dos carros (motor, travão, temperatura, bomba de gasolina); relógio
+  analógico de tablier no Painel; luzes de mudança acesas enquanto a página trabalha; faixa tricolor no
+  topo; os passos 1.ª a 4.ª em Respostas; a Agenda como livro de bordo de páginas creme; bandeira de xadrez
+  quando não há emails pendentes; patilhas «−» e «+» para mudar de imóvel.
+- **Palavras do tema:** no RedRacing os títulos falam de carros (Cockpit, Box, Garagem, Paddock,
+  Afinação…). Os botões e as ações ficam com os nomes de sempre.
+- **Nos temas simples, o máximo por imóvel também conta:** o mostrador de horas vai de 0 ao máximo desse
+  imóvel e acende «Resposta lenta» quando a média o passa.
+- **Preparado para mais temas ricos (iate, luxo…):** cada um é um ficheiro em `frontend/themes/` e uma
+  entrada em `SKINS` no `app.js`, com as suas palavras, os seus mostradores, o seu seletor de separadores e
+  o seu relógio, feitos a partir dos mesmos números.
+- Corrigido: a faixa dos passos 01–04 tinha fixa a cor do tema Noite (ficava azul-escura e quase ilegível
+  nos temas Dia e Âmbar); e a lista do «Fecho», em Voz e estilo, aparecia esticada.
+
+## α.23.0 — 24/09/2026
+
+- **Depósito da API, como combustível:** no Painel, o cartão da API passa a ser um depósito com
+  indicador E–½–F. Enches com um valor em euros (5 € por omissão) e cada pedido à API vai gastando
+  (estimativa a partir dos tokens, convertida com o câmbio que indicas). Na reserva (menos de 15 %) acende
+  a luz «Reserva»; vazio, os três botões da API desligam-se até voltares a encher — e o servidor também
+  recusa, não só os botões. O copiar/colar com o ChatGPT nunca é afetado. No painel de cada imóvel, o
+  mostrador do custo passou a ser o do depósito, com o que esse imóvel já gastou.
+- **Novo tema «RedRacing»:** preto e vermelho, fibra de carbono, títulos em itálico, números como
+  mostradores digitais, relógio LCD vermelho, faixa vermelha e amarela no topo — e o painel de
+  instrumentos completo, com o conta-rotações amarelo.
+- **Nos outros temas (Noite, Dia, Índigo, Âmbar), mostradores redondos mais pequenos e simples:** nas
+  cores do tema, só com os números das pontas, contadores simples e luzes discretas.
+- O painel de cada imóvel atualiza-se sempre que abres Imóveis (antes podia mostrar números antigos
+  depois de enviares ou encheres o depósito noutro separador).
+
+## α.22.0 — 24/09/2026
+
+- **«Enviar só este», em cada email de Respostas:** envia só esse, com o texto que está na caixa nesse
+  momento (mesmo que o tenhas escrito ou alterado à mão), depois de confirmares o destinatário e o assunto,
+  e ele sai da lista sozinho. É o mesmo caminho seguro do passo 04 (guardar → pré-visualizar → enviar), só
+  que para um email, sem teres de desmarcar os outros.
+- Know-how e voz (dados, não código): o lembrete do imóvel a seguir à saudação passa a ser «🏠 título —
+  link», sem «Referente ao» nem nenhuma palavra a traduzir; e o tom fica sempre formal e impessoal, sem
+  «estamos ansiosos», «até já» e semelhantes.
+
+## α.21.0 — 24/09/2026
+
+- **Imóveis: um imóvel de cada vez, num slider** (setas, pontos, as setas do teclado ou deslizar no
+  telemóvel), em vez de cartões lado a lado. O imóvel escolhido fica lembrado neste browser.
+- **Painel do imóvel, no topo, em estilo painel de instrumentos retro:** conta-rotações amarelo ao centro
+  (emails por responder, zona vermelha a partir de metade da escala), mostradores escuros ao lado (tempo
+  médio de resposta, com a zona vermelha a partir das 24 h; custo da API deste imóvel), conta-quilómetros
+  (respostas enviadas, clientes ativos, contactos, visitas marcadas), luzes de aviso (rascunhos,
+  bloqueados, atenção, só noutra data, blacklist, greylist) e o gráfico de pedidos e respostas só deste
+  imóvel, com o mesmo período do Painel.
+- **Blacklist e greylist lado a lado, com a última ronda de visitas**, logo por baixo: ver, tirar alguém
+  da lista ou acrescentar um email à mão, em cada uma. «Ignorar sempre» vai para a blacklist; «Não tem
+  interesse», para a greylist.
+- **«+ Novo imóvel» é agora uma vista própria**, separada dos imóveis existentes; «Editar dados do anúncio»
+  abre-a já preenchida («Editar REF»), e ao guardar volta ao slider nesse imóvel.
+- No Painel, cada imóvel da carteira tem «Painel do imóvel →», que abre esse imóvel em Imóveis.
+- Os envios e os pedidos à API passam a registar o imóvel. Os envios antigos são atribuídos pelos IDs que
+  cada fila guarda; os pedidos à API anteriores a 24/09 não guardaram o imóvel e contam só no total do Painel.
+
+## α.20.1 — 24/09/2026
+
+- **A lista a ignorar passa a guardar o motivo.** Novo botão em cada email, «Não tem interesse», para
+  quando é o próprio cliente a dizer que não quer continuar — o efeito é o mesmo do «Ignorar sempre»
+  (nunca mais entra na fila, não recebe mais nada), mas fica registado o porquê, visível em Imóveis →
+  «Clientes a ignorar».
+
+## α.20.0 — 24/09/2026
+
+- **Lista a ignorar, por imóvel.** Em cada email, «Ignorar sempre» retira-o da fila e passa esse cliente a
+  ser ignorado nesse imóvel: escreva o que escrever, nunca mais entra em Respostas; também deixa de
+  receber propostas de visita, lembretes, pedido de consentimento ou o email de «visitas fechadas». Nada é
+  apagado (ao contrário do apagar por RGPD em Contactos) — só fica marcado. Gere-se em Imóveis → «Clientes
+  a ignorar»: vê quem lá está, tira alguém da lista, ou acrescenta um email à mão, mesmo antes de escrever.
+
+## α.19.0 — 23/09/2026
+
+- **A «Ronda de visitas» agora mostra a última ronda de cada imóvel**, logo por baixo do botão «Iniciar
+  ronda»: o dia e o intervalo propostos, e cada cliente com o estado atual — hora marcada (com a hora),
+  enviado e a aguardar resposta, ainda não enviado (rascunho por tratar), ou recusou/só pode noutra data.
+  Antes, depois de enviar os rascunhos não havia onde voltar a ver quem tinha recebido o quê.
+
+## α.18.1 — 23/09/2026
+
+- **Cada rascunho diz agora se está «Guardado» ou «Por guardar»**, junto ao botão "Guardar rascunho" —
+  antes não havia nenhuma pista de que um texto editado (colado do ChatGPT ou escrito à mão) ainda não
+  tinha sido gravado. Muda em tempo real enquanto escreves, sem esperares pelo clique.
+
+## α.18.0 — 23/09/2026
+
+- **Novo cartão no Painel, ao lado do Ponto de situação diário: «Ronda de visitas».** Escolhe o imóvel, o
+  dia e o intervalo, clica «Iniciar ronda» e cria de imediato uma proposta de visita para todos os clientes
+  ativos desse imóvel (os mesmos que já apareciam elegíveis em Imóveis → Visitas → Escolher clientes) —
+  sem teres de os selecionar um a um. Pede confirmação antes de criar («Vais avisar N cliente(s)…»). As
+  propostas ficam na fila de Respostas, por rever e enviar como qualquer outra; o painel detalhado em
+  Imóveis continua para quando quiseres escolher só alguns clientes à mão.
+- **As propostas de visita passam a levar o histórico da conversa para o prompt**, tal como as outras
+  respostas — antes não levavam nenhum, porque são criadas fora da leitura normal de emails. Também deixa
+  de dizer "Mensagem nova" quando na verdade é o proprietário a propor a visita, não o cliente a escrever.
+
+## α.17.1 — 23/09/2026
+
+- **O cartão «Ponto de situação diário» passa a aparecer sempre no Painel**, mesmo sem rascunho ainda —
+  antes ficava completamente invisível, e por isso a funcionalidade era impossível de descobrir. Agora
+  mostra «Ainda sem rascunho», com os botões «Guardar»/«Enviar» visíveis mas desativados, e o rato por
+  cima explica porquê (aparece só depois da próxima leitura, e só com destinatário definido).
+
+## α.17.0 — 23/09/2026
+
+- **Campo novo em Voz e estilo: «Enviar o ponto de situação diário para».** O backend já sabia preparar e
+  enviar este resumo (rascunho a cada leitura, envio só com clique em «Enviar», como tudo o resto) desde
+  22/09, mas a página nunca teve onde escrever o destinatário — ficava sempre vazio e a funcionalidade,
+  invisível, nunca chegou a arrancar. Configurei já o teu (fica só no `data/voice.json`), a pedido.
+- O painel «Ponto de situação diário» aparece a partir da próxima leitura de emails (é aí que o rascunho
+  é preparado); até lá continua vazio, como sempre esteve.
+
+## α.16.3 — 23/09/2026
+
+- **Causa real encontrada (não só "o modelo perde a atenção"):** a nota do exemplo era uma regra de
+  comportamento ("não perguntes X salvo se o cliente falar nisso primeiro"), não um facto a citar — e a
+  regra da base de conhecimento só falava em "responder a perguntas do cliente". A IA lia isso como
+  contexto para consultar, não como uma instrução a cumprir sempre, por isso perguntou na mesma. A regra
+  agora diz explicitamente que a base tem os dois tipos de conteúdo — factos e regras de comportamento —
+  e que as regras contam tanto como a voz e as interações, não como um extra.
+- Corrigido também `backend/templates/profile.example.json` (o modelo usado para imóveis novos, reais ou
+  de demonstração): tinha uma cópia antiga desta regra, presa desde a criação de cada imóvel. Os dois
+  imóveis reais já em uso nunca tinham este campo preenchido, por isso já usavam a regra nova assim que o
+  código foi atualizado (α.16.2); só os imóveis criados a partir de agora precisavam desta correção.
+
+## α.16.2 — 23/09/2026
+
+- **Reforço no prompt para usar melhor as notas e o conhecimento do imóvel (RAG).** Confirmei que o
+  `notas.md` chega sempre ao prompt, igual nos dois caminhos (API e copiar/colar) — não era aí o
+  problema. O relatado foi a IA simplesmente ignorar uma nota relevante ao responder via API em lote.
+  Regra da base de conhecimento mais direta ("usa-a sempre, por pequena que pareça"), e um lembrete
+  igual repetido mesmo antes dos emails (perto do fim de um prompt longo, onde é mais fácil perder-se
+  uma regra lida lá em cima). Mitiga uma falha de atenção do modelo; não é garantia — se voltar a
+  acontecer, o texto exato da nota e da resposta ajuda a apanhar o resto.
+
+## α.16.1 — 23/09/2026
+
+- **A etiqueta da versão, no canto, agora diz «version: vα.X.Y» e, por baixo, a data e a hora em que esta
+  página arrancou** (`mac/web.command`/`bot-mail web`) — não há um passo de compilação nesta app, por isso
+  "build" aqui é literalmente quando este processo começou a correr com este código.
+
+## α.16.0 — 23/09/2026
+
+- **Novo separador «Agenda»**: a semana em página de papel, ao estilo Filofax — um dia por página, lado a
+  lado, com as propostas de visita e as marcadas de todos os imóveis (ou de um só, a filtrar). Botões
+  «Semana anterior / Esta semana / Semana seguinte» para navegar. Não usa nenhum pedido novo ao servidor:
+  lê os mesmos dados que já estavam em Imóveis → Visitas.
+- Exportar para o teu calendário (Google/Apple/.ics) fica para mais tarde, a pedido — por agora gere-se
+  só aqui.
+
+## α.15.0 — 23/09/2026
+
+- **Lista de clientes ativos, persistente, em cada imóvel** (Imóveis → «Clientes ativos»): quem já
+  escreveu, o estado (ativo, por responder, visita marcada, recusou, só noutra data) e quantas interações.
+  Já não é preciso clicar em «Escolher clientes» para ver quem está em jogo.
+- **«Analisar antes de propor»**: resume o que os clientes ativos já disseram — disponibilidade, urgência,
+  preferências de horário — antes de escolheres o dia e o intervalo das visitas. Duas vias, como o resto:
+  «Criar prompt de análise» + «Copiar» para o ChatGPT (a resposta lê-se lá, não precisa de voltar à
+  página), ou «Analisar via API», que mostra o resumo logo na página. É só leitura: nunca grava nada.
+- «Fechar visitas» continua a ser o único evento de fim de imóvel (vendido, arrendado ou desistiu contam
+  todos como o mesmo «fechado» — decidido a pedido, para não criar um estado novo por agora).
+
+## α.14.0 — 23/09/2026
+
+- **O calendário retro voltou a aparecer.** Tinha uma regra que o escondia sempre que a janela ficava
+  abaixo de 1150px de largura; agora nunca desaparece — o cabeçalho do Painel quebra linha em vez disso.
+- **Novo botão, em cada email: «Guardar e refazer esta resposta (API)»**, ao lado de «Guardar no
+  conhecimento». Guarda o facto novo e já pede à API da OpenAI um rascunho novo para esse email, a usar
+  esse conhecimento — sem teres de ir a «Gerar respostas via API» à parte. Precisa da chave OpenAI
+  configurada, como o resto da via API.
+
+## α.13.0 — 23/09/2026
+
+- **Relógio e calendário retro no Painel**, ao lado do título: hora ao segundo e um mês em miniatura, com
+  hoje destacado e um pontinho nos dias em que já há uma visita marcada (em qualquer imóvel) — passa o
+  rato por cima para ver quem. Não é só decorativo: usa as visitas que já estavam em «Imóveis → Visitas»,
+  sem nenhum pedido novo ao servidor. Escondido em ecrãs estreitos, para não apertar o resto do cabeçalho.
+
+## 0.12.0 — 23/09/2026
+
+- **Via alternativa por API, ao lado de Criar prompt/Copiar:** no passo 02, o botão «Gerar respostas via
+  API» faz o mesmo que os passos 02+03 à mão — cria o prompt, obtém a resposta e guarda os rascunhos —
+  mas indo diretamente à API da OpenAI (modelo `gpt-4o` por omissão), sem passares pelo ChatGPT.
+- **A regra de aprovação humana não tem exceções:** a API só produz rascunhos, tal como o copiar/colar;
+  continuas a rever e a confirmar o envio da mesma forma, sempre.
+- **Chave OpenAI opcional**, guardada no Keychain com `mac/openai_key.command` (confirmada contra a API
+  antes de ser guardada, como a App Password). Sem chave, o botão explica o que falta e o copiar/colar
+  continua a funcionar exactamente como antes.
+- Sem dependências novas: o pedido à OpenAI usa só a biblioteca padrão do Python (`urllib`).
 
 ## 0.11.0 — 23/09/2026
 
