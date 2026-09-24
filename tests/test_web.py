@@ -1,4 +1,6 @@
 import json
+from pathlib import Path
+import re
 from unittest.mock import patch
 import pytest
 from starlette.testclient import TestClient
@@ -55,9 +57,42 @@ def test_the_page_is_served_as_its_own_files(page):
     # Its label is generic, with no brand; the id stays "racing" so a choice saved in the browser survives.
     assert '<option value="racing">90\'s RacingCar</option>' in html.text
     assert not any("Ferrari" in served.text for served in (html, script, style, racing))
+    # 90's Boat is its sibling: its own stylesheet, its option and its entry in THEMES.
+    assert '<link rel="stylesheet" href="themes/boat.css">' in html.text
+    assert '<option value="boat">90\'s Boat</option>' in html.text and "'boat'" in script.text
+    boat = client.get("/themes/boat.css")
+    assert boat.headers["content-type"].startswith("text/css") and ':root[data-theme="boat"]' in boat.text
     # The template itself, with its placeholders, is never served; nor is a theme that does not exist.
     assert client.get("/index.html").status_code == 404
     assert client.get("/themes/nada.css").status_code == 404
+
+
+def test_a_skin_only_dresses_its_own_theme():
+    # Every rule in frontend/themes/<id>.css starts with :root[data-theme="<id>"], so a rich theme can never
+    # change how the plain themes, or the other skins, look. @keyframes steps are not selectors.
+    for sheet in sorted((Path(__file__).resolve().parents[1] / "frontend" / "themes").glob("*.css")):
+        css = re.sub(r"/\*.*?\*/", "", sheet.read_text(encoding="utf-8"), flags=re.S)
+        prefix, depth, keyframes, start = f':root[data-theme="{sheet.stem}"]', 0, None, 0
+        for i, char in enumerate(css):
+            if char == "{":
+                head = css[start:i].strip()
+                if head.startswith("@keyframes"):
+                    keyframes = depth
+                elif not head.startswith("@") and keyframes is None:
+                    parts, level, last = [], 0, 0
+                    for j, c in enumerate(head):  # split on the commas outside :is(), :not()…
+                        level += (c == "(") - (c == ")")
+                        if c == "," and level == 0:
+                            parts, last = parts + [head[last:j]], j + 1
+                    for selector in parts + [head[last:]]:
+                        assert selector.strip().startswith(prefix), f"{sheet.name}: {selector.strip()[:80]}"
+                depth, start = depth + 1, i + 1
+            elif char == "}":
+                depth, start = depth - 1, i + 1
+                if keyframes is not None and depth == keyframes:
+                    keyframes = None
+            elif char == ";" and depth == 0:
+                start = i + 1
 
 
 def test_copy_paste_flow_drafts_previews_and_sends(service, page):

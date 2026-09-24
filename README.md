@@ -44,9 +44,11 @@ Abre `http://127.0.0.1:8765` no browser, já com o link certo. É o mesmo que `.
 - **Arrancar outra vez fecha a página anterior** da mesma pasta de dados; nunca mexe noutros programas.
 - Tem quatro separadores: **Painel** (métricas dos últimos 14 dias, imóveis e estado da configuração),
   **Respostas**, **Imóveis** e **Voz e estilo**, com quatro temas visuais simples (Noite, Dia, Índigo e Âmbar)
-  e um tema rico, o **90's RacingCar** (um cockpit de GT italiano dos anos 90: carbono, nogueira, pele, caixa de
-  velocidades como navegação e um quadro de instrumentos por imóvel). Os temas ricos vivem em
-  `frontend/themes/`, cada um com a sua folha de estilo e o seu registo em `SKINS` no `app.js`.
+  e dois temas ricos: o **90's RacingCar** (um cockpit de GT italiano dos anos 90: carbono, nogueira, pele, caixa
+  de velocidades como navegação e um quadro de instrumentos por imóvel) e o **90's Boat** (o posto de comando de
+  um iate de luxo dos anos 90: casco creme, cromados, teca envernizada nos detalhes, ecrãs azuis e bandeiras de
+  sinais nos separadores). Os temas ricos vivem em `frontend/themes/`, cada um com a sua folha de estilo e, quando
+  traz palavras, instrumentos, seletor ou relógio próprios, o seu registo em `SKINS` no `app.js`.
 
 Tudo o que orienta as respostas edita-se na página, e cada campo diz o que é: **RAG** (factos que o
 assistente consulta: o know-how da agência, em «Voz e estilo», e o conhecimento de cada imóvel, em
@@ -217,7 +219,7 @@ backend/                   o código Python
   demo.py                  pasta de demonstração, só com dados fictícios
   templates/               exemplos publicados, com dados fictícios: config, voz e perfil de imóvel
 frontend/                  a página: index.html, app.js, style.css (só fala com a API)
-  themes/<tema>.css        os temas ricos ("skins"), um ficheiro cada: racing.css (90's RacingCar)
+  themes/<tema>.css        os temas ricos ("skins"), um ficheiro cada: racing.css (90's RacingCar), boat.css (90's Boat)
 mac/                       atalhos de duplo clique: web, setup, password, openai_key, read, send e o agendamento do READ
 main.py                    arranque local: a página em 127.0.0.1 e o browser; mais tarde, a .app
 data/                      os teus dados (local, ignorado pelo Git)

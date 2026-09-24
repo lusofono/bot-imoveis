@@ -15,6 +15,25 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.26.0 — 24/09/2026
+
+- **Tema novo, «90's Boat»: o posto de comando de um iate de luxo dos anos 90.** Casco creme brilhante em
+  todo o lado, cromados nos acabamentos e teca envernizada só nos detalhes, para não parecer o carro:
+  - a barra lateral tem um corrimão cromado; a marca é uma vigia com a casa lá dentro, e a versão é uma placa
+    de teca;
+  - cada separador tem a sua bandeira do Código Internacional de Sinais: P (Painel), R (Respostas),
+    I (Imóveis), C (Contactos), A (Agenda) e V (Voz e estilo); o separador aberto é uma peça de teca com
+    moldura cromada;
+  - a barra de cima é o para-brisas, com o reflexo da luz, sobre um friso cromado;
+  - os números do Painel estão em ecrãs azuis de bordo, com moldura de teca; os títulos pequenos são
+    galhardetes azul-marinho, e os cartões têm a linha de água do casco;
+  - os botões são de gelcoat com aro cromado, o principal é azul-marinho e os que enviam emails levam o aro
+    vermelho e branco de uma boia; as caixas de seleção são interruptores basculantes, com luz azul;
+  - os passos das Respostas são pontos da rota (WP1 a WP4), a Agenda é o diário de bordo e a caixa de
+    entrada vazia lança âncora.
+- É a base do tema: as palavras dos títulos, a roda do leme como seletor, o relógio de bordo e os
+  instrumentos de cada imóvel chegam nas próximas versões. Os outros temas não mudam.
+
 ## α.25.1 — 24/09/2026
 
 - **O tema «90's Ferrari» passa a chamar-se «90's RacingCar»:** um nome genérico, sem marca. Por dentro

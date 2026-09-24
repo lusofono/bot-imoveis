@@ -3,6 +3,34 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 24/09/2026, noite (5): o tema «90's Boat», primeiro a base (α.26.0)
+
+**Decisão.**
+- **Um segundo tema rico, `boat` («90's Boat»), em `frontend/themes/boat.css`.** É o posto de comando de um
+  iate de luxo dos anos 90, e a hierarquia dos materiais vem das fotografias que o utilizador mostrou:
+  - **casco creme (gelcoat) como material principal:** fundo, barra lateral, cartões e botões;
+  - **cromado nos acabamentos:** o corrimão da barra lateral, o friso sob o para-brisas, os aros;
+  - **teca envernizada só nos detalhes:** o separador aberto, as molduras dos ecrãs e a placa da versão;
+  - **ecrãs azuis de bordo** para os números, em vez do LCD âmbar do carro.
+- **Bandeiras do Código Internacional de Sinais nos separadores**, pela inicial de cada um: P, R, I, C, A e V.
+- **Os botões que enviam emails** (a classe `send-action`) levam o aro vermelho e branco de uma boia, tal como
+  no carro levam a moldura amarela e preta: continuam a ser os únicos com esse sinal.
+- **Tipos de letra do macOS:** Didot nos títulos, Copperplate nas placas e galhardetes, Avenir Next no resto
+  e Snell Roundhand no nome da marca, com alternativas noutros sistemas. Nada vem de fora.
+- **Primeiro a base, só em CSS**: sem entrada em `SKINS`, o tema usa por agora os mostradores simples e os
+  títulos de sempre. As palavras, a roda do leme (seletor dos seis separadores), o relógio de bordo e os
+  instrumentos de cada imóvel entram depois, nos mesmos quatro encaixes do carro.
+- **Um teste garante que cada tema rico só se veste a si próprio:** todas as regras de
+  `frontend/themes/<id>.css` começam por `:root[data-theme="<id>"]`.
+- **Contraste verificado (WCAG AA, 4,5:1)** nos pares de texto e fundo do tema, incluindo o texto nos ecrãs
+  azuis e sobre a teca.
+- **No telemóvel, os seis separadores ficam em duas filas de três**, com as bandeiras mais pequenas. Nos temas
+  simples, a fila única de seis fica apertada numa largura de 390 px; não se mexeu nisso aqui.
+
+**Porquê.** Pedido direto do utilizador: «cria um novo tema chamado 90's boat… GO WILD… inspirado num yacht
+motor e vela», e sobre as fotografias: «pode ter mais branco também» e «com luxo, cromados e branco também,
+com a madeira, senão fica muito parecido com um carro».
+
 ## 24/09/2026, noite (4): o tema passa a «90's RacingCar» (α.25.1)
 
 **Decisão.**

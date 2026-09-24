@@ -7,7 +7,7 @@ const $ = id => document.getElementById(id);
 let state = {properties: []}, settings = null, preview = null;
 
 // Only the visual preference is stored locally; never account or email content.
-const THEMES = ['night', 'day', 'indigo', 'amber', 'racing'];
+const THEMES = ['night', 'day', 'indigo', 'amber', 'racing', 'boat'];
 function applyTheme(theme) {
   const chosen = THEMES.includes(theme) ? theme : 'night';
   document.documentElement.dataset.theme = chosen;
