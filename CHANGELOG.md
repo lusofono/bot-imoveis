@@ -15,6 +15,20 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.30.0 — 24/09/2026
+
+- **«90's Boat» ganha os extras:**
+  - **sons de bordo**, desligados até carregares em «Sons» na barra de cima (o botão só aparece neste
+    tema): a buzina de um navio quando emails saem de facto, e o sino de bordo, duas vezes, quando uma
+    leitura traz emails novos. São feitos no próprio browser, sem ficheiros; a escolha fica neste browser,
+    como o tema;
+  - **cursor em forma de âncora** nas superfícies; nos botões e ligações continua a mão, e nos campos de
+    texto o cursor de escrever;
+  - **o quarto da noite, das 20h às 7h:** lá fora fica escuro — estrelas por cima da página, a lua no
+    para-brisas, o mar e o veleiro de noite (com as luzes acesas), a luz vermelha de bombordo no topo do
+    corrimão e a verde de estibordo no canto do para-brisas. O posto de comando (barra lateral, cartões,
+    painéis) continua iluminado, com as cores de dia, e o texto que fica por cima da noite passa a claro.
+
 ## α.29.0 — 24/09/2026
 
 - **«90's Boat» ganha mar em movimento:**

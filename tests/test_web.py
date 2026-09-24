@@ -62,6 +62,8 @@ def test_the_page_is_served_as_its_own_files(page):
     assert '<option value="boat">90\'s Boat</option>' in html.text and "'boat'" in script.text
     boat = client.get("/themes/boat.css")
     assert boat.headers["content-type"].startswith("text/css") and ':root[data-theme="boat"]' in boat.text
+    # A skin's Sons switch starts hidden and off: nothing plays until the owner turns it on.
+    assert re.search(r'<button id="sound-toggle"[^>]*aria-pressed="false"[^>]*\bhidden\b', html.text)
     # The template itself, with its placeholders, is never served; nor is a theme that does not exist.
     assert client.get("/index.html").status_code == 404
     assert client.get("/themes/nada.css").status_code == 404

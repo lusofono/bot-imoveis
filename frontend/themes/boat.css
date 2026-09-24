@@ -20,6 +20,7 @@
   --accent-hover:#0b4a72;--glow-soft:#0e5a8a0d;--glow-soft1:#0e5a8a12;--accent-tint:#0e5a8a14;--glow:#0e5a8a33;
   --brand-border:#0e5a8a40;
   --navy:#0f2a47;--brass-text:#7a5528;--ink-blue:#d9f6ff;--glow-blue:#5fd4ff;
+  --heading:#0f2a47;--pennant:#0f2a47;--pennant-text:#fff;cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cg fill='none' stroke-linecap='round' stroke-linejoin='round'%3E %3Cg stroke='%23fff' stroke-width='4.2'%3E%3Ccircle cx='14' cy='5' r='2.6'/%3E%3Cpath d='M14 7.6V25M9 11.5h10M5 17c1.4 5 4.8 8 9 8.5c4.2-.5 7.6-3.5 9-8.5'/%3E%3C/g%3E %3Cg stroke='%230f2a47' stroke-width='2'%3E%3Ccircle cx='14' cy='5' r='2.6'/%3E%3Cpath d='M14 7.6V25M9 11.5h10M5 17c1.4 5 4.8 8 9 8.5c4.2-.5 7.6-3.5 9-8.5'/%3E%3C/g%3E %3C/g%3E%3C/svg%3E") 14 3,auto;
   --display:"Didot","Bodoni 72","Bodoni MT","Libre Bodoni",Georgia,"Times New Roman",serif;
   --plaque:"Copperplate","Copperplate Gothic Light","Engravers MT",Optima,Candara,ui-serif,serif;
   --ui:"Avenir Next","Avenir","Futura","Helvetica Neue",ui-sans-serif,system-ui,sans-serif;
@@ -38,10 +39,10 @@
 :root[data-theme="boat"] :focus-visible{outline-color:#1f8ad0}
 
 /* Type: Didot for the page titles, as in a yacht brochure; Copperplate on plates and pennants; Avenir Next elsewhere */
-:root[data-theme="boat"] h1{font-family:var(--display);font-weight:400;letter-spacing:-.4px;color:var(--navy)}
-:root[data-theme="boat"] h2{font-family:var(--ui);font-weight:600;letter-spacing:-.1px;color:var(--navy)}
+:root[data-theme="boat"] h1{font-family:var(--display);font-weight:400;letter-spacing:-.4px;color:var(--heading)}
+:root[data-theme="boat"] h2{font-family:var(--ui);font-weight:600;letter-spacing:-.1px;color:var(--heading)}
 :root[data-theme="boat"] .eyebrow{display:block;width:fit-content;height:fit-content;justify-self:start;align-self:start;margin-bottom:12px;
-  padding:3px 24px 3px 12px;color:#fff;background:var(--navy);font:700 10px/1.6 var(--plaque);letter-spacing:2.4px;
+  padding:3px 24px 3px 12px;color:var(--pennant-text);background:var(--pennant);font:700 10px/1.6 var(--plaque);letter-spacing:2.4px;
   clip-path:polygon(0 0,100% 0,calc(100% - 9px) 50%,100% 100%,0 100%)}
 :root[data-theme="boat"] .ignore-list.black .eyebrow{color:#fff;background:#9b1c1c}
 :root[data-theme="boat"] .ignore-list.grey .eyebrow{color:#fff;background:#5b6673}
@@ -170,15 +171,16 @@
 :root[data-theme="boat"] input[type=checkbox]:checked{background:linear-gradient(180deg,#2a2f36,#0d1013 46%,#1a1e23 54%,#434a54)}
 :root[data-theme="boat"] input[type=checkbox]:checked::before{top:auto;bottom:3px;background:#5fd0ff;box-shadow:0 0 6px #5fd0ff}
 :root[data-theme="boat"] input[type=checkbox]:disabled{opacity:.4;cursor:not-allowed}
-:root[data-theme="boat"] select{-webkit-appearance:none;appearance:none;padding-right:34px;border:1px solid #cfc5b2;color:var(--text);
+:root[data-theme="boat"] select{-webkit-appearance:none;appearance:none;padding-right:34px;border:1px solid #cfc5b2;color:#13233a;cursor:auto;
   background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%230f2a47' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") right 12px center/11px 8px no-repeat;box-shadow:inset 0 1px 2px #1b2a3a14}
-:root[data-theme="boat"] :is(input:not([type=checkbox]),textarea){border:1px solid #d6cdbb;background-color:#fff;box-shadow:inset 0 1px 3px #1b2a3a17}
+:root[data-theme="boat"] :is(input:not([type=checkbox]),textarea){border:1px solid #d6cdbb;background-color:#fff;color:#13233a;cursor:auto;
+  box-shadow:inset 0 1px 3px #1b2a3a17}
 :root[data-theme="boat"] :is(input,textarea,select):focus{border-color:#1f8ad0;outline:2px solid #1f8ad055;outline-offset:1px}
 :root[data-theme="boat"] .tag{border-color:#c9d6e2;background:#f3f7fb;color:var(--tag-text);font:700 10px/1.4 var(--ui);letter-spacing:.8px;text-transform:uppercase}
 :root[data-theme="boat"] .tag.draft{color:var(--ok);border-color:var(--success-border);background:var(--ok-bg)}
 :root[data-theme="boat"] .tag.visit{color:var(--warn);border-color:var(--warning-border);background:#fff6df}
 :root[data-theme="boat"] .alert{border-left:3px solid currentColor}
-:root[data-theme="boat"] pre{background:#fdfcf9;border-color:#e4ddcf}
+:root[data-theme="boat"] pre{background:#fdfcf9;border-color:#e4ddcf;color:#13233a}
 :root[data-theme="boat"] .contacts-table th{font-family:var(--plaque);letter-spacing:1.6px;color:#6b7a89}
 
 /* Painel: a ship's clock (white enamel, chrome bezel, red seconds) on a round teak mount, beside the calendar,
@@ -332,6 +334,42 @@
 :root[data-theme="boat"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *):not(:disabled):active{animation:none}
 @keyframes boat-bob{0%,100%{transform:none}50%{transform:translateY(-2px)}}
 
+/* The Sons switch (app.js shows it only in a skin with sounds): a small push-button with a bell, navy when on */
+:root[data-theme="boat"] .sound-toggle{margin-left:auto;min-height:32px;padding:4px 12px 4px 9px;gap:7px;font-size:11px;letter-spacing:.6px;text-transform:uppercase}
+:root[data-theme="boat"] .sound-toggle::before{content:"";width:15px;height:15px;background:currentColor;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v1.5M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.8 2H4.7Z'/%3E%3Cpath d='M10 20.5a2 2 0 0 0 4 0'/%3E %3Cpath d='M3.5 3.5l17 17'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v1.5M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.8 2H4.7Z'/%3E%3Cpath d='M10 20.5a2 2 0 0 0 4 0'/%3E %3Cpath d='M3.5 3.5l17 17'/%3E%3C/svg%3E") center/contain no-repeat}
+:root[data-theme="boat"] .sound-toggle[aria-pressed="true"]{color:#fff;border-color:#0a1d33;text-shadow:0 1px 1px #0008;
+  background:linear-gradient(180deg,#2a649f,#0f2a47)}
+:root[data-theme="boat"] .sound-toggle[aria-pressed="true"]::before{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v1.5M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.8 2H4.7Z'/%3E%3Cpath d='M10 20.5a2 2 0 0 0 4 0'/%3E %3Cpath d='M2.5 9.5a8 8 0 0 1 2-4M21.5 9.5a8 8 0 0 0-2-4'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v1.5M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.8 2H4.7Z'/%3E%3Cpath d='M10 20.5a2 2 0 0 0 4 0'/%3E %3Cpath d='M2.5 9.5a8 8 0 0 1 2-4M21.5 9.5a8 8 0 0 0-2-4'/%3E%3C/svg%3E")}
+:root[data-theme="boat"] .sound-toggle:not([hidden])+.theme-control{margin-left:0}
+
+/* The night watch, from 20:00 to 7:00 (app.js sets data-watch on the page). Outside it is dark: stars over the page,
+   a moon in the windscreen, the sea by night, the sloop with her lights on, the red port light at the head of the
+   rail and the green starboard light at the far end of the windscreen. The lit cockpit (sidebar, cards, panels)
+   keeps its day colours, so every text inside it reads as by day; the few texts that sit straight on the night
+   take the light variables. */
+:root[data-theme="boat"][data-watch="night"]{--bg:#0a1624;--text:#e8eef5;--muted:#b3c1ce;--accent:#8fd0ff;--accent-hover:#b9e2ff;--line:#23364b;
+  --heading:#f3ead8;--pennant:#f3ead8;--pennant-text:#0f2a47;scrollbar-color:#5b6b7c #0a1624}
+:root[data-theme="boat"][data-watch="night"] :is(.card,.metric,.sidebar,.workflow,.retro-widget,.property-slider,.filofax,.empty-state){color:var(--text);
+  --text:#13233a;--muted:#566476;--accent:#0e5a8a;--accent-hover:#0b4a72;--line:#e4ddcf;--heading:#0f2a47;--pennant:#0f2a47;
+  --pennant-text:#fff}
+:root[data-theme="boat"][data-watch="night"] body{background:radial-gradient(1.2px 1.2px at 23px 41px,#fff 60%,#0000) fixed,
+  radial-gradient(1px 1px at 131px 97px,#fffbe6 60%,#0000) fixed,radial-gradient(1.4px 1.4px at 199px 13px,#dfeaff 60%,#0000) fixed,
+  radial-gradient(ellipse at 88% -10%,#1d3a5c,#0000 45%) fixed,var(--bg);background-size:223px 181px,307px 263px,389px 331px,auto,auto}
+:root[data-theme="boat"][data-watch="night"] body::before{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='70'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E %3Cstop offset='0' stop-color='%2321507c'/%3E%3Cstop offset='1' stop-color='%230d2744'/%3E%3C/linearGradient%3E%3C/defs%3E %3Cpath d='M0 44C45 34 135 34 180 44S315 54 360 44V70H0Z' fill='url(%23g)'/%3E %3Cpath d='M0 44C45 34 135 34 180 44S315 54 360 44' fill='none' stroke='%23d9e8f5' stroke-opacity='.45' stroke-width='1.4'/%3E%3C/svg%3E") 0 100%/360px 70px repeat-x,url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='480' height='70'%3E %3Cpath d='M0 30C60 18 180 18 240 30S420 42 480 30V70H0Z' fill='%231a3a5c'/%3E%3C/svg%3E") 0 100%/480px 70px repeat-x}
+:root[data-theme="boat"][data-watch="night"] .topbar{color:#c9d6e3;
+  background:radial-gradient(circle at calc(100% - 16px) 12px,#6dffae 0 2.6px,#3dff8f80 4px,#0000 9px),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'%3E%3Cdefs%3E%3CradialGradient id='h'%3E%3Cstop offset='.3' stop-color='%23fff7d6' stop-opacity='.32'/%3E %3Cstop offset='1' stop-color='%23fff7d6' stop-opacity='0'/%3E%3C/radialGradient%3E %3Cmask id='m'%3E%3Crect width='60' height='60' fill='%23fff'/%3E%3Ccircle cx='36' cy='26' r='12' fill='%23000'/%3E%3C/mask%3E%3C/defs%3E %3Ccircle cx='30' cy='30' r='30' fill='url(%23h)'/%3E%3Ccircle cx='28' cy='30' r='13' fill='%23f6efd2' mask='url(%23m)'/%3E%3C/svg%3E") 44% 50%/46px 46px no-repeat,
+    radial-gradient(1px 1px at 37px 19px,#fff 60%,#0000),radial-gradient(1.2px 1.2px at 151px 41px,#fffbe6 60%,#0000),
+    linear-gradient(180deg,#0b1a2e,#12304f 72%,#1b4468);background-size:auto,46px 46px,193px 66px,277px 66px,auto}
+:root[data-theme="boat"][data-watch="night"] .topbar strong{color:#fff}
+:root[data-theme="boat"][data-watch="night"] .breadcrumb{color:#7f93a8}
+:root[data-theme="boat"][data-watch="night"] .local-label{color:#c9d6e3}
+:root[data-theme="boat"][data-watch="night"] #busy{color:#8fd0ff}
+:root[data-theme="boat"][data-watch="night"] .topbar::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 40'%3E%3Cdefs%3E%3CradialGradient id='l'%3E%3Cstop offset='0' stop-color='%23fff'/%3E %3Cstop offset='.35' stop-color='%23fff8dc' stop-opacity='.8'/%3E%3Cstop offset='1' stop-color='%23fff8dc' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E %3Cpath d='M28.6 5.5V28.5H44.5Z' fill='%23c9d6e3' fill-opacity='.8'/%3E%3Cpath d='M27.4 8V28.5H15.5Z' fill='%23b9c8d7' fill-opacity='.75'/%3E %3Cpath d='M28 3.5V29' stroke='%23dfe8f1' stroke-width='1.2'/%3E%3Ccircle cx='28' cy='3.6' r='4.5' fill='url(%23l)'/%3E %3Cpath d='M8 29.5H53L47 36H14Z' fill='%23dfe8f1'/%3E%3Cpath d='M10 32.2H50.6' stroke='%230f2a47' stroke-width='1.4'/%3E %3Ccircle cx='12' cy='30.5' r='2.4' fill='%23ff4d4d'/%3E%3Ccircle cx='50' cy='30.5' r='2.4' fill='%233dff8f'/%3E %3Cpath d='M4 38.5q6-2 12 0t12 0t12 0t12 0t12 0' fill='none' stroke='%23d9e8f5' stroke-opacity='.5' stroke-width='1'/%3E%3C/svg%3E")}
+:root[data-theme="boat"][data-watch="night"] .sidebar::before{background:radial-gradient(circle at 50% 8px,#ff6b6b 0 2.6px,#ff3b3b88 3.8px,#0000 7.5px) top/15px 16px no-repeat,
+  linear-gradient(90deg,#6f767e,#fff 45%,#9aa1a9) top/15px 16px no-repeat,linear-gradient(90deg,#6f767e,#fff 45%,#9aa1a9) bottom/15px 16px no-repeat}
+
 /* Phone: the helm becomes the top strip, the rail runs along its foot, and the six flags sit in two rows of three */
 @media(max-width:760px){
   :root[data-theme="boat"] .sidebar{position:relative;border-right:0;border-bottom:1px solid #ddd3c1}
@@ -342,6 +380,7 @@
   :root[data-theme="boat"] .tab::before{width:20px;height:14px}
   :root[data-theme="boat"] .tab .nav-count{position:absolute;top:-7px;right:-5px;padding:0 5px}
   :root[data-theme="boat"] .skin-selector{display:none}
+  :root[data-theme="boat"] .sound-toggle{padding:4px 8px;font-size:0;gap:0}
   :root[data-theme="boat"] .cluster-gauges{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));justify-items:center;padding:24px 12px 14px;
     border-radius:30px 30px 16px 16px}
   :root[data-theme="boat"] .gauge-tach{order:-2}

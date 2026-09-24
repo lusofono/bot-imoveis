@@ -69,6 +69,7 @@ const SKINS = {
     },
     instruments: boatInstruments,
     selector: helm,
+    sounds: {send: shipHorn, read: shipBell},
   },
 };
 function skin() { return SKINS[document.documentElement.dataset.theme] || null; }
@@ -83,6 +84,66 @@ function applySkin() {
   $('skin-selector').replaceChildren();
   skinSelector = current?.selector ? current.selector($('skin-selector')) : null;
   skinSelector?.update(activeTab);
+  renderSoundSwitch();
+}
+
+// A skin's sounds (90's Boat: a ship's horn when emails go out, the ship's bell twice when new ones come in), made
+// on the spot with the Web Audio API: no files. Off until the owner turns them on with the Sons switch, which only
+// shows in a skin that has sounds; like the theme, the choice stays in this browser.
+let audio = null;
+function soundsOn() {
+  try { return localStorage.getItem('bot-mail-sounds') === 'on'; } catch { return false; }
+}
+function playSound(name) {
+  const sound = skin()?.sounds?.[name];
+  if (!sound || !soundsOn()) return;
+  try {
+    audio ??= new AudioContext();
+    if (audio.state === 'suspended') audio.resume();
+    sound(audio);
+  } catch { /* No audio in this browser: the page works the same without it. */ }
+}
+function renderSoundSwitch() {
+  const toggle = $('sound-toggle'), available = !!skin()?.sounds;
+  toggle.hidden = !available;
+  toggle.setAttribute('aria-pressed', String(available && soundsOn()));
+}
+$('sound-toggle').addEventListener('click', () => {
+  const on = !soundsOn();
+  try { localStorage.setItem('bot-mail-sounds', on ? 'on' : 'off'); } catch { /* Storage may be unavailable. */ }
+  renderSoundSwitch();
+  if (on) playSound('read');  // this click unlocks the audio, and the bell says what turned on
+});
+
+// A ship's horn: two low sawtooth voices a fifth apart (one slightly detuned), softened by a low-pass filter.
+function shipHorn(context) {
+  const t = context.currentTime, out = context.createGain(), filter = context.createBiquadFilter();
+  filter.type = 'lowpass'; filter.frequency.value = 700;
+  out.gain.setValueAtTime(0.0001, t);
+  out.gain.exponentialRampToValueAtTime(0.2, t + 0.08);
+  out.gain.setValueAtTime(0.2, t + 1.2);
+  out.gain.exponentialRampToValueAtTime(0.0001, t + 1.7);
+  filter.connect(out).connect(context.destination);
+  for (const frequency of [92, 92.8, 138]) {
+    const voice = context.createOscillator();
+    voice.type = 'sawtooth'; voice.frequency.value = frequency;
+    voice.connect(filter); voice.start(t); voice.stop(t + 1.75);
+  }
+}
+// The ship's bell, struck twice: a bell's inharmonic partials, each fading at its own pace.
+function shipBell(context) {
+  const strike = at => {
+    for (const [ratio, level] of [[0.5, 0.25], [1, 0.5], [2.01, 0.22], [2.76, 0.12], [4.07, 0.06]]) {
+      const partial = context.createOscillator(), gain = context.createGain();
+      partial.type = 'sine'; partial.frequency.value = 660 * ratio;
+      gain.gain.setValueAtTime(0.0001, at);
+      gain.gain.exponentialRampToValueAtTime(level * 0.35, at + 0.005);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + 2.2 / ratio ** 0.3);
+      partial.connect(gain).connect(context.destination);
+      partial.start(at); partial.stop(at + 2.4);
+    }
+  };
+  strike(context.currentTime); strike(context.currentTime + 0.42);
 }
 
 // 90's RacingCar's tab selector: the open gated gearbox of a GT of the time. Gears 1 to 6 are the six tabs (reverse is
@@ -391,6 +452,7 @@ function card(email) {
     }
     const result = await call('api/send', {property_ref: queueRef(), preview_token: check.preview_token, confirmed: true});
     const sent = result.results[0]?.status === 'sent';
+    if (sent) playSound('send');
     state = await call('api/state'); renderState();
     toast(sent ? `Enviado para ${reply.to}. Saiu da lista.` : 'Não saiu: vê o aviso no próprio email antes de repetir.',
       sent ? 'ok' : 'warn');
@@ -513,6 +575,7 @@ function renderPreview() {
         if (!confirm(`Enviar agora ${count} email(s) reais?`)) return;
         const result = await call('api/send', {property_ref: queueRef(), preview_token: preview.preview_token, confirmed: true});
         const sent = result.results.filter(item => item.status === 'sent').length;
+        if (sent) playSound('send');
         state = await call('api/state'); keepSteps(renderState);  // renderState clears preview-box first
         $('preview-box').replaceChildren(el('p', {class: 'alert ' + (sent === result.results.length ? 'ok' : 'warn')},
           `✓ Enviados ${sent} de ${result.results.length} email(s).`
@@ -593,6 +656,9 @@ function tickClock() {
   clockHands.hours.style.transform = `rotate(${(now.getHours() % 12) * 30 + minutes / 2}deg)`;
   clockHands.minutes.style.transform = `rotate(${minutes * 6}deg)`;
   clockHands.seconds.style.transform = `rotate(${now.getSeconds() * 6}deg)`;
+  // The watch, for a skin that follows it (90's Boat keeps its night watch from 20:00 to 7:00).
+  const watch = now.getHours() >= 20 || now.getHours() < 7 ? 'night' : 'day';
+  if (document.documentElement.dataset.watch !== watch) document.documentElement.dataset.watch = watch;
 }
 
 function visitDays() {
@@ -741,6 +807,7 @@ function renderDigest(digest) {
         if (!confirm('Enviar agora o ponto de situação de hoje?')) return;
         await call('api/digest/save', {text: text.value});
         const result = await call('api/digest/send', {confirmed: true});
+        if (result.status === 'sent') playSound('send');
         renderDigest(await call('api/digest'));
         toast(result.status === 'sent' ? 'Ponto de situação enviado.'
           : 'Envio incerto: verifica Enviados no Gmail antes de repetir.', result.status === 'sent' ? 'ok' : 'warn');
@@ -1684,6 +1751,7 @@ $('queue').addEventListener('change', renderState);
 $('emails').addEventListener('change', updateSelection);
 $('read').addEventListener('click', event => run(async () => {
   state = await call('api/read', {days: Number($('days').value) || undefined}); renderState();
+  if (state.added) playSound('read');
   toast(state.added ? `${state.added} email(s) novo(s).` : 'Leitura concluída: nada de novo.');
 }, event.currentTarget));
 $('build-prompt').addEventListener('click', event => run(async () => {

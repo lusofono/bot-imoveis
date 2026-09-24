@@ -48,7 +48,7 @@ Abre `http://127.0.0.1:8765` no browser, já com o link certo. É o mesmo que `.
   de velocidades como navegação e um quadro de instrumentos por imóvel) e o **90's Boat** (o posto de comando de
   um iate de luxo dos anos 90: casco creme, cromados, teca envernizada nos detalhes, ecrãs azuis e bandeiras de
   sinais nos separadores). Os temas ricos vivem em `frontend/themes/`, cada um com a sua folha de estilo e, quando
-  traz palavras, instrumentos, seletor ou relógio próprios, o seu registo em `SKINS` no `app.js`.
+  traz palavras, instrumentos, seletor, relógio ou sons próprios, o seu registo em `SKINS` no `app.js`.
 
 Tudo o que orienta as respostas edita-se na página, e cada campo diz o que é: **RAG** (factos que o
 assistente consulta: o know-how da agência, em «Voz e estilo», e o conhecimento de cada imóvel, em

@@ -3,6 +3,26 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 24/09/2026, noite (9): os extras do «90's Boat»: sons, cursor e o quarto da noite (α.30.0)
+
+**Decisão.**
+- **Sons feitos no browser (Web Audio API), sem ficheiros:** a buzina de navio quando um envio sai de facto
+  (um email, o lote ou o ponto de situação diário) e o sino de bordo, duas vezes, quando uma leitura traz
+  emails novos. É um quinto encaixe dos temas ricos, `sounds` em `SKINS`, tocado por `playSound`.
+- **Desligados por omissão.** O botão «Sons» só aparece num tema com sons, começa escondido e desligado
+  (um teste confirma-o), e a escolha fica no `localStorage`, como o tema: é uma preferência de aspeto, nunca
+  dados de conta ou de emails. Ligar dá logo um toque de sino, que também desbloqueia o som no browser.
+- **Cursor em âncora** em SVG dentro do CSS, com o ponto ativo no anel; os botões e ligações mantêm a mão e
+  os campos o cursor de escrever.
+- **O quarto da noite, das 20h às 7h, pela hora do computador** (`data-watch` na página, que o relógio do
+  Painel acerta a cada segundo). Lá fora fica escuro; o posto de comando continua iluminado, com as cores de
+  dia. As superfícies iluminadas repõem as variáveis de texto de dia, e só o texto que assenta na noite passa
+  a claro: títulos, subtítulos, ligações e galhardetes, com contraste verificado (acima de 6:1).
+- **Luzes de navegação no lado certo:** vermelha a bombordo (à esquerda, no topo do corrimão), verde a
+  estibordo (à direita, no canto do para-brisas).
+
+**Porquê.** Pedido direto do utilizador: «todos os extras, avança para a fase 6».
+
 ## 24/09/2026, noite (8): o mar em movimento no «90's Boat» (α.29.0)
 
 **Decisão.**
