@@ -15,6 +15,22 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.28.0 — 24/09/2026
+
+- **«90's Boat» ganha os instrumentos de bordo em cada imóvel**, com mostradores brancos, aros cromados e
+  ponteiros vermelhos, encastrados num tablier de teca envernizada de topo curvo, como nas fotografias:
+  - **barómetro:** o tempo médio de resposta, de «bom tempo» a «tempestade», que chega no máximo de cada
+    imóvel («Tempestade às … h», por baixo); acima dele acende a luz «Tempestade»;
+  - **anemómetro:** os emails por responder;
+  - **velocidade:** os pedidos recebidos por dia;
+  - **depósito:** os tokens do imóvel e, mais pequeno, a gasolina das visitas;
+  - cada leitura aparece num pequeno ecrã azul dentro do mostrador.
+- O computador de bordo é um ecrã azul, os contadores são rodas brancas num aro cromado e as luzes de aviso
+  ficam num painel de interruptores preto.
+- **Os gráficos passam a plotter:** uma carta náutica (água, quadrícula e um bocado de costa) numa moldura de
+  vidro preto, com os pedidos a azul e as respostas no magenta das rotas.
+- A teca deixou de ter emendas onde o desenho se repete.
+
 ## α.27.0 — 24/09/2026
 
 - **«90's Boat» ganha palavras, a roda do leme e o relógio de bordo:**

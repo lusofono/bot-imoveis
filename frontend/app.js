@@ -29,8 +29,8 @@ const TAB_NAMES = {dashboard: 'Painel', replies: 'Respostas', properties: 'Imóv
 // Skins: a rich theme goes beyond colours. It may bring the words on the page headings, the instruments on
 // each property's panel (from the same signals: see panelSignals), a tab selector of its own and an analog
 // clock; its stylesheet is in frontend/themes/. The plain themes use none of it. 90's RacingCar (id racing) is the first;
-// 90's Boat (id boat) fills the same slots with its own words and selector (its clock is dressed in its stylesheet, and
-// until it has instruments of its own it uses the plain dials); a grand-luxury skin would do the same.
+// 90's Boat (id boat) fills the same slots with its own words, instruments and selector (its clock is dressed in its
+// stylesheet); a grand-luxury skin would do the same.
 const SKINS = {
   racing: {
     words: {
@@ -64,8 +64,10 @@ const SKINS = {
       'contacts.eyebrow': 'LISTA DE PASSAGEIROS', 'contacts.title': 'Quem já subiu a bordo, num só registo.',
       'agenda.eyebrow': 'TÁBUA DE MARÉS', 'agenda.title': 'A semana, maré a maré.',
       'voice.eyebrow': 'PAVILHÃO', 'voice.title': 'O teu pavilhão: as tuas palavras, o teu estilo.',
-      'cluster.eyebrow': 'INSTRUMENTOS DE BORDO', 'cluster.chart': 'DIÁRIO DE BORDO DESTE IMÓVEL',
+      'cluster.eyebrow': 'INSTRUMENTOS DE BORDO', 'cluster.chart': 'PLOTTER · O RITMO DESTE IMÓVEL',
+      'lamp.heat': 'Tempestade', 'heat.limit': 'Tempestade às', 'trip.title': 'Computador de bordo',
     },
+    instruments: boatInstruments,
     selector: helm,
   },
 };
@@ -1439,6 +1441,25 @@ function carInstruments(ref, s) {
       divisions: 5, minor: 4, readout: s.perDay.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + ' /dia',
       caption: 'Velocímetro · pedidos por dia'}),
     fuelGauge(s.fuel, 'cluster:fuel', `Combustível · tokens · gastou ${costFormat.format(s.spent)}`),
+    petrolGauge(ref, s.petrol, 'Gasolina · visitas')];
+}
+
+// 90's Boat: the helm's instruments, white faces in chrome bezels. The barometer is the average reply time, from
+// fair weather to storm at this property's own limit; the anemometer, the emails waiting; the log, requests per
+// day; the tank, the property's tokens; and, smaller beside it, the petrol its visits took (by car, as ever).
+function boatInstruments(ref, s) {
+  const speedMax = Math.max(10, niceMax(Math.max(1, s.perDay)));
+  return [
+    gauge({key: ref + ':hours', role: 'heat', value: s.hours || 0, max: s.hoursMax, red: [s.hoursMax * 0.75, s.hoursMax],
+      unit: 'horas', face: 'white', labels: ['BOM TEMPO', 'VARIÁVEL', 'TEMPESTADE'], divisions: 2, minor: 4,
+      readout: hoursText(s.hours), caption: 'Barómetro · tempo médio de resposta', alert: s.hot}),
+    gauge({key: ref + ':pending', role: 'tach', value: s.pending, max: s.pendingMax, red: [s.pendingMax / 2, s.pendingMax],
+      unit: 'emails', size: 'big', face: 'white', divisions: 10, minor: 2, readout: String(s.pending),
+      caption: 'Anemómetro · por responder'}),
+    gauge({key: ref + ':speed', role: 'speedo', value: s.perDay, max: speedMax, unit: 'pedidos / dia', size: 'big',
+      face: 'white', divisions: 5, minor: 4, readout: s.perDay.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + ' /dia',
+      caption: 'Velocidade · pedidos por dia'}),
+    fuelGauge(s.fuel, 'cluster:fuel', `Depósito · tokens · gastou ${costFormat.format(s.spent)}`),
     petrolGauge(ref, s.petrol, 'Gasolina · visitas')];
 }
 

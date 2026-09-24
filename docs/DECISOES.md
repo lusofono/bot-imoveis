@@ -3,6 +3,31 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 24/09/2026, noite (7): os instrumentos de bordo do «90's Boat» (α.28.0)
+
+**Decisão.**
+- **Mostradores brancos**, com aro cromado, números azul-marinho e ponteiro vermelho: a escolha do utilizador,
+  entre estes e os pretos da primeira fotografia. Dão mais branco ao tema e distinguem-se dos do carro.
+- **`boatInstruments`, o quarto encaixe do barco**, sobre os mesmos sinais do carro (`panelSignals`):
+  - **barómetro** = tempo médio de resposta, com «BOM TEMPO», «VARIÁVEL» e «TEMPESTADE» no mostrador; o
+    máximo de cada imóvel continua a ser o fim da escala, e por baixo diz «Tempestade às … h»;
+  - **anemómetro** = emails por responder;
+  - **velocidade** = pedidos recebidos por dia;
+  - **depósito** = tokens do imóvel, e a gasolina das visitas ao lado. A gasolina continua a ser a do carro
+    que vai às visitas: é um gasto real, e o nome não muda com o tema.
+  As legendas dizem sempre o que cada mostrador mede, além do nome de bordo.
+- **O tablier é a teca envernizada**, com topo curvo e friso cromado, como nas fotografias; os mostradores
+  estão encastrados nele. A teca do tablier é mais escura do que a dos detalhes, para que as legendas creme
+  cheguem aos 4,5:1 mesmo nas riscas mais claras.
+- **Os gráficos são o plotter** em todo o tema (Painel e imóveis): uma carta náutica feita só com gradientes,
+  numa moldura de vidro preto. As respostas enviadas passam ao magenta das rotas (`--chart-secondary`), e a
+  legenda acompanha.
+- **O desenho da teca repete-se sem emendas:** o ruído fecha exatamente no tamanho do mosaico (600 × 182).
+- As palavras dos instrumentos (`lamp.heat`, `heat.limit`, `trip.title`) passam a ser as do barco.
+
+**Porquê.** Pedido direto do utilizador: «mostradores brancos, avança para a fase 4», e as fotografias do
+cockpit, com os mostradores cromados encastrados na madeira.
+
 ## 24/09/2026, noite (6): «90's Boat» com palavras, roda do leme e relógio de bordo (α.27.0)
 
 **Decisão.**

@@ -15,7 +15,7 @@
   --selected-end:#f6f1e7;--selected-border:#b9d3e4;--highlight-start:#fffdf8;--highlight-end:#f1e9d8;
   --highlight-border:#d9ccb2;--brand-start:#e9f3f9;--brand-end:#f6f1e7;--avatar:#e6eef5;--avatar-text:#0e3a5f;
   --tag-text:#2c4a68;--quote-text:#22384f;--quote-border:#7fa7c4;--cover-start:#cfe8f3;--cover-mid:#f6f1e7;
-  --cover-end:#e7d6b9;--cover-text:#0e5a8a;--chart-secondary:#b8702f;--metric-line:#d9ccb2;--empty-border:#cfc5b2;
+  --cover-end:#e7d6b9;--cover-text:#0e5a8a;--chart-secondary:#c2185b;--metric-line:#d9ccb2;--empty-border:#cfc5b2;
   --success-border:#a9d8c1;--success-border1:#a9d8c1;--error-border:#e7a9a4;--warning-border:#e2c27a;
   --accent-hover:#0b4a72;--glow-soft:#0e5a8a0d;--glow-soft1:#0e5a8a12;--accent-tint:#0e5a8a14;--glow:#0e5a8a33;
   --brand-border:#0e5a8a40;
@@ -30,7 +30,7 @@
   --chrome-rail:linear-gradient(90deg,#5f666e,#b3b9bf 20%,#fff 42%,#e9ecef 52%,#8d949c 76%,#5b6269);
   --screen:radial-gradient(130% 120% at 25% 0%,#1a639a,#0b4a7a 38%,#06294a 76%,#041a2f);
   --wood:linear-gradient(100deg,#0000 0 30%,#ffffff24 36%,#0000 44%),linear-gradient(180deg,#ffffff4a,#ffffff12 24%,#0000 52%,#00000026),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='480' height='180'%3E%3Cdefs%3E %3Cpattern id='s' width='480' height='14' patternUnits='userSpaceOnUse'%3E %3Crect width='480' height='14' fill='%238c3b13'/%3E%3Crect y='1' width='480' height='4' fill='%23a9531f'/%3E %3Crect y='6' width='480' height='1' fill='%235f240a'/%3E%3Crect y='9' width='480' height='2' fill='%23bb652b'/%3E %3Crect y='12' width='480' height='1' fill='%23702d0d'/%3E%3C/pattern%3E %3Cfilter id='w' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E %3CfeTurbulence type='fractalNoise' baseFrequency='.004 .03' numOctaves='4' seed='7' stitchTiles='stitch' result='t'/%3E %3CfeDisplacementMap in='SourceGraphic' in2='t' scale='60' xChannelSelector='R' yChannelSelector='G'/%3E%3C/filter%3E%3C/defs%3E %3Crect x='-60' y='-60' width='600' height='300' fill='url(%23s)' filter='url(%23w)'/%3E%3C/svg%3E"),#8c3b13;
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='182'%3E%3Cdefs%3E %3Cpattern id='s' width='600' height='14' patternUnits='userSpaceOnUse'%3E %3Crect width='600' height='14' fill='%238c3b13'/%3E%3Crect y='1' width='600' height='4' fill='%23a9531f'/%3E %3Crect y='6' width='600' height='1' fill='%235f240a'/%3E%3Crect y='9' width='600' height='2' fill='%23bb652b'/%3E %3Crect y='12' width='600' height='1' fill='%23702d0d'/%3E%3C/pattern%3E %3Cfilter id='w' filterUnits='userSpaceOnUse' x='0' y='0' width='600' height='182'%3E %3CfeTurbulence type='fractalNoise' baseFrequency='.005 .033' numOctaves='4' seed='7' stitchTiles='stitch' result='t'/%3E %3CfeDisplacementMap in='SourceGraphic' in2='t' scale='60' xChannelSelector='R' yChannelSelector='G'/%3E%3C/filter%3E%3C/defs%3E %3Crect x='-60' y='-56' width='720' height='294' fill='url(%23s)' filter='url(%23w)'/%3E%3C/svg%3E"),#8c3b13;
   scrollbar-color:#aeb5bd #f1ebdf}
 :root[data-theme="boat"] ::selection{background:#bfe6f7;color:#0f2a47}
 :root[data-theme="boat"] body{background:radial-gradient(ellipse at 92% -14%,#dcedf6,#0000 38%) fixed,radial-gradient(ellipse at 4% 110%,#f3eadb,#0000 38%) fixed,var(--bg)}
@@ -218,6 +218,74 @@
 :root[data-theme="boat"] .slider-arrow:hover{border-color:#5f666e;box-shadow:inset 0 1px 0 #fff,0 0 0 3px #1f8ad044,0 3px 8px #1b2a3a2e}
 :root[data-theme="boat"] .slider-dot.active:before{background:var(--navy);box-shadow:0 0 0 2px #fff,0 0 0 3px #aab1b8}
 
+/* Each property's instruments. The dash is varnished teak with a curved brow and a chrome edge, as on the helm in
+   the photographs, and the dials are set into it: white enamel faces in chrome bezels, navy numbers, red needles and
+   a small blue screen for the reading. The barometer reads fair weather to storm. */
+:root[data-theme="boat"] .cluster-gauges{align-items:flex-start;gap:clamp(8px,1.6vw,26px);margin:10px 0 22px;padding:30px 22px 18px;
+  border-radius:48% 48% 22px 22px / 46px 46px 22px 22px;background:linear-gradient(180deg,#00000038,#0000004d 55%,#00000066),var(--wood);
+  box-shadow:0 0 0 2px #fdfbf7,0 0 0 4px #b9c0c7,inset 0 2px 0 #ffffff47,inset 0 -8px 18px #3a1a0640,0 14px 30px #1b2a3a2e}
+:root[data-theme="boat"] .cluster-gauges .gauge figcaption{color:#fff4e0;font:700 10px/1.5 var(--ui);letter-spacing:1.2px;text-transform:uppercase;
+  text-shadow:0 1px 2px #000b}
+:root[data-theme="boat"] .cluster-gauges .gauge-setting{color:#fbe9cf;font-family:var(--ui);text-shadow:0 1px 1px #0009}
+:root[data-theme="boat"] .cluster-gauges .gauge-setting button.link{color:#ffe7a3}
+:root[data-theme="boat"] .gauge svg{filter:drop-shadow(0 6px 10px #0000004d)}
+:root[data-theme="boat"] .gauge-big svg{width:clamp(168px,15vw,236px)}
+:root[data-theme="boat"] .gauge-small svg{width:clamp(120px,10.5vw,164px)}
+:root[data-theme="boat"] .gauge-mini svg{width:clamp(92px,7.6vw,122px)}
+:root[data-theme="boat"] .gauge-bezel{display:inline}
+:root[data-theme="boat"] .gauge-face{fill:#fffdf8;stroke:#aab1b8;stroke-width:1.5}
+:root[data-theme="boat"] .gauge-tick{stroke:var(--navy);stroke-width:1.2}
+:root[data-theme="boat"] .gauge-tick:not(.major),:root[data-theme="boat"] .gauge-number:not(.end){display:inline}
+:root[data-theme="boat"] .gauge-tick.major{stroke-width:2.8}
+:root[data-theme="boat"] .gauge-number{fill:var(--navy);font:700 14px/1 var(--ui)}
+:root[data-theme="boat"] .gauge-heat .gauge-number{font-size:7.4px;letter-spacing:.2px}
+:root[data-theme="boat"] .gauge-unit{fill:#566476;font:700 9px/1 var(--ui);letter-spacing:1.6px}
+:root[data-theme="boat"] .gauge-icon{display:inline;color:var(--navy)}
+:root[data-theme="boat"] .gauge-red{stroke:#c8102e;stroke-width:7;opacity:1}
+:root[data-theme="boat"] .gauge-readout-box{fill:#0b4a7a;stroke:#9aa1a9;stroke-width:1.5}
+:root[data-theme="boat"] .gauge-readout{fill:var(--ink-blue);font:600 12px/1 var(--lcd)}
+:root[data-theme="boat"] .gauge-alert .gauge-readout{fill:#ffb8b8;animation:boat-blink 1s steps(2,start) infinite}
+@keyframes boat-blink{to{visibility:hidden}}
+:root[data-theme="boat"] .gauge-needle{transition-duration:1.4s;transition-timing-function:cubic-bezier(.2,1.3,.4,1)}
+:root[data-theme="boat"] .gauge-needle path{fill:#c8102e}
+:root[data-theme="boat"] .gauge-cap{fill:#c3c9cf;stroke:#6f767e;stroke-width:2}
+/* The trip computer is a blue marine screen; the counters are a log's white wheels in a chrome frame */
+:root[data-theme="boat"] .trip-computer{border:1px solid #0a1d33;border-radius:12px;background:var(--screen);color:#bfe9ff;font:600 12px/1.4 var(--ui);
+  box-shadow:0 0 0 2px #fdfbf7,0 0 0 3.5px #aab1b8,inset 0 2px 8px #0008}
+:root[data-theme="boat"] .trip-title{color:#7fe3ff;font:700 10px/1 var(--ui);letter-spacing:2px}
+:root[data-theme="boat"] .trip-computer input{border:1px solid #1f5f93;background:#041a2f;color:var(--ink-blue);font:700 12px/1 var(--lcd);box-shadow:inset 0 1px 3px #000}
+:root[data-theme="boat"] .trip-computer button.link{color:#7fe3ff}
+:root[data-theme="boat"] .trip-reading{color:var(--ink-blue);font-family:var(--lcd)}
+:root[data-theme="boat"] .odometer-digits{gap:2px;padding:3px;border-radius:5px;background:linear-gradient(180deg,#eef1f4,#9aa1a9);
+  box-shadow:0 0 0 1px #7d848c,inset 0 1px 0 #fff}
+:root[data-theme="boat"] .odometer-digits .lead{display:grid}
+:root[data-theme="boat"] .odometer-digits span{display:grid;place-items:center;width:19px;height:27px;border-radius:2px;color:var(--navy);
+  font:700 16px/1 var(--lcd);background:linear-gradient(#d3d8de,#fff 42%,#fff 58%,#d3d8de)}
+:root[data-theme="boat"] .odometer-label{color:var(--muted);font:700 9px/1.4 var(--ui);letter-spacing:1.4px;text-transform:uppercase}
+/* Warning lights: a black switch panel in a chrome frame; each light stays dark until it is lit */
+:root[data-theme="boat"] .cluster-lamps{padding:12px;border-radius:14px;background:linear-gradient(180deg,#2a2f36,#111418);
+  box-shadow:0 0 0 2px #fdfbf7,0 0 0 3.5px #aab1b8,inset 0 1px 0 #ffffff1f,0 8px 18px #1b2a3a2e}
+:root[data-theme="boat"] .lamp{gap:8px;padding:6px 12px;border-color:#343a42;background:#171a1f;color:#9aa4ae;font:700 10px/1.2 var(--ui);
+  letter-spacing:1px;text-transform:uppercase}
+:root[data-theme="boat"] .lamp strong{color:#b4bcc5}
+:root[data-theme="boat"] .lamp-bulb{width:9px;height:9px;background:#2c323a;box-shadow:inset 0 1px 2px #000}
+:root[data-theme="boat"] .lamp.on,:root[data-theme="boat"] .lamp.on strong{color:#fff}
+:root[data-theme="boat"] .lamp.on.lamp-red .lamp-bulb{background:#ff4d4d;box-shadow:0 0 9px #ff4d4d}
+:root[data-theme="boat"] .lamp.on.lamp-amber .lamp-bulb{background:#ffb000;box-shadow:0 0 9px #ffb000}
+:root[data-theme="boat"] .lamp.on.lamp-green .lamp-bulb{background:#3ddc84;box-shadow:0 0 9px #3ddc84}
+:root[data-theme="boat"] .lamp.on.lamp-grey .lamp-bulb{background:#e3e7eb;box-shadow:0 0 7px #e3e7eb}
+/* Charts are the plotter: a nautical chart (pale water, a grid, a stretch of coast) in a black glass frame, requests in
+   chart blue and replies in the magenta of a course line */
+:root[data-theme="boat"] .chart{padding:8px 10px 4px;border:6px solid #15181c;border-radius:14px;
+  background:radial-gradient(90% 70% at 96% 118%,#efe4c8 0 24%,#d9c9a3 25%,#0000 26.5%),
+    repeating-linear-gradient(0deg,#0000 0 29px,#8fb8d24d 29px 30px),repeating-linear-gradient(90deg,#0000 0 29px,#8fb8d24d 29px 30px),
+    linear-gradient(180deg,#eaf5fb,#d3e9f5);
+  box-shadow:0 0 0 1.5px #aab1b8,inset 0 0 0 1px #ffffff80,0 8px 18px #1b2a3a2e}
+:root[data-theme="boat"] .chart .bar-requests{fill:#0e5a8a}
+:root[data-theme="boat"] .chart .bar-sent{fill:var(--chart-secondary)}
+:root[data-theme="boat"] .chart .bar-label{fill:#22384f}
+:root[data-theme="boat"] .chart .grid-line{stroke:var(--navy);stroke-opacity:.6}
+
 /* Agenda: the ship's logbook, a navy canvas binding with white ruled pages */
 :root[data-theme="boat"] .filofax{border:6px solid var(--navy);background:var(--navy);box-shadow:0 0 0 1px #0a1d33,inset 0 0 0 1px #2a4a6e,0 16px 40px #0f2a4733}
 :root[data-theme="boat"] .filofax-page{border-color:#d9e3ec;background-color:#fff;color:#13233a;
@@ -251,4 +319,12 @@
   :root[data-theme="boat"] .tab::before{width:20px;height:14px}
   :root[data-theme="boat"] .tab .nav-count{position:absolute;top:-7px;right:-5px;padding:0 5px}
   :root[data-theme="boat"] .skin-selector{display:none}
+  :root[data-theme="boat"] .cluster-gauges{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));justify-items:center;padding:24px 12px 14px;
+    border-radius:30px 30px 16px 16px}
+  :root[data-theme="boat"] .gauge-tach{order:-2}
+  :root[data-theme="boat"] .gauge-speedo{order:-1}
+  :root[data-theme="boat"] .gauge svg,:root[data-theme="boat"] .gauge-big svg,:root[data-theme="boat"] .gauge-small svg{width:100%;max-width:170px}
+  :root[data-theme="boat"] .gauge-mini svg{width:100%;max-width:130px}
+  :root[data-theme="boat"] .gauge-petrol{grid-column:1/-1}
 }
+@media(prefers-reduced-motion:reduce){:root[data-theme="boat"] .gauge-alert .gauge-readout{animation:none}}
