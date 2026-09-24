@@ -28,8 +28,9 @@ const TAB_NAMES = {dashboard: 'Painel', replies: 'Respostas', properties: 'Imóv
 
 // Skins: a rich theme goes beyond colours. It may bring the words on the page headings, the instruments on
 // each property's panel (from the same signals: see panelSignals), a tab selector of its own and an analog
-// clock; its stylesheet is in frontend/themes/. The plain themes use none of it. 90's RacingCar (id racing) is the first; a
-// yacht or a grand-luxury skin fills the same four slots with its own words, dials, selector and clock.
+// clock; its stylesheet is in frontend/themes/. The plain themes use none of it. 90's RacingCar (id racing) is the first;
+// 90's Boat (id boat) fills the same slots with its own words and selector (its clock is dressed in its stylesheet, and
+// until it has instruments of its own it uses the plain dials); a grand-luxury skin would do the same.
 const SKINS = {
   racing: {
     words: {
@@ -49,6 +50,23 @@ const SKINS = {
     },
     instruments: carInstruments,
     selector: gearbox,
+  },
+  boat: {
+    words: {
+      'dashboard.eyebrow': 'PONTE DE COMANDO', 'dashboard.title': 'O teu dia, a todo o pano.',
+      'dashboard.step': 'Contactos, respostas e imóveis: todos os instrumentos de bordo à vista.',
+      'activity.eyebrow': 'DIÁRIO DE BORDO', 'activity.title': 'Pedidos e respostas, milha a milha',
+      'setup.eyebrow': 'ANTES DE LARGAR', 'setup.title': 'Pronto para largar amarras',
+      'portfolio.eyebrow': 'MARINA', 'portfolio.title': 'Os teus imóveis, atracados na marina',
+      'replies.eyebrow': 'RÁDIO DE BORDO', 'replies.title': 'Cada resposta, a bom porto.',
+      'properties.eyebrow': 'FROTA', 'properties.title': 'Cada imóvel, o seu barco.',
+      'properties.step': 'Um posto de comando por imóvel: os instrumentos, o rumo e o combustível.',
+      'contacts.eyebrow': 'LISTA DE PASSAGEIROS', 'contacts.title': 'Quem já subiu a bordo, num só registo.',
+      'agenda.eyebrow': 'TÁBUA DE MARÉS', 'agenda.title': 'A semana, maré a maré.',
+      'voice.eyebrow': 'PAVILHÃO', 'voice.title': 'O teu pavilhão: as tuas palavras, o teu estilo.',
+      'cluster.eyebrow': 'INSTRUMENTOS DE BORDO', 'cluster.chart': 'DIÁRIO DE BORDO DESTE IMÓVEL',
+    },
+    selector: helm,
   },
 };
 function skin() { return SKINS[document.documentElement.dataset.theme] || null; }
@@ -118,6 +136,67 @@ function gearbox(box) {
       timers = [[at[0], neutral], [target[0], neutral], target].map((point, i) => setTimeout(() => place(point), i * 140));
     }
     at = target;
+  }};
+}
+
+// 90's Boat's tab selector: the helm of a 90s motor yacht, a varnished wheel with six chrome spokes, one per tab.
+// Each spoke points at its tab's signal flag (the same flags as the nav); the wheel turns the short way until the
+// open tab's spoke is at the top, under the lubber mark, and the flags stay upright while it turns. A click on a
+// flag changes tab. Like the gearbox, it repeats the nav for the mouse only (aria-hidden).
+const HELM_FLAGS = {  // International Code of Signals, on a 30 × 20 cloth: P, R, I, C, A, V
+  dashboard: [['rect', {width: 30, height: 20, fill: '#1f4fa0'}], ['rect', {x: 10, y: 6.67, width: 10, height: 6.66, fill: '#fff'}]],
+  replies: [['rect', {width: 30, height: 20, fill: '#c8102e'}], ['rect', {x: 12.5, width: 5, height: 20, fill: '#ffcc00'}],
+    ['rect', {y: 7.5, width: 30, height: 5, fill: '#ffcc00'}]],
+  properties: [['rect', {width: 30, height: 20, fill: '#ffcc00'}], ['circle', {cx: 15, cy: 10, r: 5, fill: '#121212'}]],
+  contacts: [['rect', {width: 30, height: 20, fill: '#1f4fa0'}], ['rect', {y: 4, width: 30, height: 12, fill: '#fff'}],
+    ['rect', {y: 8, width: 30, height: 4, fill: '#c8102e'}]],
+  agenda: [['path', {d: 'M0 0H15V20H0Z', fill: '#fff'}], ['path', {d: 'M15 0H30L22 10L30 20H15Z', fill: '#1f4fa0'}]],
+  voice: [['rect', {width: 30, height: 20, fill: '#fff'}], ['path', {d: 'M0 0L30 20M30 0L0 20', stroke: '#c8102e', 'stroke-width': 4}]],
+};
+function helm(box) {
+  const c = 90, rim = 50, tabs = Object.keys(HELM_FLAGS), step = 360 / tabs.length;
+  const gradient = (id, attrs, colours) => svg(attrs.r ? 'radialGradient' : 'linearGradient', {id, ...attrs},
+    colours.map(([offset, colour]) => svg('stop', {offset, 'stop-color': colour})));
+  const at = (degrees, radius) => [c + radius * Math.sin(degrees * Math.PI / 180), c - radius * Math.cos(degrees * Math.PI / 180)];
+  const flags = tabs.map((tab, i) => {
+    const edge = tab === 'agenda' ? 'M.5 .5H29L21.4 10L29 19.5H.5Z' : 'M.5 .5H29.5V19.5H.5Z';
+    const cloth = svg('g', {class: 'helm-flag', 'data-tab': tab},
+      svg('circle', {r: 15, fill: 'transparent'}, svg('title', {}, TAB_NAMES[tab])),
+      svg('g', {transform: 'translate(-12 -8) scale(.8)'}, HELM_FLAGS[tab].map(([tag, attrs]) => svg(tag, attrs)),
+        svg('path', {d: edge, fill: 'none', class: 'helm-flag-edge'})));
+    cloth.addEventListener('click', () => showTab(tab));
+    const [x, y] = at(i * step, 73);
+    return {tab, cloth, holder: svg('g', {transform: `translate(${x} ${y})`}, cloth)};
+  });
+  const wheel = svg('g', {class: 'helm-wheel'},
+    tabs.map((_, i) => svg('rect', {x: c - 2.3, y: c - rim + 2, width: 4.6, height: rim - 16, rx: 2.3, fill: 'url(#helm-chrome)',
+      transform: `rotate(${i * step} ${c} ${c})`})),
+    svg('circle', {cx: c, cy: c, r: rim + 4.2, fill: 'none', stroke: '#2a0f04', 'stroke-opacity': 0.3, 'stroke-width': 1.6}),
+    svg('circle', {cx: c, cy: c, r: rim, fill: 'none', stroke: 'url(#helm-wood)', 'stroke-width': 9}),
+    svg('circle', {cx: c, cy: c, r: rim - 2.3, fill: 'none', stroke: '#fff', 'stroke-opacity': 0.4, 'stroke-width': 1.1}),
+    svg('circle', {cx: c, cy: c, r: 15, fill: 'url(#helm-hub)', stroke: '#5f666e', 'stroke-width': 0.8}),
+    svg('circle', {cx: c, cy: c, r: 8.5, fill: 'url(#helm-dome)'}),
+    svg('ellipse', {cx: c - 4, cy: c - 5, rx: 5, ry: 2.6, fill: '#fff', opacity: 0.55}),
+    flags.map(flag => flag.holder));
+  box.append(svg('svg', {viewBox: '0 0 180 180', class: 'helm'},
+    svg('defs', {},
+      gradient('helm-wood', {x1: 0, y1: 0, x2: 1, y2: 1}, [[0, '#c9743a'], [0.3, '#8a3a13'], [0.55, '#b35d27'], [0.8, '#6a2a0c'], [1, '#a24f1f']]),
+      gradient('helm-chrome', {x1: 0, y1: 0, x2: 1, y2: 0}, [[0, '#7d848c'], [0.35, '#fff'], [0.6, '#c3c9cf'], [1, '#6f767e']]),
+      gradient('helm-hub', {cx: 0.35, cy: 0.3, r: 0.8}, [[0, '#fff'], [0.4, '#dfe3e7'], [0.8, '#8d949c'], [1, '#5f666e']]),
+      gradient('helm-dome', {cx: 0.4, cy: 0.35, r: 0.7}, [[0, '#fff'], [0.5, '#c9ced4'], [1, '#7d848c']])),
+    svg('path', {d: `M${c - 5} 0H${c + 5}L${c} 7Z`, class: 'helm-lubber'}),
+    wheel));
+  let angle = null;
+  return {update(tab) {
+    const index = tabs.indexOf(tab);
+    if (index < 0) return;
+    for (const flag of flags) flag.cloth.classList.toggle('active', flag.tab === tab);
+    const first = angle === null, target = -index * step, turning = [wheel, ...flags.map(flag => flag.cloth)];
+    angle = first ? target : angle + ((target - angle) % 360 + 540) % 360 - 180;
+    if (first) turning.forEach(node => { node.style.transition = 'none'; });  // first draw: already on course
+    wheel.style.transform = `rotate(${angle}deg)`;
+    for (const flag of flags) flag.cloth.style.transform = `rotate(${-angle}deg)`;
+    if (first) { wheel.getBoundingClientRect(); turning.forEach(node => { node.style.transition = ''; }); }
   }};
 }
 

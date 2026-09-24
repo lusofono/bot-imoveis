@@ -95,6 +95,20 @@ def test_a_skin_only_dresses_its_own_theme():
                 start = i + 1
 
 
+def test_skin_words_only_name_headings_the_page_has():
+    # A skin's words replace headings marked data-word (or asked for with word()); a key with a typo would be
+    # silently ignored, so every key of every skin must exist on the page.
+    frontend = Path(__file__).resolve().parents[1] / "frontend"
+    script = (frontend / "app.js").read_text(encoding="utf-8")
+    known = set(re.findall(r'data-word="([\w.]+)"', (frontend / "index.html").read_text(encoding="utf-8")))
+    known |= set(re.findall(r"word\('([\w.]+)'", script))
+    blocks = re.findall(r"words: \{(.*?)\n\s*\},", script, flags=re.S)
+    assert len(blocks) >= 2  # racing and boat
+    for block in blocks:
+        keys = re.findall(r"'([\w.]+)':", block)
+        assert keys and set(keys) <= known, set(keys) - known
+
+
 def test_copy_paste_flow_drafts_previews_and_sends(service, page):
     _, call = page
     read(service, [lead("1")])

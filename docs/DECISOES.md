@@ -3,6 +3,25 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 24/09/2026, noite (6): «90's Boat» com palavras, roda do leme e relógio de bordo (α.27.0)
+
+**Decisão.**
+- **`SKINS.boat` no `app.js`, com dois dos quatro encaixes:** as palavras e o seletor. O relógio é o mesmo
+  desenho de todos os temas, vestido só no `boat.css`. Os instrumentos continuam os simples até o barco ter
+  os seus.
+- **As palavras só mudam títulos e subtítulos**, como no carro. Os rótulos ligados aos instrumentos
+  (`lamp.heat`, `heat.limit`, `trip.title`) ficam com o texto de sempre até haver instrumentos de barco.
+- **O seletor é a roda do leme (`helm`)**, com seis raios para seis separadores, como na fotografia do
+  cockpit. Cada raio aponta para a bandeira do seu separador. A roda gira pelo caminho mais curto até ao
+  separador aberto, e as bandeiras rodam ao contrário, com o mesmo tempo e a mesma curva, para ficarem sempre
+  direitas. Como a caixa de velocidades, repete a navegação só para o rato (`aria-hidden`); a navegação
+  acessível continua a ser a da barra lateral. Não aparece com menos de 860 px de altura nem no telemóvel.
+- **Um teste confirma que as chaves das palavras de cada tema existem na página** (`data-word` ou `word()`),
+  para uma gralha não deixar um título por traduzir sem ninguém dar por isso.
+
+**Porquê.** O plano por fases combinado com o utilizador («avanças então 2 fases», e depois «avança para outro
+passo, sozinho»), e a fotografia do cockpit, com a roda de seis raios.
+
 ## 24/09/2026, noite (5): o tema «90's Boat», primeiro a base (α.26.0)
 
 **Decisão.**

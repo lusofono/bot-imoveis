@@ -15,6 +15,19 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.27.0 — 24/09/2026
+
+- **«90's Boat» ganha palavras, a roda do leme e o relógio de bordo:**
+  - os títulos falam de bordo: «Ponte de comando — O teu dia, a todo o pano.», «Frota — Cada imóvel, o seu
+    barco.», «Tábua de marés», «Lista de passageiros», «Pavilhão»… Só os títulos mudam; botões, campos e
+    mensagens ficam iguais em todos os temas;
+  - por baixo dos separadores, **a roda do leme** faz de seletor, como a caixa de velocidades no carro: seis
+    raios cromados, um por separador, cada um a apontar para a sua bandeira. Ao mudar de separador, a roda gira
+    pelo caminho mais curto até o raio certo ficar em cima, sob a marca vermelha, e as bandeiras ficam sempre
+    direitas. Um clique numa bandeira muda de separador. Em ecrãs baixos e no telemóvel não aparece;
+  - no Painel, **o relógio de bordo**: mostrador branco, aro cromado e ponteiro dos segundos vermelho, montado
+    numa peça redonda de teca.
+
 ## α.26.0 — 24/09/2026
 
 - **Tema novo, «90's Boat»: o posto de comando de um iate de luxo dos anos 90.** Casco creme brilhante em
