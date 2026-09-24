@@ -15,6 +15,11 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.25.1 — 24/09/2026
+
+- **O tema «90's Ferrari» passa a chamar-se «90's RacingCar»:** um nome genérico, sem marca. Por dentro
+  continua a ser `racing`, por isso quem o tinha escolhido continua com ele. O aspeto não muda.
+
 ## α.25.0 — 24/09/2026
 
 - **Um depósito de tokens por imóvel**, porque é aí que se controla melhor. Enche-se no painel de cada imóvel,

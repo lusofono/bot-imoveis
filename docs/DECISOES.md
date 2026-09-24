@@ -3,7 +3,20 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 24/09/2026, noite (4): o tema passa a «90's RacingCar» (α.25.1)
+
+**Decisão.**
+- **O tema rico `racing` chama-se «90's RacingCar».** O `id` continua a ser `racing`, para não perder a
+  escolha guardada no browser, e o aspeto não muda. O nome «Ferrari» sai da página, do código e da
+  documentação atual; fica só no histórico (este ficheiro e o `CHANGELOG.md`). Um teste confirma que a
+  página e as folhas de estilo não o voltam a trazer.
+
+**Porquê.** Pedido direto do utilizador: «muda para 90's RacingCar». Resolve também a nota da decisão
+anterior sobre um nome de marca num repositório público.
+
 ## 24/09/2026, noite (3): depósito por imóvel, € = US$ e a gasolina das visitas (α.25.0)
+
+> **Substituída na parte do nome do tema** pela decisão acima: o tema chama-se «90's RacingCar».
 
 **Decisão.**
 - **Um depósito de tokens por imóvel**, guardado em `properties/<REF>/painel.json` (`tank`: tamanho e quando

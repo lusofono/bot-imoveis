@@ -1,4 +1,4 @@
-/* 90's Ferrari (theme id "racing") — a 90s Italian GT cockpit: carbon fibre where it races, figured walnut where it tours, black
+/* 90's RacingCar (theme id "racing") — a 90s Italian GT cockpit: carbon fibre where it races, figured walnut where it tours, black
    leather with rosso stitching, chrome and brushed aluminium; switches for buttons, a gated gearbox for the
    tabs, an analog dash clock and the full instrument cluster. Everything is under :root[data-theme="racing"]:
    the page draws the same elements in every theme, and app.js (SKINS.racing) adds this skin's words,

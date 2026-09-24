@@ -52,6 +52,9 @@ def test_the_page_is_served_as_its_own_files(page):
     assert '<link rel="stylesheet" href="themes/racing.css">' in html.text
     racing = client.get("/themes/racing.css")
     assert racing.headers["content-type"].startswith("text/css") and ':root[data-theme="racing"]' in racing.text
+    # Its label is generic, with no brand; the id stays "racing" so a choice saved in the browser survives.
+    assert '<option value="racing">90\'s RacingCar</option>' in html.text
+    assert not any("Ferrari" in served.text for served in (html, script, style, racing))
     # The template itself, with its placeholders, is never served; nor is a theme that does not exist.
     assert client.get("/index.html").status_code == 404
     assert client.get("/themes/nada.css").status_code == 404

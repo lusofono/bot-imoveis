@@ -44,7 +44,7 @@ Abre `http://127.0.0.1:8765` no browser, já com o link certo. É o mesmo que `.
 - **Arrancar outra vez fecha a página anterior** da mesma pasta de dados; nunca mexe noutros programas.
 - Tem quatro separadores: **Painel** (métricas dos últimos 14 dias, imóveis e estado da configuração),
   **Respostas**, **Imóveis** e **Voz e estilo**, com quatro temas visuais simples (Noite, Dia, Índigo e Âmbar)
-  e um tema rico, o **90's Ferrari** (um cockpit de GT italiano dos anos 90: carbono, nogueira, pele, caixa de
+  e um tema rico, o **90's RacingCar** (um cockpit de GT italiano dos anos 90: carbono, nogueira, pele, caixa de
   velocidades como navegação e um quadro de instrumentos por imóvel). Os temas ricos vivem em
   `frontend/themes/`, cada um com a sua folha de estilo e o seu registo em `SKINS` no `app.js`.
 
@@ -217,7 +217,7 @@ backend/                   o código Python
   demo.py                  pasta de demonstração, só com dados fictícios
   templates/               exemplos publicados, com dados fictícios: config, voz e perfil de imóvel
 frontend/                  a página: index.html, app.js, style.css (só fala com a API)
-  themes/<tema>.css        os temas ricos ("skins"), um ficheiro cada: racing.css (90's Ferrari)
+  themes/<tema>.css        os temas ricos ("skins"), um ficheiro cada: racing.css (90's RacingCar)
 mac/                       atalhos de duplo clique: web, setup, password, openai_key, read, send e o agendamento do READ
 main.py                    arranque local: a página em 127.0.0.1 e o browser; mais tarde, a .app
 data/                      os teus dados (local, ignorado pelo Git)

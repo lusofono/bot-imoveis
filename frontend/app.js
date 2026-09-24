@@ -28,7 +28,7 @@ const TAB_NAMES = {dashboard: 'Painel', replies: 'Respostas', properties: 'Imóv
 
 // Skins: a rich theme goes beyond colours. It may bring the words on the page headings, the instruments on
 // each property's panel (from the same signals: see panelSignals), a tab selector of its own and an analog
-// clock; its stylesheet is in frontend/themes/. The plain themes use none of it. 90's Ferrari (id racing) is the first; a
+// clock; its stylesheet is in frontend/themes/. The plain themes use none of it. 90's RacingCar (id racing) is the first; a
 // yacht or a grand-luxury skin fills the same four slots with its own words, dials, selector and clock.
 const SKINS = {
   racing: {
@@ -65,7 +65,7 @@ function applySkin() {
   skinSelector?.update(activeTab);
 }
 
-// 90's Ferrari's tab selector: the open gated gearbox of a GT of the time. Gears 1 to 6 are the six tabs (reverse is
+// 90's RacingCar's tab selector: the open gated gearbox of a GT of the time. Gears 1 to 6 are the six tabs (reverse is
 // only there for the look); the lever goes through neutral like a real one, and a click on a gear changes
 // tab. It repeats the nav for the mouse: the nav itself stays the accessible way (aria-hidden here).
 const GEARS = {dashboard: [71, 29], replies: [71, 103], properties: [106, 29], contacts: [106, 103], agenda: [141, 29],
@@ -486,7 +486,7 @@ function chart(days, bucketDays) {
 // from settings.properties[].visits.slots — already loaded for Imóveis, so no call of its own.
 const WEEKDAY_NARROW = [...Array(7)].map((_, i) => new Date(2024, 0, 1 + i).toLocaleDateString('pt-PT', {weekday: 'narrow'}));
 
-// The analog face beside it, drawn once in every theme and shown only by a skin that has one (90's Ferrari's
+// The analog face beside it, drawn once in every theme and shown only by a skin that has one (90's RacingCar's
 // is a 90s dash clock). Quartz: the second hand ticks, it does not sweep.
 const clockHands = (() => {
   const c = 50, at = (degrees, radius) => [c + radius * Math.sin(degrees * Math.PI / 180), c - radius * Math.cos(degrees * Math.PI / 180)];
@@ -1344,7 +1344,7 @@ function plainInstruments(ref, s) {
     petrolGauge(ref, s.petrol, 'Gasolina das visitas')];
 }
 
-// 90's Ferrari: a GT's binnacle. Water temperature is the average reply time, with this property's own limit
+// 90's RacingCar: a GT's binnacle. Water temperature is the average reply time, with this property's own limit
 // as its H; the yellow tachometer, the emails waiting; the speedometer, requests per day; fuel, the property's
 // token tank; and, smaller beside it, the petrol its visits took.
 function carInstruments(ref, s) {

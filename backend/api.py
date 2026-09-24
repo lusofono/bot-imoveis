@@ -29,7 +29,7 @@ from .service import MailService
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
 COOKIE = "bot_mail_web"
 # The page's own files. index.html is only served at "/", with the token written into it. A rich theme (a
-# "skin": 90's Ferrari now, more to come) keeps its stylesheet in frontend/themes/, listed once at start.
+# "skin": 90's RacingCar now, more to come) keeps its stylesheet in frontend/themes/, listed once at start.
 ASSETS = {"app.js": "text/javascript", "style.css": "text/css",
           **{f"themes/{sheet.name}": "text/css" for sheet in sorted((FRONTEND / "themes").glob("*.css"))}}
 HEADERS = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
