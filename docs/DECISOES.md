@@ -3,6 +3,21 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 24/09/2026, noite (8): o mar em movimento no «90's Boat» (α.29.0)
+
+**Decisão.**
+- **Movimento só decorativo e leve:** as ondas deslizam o fundo (`background-position`) numa faixa de 70 px;
+  o resto anima só `transform`: o veleiro no para-brisas, o radar do «A trabalhar…», a bandeira do separador
+  aberto e o balanço dos botões ao passar o rato. Nada muda de lugar no conteúdo.
+- **As ondas ficam por trás de tudo** (`z-index:-1`, fixas no fundo da janela): veem-se nos espaços livres e
+  nunca tapam texto nem botões. O veleiro passa por trás do texto da barra de cima.
+- **«Reduzir movimento» desliga tudo:** a regra geral da página já o fazia, e o `boat.css` repete-a para estes
+  elementos. Sem animação, o veleiro fica parado a meio do para-brisas.
+- **O balanço pára ao carregar num botão**, para o clique continuar a afundar o botão como nos outros temas.
+
+**Porquê.** O plano por fases, pedido pelo utilizador («avança para a fase 5»): «ondas, veleiro, gaivotas e o
+radar a varrer quando a página está a trabalhar».
+
 ## 24/09/2026, noite (7): os instrumentos de bordo do «90's Boat» (α.28.0)
 
 **Decisão.**

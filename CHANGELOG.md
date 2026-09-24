@@ -15,6 +15,17 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.29.0 — 24/09/2026
+
+- **«90's Boat» ganha mar em movimento:**
+  - duas faixas de ondas no fundo da janela, a mais próxima mais depressa, com espuma branca; espreitam por
+    trás dos cartões e nunca tapam o conteúdo;
+  - um veleiro branco, com duas gaivotas atrás, atravessa devagar o para-brisas, por trás do texto da barra
+    de cima;
+  - enquanto a página trabalha, «A trabalhar…» leva um radar a varrer;
+  - a bandeira do separador aberto esvoaça, e os botões balançam ao de leve quando passas o rato por cima.
+- Com «reduzir movimento» ligado no Mac, nada disto se mexe.
+
 ## α.28.0 — 24/09/2026
 
 - **«90's Boat» ganha os instrumentos de bordo em cada imóvel**, com mostradores brancos, aros cromados e
