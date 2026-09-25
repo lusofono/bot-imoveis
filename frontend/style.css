@@ -378,3 +378,8 @@
 #fuel-panel .fuel-side button.link::before{content:"";width:26px;height:26px;background:currentColor;
   -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 3h9a1 1 0 0 1 1 1v16h1a1 1 0 0 1 0 2H2a1 1 0 0 1 0-2h1V4a1 1 0 0 1 1-1zm1.5 2v5h6V5h-6z' fill='black'/%3E%3Cpath d='M14.5 6.5l3 3V17a1.6 1.6 0 0 0 3.2 0V8.4L18.2 6' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 3h9a1 1 0 0 1 1 1v16h1a1 1 0 0 1 0 2H2a1 1 0 0 1 0-2h1V4a1 1 0 0 1 1-1zm1.5 2v5h6V5h-6z' fill='black'/%3E%3Cpath d='M14.5 6.5l3 3V17a1.6 1.6 0 0 0 3.2 0V8.4L18.2 6' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat}
 #fuel-panel .fuel-side button.link:hover{background:var(--accent-tint);text-decoration:none}
+/* Agenda, «Depois das visitas»: past visits still to check, as buttons above the week (the after-visit step) */
+.agenda-todo{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:0 0 16px;padding:10px 14px;
+  border:1px dashed var(--accent);border-radius:12px;background:var(--accent-tint)}
+.agenda-todo-item{min-height:30px;padding:4px 12px;font-size:12px;border-left:4px solid var(--agenda-green)}
+.agenda-todo-item.offered{border-left-color:var(--agenda-blue)}.agenda-todo-item.accepted{border-left-color:var(--agenda-orange)}

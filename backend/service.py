@@ -1270,7 +1270,7 @@ class MailService:
                        for slot in load_visits(self.folder, ref)["slots"] if slot["at"][:10] >= since),
                       key=lambda slot: slot["at"])
 
-    def check_visit(self, property_ref, email, attended, private_note="", public_note=""):
+    def check_visit(self, property_ref, email, attended, private_note="", public_note="", at=None):
         """After the visit, in the agenda: did the customer come, a private note (only for the owner — never in
         an email nor sent to the AI) and a public one (it goes into the thanks)."""
         email = str(email or "").strip().casefold()
@@ -1283,14 +1283,25 @@ class MailService:
             ref = self.pick(self.profiles(), property_ref)
             agenda = load_visits(self.folder, ref)
             slots = sorted((slot for slot in agenda["slots"] if slot.get("customer") == email), key=lambda slot: slot["at"])
+            data = self.load(ref)
+            conversation = data.get("conversations", {}).get(email)
+            if not slots and at and conversation is not None:
+                # A time still offered or accepted (blue, orange) the customer did come to: it was the visit.
+                try:
+                    at = datetime.strptime(str(at).strip(), "%Y-%m-%d %H:%M").strftime("%Y-%m-%d %H:%M")
+                except ValueError:
+                    raise ValueError("Hora de visita inválida.") from None
+                agenda["slots"].append({"at": at, "customer": email, "name": conversation.get("name") or "",
+                                        "source": "check", "booked_at": now()})
+                conversation.pop("visit_offered", None)
+                conversation.pop("visit_accepted", None)
+                slots = [agenda["slots"][-1]]
             if not slots:
                 raise ValueError("Este cliente não tem visita marcada neste imóvel.")
             today = date.today().isoformat()
             slot = next((slot for slot in reversed(slots) if slot["at"][:10] <= today), slots[0])
             slot["check"] = {"attended": attended, **notes, "checked_at": now()}
             save_visits(self.folder, ref, agenda)
-            data = self.load(ref)
-            conversation = data.get("conversations", {}).get(email)
             if conversation is not None:
                 conversation["visit_check"] = {**(conversation.get("visit_check") or {}), "at": slot["at"],
                                                "attended": attended, **notes}

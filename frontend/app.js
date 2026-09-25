@@ -50,7 +50,7 @@ const SKINS = {
     },
     instruments: carInstruments,
     selector: gearbox,
-    sounds: {send: engineBlip, read: pitRadio, click: switchClack},
+    sounds: {send: engineBlip, read: pitRadio, click: switchClack, shift: gearShift},
   },
   boat: {
     words: {
@@ -96,13 +96,13 @@ let audio = null;
 function soundsOn() {
   try { return localStorage.getItem('bot-mail-sounds') === 'on'; } catch { return false; }
 }
-function playSound(name) {
+function playSound(name, ...details) {
   const sound = skin()?.sounds?.[name];
   if (!sound || !soundsOn()) return;
   try {
     audio ??= new AudioContext();
     if (audio.state === 'suspended') audio.resume();
-    sound(audio);
+    sound(audio, ...details);
   } catch { /* No audio in this browser: the page works the same without it. */ }
 }
 function renderSoundSwitch() {
@@ -120,7 +120,9 @@ $('sound-toggle').addEventListener('click', () => {
 // disables itself while working still sounds. The Sons switch plays its own sound.
 document.addEventListener('click', event => {
   const button = event.target.closest?.('button');
-  if (button && button.id !== 'sound-toggle' && !button.disabled) playSound('click');
+  // A tab is a gear change where the skin has one (showTab plays it): no switch click on top of it.
+  const shifts = button?.classList.contains('tab') && skin()?.sounds?.shift;
+  if (button && button.id !== 'sound-toggle' && !button.disabled && !shifts) playSound('click');
 }, true);
 
 // A short burst of noise, shaped: the body of the mechanical sounds below.
@@ -168,6 +170,34 @@ function pitRadio(context) {
     gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.12);
     beep.connect(gain).connect(context.destination);
     beep.start(at); beep.stop(at + 0.13);
+  }
+}
+// 90's RacingCar, a tab is a gear change: the lever through the gate, then the engine pulling in that gear. Each gear
+// sits a step higher than the one below (1st a low growl, 6th the highest), like a car gathering speed; going up,
+// the revs drop and pull again; going down, a throttle blip first (heel and toe), then it settles.
+function gearShift(context, gear, from = 0) {
+  const t = context.currentTime, pull = t + 0.06, down = from > 0 && gear < from;
+  noiseBurst(context, t, 0.03, 'bandpass', 1400, 0.14);
+  const base = 46 * 1.2 ** (Math.max(1, gear) - 1);
+  const out = context.createGain(), filter = context.createBiquadFilter(), grit = context.createWaveShaper();
+  const curve = new Float32Array(256);
+  for (let i = 0; i < 256; i++) { const x = i / 128 - 1; curve[i] = Math.tanh(2.2 * x); }
+  grit.curve = curve;
+  filter.type = 'lowpass'; filter.frequency.setValueAtTime(900 + gear * 150, pull);
+  filter.frequency.linearRampToValueAtTime(1600 + gear * 250, pull + 0.45);
+  out.gain.setValueAtTime(0.0001, t);
+  out.gain.exponentialRampToValueAtTime(0.12, pull + 0.05);
+  out.gain.setValueAtTime(0.12, pull + 0.6);
+  out.gain.exponentialRampToValueAtTime(0.0001, pull + 1);
+  grit.connect(filter).connect(out).connect(context.destination);
+  for (const [ratio, detune] of [[1, 0], [1.5, 5], [2, -5]]) {
+    const voice = context.createOscillator();
+    voice.type = 'sawtooth'; voice.detune.value = detune;
+    voice.frequency.setValueAtTime(base * (down ? 1.9 : 0.8) * ratio, pull);
+    if (down) voice.frequency.exponentialRampToValueAtTime(base * 1.2 * ratio, pull + 0.18);
+    voice.frequency.exponentialRampToValueAtTime(base * 2.1 * ratio, pull + 0.55);
+    voice.frequency.exponentialRampToValueAtTime(base * 1.4 * ratio, pull + 0.95);
+    voice.connect(grit); voice.start(pull); voice.stop(pull + 1.05);
   }
 }
 // 90's RacingCar, every button: a dashboard toggle switch — a sharp click over a small low thump.
@@ -385,7 +415,11 @@ async function copyText(text, done, fallbackBox) {
   catch { fallbackBox.open = true; toast('Não consegui copiar sozinho: seleciona o texto do prompt e copia-o.', 'warn'); }
 }
 
+// The gear of a tab (its place in the menu, 1 to 6): 90's RacingCar changes gear with the tabs, and sounds it.
+function gearOf(tab) { return Number(document.querySelector(`nav [data-tab="${tab}"]`)?.dataset.gear) || 0; }
+
 function showTab(name) {
+  if (name !== activeTab) playSound('shift', gearOf(name), gearOf(activeTab));
   activeTab = name;
   skinSelector?.update(name);
   document.querySelectorAll('nav [data-tab]').forEach(button => {
@@ -1368,10 +1402,12 @@ function agendaEntries(iso) {
     }
     // Still to be agreed, found by «Atualizar agenda»: accepted by the customer (orange), offered by us (blue).
     for (const accepted of property.visits?.accepted || []) {
-      visit(property.reference, accepted.at, accepted.name || accepted.customer, 'accepted', accepted.evidence, accepted.replaces);
+      visit(property.reference, accepted.at, accepted.name || accepted.customer, 'accepted', accepted.evidence, accepted.replaces,
+        {customer: accepted.customer});
     }
     for (const offered of property.visits?.offered || []) {
-      visit(property.reference, offered.at, offered.name || offered.customer, 'offered', offered.evidence, offered.replaces);
+      visit(property.reference, offered.at, offered.name || offered.customer, 'offered', offered.evidence, offered.replaces,
+        {customer: offered.customer});
     }
   }
   // The time a customer accepted sits in a draft until the owner sends it; only then is it booked (green).
@@ -1456,6 +1492,7 @@ function renderAgenda() {
         : `${weekday(index)} disponível: clica para pôr em blackout`, onclick: () => toggleAgendaDay(index)}, name)));
   const todayIso = isoDate(new Date());
   const filter = $('agenda-property').value;
+  renderVisitTodo(filter);
   const showLabel = Object.keys(properties).length > 1;
   const week = days.map((date, index) => ({date, index, iso: isoDate(date), off: agendaOff.has(index),
     entries: agendaEntries(isoDate(date)).filter(entry => !filter || entry.ref === filter)}))
@@ -1482,8 +1519,9 @@ function renderAgenda() {
     const day = el('div', {class: 'filofax-day'}, agendaRuling(from, quarters),
       windows.map(entry => agendaPlace(el('div', {class: 'filofax-entry window', title: tip(entry)}), from, entry)),
       visits.map(entry => {
-        // A booked visit opens its check (who came, the notes, the thanks) below the week.
-        const clickable = entry.kind === 'confirmed' && entry.customer;
+        // A visit opens its check (who came, the notes, the thanks) below the week — booked (green), and also a
+        // time still offered or accepted (blue, orange): if the customer came, that was the visit.
+        const clickable = ['confirmed', 'offered', 'accepted'].includes(entry.kind) && entry.customer;
         const came = entry.came === true ? ' attended' : entry.came === false ? ' noshow' : '';
         const node = el('div', {class: `filofax-entry visit ${entry.clashes.length ? 'overbooked' : entry.kind}${came}${clickable ? ' clickable' : ''}`,
           title: tip(entry) + (clickable ? ' · clica para o check da visita' : '')},
@@ -1509,6 +1547,23 @@ function renderAgenda() {
 
 // After the visit: did the customer come, a private note (only for the owner: never in an email nor to the AI),
 // a public one (it goes into the thanks), and «Criar agradecimento», which puts the after-visit draft in Comunicações.
+// «Depois das visitas»: the visits already past (last 14 days) nobody has checked yet, as buttons above the week —
+// the way into the after-visit step (who came, the notes, the thanks), without hunting for the blocks.
+function renderVisitTodo(filter) {
+  const now = new Date(), days = [];
+  for (let back = 14; back >= 0; back--) { const day = new Date(now); day.setDate(now.getDate() - back); days.push(isoDate(day)); }
+  const past = entry => new Date(entry.at.replace(' ', 'T')) <= now;
+  const todo = days.flatMap(iso => agendaEntries(iso)).filter(entry => (!filter || entry.ref === filter) && entry.customer
+    && ['confirmed', 'offered', 'accepted'].includes(entry.kind) && entry.check?.attended == null && past(entry));
+  $('agenda-todo').replaceChildren(...(todo.length ? [
+    el('strong', {}, 'Depois das visitas'),
+    el('span', {class: 'muted small'}, 'quem apareceu, notas e agradecimento:'),
+    ...todo.map(entry => el('button', {type: 'button', class: 'agenda-todo-item ' + entry.kind,
+      title: 'Assinalar esta visita e criar o agradecimento', onclick: () => openVisitCheck(entry)},
+      `${entry.name || entry.customer} · ${entry.at.slice(8, 10)}/${entry.at.slice(5, 7)} ${entry.at.slice(11)}`))] : []));
+  $('agenda-todo').hidden = !todo.length;
+}
+
 function openVisitCheck(entry) {
   const check = entry.check || {}, survey = entry.survey;
   const box = $('agenda-check');
@@ -1520,7 +1575,7 @@ function openVisitCheck(entry) {
   const save = async () => {
     const attended = came.checked ? true : missed.checked ? false : null;
     const result = await call('api/visits/check', {property_ref: entry.ref, email: entry.customer, attended,
-      private_note: privateNote.value, public_note: publicNote.value});
+      private_note: privateNote.value, public_note: publicNote.value, at: entry.at});
     settings = result.settings; renderAgenda();
     return attended;
   };

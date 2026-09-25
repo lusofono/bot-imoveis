@@ -15,6 +15,21 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.39.2 — 25/09/2026
+
+- **Agenda, «Depois das visitas»:** por cima da semana aparece a lista das visitas que já passaram (até 14 dias)
+  e ainda não assinalaste, cada uma com um botão («Nome · 25/09 13:00») que abre o passo pós-visita: se
+  apareceu, as notas e «Guardar e criar agradecimento». Antes só se chegava lá carregando no bloco da visita.
+- **As horas a azul (proposta nossa) e a laranja (aceite pelo cliente) também se podem assinalar:** se o cliente
+  apareceu a essa hora, a visita fica registada nela (verde) e segue para o agradecimento.
+
+## α.39.1 — 25/09/2026
+
+- **90's RacingCar, com «Sons» ligado: cada separador é uma mudança.** Ao mudar de separador (no menu ou na
+  caixa de velocidades) ouve-se a alavanca a passar a grelha e o motor a puxar nessa mudança; cada mudança é
+  mais aguda que a anterior (a 1.ª um rosnar grave, a 6.ª a mais alta). A subir, a rotação cai e volta a puxar; a
+  descer, um golpe de acelerador antes de assentar. Os separadores deixam de dar o estalido dos outros botões.
+
 ## α.39.0 — 25/09/2026
 
 - **Depois da visita, na Agenda:** cada visita marcada tem um «check» — apareceu ou não, uma **nota privada**

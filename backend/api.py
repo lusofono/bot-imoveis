@@ -179,7 +179,8 @@ def web_app(folder, token):
         attended = body.get("attended")
         return {**service.check_visit(body.get("property_ref") or None, body.get("email"),
                                       attended if attended in (True, False) else None,
-                                      body.get("private_note"), body.get("public_note")), "settings": service.settings()}
+                                      body.get("private_note"), body.get("public_note"), body.get("at")),
+                "settings": service.settings()}
 
     def visit_thanks(body):
         return {**service.visit_thanks(body.get("property_ref") or None, body.get("email")), "state": state()}
