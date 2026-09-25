@@ -52,6 +52,29 @@ INTERACTIONS = ((1, "first_interaction"), (2, "second_interaction"), (3, "third_
                 (4, "fourth_interaction"))
 
 
+# After the visit (25/09): thanks, the visit sheet and a short survey the customer answers by replying to the
+# email itself — no link, no form, works in every mail app. Used when Voz e estilo has none of its own.
+AFTER_VISIT_RULE = ("Depois da visita, agradece ao cliente ter vindo, de forma breve e cordial. Se houver nota pública "
+                    "do consultor, usa-a com naturalidade: é para o cliente ler. Inclui o inquérito e a ficha de visita do "
+                    "conteúdo base, preenchendo o imóvel, a morada, o dia e a hora, o consultor e o nome do visitante com "
+                    "os dados que tens (nunca inventes); traduz tudo para o idioma do cliente, mas mantém a numeração de "
+                    "1 a 5, para ele responder na mesma linha. Não peças documentos nem prometas nada sobre a candidatura.")
+AFTER_VISIT_TEMPLATE = """Para melhorarmos, pedimos-lhe um minuto: responda a este email escrevendo, à frente de cada número, uma nota de 1 (mau) a 5 (excelente).
+1. O imóvel:
+2. O consultor que o recebeu na visita:
+3. A marcação da visita e a troca de emails (rapidez, clareza, respostas às suas dúvidas):
+4. Continua interessado em arrendar este imóvel? (sim / não / talvez):
+5. Comentário ou dúvida (opcional):
+
+FICHA DE VISITA
+Imóvel: {imóvel} (ref. {referência})
+Morada: {morada}
+Data e hora: {dia e hora da visita}
+Consultor: {consultor}
+Visitante: {nome do cliente}
+Para ficar registada, responda também com «Confirmo a visita».""".replace("{", "<").replace("}", ">")
+
+
 def day_label(day):
     """2026-09-25 → quinta-feira, 25/09/2026."""
     value = date.fromisoformat(day)
@@ -110,6 +133,10 @@ def instructions(profile, voice, visits=None):
             out.append(f"- {number}.ª: " + (prompt.get("when_not_configured")
                                             or "Sem prompt configurada: avisa o proprietário e aguarda instruções."))
     out.append("- 5.ª e seguintes: sem prompt configurada; avisa o proprietário e aguarda instruções.")
+    after = style.get("after_visit") or {}
+    after_template = style.get("after_visit_template") or {}
+    out += ["- Pós-visita (agradecimento, emails marcados «pós-visita»): " + (after.get("text") or AFTER_VISIT_RULE),
+            "  Conteúdo base:\n" + (after_template.get("text") or AFTER_VISIT_TEMPLATE)]
     if visits and visits.get("windows"):
         durations = [f"arrendamento {visits['rental']}" if visits.get("rental") else "",
                      f"compra {visits['sale']}" if visits.get("sale") else ""]
@@ -183,7 +210,12 @@ def reply_prompt(queue, ids, extra=""):
         if addition:
             message = ("(sem mensagem nova do cliente: é um acrescento do proprietário a esta conversa; escreve só o "
                        "que as instruções extra pedirem, sem repetir o que já foi dito)")
-        step = "acrescento" if addition else f"{email.get('interaction') or 1}.ª"
+        visited = email.get("visit_done") if email.get("kind") == "visit_thanks" else None
+        if visited:
+            message = (f"(sem mensagem nova do cliente: é o agradecimento pela visita de {slot_label(visited.get('at'))}; "
+                       f"visitante: {visited.get('name') or 'o cliente'}) Nota pública do consultor para este cliente: "
+                       f"{visited.get('public') or '(nenhuma)'}")
+        step = "acrescento" if addition else "pós-visita" if visited else f"{email.get('interaction') or 1}.ª"
         parts += [f"--- id: {short_id(email['id'])} | interação: {step}"
                   f" | data: {email.get('date') or '?'}", f"Cliente: {name}"]
         history = email.get("history") or []
@@ -192,7 +224,7 @@ def reply_prompt(queue, ids, extra=""):
             for turn in history:
                 parts.append(f"[{turn.get('at', '?')}] {'Cliente' if turn['who'] == 'cliente' else 'Nós'}: "
                              f"{turn['text'][:1000]}")
-        parts += ["Mensagem" + (" nova" if history and not window and not addition else "") + ":", message[:4000]]
+        parts += ["Mensagem" + (" nova" if history and not window and not addition and not visited else "") + ":", message[:4000]]
         if email.get("visit_status"):
             parts.append("Visita: " + VISIT_STATES.get(email["visit_status"], email["visit_status"]) + ".")
         if email.get("warnings"):
@@ -333,6 +365,37 @@ def parse_agenda(text, ids):
                 continue  # no usable day and time: nothing to put on the agenda
         found[row["id"]] = {"state": row["estado"], "at": at, "evidence": " ".join(str(row.get("prova") or "").split())[:200]}
     return found
+
+
+def slot_label(at):
+    """«2026-09-25 13:00» → «sexta-feira, 25/09/2026, às 13:00»."""
+    day, _, time = str(at or "").partition(" ")
+    try:
+        return f"{day_label(day)}, às {time}" if time else day_label(day)
+    except ValueError:
+        return str(at or "")
+
+
+SCORE_LINE = re.compile(r"^\s*([1-3])\s*[.)\-:–]\s*[^\n]*?(?<![\d/])([1-5])(?:\s*/\s*5)?\s*$", re.M)
+INTEREST_LINE = re.compile(r"^\s*4\s*[.)\-:–][^\n]*?\b(sim|não|nao|talvez|yes|no|maybe|oui|non|peut-être)\b[^\n]*$", re.M | re.I)
+COMMENT_LINE = re.compile(r"^\s*5\s*[.)\-:–][^:\n]*:\s*(.+)$", re.M)
+CONFIRM = re.compile(r"confirmo\s+a\s+visita|i\s+confirm\s+the\s+visit|je\s+confirme\s+la\s+visite", re.I)
+INTEREST = {"sim": "sim", "yes": "sim", "oui": "sim", "não": "não", "nao": "não", "no": "não", "non": "não",
+            "talvez": "talvez", "maybe": "talvez", "peut-être": "talvez"}
+
+
+def parse_survey(text):
+    """A reply to the after-visit email: the 1–5 scores (house, consultant, booking and emails), the interest,
+    the comment and whether the visit sheet was confirmed. None when it answers none of it."""
+    text = str(text or "")
+    scores = {number: int(value) for number, value in SCORE_LINE.findall(text)}
+    interest = INTEREST_LINE.search(text)
+    comment = COMMENT_LINE.search(text)
+    found = {"imovel": scores.get("1"), "consultor": scores.get("2"), "marcacao": scores.get("3"),
+             "interesse": INTEREST.get(interest[1].casefold()) if interest else None,
+             "comentario": " ".join(comment[1].split())[:500] if comment else None,
+             "ficha_confirmada": bool(CONFIRM.search(text))}
+    return found if any(value for value in found.values()) else None
 
 
 def listing_prompt(url):

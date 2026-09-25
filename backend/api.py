@@ -175,6 +175,15 @@ def web_app(folder, token):
     def active_remove(body):
         return {**service.remove_active(body.get("property_ref") or None, body.get("email")), "state": state()}
 
+    def visit_check(body):
+        attended = body.get("attended")
+        return {**service.check_visit(body.get("property_ref") or None, body.get("email"),
+                                      attended if attended in (True, False) else None,
+                                      body.get("private_note"), body.get("public_note")), "settings": service.settings()}
+
+    def visit_thanks(body):
+        return {**service.visit_thanks(body.get("property_ref") or None, body.get("email")), "state": state()}
+
     def agenda_sync(body):
         # «Atualizar agenda»: the API reads the conversations and updates the agenda by itself.
         return {**service.sync_agenda(body.get("property_ref") or None), "settings": service.settings(), "state": state()}
@@ -339,7 +348,7 @@ def web_app(folder, token):
                 "visits/candidates": ("POST", visit_candidates), "visits/propose": ("POST", visit_propose),
                 "visits/analysis-prompt": ("POST", visit_analysis_prompt), "visits/analyze": ("POST", visit_analyze),
                 "visits/round-summary": ("POST", visit_round_summary), "visits/close": ("POST", visits_close),
-                "agenda/sync": ("POST", agenda_sync),
+                "agenda/sync": ("POST", agenda_sync), "visits/check": ("POST", visit_check), "visits/thanks": ("POST", visit_thanks),
                 "active/write": ("POST", active_write), "active/remove": ("POST", active_remove),
                 "consent/request": ("POST", consent_request), "consent/confirm": ("POST", consent_confirm),
                 "contacts": ("GET", lambda body: service.contacts()),

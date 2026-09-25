@@ -85,8 +85,8 @@
 @media(max-height:840px){:root[data-theme="racing"] .skin-selector{display:none}}
 
 /* Top bar: a thin tricolore, then red; the shift lights rev while the page works */
-:root[data-theme="racing"] .topbar{position:relative;background:linear-gradient(180deg,#141416f5,#0b0b0df2);border-bottom:1px solid #000}
-:root[data-theme="racing"] .topbar::after{content:"";position:absolute;left:0;right:0;bottom:-3px;height:3px;pointer-events:none;
+:root[data-theme="racing"] .topbar{position:relative;z-index:0;overflow:hidden;background:linear-gradient(180deg,#141416f5,#0b0b0df2);border-bottom:1px solid #000}
+:root[data-theme="racing"] .topbar::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;pointer-events:none;
   background:linear-gradient(90deg,#009246 0 72px,#f4f5f0 72px 144px,#ce2b37 144px 216px,#e8140c 216px);box-shadow:0 1px 8px #e8140c40}
 :root[data-theme="racing"] #busy{display:inline-flex;align-items:center;gap:10px;color:var(--amber);font:700 10px/1 var(--din);letter-spacing:1.4px;text-transform:uppercase}
 :root[data-theme="racing"] .shift-lights{display:inline-flex;gap:3px;padding:4px 6px;border-radius:5px;background:#050506;box-shadow:inset 0 1px 3px #000,0 0 0 1px #2a2a2e}
@@ -323,3 +323,13 @@
   :root[data-theme="racing"] .gauge-petrol{grid-column:1/-1}
 }
 @media(prefers-reduced-motion:reduce){:root[data-theme="racing"] .shift-lights i,:root[data-theme="racing"] .gauge-alert .gauge-readout{animation:none}}
+
+/* A red 90s GT (F40-style wedge, big rear wing, NACA ducts, five-spoke wheels — no badge, no name) flashes across the
+   top bar behind its text now and then, the way the sloop sails in 90's Boat. Pure design: transform only, clipped
+   by the bar, first pass soon after the page opens, and gone with "reduce motion" */
+:root[data-theme="racing"] .topbar::before{content:"";position:absolute;left:0;bottom:3px;width:150px;height:35px;z-index:-1;
+  pointer-events:none;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 152 36'%3E %3Cdefs%3E%3ClinearGradient id='b' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23ff2a1c'/%3E%3Cstop offset='.55' stop-color='%23d40000'/%3E%3Cstop offset='1' stop-color='%238e0000'/%3E%3C/linearGradient%3E %3ClinearGradient id='s' x1='0' y1='0' x2='1' y2='0'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.55'/%3E%3Cstop offset='1' stop-color='%23fff' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E %3Cpath d='M120 13H150M122 19H146M118 25H142' stroke='url%28%23s%29' stroke-width='1.3' stroke-linecap='round'/%3E %3Cellipse cx='60' cy='31.5' rx='56' ry='2.6' fill='%23000' opacity='.45'/%3E %3Cpath d='M3 25.5L4.5 21.2Q9 18.6 22 17.4L40 15.6L51 8.6Q59 7.4 68 7.8L79 11.4L103 13.2H110L113.5 17.5L113 25.5H102.8A8.6 8.6 0 0 0 85.6 25.5H32.6A8.6 8.6 0 0 0 15.4 25.5Z' fill='url%28%23b%29'/%3E %3Cpath d='M41.4 15.4L51.6 9.4Q59 8.4 66.8 8.8L72 14.6Z' fill='%23141414'/%3E %3Cpath d='M52.4 10.2L55 14.8M66 9.3L69.8 14.4' stroke='%23d40000' stroke-width='.9'/%3E %3Cpath d='M96 12.9V7.6M106 13V7.6' stroke='%231a1a1a' stroke-width='1.6'/%3E %3Cpath d='M93 5.4H112.5L113.5 8.2H92.4Z' fill='%23d40000'/%3E%3Cpath d='M93 5.4H112.5' stroke='%23ff5a4a' stroke-width='.6'/%3E %3Cpath d='M58 18.4L66 17.6L64.6 20.2L58.8 20.6Z' fill='%235a0000'/%3E %3Cpath d='M4.2 22.6H11' stroke='%235a0000' stroke-width='.8'/%3E%3Crect x='6' y='19.8' width='3.6' height='1.2' rx='.5' fill='%23ffb000'/%3E %3Ccircle cx='111.6' cy='19' r='1.3' fill='%23ff3b30'/%3E%3Ccircle cx='111.6' cy='22.2' r='1.3' fill='%23ff3b30'/%3E %3Cpath d='M4 25.6H113' stroke='%233a0000' stroke-width='.8'/%3E %3Ccircle cx='24' cy='26.2' r='6.8' fill='%23111'/%3E%3Ccircle cx='24' cy='26.2' r='4.3' fill='%23c9ccd1'/%3E %3Ccircle cx='94.2' cy='26.2' r='6.8' fill='%23111'/%3E%3Ccircle cx='94.2' cy='26.2' r='4.3' fill='%23c9ccd1'/%3E %3Cpath d='M24 22.3V26.2M20.3 25L24 26.2M21.7 29.4L24 26.2M26.3 29.4L24 26.2M27.7 25L24 26.2M94.2 22.3V26.2M90.5 25L94.2 26.2M91.9 29.4L94.2 26.2M96.5 29.4L94.2 26.2M97.9 25L94.2 26.2' stroke='%238a8f96' stroke-width='.9'/%3E %3Ccircle cx='24' cy='26.2' r='1' fill='%23555'/%3E%3Ccircle cx='94.2' cy='26.2' r='1' fill='%23555'/%3E %3C/svg%3E") no-repeat center/contain;
+  transform:translateX(100vw);animation:racing-pass 30s linear -25s infinite}
+@keyframes racing-pass{0%,84%{transform:translateX(100vw);animation-timing-function:cubic-bezier(.45,0,.75,.55)}
+  100%{transform:translateX(-180px)}}
+@media(prefers-reduced-motion:reduce){:root[data-theme="racing"] .topbar::before{display:none}}

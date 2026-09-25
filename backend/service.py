@@ -14,7 +14,8 @@ import secrets
 import smtplib
 import time
 import os
-from .ai import KNOWLEDGE_RULE, agenda_prompt, describe, instructions, parse_agenda, visit_analysis_prompt
+from .ai import (AFTER_VISIT_RULE, AFTER_VISIT_TEMPLATE, KNOWLEDGE_RULE, agenda_prompt, describe, instructions,
+                 parse_agenda, parse_survey, visit_analysis_prompt)
 from .configure import STARTER, example_profile
 from .mail import build_digest, build_reply, read_messages
 from .openai_client import MODEL_DEFAULT, complete, estimate_cost_usd
@@ -30,7 +31,7 @@ from .store import (CONTACT_FIELDS, add_contacts, add_note, find_photo, knowledg
 CONTACT_SOURCE = "Idealista"  # today's only portal; see README for the family of emails it accepts.
 # Sent automatically or by a one-click button, in the customer's conversation, but never counted as one
 # of the four interactions and never resetting the clock the 2/4-day reminders are measured from.
-AUX_KINDS = {"reminder", "consent_request", "visits_closed", "addition"}  # "addition": «Escrever mais» to an active customer
+AUX_KINDS = {"reminder", "consent_request", "visits_closed", "addition", "visit_thanks"}  # "addition": «Escrever mais»; "visit_thanks": after the visit
 PROGRAM_KINDS = AUX_KINDS | {"visit_proposal"}  # drafts the program creates; not an email a customer sent
 REMINDER_HOURS = {"2d": 48, "4d": 96}
 HISTORY_LIMIT = 20  # turns kept per conversation, oldest dropped first; also what the prompt gets
@@ -40,7 +41,7 @@ CHART_PERIODS = {3: 1, 7: 1, 14: 1, 30: 1, 90: 7}
 VIEW_FIELDS = ("id", "kind", "date", "subject", "customer", "recipient", "blocked", "body_text", "body_truncated",
                "reply_text", "reply_status", "reply_error", "reply_message_id", "visit_window", "visit_slot",
                "visit_status", "reminder", "closing", "consent_suggested", "consent_confirmed", "history", "merged",
-               "merged_ids")
+               "merged_ids", "visit_done")
 # Page field → (profile prompt, key), the same prompts the terminal setup asks for.
 PROMPT_FIELDS = {"general": ("general", "text"), "first": ("first_interaction", "text"),
                  "first_template": ("first_interaction", "reply_template"), "second": ("second_interaction", "text"),
@@ -397,6 +398,13 @@ class MailService:
                     # Known by their email already, whether this message is a direct reply (follow_up) or
                     # another portal notice (lead) from someone we have written to before either way.
                     conversation = queues[ref]["conversations"].get(email) if email else None
+                    if conversation is not None and (conversation.get("visit_check") or {}).get("thanks_sent_at"):
+                        # An answer to the after-visit email: the survey and the visit sheet, kept on the customer.
+                        survey = parse_survey(item["customer"].get("message") or item.get("body_text"))
+                        if survey:
+                            conversation["visit_survey"] = {**survey, "at": item.get("date") or now()}
+                            item.setdefault("warnings", []).append(
+                                "Resposta ao inquérito pós-visita registada (vê-a na Agenda, na visita deste cliente).")
                     if conversation is not None:
                         # A snapshot of everything before this message: shown in "Email completo" and sent
                         # in the prompt, so the assistant (ChatGPT or the API) sees the whole exchange.
@@ -722,8 +730,10 @@ class MailService:
         if item.get("reply_text"):
             conversation["last_text"] = item["reply_text"]
             cls.append_history(conversation, "nos", item["reply_text"], now()[:10], now())
-        if not aux or item.get("kind") == "addition":
+        if not aux or item.get("kind") in ("addition", "visit_thanks"):
             conversation["last_sent_at"] = now()
+        if item.get("kind") == "visit_thanks":
+            conversation.setdefault("visit_check", {})["thanks_sent_at"] = now()
 
     @staticmethod
     def aux_item(key, kind, email, conversation, text, **extra):
@@ -1249,6 +1259,67 @@ class MailService:
             self.log("openai_usage", model=model, **usage, reference=ref, cost_usd=round(estimate_cost_usd(model, **{
                 k: usage[k] for k in ("prompt_tokens", "completion_tokens")}), 6))
             return {"property_ref": ref, "summary": summary, "tokens": usage, "fuel": self.api_fuel(ref)}
+
+    def agenda_slots(self, ref, today, back_days=14):
+        """The booked visits for the agenda: the coming ones and those of the last back_days, so a visit can be
+        checked after it happened; each with its check (who came, the notes) and the survey answered."""
+        since = (date.fromisoformat(today) - timedelta(days=back_days)).isoformat()
+        conversations = self.load(ref).get("conversations", {})
+        return sorted(({**slot, "survey": (conversations.get(slot["customer"]) or {}).get("visit_survey"),
+                        "thanks_sent_at": ((conversations.get(slot["customer"]) or {}).get("visit_check") or {}).get("thanks_sent_at")}
+                       for slot in load_visits(self.folder, ref)["slots"] if slot["at"][:10] >= since),
+                      key=lambda slot: slot["at"])
+
+    def check_visit(self, property_ref, email, attended, private_note="", public_note=""):
+        """After the visit, in the agenda: did the customer come, a private note (only for the owner — never in
+        an email nor sent to the AI) and a public one (it goes into the thanks)."""
+        email = str(email or "").strip().casefold()
+        if attended not in (True, False, None):
+            raise ValueError("Indica se o cliente apareceu.")
+        notes = {key: str(value or "").strip() for key, value in (("private", private_note), ("public", public_note))}
+        if any(len(value) > 2000 for value in notes.values()):
+            raise ValueError("Nota demasiado longa (até 2000 caracteres).")
+        with locked(self.folder):
+            ref = self.pick(self.profiles(), property_ref)
+            agenda = load_visits(self.folder, ref)
+            slots = sorted((slot for slot in agenda["slots"] if slot.get("customer") == email), key=lambda slot: slot["at"])
+            if not slots:
+                raise ValueError("Este cliente não tem visita marcada neste imóvel.")
+            today = date.today().isoformat()
+            slot = next((slot for slot in reversed(slots) if slot["at"][:10] <= today), slots[0])
+            slot["check"] = {"attended": attended, **notes, "checked_at": now()}
+            save_visits(self.folder, ref, agenda)
+            data = self.load(ref)
+            conversation = data.get("conversations", {}).get(email)
+            if conversation is not None:
+                conversation["visit_check"] = {**(conversation.get("visit_check") or {}), "at": slot["at"],
+                                               "attended": attended, **notes}
+                self.save(data, ref)
+            self.log("visit_checked", reference=ref, attended=attended)
+            return {"property_ref": ref, "at": slot["at"], "check": slot["check"]}
+
+    def visit_thanks(self, property_ref, email):
+        """«Criar agradecimento»: the after-visit email for a customer who came, a draft in their conversation.
+        The assistant writes it with the after-visit prompt (Voz e estilo): thanks, the public note, the
+        survey and the visit sheet, in the customer's language. Reviewed and sent like any other draft."""
+        email = str(email or "").strip().casefold()
+        with locked(self.folder):
+            ref = self.pick(self.profiles(), property_ref)
+            data = self.load(ref)
+            conversation = data.get("conversations", {}).get(email)
+            check = (conversation or {}).get("visit_check") or {}
+            if not conversation or check.get("attended") is not True:
+                raise ValueError("Marca primeiro na Agenda que o cliente apareceu na visita.")
+            if any(recipient_email(item) == email and item.get("kind") == "visit_thanks" for item in data["emails"]):
+                raise ValueError("O agradecimento a este cliente já está na fila.")
+            key = f"pos-visita-{hashlib.sha256((email + check.get('at', '')).encode()).hexdigest()[:12]}"
+            data["emails"].append(self.aux_item(key, "visit_thanks", email, conversation, "", reply_status="pending",
+                                                history=list(conversation.get("history") or []),
+                                                visit_done={"at": check.get("at"), "name": conversation.get("name") or "",
+                                                            "public": check.get("public") or ""}))
+            self.save(data, ref)
+            self.log("visit_thanks_created", reference=ref)
+            return {"id": key, "property_ref": ref}
 
     def pending_visits(self, ref, today, field):
         """Times still to be agreed, found in the emails by «Atualizar agenda»: visit_accepted (the customer's,
@@ -1867,6 +1938,8 @@ class MailService:
             voice["reminders"] = {key: (reminders.get(key) or {}).get("text") or "" for key in ("day2", "day4")}
             voice["visits_closed"] = (style.get("visits_closed") or {}).get("text") or ""
             voice["consent_request"] = (style.get("consent_request") or {}).get("text") or ""
+            voice["after_visit"] = (style.get("after_visit") or {}).get("text") or AFTER_VISIT_RULE
+            voice["after_visit_template"] = (style.get("after_visit_template") or {}).get("text") or AFTER_VISIT_TEMPLATE
             voice["digest_recipient"] = (style.get("digest_recipient") or {}).get("text") or ""
             today = date.today().isoformat()
             properties = []
@@ -1881,8 +1954,7 @@ class MailService:
                                    "api_fuel": self.api_fuel(ref, events),
                                    "visits": {"windows": [window for window in load_visits(self.folder, ref)["windows"]
                                                           if window["day"] >= today],
-                                              "slots": sorted((slot for slot in load_visits(self.folder, ref)["slots"]
-                                                               if slot["at"][:10] >= today), key=lambda s: s["at"]),
+                                              "slots": self.agenda_slots(ref, today),
                                               "closed_at": load_visits(self.folder, ref)["closed_at"],
                                               # Accepted by the customer, not yet confirmed (found by «Atualizar agenda»).
                                               "accepted": self.pending_visits(ref, today, "visit_accepted"),
@@ -1960,6 +2032,14 @@ class MailService:
                 for key, text in texts.items():
                     style.setdefault("reminders", {}).setdefault(key, {}).update(
                         text=text, status="configured" if text else "not_configured")
+            for key, default in (("after_visit", AFTER_VISIT_RULE), ("after_visit_template", AFTER_VISIT_TEMPLATE)):
+                if key in choices:
+                    text = str(choices.get(key) or "").strip()
+                    if len(text) > 5000:
+                        raise ValueError("Texto demasiado longo (até 5000 caracteres).")
+                    same = " ".join(text.split()) == " ".join(default.split())  # left as it came: keep following the code
+                    style.setdefault(key, {}).update(text="" if same else text,
+                                                     status="configured" if text and not same else "not_configured")
             for key in ("visits_closed", "consent_request"):
                 if key in choices:
                     text = str(choices.get(key) or "").strip()

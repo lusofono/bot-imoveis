@@ -3,6 +3,44 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 25/09/2026, noite: o carro no topo do RacingCar e um Painel mais compacto (α.39.0)
+
+**Decisão.**
+- **Só design, com outro agente a trabalhar ao mesmo tempo:** o carro é um SVG no `.topbar::before` do
+  `racing.css`, animado só com `transform` (de 30 em 30 s, a primeira passagem logo ao abrir). Para não criar
+  deslocamento lateral, a barra de cima corta o que sai dela (`overflow:hidden`) e a faixa tricolor passou para
+  dentro dela.
+- **Depósitos no Painel:** grelha lado a lado (`#fuel-panel`), o «Encher» como ícone em CSS (máscara SVG na cor
+  das ligações do tema; o texto fica para os leitores de ecrã) e a nota da estimativa no `title` das linhas de
+  gastos (ⓘ), a pedido do utilizador.
+- A versão e o CHANGELOG do trabalho dos dois agentes foram juntos aqui, quando o outro parou.
+
+## 25/09/2026, fim da tarde: pós-visita, Centro de Comunicações e sons nos botões
+
+**Decisão.**
+- **Pós-visita (pedido do utilizador, ao voltar das visitas):** na Agenda, cada visita marcada abre um «check»:
+  apareceu ou não, uma **nota privada** (só para o proprietário: nunca vai num email nem para a IA) e uma **nota
+  pública** (vai no agradecimento). «Guardar e criar agradecimento» põe um rascunho `visit_thanks` na fila (tipo
+  auxiliar: não gasta etapa, mas conta como a nossa última mensagem para os lembretes), escrito pela IA com as
+  instruções «Pós-visita» de Voz e estilo e o conteúdo base: agradecimento, inquérito e ficha de visita.
+- **O inquérito responde-se no próprio email** — linhas numeradas com uma nota de 1 a 5 (imóvel, consultor,
+  marcação e emails), o interesse (sim/não/talvez), um comentário e «Confirmo a visita» para a ficha de visita.
+  Sem links nem formulários de fora: funciona em qualquer programa de email e os dados não saem daqui. A IA
+  traduz para o idioma do cliente e mantém a numeração; `parse_survey` lê a resposta na leitura seguinte
+  (português, inglês e francês) e guarda-a no cliente (`visit_survey`), mostrada na visita, na Agenda. A Agenda
+  passa a mostrar também as visitas dos últimos 14 dias, para se poderem assinalar depois.
+- Os textos «Pós-visita» ficam no código por omissão (`AFTER_VISIT_RULE`, `AFTER_VISIT_TEMPLATE`); se forem
+  guardados iguais ao que vem por omissão, o perfil continua a seguir o código (não congela).
+- **«Respostas» → «Comunicações»** no menu, «Centro de Comunicações» no título (o utilizador pediu algo mais
+  sério do que «Central Comm»; o nome longo não cabe no menu com o contador). Ícones: torre de comunicações nos
+  temas simples e no 90's RacingCar (ao lado do número da mudança; a regra está em `style.css` enquanto outro
+  agente trabalha no `racing.css`), microfone de rádio UHF de bordo no 90's Boat.
+- **Sons:** o 90's RacingCar ganha o interruptor «Sons» (acelerar de V12 ao enviar, rádio da box ao chegarem
+  emails novos) e os botões passam a ter som nos dois temas com sons (estalido de interruptor; toque de latão
+  no barco), tocado antes da ação do botão. Continuam desligados até se carregar em «Sons».
+- Trabalho feito com outro agente ativo na mesma pasta (o carro que passa no topo do RacingCar): regras em
+  `CLAUDE.md`; a versão e o CHANGELOG ficam para quando se juntar o trabalho.
+
 ## 25/09/2026, tarde (6): um cliente, um cartão (α.38.0)
 
 **Decisão.**

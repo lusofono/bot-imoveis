@@ -15,6 +15,31 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.39.0 — 25/09/2026
+
+- **Depois da visita, na Agenda:** cada visita marcada tem um «check» — apareceu ou não, uma **nota privada**
+  (só para ti: nunca vai num email nem para a IA) e uma **nota pública**. «Guardar e criar agradecimento» põe na
+  fila o rascunho pós-visita, escrito pela IA com as instruções «Pós-visita» de Voz e estilo: agradecimento com a
+  nota pública, um **inquérito respondido no próprio email** (de 1 a 5: o imóvel, o consultor, a marcação e os
+  emails; se continua interessado; um comentário) e a **ficha de visita** («Confirmo a visita»). A leitura
+  seguinte guarda as respostas no cliente e mostra-as na visita. A Agenda mostra também as visitas dos últimos
+  14 dias, para as assinalares depois.
+- **Sons:** o 90's RacingCar também tem o interruptor «Sons» (um V12 a acelerar ao enviar, o rádio da box quando
+  chegam emails), e os botões passam a ter som nos temas com sons. Continuam desligados até carregares em «Sons».
+- **90's RacingCar:** um carro vermelho dos anos 90, em cunha e com a grande asa traseira (sem marca), passa de vez
+  em quando no topo, por trás do texto, como o barco no 90's Boat. Com «reduzir movimento» não aparece.
+- **Painel, «Depósitos · API OpenAI»:** os depósitos dos imóveis ficam lado a lado, a toda a largura; «Encher no
+  painel do imóvel» passa a um ícone de bomba de gasolina; a nota sobre a estimativa passa para o «ⓘ» ao passar o
+  rato nas linhas de gastos, que também ficam lado a lado. O cartão fica com menos de metade da altura.
+- As regras para quem trabalha no projeto (testar só com código, sem browser; vários agentes, cada um nos seus
+  ficheiros) ficam em `CLAUDE.md`.
+
+## α.38.3 — 25/09/2026
+
+- **O separador «Respostas» passa a chamar-se «Comunicações»** (no título da página: «Centro de Comunicações»),
+  no menu e nas mensagens que apontam para a fila. «Respostas enviadas» (no Painel) e a coluna «Respostas» (nos
+  Contactos) ficam como estão: contam respostas, não são o separador.
+
 ## α.38.2 — 25/09/2026
 
 - **Cada troca da conversa mostra o dia e a hora** («qui., 24/09, 22:40»), no «Email completo» e nos cartões

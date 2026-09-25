@@ -16,7 +16,7 @@
   <p class="nav-label">ESPAÇO DE TRABALHO</p>
   <nav aria-label="Navegação principal">
     <button class="tab active" data-tab="dashboard" data-gear="1" aria-current="page"><span aria-hidden="true">◫</span>Painel</button>
-    <button class="tab" data-tab="replies" data-gear="2"><span aria-hidden="true">↗</span>Respostas <span id="nav-count" class="nav-count">0</span></button>
+    <button class="tab" data-tab="replies" data-gear="2"><span aria-hidden="true" class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10.5 8.5 21.5M12 10.5l3.5 11M9.6 18h4.8M10.6 14.8h2.8"/><circle cx="12" cy="8.5" r="1.5" fill="currentColor" stroke="none"/><path d="M8.6 5.4a4.5 4.5 0 0 0 0 6.2M15.4 5.4a4.5 4.5 0 0 1 0 6.2M6 3a8 8 0 0 0 0 11M18 3a8 8 0 0 1 0 11"/></svg></span>Comunicações <span id="nav-count" class="nav-count">0</span></button>
     <button class="tab" data-tab="properties" data-gear="3"><span aria-hidden="true">▤</span>Imóveis</button>
     <button class="tab" data-tab="contacts" data-gear="4"><span aria-hidden="true">◎</span>Contactos</button>
     <button class="tab" data-tab="agenda" data-gear="5"><span aria-hidden="true">▦</span>Agenda</button>
@@ -61,10 +61,9 @@
 
     <article class="card" id="openai-usage-card"><p class="eyebrow">DEPÓSITOS · API OPENAI</p><h2>Um depósito de tokens por imóvel</h2>
       <div id="fuel-panel"></div>
-      <div class="usage-row"><span>No período escolhido acima</span><strong id="usage-period"></strong></div>
-      <div class="usage-row"><span>Desde sempre, nesta pasta</span><strong id="usage-all-time"></strong></div>
-      <p class="muted small">Estimativa a partir dos tokens exatos que a OpenAI devolve; os preços por token podem já
-        ter mudado. Confirma a fatura real em platform.openai.com/usage.</p></article></div>
+      <div class="usage-rows" title="Estimativa a partir dos tokens exatos que a OpenAI devolve; os preços por token podem já ter mudado. Confirma a fatura real em platform.openai.com/usage.">
+        <div class="usage-row"><span>No período escolhido acima</span><strong id="usage-period"></strong></div>
+        <div class="usage-row"><span>Desde sempre, nesta pasta</span><strong id="usage-all-time"></strong></div></div></article></div>
     <div class="section-heading portfolio-heading"><div><p class="eyebrow" data-word="portfolio.eyebrow">POR IMÓVEL</p><h2 data-word="portfolio.title">A tua carteira</h2></div><button data-tab="properties">Gerir imóveis →</button></div>
     <div id="dashboard-properties" class="portfolio-grid"></div>
   </section>
@@ -198,6 +197,7 @@
       <p class="agenda-legend muted small"><span class="window">Janela proposta</span><span class="accepted">Aceite pelo cliente, por confirmar</span><span class="offered">Proposta nossa, à espera do cliente</span><span class="confirmed">Confirmada (pela página ou no teu Gmail)</span><span class="overbooked">Sobreposta (overbooking)</span></p>
     </div>
     <div id="agenda-week" class="filofax"></div>
+    <div id="agenda-check"></div>
   </section>
 
   <section id="tab-voice" hidden>

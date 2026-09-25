@@ -79,8 +79,9 @@ Atualiza o código sem mexer na pasta `data/`. Reinicia a página depois de atua
 `mac/web.command` fecha a anterior.
 
 Para trabalhar na página com outra ferramenta ou outro assistente, usa uma pasta de demonstração
-(`bot-mail demo <pasta>`), nunca `data/`. E um agente de cada vez nesta pasta: dois a editar os mesmos
-ficheiros estragam o trabalho um do outro.
+(`bot-mail demo <pasta>`), nunca `data/`. Podem trabalhar vários agentes ao mesmo tempo, desde que cada um
+mexa em ficheiros diferentes: dois a editar os mesmos ficheiros estragam o trabalho um do outro. As regras
+para os agentes (testar só com código, sem browser; cada um nos ficheiros da sua tarefa) estão no `CLAUDE.md`.
 Não copies dados privados para criar outra conta; o comando `replicate` só cria uma pasta de dados vazia.
 As pastas novas usam o ambiente Python da instalação que as criou. Para mover para outra máquina,
 instala um clone completo e configura a pasta de dados de novo.

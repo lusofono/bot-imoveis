@@ -56,7 +56,7 @@ assistente consulta: o know-how da agência, em «Voz e estilo», e o conhecimen
 **Copiar/colar** (o que levas e trazes do ChatGPT). Por agora usa-se copiar/colar ou, opcionalmente, a API
 da OpenAI (ver «Via alternativa por API» abaixo); o MCP fica para depois.
 
-No separador **Respostas**, o fluxo é em lote. Antes de ler, escolhes quantos dias recuar (7 por omissão):
+No separador **Comunicações** (Centro de Comunicações; antes «Respostas»), o fluxo é em lote. Antes de ler, escolhes quantos dias recuar (7 por omissão):
 
 1. **Ler emails do Gmail** e escolher os emails a tratar.
 2. **Criar prompt**: um só prompt para todos os selecionados, mostrado na página antes de qualquer cópia.

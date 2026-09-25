@@ -23,7 +23,7 @@ $('theme-select').addEventListener('change', event => {
   if (settings && !$('tab-properties').hidden) renderPropertySlider();
 });
 let activeTab = 'dashboard', skinSelector = null;
-const TAB_NAMES = {dashboard: 'Painel', replies: 'Respostas', properties: 'Imóveis', contacts: 'Contactos', agenda: 'Agenda',
+const TAB_NAMES = {dashboard: 'Painel', replies: 'Centro de Comunicações', properties: 'Imóveis', contacts: 'Contactos', agenda: 'Agenda',
   voice: 'Voz e estilo'};
 
 // Skins: a rich theme goes beyond colours. It may bring the words on the page headings, the instruments on
@@ -50,6 +50,7 @@ const SKINS = {
     },
     instruments: carInstruments,
     selector: gearbox,
+    sounds: {send: engineBlip, read: pitRadio, click: switchClack},
   },
   boat: {
     words: {
@@ -69,7 +70,7 @@ const SKINS = {
     },
     instruments: boatInstruments,
     selector: helm,
-    sounds: {send: shipHorn, read: shipBell},
+    sounds: {send: shipHorn, read: shipBell, click: brassTick},
   },
 };
 function skin() { return SKINS[document.documentElement.dataset.theme] || null; }
@@ -87,8 +88,9 @@ function applySkin() {
   renderSoundSwitch();
 }
 
-// A skin's sounds (90's Boat: a ship's horn when emails go out, the ship's bell twice when new ones come in), made
-// on the spot with the Web Audio API: no files. Off until the owner turns them on with the Sons switch, which only
+// A skin's sounds, made on the spot with the Web Audio API: no files. 90's Boat: a ship's horn when emails go out,
+// the ship's bell twice when new ones come in, a small brass tick on every button. 90's RacingCar: a V12 blip, the
+// pit radio's two beeps, a toggle switch's clack. Off until the owner turns them on with the Sons switch, which only
 // shows in a skin that has sounds; like the theme, the choice stays in this browser.
 let audio = null;
 function soundsOn() {
@@ -112,8 +114,82 @@ $('sound-toggle').addEventListener('click', () => {
   const on = !soundsOn();
   try { localStorage.setItem('bot-mail-sounds', on ? 'on' : 'off'); } catch { /* Storage may be unavailable. */ }
   renderSoundSwitch();
-  if (on) playSound('read');  // this click unlocks the audio, and the bell says what turned on
+  if (on) playSound('read');  // this click unlocks the audio, and the bell (or the radio) says what turned on
 });
+// Every button clicks in a skin that has a click — before its own action runs (capture), so a button that
+// disables itself while working still sounds. The Sons switch plays its own sound.
+document.addEventListener('click', event => {
+  const button = event.target.closest?.('button');
+  if (button && button.id !== 'sound-toggle' && !button.disabled) playSound('click');
+}, true);
+
+// A short burst of noise, shaped: the body of the mechanical sounds below.
+function noiseBurst(context, at, length, filterType, frequency, level) {
+  const buffer = context.createBuffer(1, Math.ceil(context.sampleRate * length), context.sampleRate);
+  const samples = buffer.getChannelData(0);
+  for (let i = 0; i < samples.length; i++) samples[i] = (Math.random() * 2 - 1) * (1 - i / samples.length) ** 3;
+  const source = context.createBufferSource(), filter = context.createBiquadFilter(), gain = context.createGain();
+  source.buffer = buffer; filter.type = filterType; filter.frequency.value = frequency; gain.gain.value = level;
+  source.connect(filter).connect(gain).connect(context.destination);
+  source.start(at);
+}
+// 90's RacingCar, emails out: a V12 blip — three sawtooth voices rising and falling together, with some grit.
+function engineBlip(context) {
+  const t = context.currentTime, out = context.createGain(), filter = context.createBiquadFilter(), grit = context.createWaveShaper();
+  const curve = new Float32Array(256);
+  for (let i = 0; i < 256; i++) { const x = i / 128 - 1; curve[i] = Math.tanh(2.5 * x); }
+  grit.curve = curve;
+  filter.type = 'lowpass'; filter.frequency.setValueAtTime(900, t); filter.frequency.linearRampToValueAtTime(2200, t + 0.35);
+  filter.frequency.linearRampToValueAtTime(700, t + 1.1);
+  out.gain.setValueAtTime(0.0001, t);
+  out.gain.exponentialRampToValueAtTime(0.16, t + 0.06);
+  out.gain.setValueAtTime(0.16, t + 0.7);
+  out.gain.exponentialRampToValueAtTime(0.0001, t + 1.25);
+  grit.connect(filter).connect(out).connect(context.destination);
+  for (const [ratio, detune] of [[1, 0], [1.5, 6], [2, -4]]) {
+    const voice = context.createOscillator();
+    voice.type = 'sawtooth'; voice.detune.value = detune;
+    voice.frequency.setValueAtTime(62 * ratio, t);
+    voice.frequency.exponentialRampToValueAtTime(215 * ratio, t + 0.35);
+    voice.frequency.exponentialRampToValueAtTime(78 * ratio, t + 1.2);
+    voice.connect(grit); voice.start(t); voice.stop(t + 1.3);
+  }
+}
+// 90's RacingCar, new emails: the pit radio — a squelch, then two short beeps.
+function pitRadio(context) {
+  const t = context.currentTime;
+  noiseBurst(context, t, 0.08, 'bandpass', 1800, 0.08);
+  for (const at of [t + 0.1, t + 0.28]) {
+    const beep = context.createOscillator(), gain = context.createGain();
+    beep.type = 'square'; beep.frequency.value = 1320;
+    gain.gain.setValueAtTime(0.0001, at);
+    gain.gain.exponentialRampToValueAtTime(0.05, at + 0.01);
+    gain.gain.setValueAtTime(0.05, at + 0.09);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.12);
+    beep.connect(gain).connect(context.destination);
+    beep.start(at); beep.stop(at + 0.13);
+  }
+}
+// 90's RacingCar, every button: a dashboard toggle switch — a sharp click over a small low thump.
+function switchClack(context) {
+  const t = context.currentTime, thump = context.createOscillator(), gain = context.createGain();
+  noiseBurst(context, t, 0.025, 'highpass', 2500, 0.18);
+  thump.type = 'sine'; thump.frequency.setValueAtTime(140, t); thump.frequency.exponentialRampToValueAtTime(60, t + 0.05);
+  gain.gain.setValueAtTime(0.12, t); gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+  thump.connect(gain).connect(context.destination); thump.start(t); thump.stop(t + 0.07);
+}
+// 90's Boat, every button: a small brass tick, like a switch on the bridge console.
+function brassTick(context) {
+  const t = context.currentTime;
+  for (const [frequency, level] of [[2350, 0.05], [3700, 0.025]]) {
+    const partial = context.createOscillator(), gain = context.createGain();
+    partial.type = 'sine'; partial.frequency.value = frequency;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(level, t + 0.002);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+    partial.connect(gain).connect(context.destination); partial.start(t); partial.stop(t + 0.1);
+  }
+}
 
 // A ship's horn: two low sawtooth voices a fifth apart (one slightly detuned), softened by a low-pass filter.
 function shipHorn(context) {
@@ -523,7 +599,8 @@ function card(email) {
     el('div', {class: 'card-head'},
       el('label', {class: 'who'}, el('input', {type: 'checkbox', class: 'pick', 'data-id': email.id, checked: !email.blocked, disabled: !!email.blocked}),
         el('strong', {}, customer.name || sender.name || sender.email || 'Sem nome')),
-      email.kind === 'addition' ? el('span', {class: 'tag visit'}, 'acrescento')
+      email.kind === 'visit_thanks' ? el('span', {class: 'tag visit'}, 'pós-visita')
+        : email.kind === 'addition' ? el('span', {class: 'tag visit'}, 'acrescento')
         : email.interaction && el('span', {class: 'tag'}, email.interaction + '.ª interação'),
       email.merged?.length > 1 && el('span', {class: 'tag visit', title: 'Vários emails deste cliente juntos: uma só resposta responde a todos.'},
         email.merged.length + ' mensagens'),
@@ -543,6 +620,8 @@ function card(email) {
     email.consent_suggested && el('p', {class: 'alert warn'}, 'O cliente parece ter dito que sim: confirma para gravar em contactos.csv.'),
     el('blockquote', {}, email.visit_window
       ? `Proposta de visita: ${dayLabel(email.visit_window.day)}, das ${email.visit_window.start} às ${email.visit_window.end}.`
+      : email.kind === 'visit_thanks' ? `(agradecimento pela visita de ${slotLabel(email.visit_done?.at || '')}, com o inquérito e a ficha de visita`
+        + (email.visit_done?.public ? `; nota pública: «${email.visit_done.public}»)` : ')')
       : email.kind === 'addition' ? '(acrescento teu a esta conversa: escreve-o abaixo, ou pede-o à IA nas instruções extra)'
       : AUX_KINDS.includes(email.kind) || email.closing ? '(sem mensagem nova do cliente: email preparado automaticamente, ver o rascunho abaixo)'
       : customer.message || email.body_text || ''),
@@ -928,7 +1007,7 @@ function renderVisitsRound() {
   card(
     el('p', {class: 'step'},
       'Um email a cada cliente ativo deste imóvel, a propor o dia e o intervalo e a perguntar a hora que '
-      + 'lhe dá mais jeito dentro dele — fica na fila de Respostas, por rever antes de enviar, como qualquer outra.'),
+      + 'lhe dá mais jeito dentro dele — fica na fila das Comunicações, por rever antes de enviar, como qualquer outra.'),
     el('div', {class: 'row'}, propertySelect, day, start, end),
     el('div', {class: 'actions'}, el('button', {class: 'primary', onclick: event => run(async () => {
       if (!day.value) throw new Error('Escolhe o dia das visitas.');
@@ -940,7 +1019,7 @@ function renderVisitsRound() {
           + `às ${end.value}. Continuar?`)) return;
       const result = await call('api/visits/propose', {property_ref: ref, day: day.value, start: start.value, end: end.value, emails});
       state = result.state; settings = result.settings; renderState(); renderSettings();
-      toast(`${result.created} proposta(s) de visita na fila de Respostas: prepara-as no ChatGPT ou via API, como as outras.`);
+      toast(`${result.created} proposta(s) de visita na fila das Comunicações: prepara-as no ChatGPT ou via API, como as outras.`);
     }, event.currentTarget)}, 'Iniciar ronda')),
     summaryBox);
   loadSummary();
@@ -1192,7 +1271,7 @@ function visitsPanel(property) {
         const result = await call('api/visits/propose', {property_ref: property.reference, day: day.value,
           start: start.value, end: end.value, emails});
         state = result.state; settings = result.settings; renderState(); renderSettings();
-        toast(`${result.created} proposta(s) de visita na fila de Respostas: prepara-as no ChatGPT como as outras.`);
+        toast(`${result.created} proposta(s) de visita na fila das Comunicações: prepara-as no ChatGPT como as outras.`);
       }, event.currentTarget)}, 'Criar propostas')));
     toast(`${data.customers.length} cliente(s) encontrados.`);
   }, event.currentTarget);
@@ -1200,12 +1279,12 @@ function visitsPanel(property) {
     if (!confirm(`Fechar as visitas de ${property.reference}? Prepara um email de agradecimento para cada cliente (pendentes e já respondidos) e os pedidos novos deste imóvel passam a ser respondidos automaticamente.`)) return;
     const result = await call('api/visits/close', {property_ref: property.reference});
     state = result.state; settings = result.settings; renderState(); renderSettings();
-    toast(`Visitas fechadas: ${result.drafted} rascunho(s) na fila de Respostas, prontos a rever e enviar.`);
+    toast(`Visitas fechadas: ${result.drafted} rascunho(s) na fila das Comunicações, prontos a rever e enviar.`);
   }, event.currentTarget)}, 'Fechar visitas e agradecer a todos');
   const requestConsent = el('button', {onclick: event => run(async () => {
     const result = await call('api/consent/request', {property_ref: property.reference});
     state = result.state; renderState();
-    toast(result.drafted ? `${result.drafted} pedido(s) de consentimento na fila de Respostas.` : 'Ninguém por pedir: já foi pedido a todos os que responderam.');
+    toast(result.drafted ? `${result.drafted} pedido(s) de consentimento na fila das Comunicações.` : 'Ninguém por pedir: já foi pedido a todos os que responderam.');
   }, event.currentTarget)}, 'Pedir consentimento RGPD a quem respondeu');
   return el('details', {class: 'visits-panel'}, el('summary', {class: 'muted small'}, 'Visitas: propor e marcar' + (closed ? ' (fechadas)' : '')),
     closed && el('p', {class: 'alert warn'}, `Visitas fechadas em ${when(visits.closed_at)}. Novos pedidos deste imóvel recebem a resposta automática.`),
@@ -1268,11 +1347,14 @@ function agendaEntries(iso) {
     [property.reference, property.reference || property.description || 'Imóvel']));
   const length = settings?.voice?.visits?.slot_minutes || 30;  // a visit fills its whole slot
   const entries = [];
-  const visit = (ref, at, name, kind, evidence, before) => {
+  const visit = (ref, at, name, kind, evidence, before, slot) => {
     const [day, time] = String(at).split(' ');
-    if (day === iso) entries.push({ref, label: labels[ref] || ref || 'Imóvel', kind, start: minutesOf(time),
-      end: Math.min(minutesOf(time) + length, 24 * 60), text: `${time} · ${name || 'visita'}`,
-      evidence: [evidence && `lido nos emails pela IA: «${evidence}»`, before && `antes: ${String(before).slice(11)}`]
+    const came = slot?.check?.attended;
+    if (day === iso) entries.push({ref, label: labels[ref] || ref || 'Imóvel', kind, start: minutesOf(time), at, name,
+      end: Math.min(minutesOf(time) + length, 24 * 60),
+      text: `${came === true ? '✓ ' : came === false ? '✗ ' : ''}${time} · ${name || 'visita'}${slot?.survey ? ' ★' : ''}`,
+      customer: slot?.customer, check: slot?.check, survey: slot?.survey, thanksSentAt: slot?.thanks_sent_at,
+      came, evidence: [evidence && `lido nos emails pela IA: «${evidence}»`, before && `antes: ${String(before).slice(11)}`]
         .filter(Boolean).join(' · ')});
   };
   for (const property of properties) {
@@ -1282,7 +1364,7 @@ function agendaEntries(iso) {
     }
     for (const slot of property.visits?.slots || []) {
       visit(property.reference, slot.at, slot.name || slot.customer, 'confirmed', slot.source === 'api' && slot.evidence,
-        slot.previous);
+        slot.previous, slot);
     }
     // Still to be agreed, found by «Atualizar agenda»: accepted by the customer (orange), offered by us (blue).
     for (const accepted of property.visits?.accepted || []) {
@@ -1399,8 +1481,16 @@ function renderAgenda() {
       count(visits.filter(entry => entry.clashes.length), 'sobreposta', 'sobrepostas')].filter(Boolean).join(' · ');
     const day = el('div', {class: 'filofax-day'}, agendaRuling(from, quarters),
       windows.map(entry => agendaPlace(el('div', {class: 'filofax-entry window', title: tip(entry)}), from, entry)),
-      visits.map(entry => agendaPlace(el('div', {class: `filofax-entry visit ${entry.clashes.length ? 'overbooked' : entry.kind}`,
-        title: tip(entry)}, el('strong', {}, entry.text), showLabel && el('span', {}, entry.label)), from, entry)));
+      visits.map(entry => {
+        // A booked visit opens its check (who came, the notes, the thanks) below the week.
+        const clickable = entry.kind === 'confirmed' && entry.customer;
+        const came = entry.came === true ? ' attended' : entry.came === false ? ' noshow' : '';
+        const node = el('div', {class: `filofax-entry visit ${entry.clashes.length ? 'overbooked' : entry.kind}${came}${clickable ? ' clickable' : ''}`,
+          title: tip(entry) + (clickable ? ' · clica para o check da visita' : '')},
+          el('strong', {}, entry.text), showLabel && el('span', {}, entry.label));
+        if (clickable) node.addEventListener('click', () => openVisitCheck(entry));
+        return agendaPlace(node, from, entry);
+      }));
     day.style.height = `calc(var(--quarter) * ${quarters})`;
     const shown = off ? `Blackout, mas com visitas · ${summary}` : summary || 'Sem visitas previstas.';
     return el('div', {class: 'filofax-page' + (iso === todayIso ? ' today' : '') + (off ? ' blackout' : '')},
@@ -1415,6 +1505,47 @@ function renderAgenda() {
   }));
   if (!week.length) box.replaceChildren(el('p', {class: 'empty-state filofax-none'}, 'Todos os dias estão em blackout. Liga um dia em «Dias».'));
   fitAgenda();
+}
+
+// After the visit: did the customer come, a private note (only for the owner: never in an email nor to the AI),
+// a public one (it goes into the thanks), and «Criar agradecimento», which puts the after-visit draft in Comunicações.
+function openVisitCheck(entry) {
+  const check = entry.check || {}, survey = entry.survey;
+  const box = $('agenda-check');
+  const name = 'came-' + entry.customer;
+  const came = el('input', {type: 'radio', name, checked: check.attended === true});
+  const missed = el('input', {type: 'radio', name, checked: check.attended === false});
+  const privateNote = el('textarea', {rows: 3, placeholder: 'Só para ti: nunca vai em nenhum email nem para a IA.'}, check.private || '');
+  const publicNote = el('textarea', {rows: 3, placeholder: 'Vai no agradecimento ao cliente, ex.: «foi um prazer mostrar-lhe o apartamento».'}, check.public || '');
+  const save = async () => {
+    const attended = came.checked ? true : missed.checked ? false : null;
+    const result = await call('api/visits/check', {property_ref: entry.ref, email: entry.customer, attended,
+      private_note: privateNote.value, public_note: publicNote.value});
+    settings = result.settings; renderAgenda();
+    return attended;
+  };
+  const score = value => value == null ? '–' : `${value}/5`;
+  box.replaceChildren(el('section', {class: 'card visit-check'},
+    el('div', {class: 'section-heading'}, el('h2', {}, `Visita · ${entry.name || entry.customer}`),
+      el('button', {type: 'button', class: 'link', onclick: () => box.replaceChildren()}, 'Fechar')),
+    el('p', {class: 'muted small'}, `${slotLabel(entry.at)} · ${entry.label} · ${entry.customer}`),
+    el('div', {class: 'row'}, el('label', {}, came, 'Apareceu'), el('label', {}, missed, 'Não apareceu')),
+    el('label', {class: 'field'}, 'Nota privada (só para ti)', privateNote),
+    el('label', {class: 'field'}, 'Nota pública (vai no agradecimento ao cliente)', publicNote),
+    entry.thanksSentAt && el('p', {class: 'alert ok'}, `Agradecimento enviado em ${when(entry.thanksSentAt)}.`),
+    survey && el('p', {class: 'alert ok'}, `Inquérito respondido (${when(survey.at)}): imóvel ${score(survey.imovel)} · `
+      + `consultor ${score(survey.consultor)} · marcação e emails ${score(survey.marcacao)} · interesse: ${survey.interesse || '–'}`
+      + (survey.ficha_confirmada ? ' · ficha de visita confirmada ✓' : ' · ficha de visita por confirmar')
+      + (survey.comentario ? ` · «${survey.comentario}»` : '')),
+    el('div', {class: 'actions'},
+      el('button', {type: 'button', onclick: event => run(async () => { await save(); toast('Visita registada.'); }, event.currentTarget)}, 'Guardar'),
+      el('button', {type: 'button', class: 'primary', onclick: event => run(async () => {
+        if (await save() !== true) throw new Error('Marca «Apareceu» para criar o agradecimento.');
+        const result = await call('api/visits/thanks', {property_ref: entry.ref, email: entry.customer});
+        state = result.state; renderState();
+        toast('Agradecimento nas Comunicações: gera-o com a IA (Criar prompt ou via API), revê e envia.');
+      }, event.currentTarget)}, 'Guardar e criar agradecimento'))));
+  box.scrollIntoView({block: 'nearest', behavior: 'smooth'});
 }
 
 // «Atualizar agenda»: the API reads the active customers' conversations and updates the agenda by itself.
@@ -1634,7 +1765,7 @@ function fuelOf(ref) {
   return (ref ? settings?.properties.find(property => property.reference === ref)?.api_fuel : null) ?? settings?.api_fuel;
 }
 
-// An empty tank switches off that property's API buttons (data-ref, else the queue open in Respostas):
+// An empty tank switches off that property's API buttons (data-ref, else the queue open in Comunicações):
 // data-hold stops run() from switching them back on, and the title says why. Copy/paste is untouched, and
 // the server refuses the call too — this is only the signal.
 function holdFuelButtons() {
@@ -1865,7 +1996,7 @@ function ignoreListCard(property, kind, customers) {
       el('span', {class: 'tag'}, String(customers.length))),
     el('p', {class: 'step'}, grey
       ? 'Disseram que não têm interesse: não voltam a receber nada deste imóvel.'
-      : 'Por decisão tua: nunca mais entram em Respostas, mesmo que escrevam, nem recebem envios automáticos.'),
+      : 'Por decisão tua: nunca mais entram nas Comunicações, mesmo que escrevam, nem recebem envios automáticos.'),
     el('div', {class: 'client-list'}, customers.length ? customers.map(customer => el('div', {class: 'client-row'},
       el('span', {}, customer.name || customer.email,
         customer.reason ? el('span', {class: 'muted small ignore-reason'}, customer.reason) : null),
@@ -1930,6 +2061,8 @@ function renderVoice() {
   const visitsClosed = el('textarea', {rows: 4, placeholder: 'ex.: Agradecemos o interesse. As visitas a este imóvel já estão fechadas.'}, settings.voice.visits_closed || '');
   const consentRequest = el('textarea', {rows: 4, placeholder: 'ex.: Podemos guardar o seu contacto para futuras oportunidades semelhantes? Responda "sim" se concordar.'}, settings.voice.consent_request || '');
   const digestRecipient = el('input', {type: 'email', value: settings.voice.digest_recipient || '', placeholder: 'vazio: sem ponto de situação diário'});
+  const afterVisit = el('textarea', {rows: 5}, settings.voice.after_visit || '');
+  const afterVisitTemplate = el('textarea', {rows: 14}, settings.voice.after_visit_template || '');
   $('voice-form').replaceChildren(el('p', {class: 'eyebrow'}, 'VOZ ', kind('voice')),
     choice('greeting', 'Saudação'), choice('languages', 'Idiomas'), choice('closing', 'Fecho'),
     el('label', {class: 'field'}, 'Assinatura (sempre igual, sem tradução)', signature),
@@ -1949,6 +2082,13 @@ function renderVoice() {
     el('label', {class: 'field'}, 'Lembrete aos 4 dias sem resposta (o segundo e último)', reminderDay4),
     el('label', {class: 'field'}, 'Email de «visitas fechadas», para todos os clientes do imóvel', visitsClosed),
     el('label', {class: 'field'}, 'Pedido de consentimento RGPD, para quem já respondeu', consentRequest),
+    el('p', {class: 'eyebrow voice-section'}, 'PÓS-VISITA ', kind('prompt')),
+    el('p', {class: 'step voice-section'},
+      'Depois de marcares na Agenda que o cliente apareceu, «Criar agradecimento» põe um rascunho nas Comunicações: o assistente '
+      + 'escreve-o com estas instruções, no idioma do cliente, com a tua nota pública, o inquérito e a ficha de visita. '
+      + 'O cliente responde ao próprio email; a leitura seguinte guarda as notas na visita dele, na Agenda.'),
+    el('label', {class: 'field'}, 'Instruções do agradecimento', afterVisit),
+    el('label', {class: 'field'}, 'Conteúdo base: inquérito (1 a 5) e ficha de visita — os <…> são preenchidos pelo assistente', afterVisitTemplate),
     el('p', {class: 'eyebrow voice-section'}, 'PONTO DE SITUAÇÃO DIÁRIO ', kind('voice')),
     el('p', {class: 'step voice-section'},
       'Um rascunho é preparado a cada leitura de emails, para este endereço; só sai depois de reveres e '
@@ -1960,7 +2100,8 @@ function renderVoice() {
         sender_name: senderName.value, reply_subject: replySubject.value, application_instructions: behaviour.value,
         visits: {slot_minutes: Number(slot.value), rental: rental.value, sale: sale.value},
         reminders: {day2: reminderDay2.value, day4: reminderDay4.value},
-        visits_closed: visitsClosed.value, consent_request: consentRequest.value, digest_recipient: digestRecipient.value});
+        visits_closed: visitsClosed.value, consent_request: consentRequest.value, digest_recipient: digestRecipient.value,
+        after_visit: afterVisit.value, after_visit_template: afterVisitTemplate.value});
       renderSettings(); await refreshState(); toast('Voz guardada.');
     }, event.currentTarget)}, 'Guardar voz')));
 }
