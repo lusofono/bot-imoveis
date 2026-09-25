@@ -1152,10 +1152,29 @@ function visitsPanel(property) {
     el('div', {class: 'actions'}, !closed && closeVisits, requestConsent));
 }
 
-// Agenda: a weekly planner, filofax-style — one paper page per day, day pages laid side by side, not a
-// Google-Calendar grid. Reads only settings.properties[].visits (already loaded for Imóveis): no request
-// of its own. Export to a real calendar is deliberately not built yet — for now this page is the agenda.
+// Agenda: a weekly planner, filofax-style — one paper page per day, day pages laid side by side. Each day is a
+// time column ruled every 15 minutes (hours written in the margin, half hours dashed), stretched down to the
+// bottom of the window, so a visit sits at its own time and its length reads at a glance. Four colours tell
+// where each time stands: grey the window proposed in a round, orange the time a customer accepted (still a
+// draft), green the visit the owner confirmed (email sent, booked), brick two visits at overlapping times.
+// Reads only what the page already holds — settings.properties[].visits and the queues in state — so no
+// request of its own. Export to a real calendar is deliberately not built yet — for now this page is the agenda.
 let agendaWeekOffset = 0;
+const AGENDA_DAY = [9 * 60, 19 * 60];  // always shown; a visit earlier or later widens the whole week
+// Blackout: a weekday switched off leaves the week and the other days widen. It is a way of looking at the week,
+// kept in this browser like the theme (Monday 0 … Sunday 6); a blackout day that still has visits stays, hatched,
+// so no visit is ever hidden.
+const WEEKDAY_SHORT = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+let agendaOff = new Set();
+try {
+  agendaOff = new Set(JSON.parse(localStorage.getItem('bot-mail-agenda-off') || '[]').filter(day => Number.isInteger(day) && day >= 0 && day < 7));
+} catch { /* Storage may be unavailable or hold something else. */ }
+
+function toggleAgendaDay(index) {
+  if (agendaOff.has(index)) agendaOff.delete(index); else agendaOff.add(index);
+  try { localStorage.setItem('bot-mail-agenda-off', JSON.stringify([...agendaOff])); } catch { /* Storage may be unavailable. */ }
+  renderAgenda();
+}
 
 function startOfWeek(date) {
   const start = new Date(date);
@@ -1168,22 +1187,92 @@ function isoDate(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-function agendaEntries(iso, propertyFilter) {
+function minutesOf(time) {
+  const [hours, minutes] = String(time).split(':').map(Number);
+  return hours * 60 + (minutes || 0);
+}
+
+const AGENDA_KINDS = {window: 'Janela proposta', accepted: 'Aceite pelo cliente, por confirmar (rascunho por enviar)',
+  confirmed: 'Confirmada (email enviado)'};
+
+// Every entry of one day, of every property: the filter only hides, so a clash with a hidden property still shows.
+function agendaEntries(iso) {
   const properties = settings?.properties || [];
+  const labels = Object.fromEntries(properties.map(property =>
+    [property.reference, property.reference || property.description || 'Imóvel']));
+  const length = settings?.voice?.visits?.slot_minutes || 30;  // a visit fills its whole slot
   const entries = [];
+  const visit = (ref, at, name, kind) => {
+    const [day, time] = String(at).split(' ');
+    if (day === iso) entries.push({ref, label: labels[ref] || ref || 'Imóvel', kind, start: minutesOf(time),
+      end: Math.min(minutesOf(time) + length, 24 * 60), text: `${time} · ${name || 'visita'}`});
+  };
   for (const property of properties) {
-    if (propertyFilter && property.reference !== propertyFilter) continue;
-    const label = property.reference || property.description || 'Imóvel';
     for (const window of property.visits?.windows || []) {
-      if (window.day === iso) entries.push({time: window.start, kind: 'window', label, text: `Proposta: ${window.start}–${window.end}`});
+      if (window.day === iso) entries.push({ref: property.reference, label: labels[property.reference], kind: 'window',
+        start: minutesOf(window.start), end: minutesOf(window.end), text: `Janela: ${window.start}–${window.end}`});
     }
-    for (const slot of property.visits?.slots || []) {
-      const [day, time] = String(slot.at).split(' ');
-      if (day === iso) entries.push({time, kind: 'slot', label, text: `Marcada: ${time} · ${slot.name || slot.customer || 'visita'}`});
+    for (const slot of property.visits?.slots || []) visit(property.reference, slot.at, slot.name || slot.customer, 'confirmed');
+  }
+  // The time a customer accepted sits in a draft until the owner sends it; only then is it booked (green).
+  for (const queue of state?.properties || []) {
+    for (const email of queue.emails || []) {
+      if (email.visit_slot) visit(queue.property_ref, email.visit_slot,
+        email.recipient?.name || email.customer?.name || email.recipient?.email, 'accepted');
     }
   }
-  entries.sort((a, b) => a.time.localeCompare(b.time));
-  return {entries, showLabel: properties.length > 1};
+  // Overbooking: two visits (accepted or confirmed, any property) whose times overlap.
+  const visits = entries.filter(entry => entry.kind !== 'window');
+  for (const entry of visits) entry.clashes = visits.filter(other => other !== entry && other.start < entry.end && entry.start < other.end);
+  return entries.sort((one, other) => one.start - other.start);
+}
+
+// Side by side only where they overlap (two properties under «Todos»): items that overlap, directly or through
+// a neighbour, share the width of their group; each takes the first free lane in it.
+function agendaLanes(items) {
+  let group = [], groupEnd = -1;
+  const close = () => { const lanes = Math.max(0, ...group.map(item => item.lane)) + 1; group.forEach(item => { item.lanes = lanes; }); };
+  for (const item of items) {
+    if (item.start >= groupEnd && group.length) { close(); group = []; }
+    const taken = group.filter(other => other.end > item.start).map(other => other.lane);
+    item.lane = [...Array(taken.length + 1).keys()].find(lane => !taken.includes(lane));
+    group.push(item);
+    groupEnd = Math.max(groupEnd, item.end);
+  }
+  if (group.length) close();
+}
+
+// The CSP allows no style attribute, so every position goes through the element's style object, in quarters.
+// Proposals span the whole width (overlapping ones just tint deeper); booked visits take their lane.
+function agendaPlace(node, from, item) {
+  const lanes = item.lanes || 1, lane = item.lane || 0;
+  node.style.top = `calc(var(--quarter) * ${(item.start - from) / 15})`;
+  node.style.height = `calc(var(--quarter) * ${(item.end - item.start) / 15})`;
+  node.style.left = `calc(var(--gutter) + (100% - var(--gutter)) * ${lane / lanes})`;
+  node.style.width = `calc((100% - var(--gutter)) / ${lanes} - 2px)`;
+  return node;
+}
+
+function agendaRuling(from, quarters) {
+  return [...Array(quarters + 1)].flatMap((_, quarter) => {
+    const kind = quarter % 4 === 0 ? 'hour' : quarter % 2 === 0 ? 'half' : 'quarter';
+    const rule = el('div', {class: 'filofax-rule ' + kind});
+    rule.style.top = `calc(var(--quarter) * ${quarter})`;
+    if (kind !== 'hour' || quarter === quarters) return [rule];
+    const hour = el('span', {class: 'filofax-hour'}, `${Math.floor((from + quarter * 15) / 60)}h`);
+    hour.style.top = rule.style.top;
+    return [rule, hour];
+  });
+}
+
+// Down to the bottom of the window: a quarter of an hour gets whatever whole pixels the room below the day
+// heads allows (so every rule lands on a pixel), never fewer than 12, so a 15-minute mark is never lost.
+function fitAgenda() {
+  const box = $('agenda-week'), day = box.querySelector('.filofax-day');
+  if (!day || $('tab-agenda').hidden) return;
+  const room = window.innerHeight - (day.getBoundingClientRect().top + window.scrollY) - 34;
+  const narrow = window.matchMedia('(max-width: 760px)').matches;
+  box.style.setProperty('--quarter', `${narrow ? 12 : Math.max(12, Math.floor(room / Number(box.dataset.quarters)))}px`);
 }
 
 function renderAgenda() {
@@ -1193,29 +1282,67 @@ function renderAgenda() {
   const monday = startOfWeek(new Date());
   monday.setDate(monday.getDate() + agendaWeekOffset * 7);
   const days = [...Array(7)].map((_, i) => { const d = new Date(monday); d.setDate(monday.getDate() + i); return d; });
-  $('agenda-range').textContent = agendaWeekOffset === 0 ? 'Esta semana'
-    : `${days[0].toLocaleDateString('pt-PT', {day: '2-digit', month: '2-digit'})} – `
-      + days[6].toLocaleDateString('pt-PT', {day: '2-digit', month: '2-digit'});
+  const dayMonth = date => date.toLocaleDateString('pt-PT', {day: '2-digit', month: '2-digit'});
+  const [first, last] = [days[0], days[6]];
+  $('agenda-range').textContent = first.getFullYear() === last.getFullYear()
+    ? `${dayMonth(first)} – ${dayMonth(last)}/${last.getFullYear()}`
+    : `${dayMonth(first)}/${first.getFullYear()} – ${dayMonth(last)}/${last.getFullYear()}`;
+  $('agenda-today').disabled = agendaWeekOffset === 0;
+  $('agenda-today').title = agendaWeekOffset === 0 ? 'Já estás na semana atual.' : '';
+  const weekday = index => days[index].toLocaleDateString('pt-PT', {weekday: 'long'});
+  $('agenda-days').replaceChildren(el('span', {class: 'muted small'}, 'Dias:'), ...WEEKDAY_SHORT.map((name, index) =>
+    el('button', {type: 'button', class: 'agenda-day', 'aria-pressed': String(!agendaOff.has(index)),
+      title: agendaOff.has(index) ? `${weekday(index)} em blackout: clica para voltar a mostrar`
+        : `${weekday(index)} disponível: clica para pôr em blackout`, onclick: () => toggleAgendaDay(index)}, name)));
   const todayIso = isoDate(new Date());
   const filter = $('agenda-property').value;
-  $('agenda-week').replaceChildren(...days.map(date => {
-    const iso = isoDate(date);
-    const {entries, showLabel} = agendaEntries(iso, filter);
-    return el('div', {class: 'filofax-page' + (iso === todayIso ? ' today' : '')},
+  const showLabel = Object.keys(properties).length > 1;
+  const week = days.map((date, index) => ({date, index, iso: isoDate(date), off: agendaOff.has(index),
+    entries: agendaEntries(isoDate(date)).filter(entry => !filter || entry.ref === filter)}))
+    .filter(day => !day.off || day.entries.length);
+  const all = week.flatMap(day => day.entries);
+  const from = Math.max(0, Math.floor(Math.min(AGENDA_DAY[0], ...all.map(entry => entry.start)) / 60) * 60);
+  const to = Math.min(24 * 60, Math.ceil(Math.max(AGENDA_DAY[1], ...all.map(entry => entry.end)) / 60) * 60);
+  const quarters = (to - from) / 15;
+  const box = $('agenda-week');
+  box.dataset.quarters = quarters;
+  box.replaceChildren(...week.map(({date, index, iso, off, entries}) => {
+    const windows = entries.filter(entry => entry.kind === 'window'), visits = entries.filter(entry => entry.kind !== 'window');
+    agendaLanes(visits);
+    const tip = entry => [entry.clashes?.length ? 'Sobreposta (overbooking)' : AGENDA_KINDS[entry.kind], entry.text,
+      showLabel && entry.label,
+      entry.clashes?.length && 'com ' + entry.clashes.map(other => `${other.text} (${other.label})`).join(', ')]
+      .filter(Boolean).join(' · ');
+    const count = (items, one, many) => items.length && `${items.length} ${items.length === 1 ? one : many}`;
+    const summary = [...windows.map(entry => entry.text),
+      count(visits.filter(entry => entry.kind === 'confirmed'), 'confirmada', 'confirmadas'),
+      count(visits.filter(entry => entry.kind === 'accepted'), 'por confirmar', 'por confirmar'),
+      count(visits.filter(entry => entry.clashes.length), 'sobreposta', 'sobrepostas')].filter(Boolean).join(' · ');
+    const day = el('div', {class: 'filofax-day'}, agendaRuling(from, quarters),
+      windows.map(entry => agendaPlace(el('div', {class: 'filofax-entry window', title: tip(entry)}), from, entry)),
+      visits.map(entry => agendaPlace(el('div', {class: `filofax-entry visit ${entry.clashes.length ? 'overbooked' : entry.kind}`,
+        title: tip(entry)}, el('strong', {}, entry.text), showLabel && el('span', {}, entry.label)), from, entry)));
+    day.style.height = `calc(var(--quarter) * ${quarters})`;
+    const shown = off ? `Blackout, mas com visitas · ${summary}` : summary || 'Sem visitas previstas.';
+    return el('div', {class: 'filofax-page' + (iso === todayIso ? ' today' : '') + (off ? ' blackout' : '')},
       el('div', {class: 'filofax-head'},
-        el('span', {class: 'filofax-weekday'}, date.toLocaleDateString('pt-PT', {weekday: 'long'})),
-        el('span', {class: 'filofax-date'}, date.toLocaleDateString('pt-PT', {day: '2-digit', month: '2-digit'}))),
-      el('div', {class: 'filofax-lines'},
-        entries.length ? entries.map(entry => el('div', {class: 'filofax-entry ' + entry.kind},
-          el('strong', {}, entry.text), showLabel && el('span', {class: 'muted small'}, entry.label)))
-          : el('p', {class: 'muted small filofax-empty'}, 'Sem visitas previstas.')));
+        el('span', {class: 'filofax-weekday'}, weekday(index)),
+        el('span', {class: 'filofax-date'}, dayMonth(date)),
+        el('span', {class: 'muted small filofax-summary', title: shown}, shown),
+        el('button', {type: 'button', class: 'link filofax-off', onclick: () => toggleAgendaDay(index),
+          title: off ? `Voltar a pôr ${weekday(index)} como disponível`
+            : `Pôr ${weekday(index)} em blackout: sai da semana e os outros dias alargam`}, off ? 'Disponível' : 'Blackout')),
+      day);
   }));
+  if (!week.length) box.replaceChildren(el('p', {class: 'empty-state filofax-none'}, 'Todos os dias estão em blackout. Liga um dia em «Dias».'));
+  fitAgenda();
 }
 
 $('agenda-prev').addEventListener('click', () => { agendaWeekOffset--; renderAgenda(); });
 $('agenda-next').addEventListener('click', () => { agendaWeekOffset++; renderAgenda(); });
 $('agenda-today').addEventListener('click', () => { agendaWeekOffset = 0; renderAgenda(); });
 $('agenda-property').addEventListener('change', renderAgenda);
+window.addEventListener('resize', () => { if (activeTab === 'agenda') fitAgenda(); });
 
 // Imóveis: one property at a time (a slider, not side by side), each with its own instrument cluster;
 // creating or editing a property's ad data is a view of its own. The property shown is remembered in
@@ -1752,7 +1879,9 @@ $('emails').addEventListener('change', updateSelection);
 $('read').addEventListener('click', event => run(async () => {
   state = await call('api/read', {days: Number($('days').value) || undefined}); renderState();
   if (state.added) playSound('read');
-  toast(state.added ? `${state.added} email(s) novo(s).` : 'Leitura concluída: nada de novo.');
+  // Replies written straight in Gmail (found in All Mail or Sent) answer their emails here too.
+  const direct = state.direct ? ` ${state.direct} resposta(s) tua(s) enviada(s) diretamente do Gmail registada(s).` : '';
+  toast((state.added ? `${state.added} email(s) novo(s).` : 'Leitura concluída: nada de novo.') + direct);
 }, event.currentTarget));
 $('build-prompt').addEventListener('click', event => run(async () => {
   const ids = selectedIds();

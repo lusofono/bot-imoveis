@@ -77,3 +77,61 @@ def test_read_messages_with_fake_imap_fetches_text_only_when_accepted():
         "Tens uma nova mensagem", "Ana Exemplo", "900 000 001", "ana.exemplo@example.com", "Bom dia, gostaria de visitar."]
     # The unrelated message was never downloaded beyond its headers.
     assert [spec for uid, spec in mail.calls if uid == b"2"] == ["(BODY.PEEK[HEADER] BODYSTRUCTURE X-GM-THRID X-GM-MSGID)"]
+
+
+OWN = ("From: Equipa <owner@example.com>\r\nTo: ana.exemplo@example.com\r\nSubject: Re: Nova mensagem\r\n"
+       "Message-ID: <direct@example.com>\r\nDate: Thu, 17 Sep 2026 10:00:00 +0100\r\n\r\n").encode()
+
+
+def fake_imap(boxes):
+    """boxes: mailbox name → {uid: raw headers}; the LIST flags mark All Mail and Sent as Gmail does."""
+    structure = b'BODYSTRUCTURE ("TEXT" "PLAIN" ("CHARSET" "utf-8") NIL NIL "8BIT" 30 1 NIL NIL NIL NIL)'
+    class Mail:
+        selected, calls = None, []
+        def list(self):
+            return "OK", [b'(\\HasNoChildren \\All) "/" "[Gmail]/All Mail"', b'(\\HasNoChildren \\Sent) "/" "[Gmail]/Enviados"']
+        def select(self, box, readonly=True):
+            self.selected = box.strip('"')
+            return "OK", [b"1"]
+        def uid(self, command, *args):
+            messages = boxes[self.selected]
+            if command == "search":
+                return "OK", [b" ".join(messages)]
+            uid, spec = args
+            self.calls.append((self.selected, uid, spec))
+            if "HEADER" in spec:
+                header = messages[uid]
+                prefix = b"%s (X-GM-THRID 70 X-GM-MSGID 9%s %s BODY[HEADER] {%d}" % (uid, uid, structure, len(header))
+                return "OK", [(prefix, header), b")"]
+            if ".MIME" in spec:
+                return "OK", [(b"", b"Content-Type: text/plain; charset=utf-8\r\n")]
+            return "OK", [(b"", "Pode visitar amanhã.".encode())]
+        def logout(self):
+            pass
+    return Mail()
+
+
+def test_read_messages_hands_over_the_owners_own_replies_apart():
+    # All Mail holds both: the customer's email comes back as incoming, the owner's reply only as outgoing.
+    mail = fake_imap({"[Gmail]/All Mail": {b"1": LEAD, b"2": OWN}})
+    outgoing = []
+    with patch("backend.mail.connect", return_value=mail):
+        items, scanned, box = read_messages("owner@example.com", "x", "", "2026-09-16", "2026-09-18",
+                                            accept=lambda item: True, outgoing=outgoing,
+                                            accept_outgoing=lambda item: item["to"][0]["email"] == "ana.exemplo@example.com")
+    assert [item["message_id"] for item in items] == ["<lead@example.com>"]
+    assert [(item["message_id"], item["body_text"]) for item in outgoing] == [("<direct@example.com>", "Pode visitar amanhã.")]
+    # Without the outgoing list, the owner's own mail is skipped exactly as before.
+    with patch("backend.mail.connect", return_value=fake_imap({"[Gmail]/All Mail": {b"1": LEAD, b"2": OWN}})):
+        items, _, _ = read_messages("owner@example.com", "x", "", "2026-09-16", "2026-09-18", accept=lambda item: True)
+    assert [item["message_id"] for item in items] == ["<lead@example.com>"]
+
+
+def test_with_the_inbox_only_the_sent_folder_is_read_too_whatever_its_language():
+    mail = fake_imap({"INBOX": {b"1": LEAD}, "[Gmail]/Enviados": {b"7": OWN}})
+    outgoing = []
+    with patch("backend.mail.connect", return_value=mail):
+        items, scanned, box = read_messages("owner@example.com", "x", "", "2026-09-16", "2026-09-18", mailbox="inbox",
+                                            accept=lambda item: True, outgoing=outgoing, accept_outgoing=lambda item: True)
+    assert (box, scanned, len(items)) == ("INBOX", 1, 1)
+    assert [item["message_id"] for item in outgoing] == ["<direct@example.com>"]

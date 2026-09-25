@@ -161,6 +161,44 @@ def test_ignoring_clears_their_pending_email_and_skips_them_when_closing_visits(
     assert result["drafted"] == 1
 
 
+def test_while_a_time_is_being_arranged_every_reply_stays_the_fourth_interaction(service):
+    for key, email in (("1", "a@example.com"), ("2", "b@example.com")):
+        read(service, [customer(key, email)])
+        draft_and_send(service, key, "Olá.")
+    service.propose_visits(REF, DAY, "17:00", "19:00", ["a@example.com", "b@example.com"])
+    for proposal in [e for e in service.pending()["properties"][0]["emails"] if e.get("kind") == "visit_proposal"]:
+        draft_and_send(service, proposal["id"], "Proposta de visita.")
+
+    def answer(key, email, text):
+        last = service.load(REF)["conversations"][email]["sent_message_ids"][-1]
+        read(service, [{"gmail_message_id": key, "from": [{"email": email}], "in_reply_to": last,
+                        "subject": "Re: visita", "body_text": text}])
+
+    # A asks for a time outside the window: no booking, we offer the time left (a 4th-interaction reply).
+    answer("ra", "a@example.com", "Só posso às 20h.")
+    assert item(service, "ra")["interaction"] == 4
+    draft_and_send(service, "ra", "Lamentamos, mas já só temos o período das 17:30 às 18:00.")
+    # B takes a time and is booked.
+    answer("rb", "b@example.com", "Posso às 17h.")
+    revision = service.pending()["properties"][0]["revision"]
+    service.drafts([{"id": "rb", "reply_text": "Fica marcado às 17h."}], revision, REF,
+                   [{"id": "rb", "visit_slot": f"{DAY} 17:00"}])
+    preview = service.preview(["rb"])
+    with patch("backend.service.app_password", return_value="fake"), patch("backend.service.smtplib.SMTP_SSL", SMTP):
+        service.send(preview["preview_token"], True)
+
+    # A accepts the offer: still the 4th interaction, so it can be booked. B, booked, writes again: a 5th,
+    # left to the owner, as is anyone who said they no longer want to visit.
+    answer("ra2", "a@example.com", "Pode ser às 17h30.")
+    answer("rb2", "b@example.com", "Posso levar o meu marido?")
+    assert item(service, "ra2")["interaction"] == 4
+    assert item(service, "rb2")["interaction"] == 5
+    queue = service.load(REF)
+    queue["conversations"]["a@example.com"]["visit"] = "nao_quer"
+    service.save(queue, REF)
+    assert item(service, "ra2")["interaction"] == 5
+
+
 def test_the_round_summary_is_empty_before_any_round_was_ever_proposed(service):
     assert service.visit_round_summary(REF) == {"property_ref": REF, "window": None, "recipients": []}
 

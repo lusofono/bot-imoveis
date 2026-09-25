@@ -112,7 +112,12 @@ reais. A pasta `data/` nunca entra no Git.
 
 Com pelo menos um perfil, o READ só guarda:
 - avisos do portal com o remetente exato (`from_address_equals`) e a referência exata no assunto;
-- respostas diretas de um cliente a um email enviado por esta ferramenta (mesma conversa no Gmail).
+- respostas diretas de um cliente a um email enviado por esta ferramenta (mesma conversa no Gmail);
+- as tuas próprias respostas escritas diretamente no Gmail a um cliente que a página conhece (pelo endereço
+  ou pela conversa do Gmail; o assunto desempata um cliente de dois imóveis). Os emails desse cliente
+  anteriores à tua resposta saem da fila como respondidos, a conversa avança uma interação e o que
+  escreveste (sem a parte citada) entra no histórico, que a IA lê. Com «Todo o correio» já lá estão; com
+  só a INBOX, a leitura abre também a pasta dos enviados.
 
 O resto do correio é ignorado, sem descarregar o texto.
 

@@ -3,6 +3,96 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 25/09/2026, tarde: as respostas escritas diretamente no Gmail contam (α.35.0)
+
+**Decisão.**
+- **Pedido do utilizador:** às vezes responde diretamente ao cliente no Gmail; a leitura tem de ver os
+  enviados e ler esse contexto. Antes, `read_messages` saltava todo o correio da própria conta
+  (`incoming_only`), por isso esses emails continuavam pendentes na página e a IA não sabia o que fora dito.
+- **Onde estão:** a configuração normal lê «Todo o correio» (All Mail), que já tem os enviados; os cabeçalhos
+  já eram descarregados, só eram deitados fora. Com `mailbox: inbox`, a leitura abre também a pasta com a
+  marca `\Sent` (o nome muda com a língua da conta: «Enviados», «Sent Mail»). O texto só se descarrega para
+  mensagens aceites, como no resto da leitura.
+- **Como se liga ao cliente:** pelo endereço de destino (To/Cc) ou pela conversa do Gmail (X-GM-THRID) de um
+  email pendente ou de uma conversa. **O assunto sozinho não serve:** as respostas dos clientes levam todas
+  «Re: <descrição do imóvel>» (nos dados reais, 2 assuntos diferentes em 11 pendentes), por isso fica só
+  para desempatar um cliente conhecido em dois imóveis; o que continuar ambíguo fica de fora.
+- **A data decide o que ficou respondido:** os emails do cliente que chegaram antes da resposta saem da fila
+  (para `replied_message_ids`, como um envio da página); os que chegaram depois ficam, mas recebem no seu
+  histórico o que o proprietário escreveu. Um lembrete anterior à resposta também sai.
+- **A etapa só avança quando respondeu a algum email pendente:** uma mensagem extra, por iniciativa do
+  proprietário, entra no histórico mas não gasta uma interação — a numeração continua a bater com os prompts.
+- **Nunca conta duas vezes:** cada resposta direta fica nos `sent_message_ids` da conversa, e esses IDs (tal
+  como os dos envios da página) são recusados à entrada. Verificado nos dados reais antes de construir: os
+  102 envios da página guardados no Gmail têm exatamente o Message-ID que a página registou.
+- **Texto:** só o que o proprietário escreveu, cortado na citação (`QUOTE`) e na linha «Em …, Nome <email>
+  escreveu:», que o Gmail parte em várias linhas. No Painel conta como resposta enviada (`send` com
+  `kind: direct`, a hora do envio e o tempo de espera), sem endereços nem texto nos registos.
+- **Ensaio antes de entregar**, numa cópia de `data/` (apagada a seguir), com o Gmail real só em leitura:
+  13 respostas diretas em 5 dias; na Ramada a fila passava de 10 para 4; nenhum texto com restos de citação.
+
+## 25/09/2026, ainda mais tarde: contraproposta de hora e a negociação fica na 4.ª interação (α.34.0)
+
+**Decisão.**
+- **Cliente pede hora fora do intervalo (ou ocupada) → oferecemos uma só hora**, a primeira livre (a que junta
+  as visitas do dia), com início e fim, e a frase de recurso do utilizador («Caso não encontremos um cliente
+  indicado…»). É o próprio prompt da 4.ª interação de cada imóvel (dados, fora do Git) que o diz; nada fica
+  marcado nem com `visita_estado` até o cliente aceitar. Só `outra_data` quando o cliente diz que não pode
+  mesmo nesse dia.
+- **A contraproposta obrigou a mudar a numeração.** Cada envio sobe o `stage`, por isso o «pode ser às 15:00»
+  seguinte chegava como 5.ª interação, sem prompt, e a IA deixava-o ao proprietário. Agora, em `view()`, uma
+  resposta depois da proposta continua a ser a 4.ª enquanto: (1) há uma janela aberta para a qual o cliente
+  foi convidado (`recipients` da janela); (2) ele não tem visita marcada daqui para a frente (`booked`, novo em
+  `open_visits`); (3) não disse que não quer visitar (`nao_quer`). Resolve também a segunda ronda, que antes
+  caía na 6.ª interação.
+- **Janelas antigas sem `recipients` (criadas antes da α.19.0) contam como convite a todos**, porque não se sabe
+  quem foi convidado — é o caso da janela real de 25/09. Quem tem visita marcada e volta a escrever (mudar a
+  hora, levar alguém) continua a ser uma 5.ª, para o proprietário decidir: mexer numa visita marcada fica
+  fora da IA.
+
+## 25/09/2026, mais tarde: Agenda a quatro cores, dias em blackout e texto a enviar claro no RacingCar (α.32.0–α.33.1)
+
+**Decisão.**
+- **As quatro cores seguem o caminho de uma visita**, com os dados que a página já tem (nenhum pedido novo):
+  cinzento = janela proposta na ronda (`visits.windows`); laranja = `visit_slot` de um rascunho na fila (o
+  cliente aceitou, a IA pôs a hora, falta enviares); verde = `visits.slots` (o email saiu, a hora ficou
+  marcada); tijolo = sobreposição. O «pediram» do pedido foi lido como as janelas que propomos nas rondas,
+  porque não guardamos janelas pedidas pelo cliente; se um dia se guardarem, entram no cinzento.
+- **Sobreposição entre todos os imóveis, mesmo com filtro:** dentro de um imóvel a página já recusa a mesma
+  hora duas vezes, por isso o risco real é o mesmo agente em dois imóveis à mesma hora. O filtro só esconde;
+  a sobreposição com um imóvel escondido continua a pintar de tijolo. Não conta o tempo de deslocação.
+- **Cores fixas, iguais em todos os temas** (`--agenda-grey/orange/green/brick` em `#tab-agenda`), e o tijolo
+  também às riscas, para se distinguir sem depender da cor.
+- **Blackout por dia da semana, guardado no browser** (`bot-mail-agenda-off`, como o tema): é uma forma de
+  ver a semana, não uma regra de marcação — a IA continua a marcar só dentro das janelas que propões. Um dia
+  em blackout com visitas nunca some (fica às riscas), para não se perder uma visita marcada.
+- **90's RacingCar:** o rascunho, o ponto de situação e a pré-visualização do envio em papel claro
+  (#f7f1e3) e tinta preta (#111), a pedido: é o texto que se revê antes de enviar. O resto fica escuro.
+
+## 25/09/2026: a Agenda passa a ter horas, dia a dia até ao fundo da janela (α.31.0)
+
+**Decisão.**
+- **Cada página do dia passa a ser uma coluna de horas**, com uma linha a cada 15 minutos, esticada até ao
+  fundo da janela; a largura fica igual. Foi o pedido do utilizador: um dia «muito mais longo para baixo»,
+  para ver melhor as marcações de 15 em 15 minutos. Isto revê a decisão de 23/09 (α.16.0), que listava as
+  entradas por hora, sem escala: com marcações seguidas, a escala mostra onde há buracos e quanto dura cada
+  visita. Continua a ser uma página de papel (furos, cabeçalho, linhas), não uma grelha tipo Google Calendar.
+- **A altura de 15 minutos vem da janela:** `fitAgenda()` mede o espaço entre o topo do dia e o fundo da
+  janela e dá a cada quarto de hora pixéis inteiros (nunca menos de 12, para a linha nunca se perder);
+  recalcula ao redimensionar. Num ecrã de 1920×1080 ficam 15 px por quarto de hora; num de 900 px de altura,
+  12 px, e a página passa ligeiramente o fundo. No telemóvel os dias ficam uns por baixo dos outros, com 12 px.
+- **Das 9h às 19h por omissão, o mesmo para a semana toda** (`AGENDA_DAY`): uma visita fora desse horário
+  alarga todos os dias, para as horas ficarem alinhadas de coluna para coluna.
+- **A marcação ocupa o intervalo de marcação** (`slot_minutes` em Voz e estilo, 30 por omissão), não a
+  duração estimada da visita (15 a 20 minutos no arrendamento), porque é esse o tempo que fica ocupado na
+  agenda do imóvel.
+- **Lado a lado só onde há sobreposição** (duas marcações de imóveis diferentes em «Todos»); as propostas
+  ocupam a largura toda e, sobrepostas, só ficam com uma cor mais carregada.
+- **Posições pelo objeto `style` do elemento**, não pelo atributo `style`: a CSP da página
+  (`style-src 'self'`) bloqueia estilos no HTML.
+- Os temas pintam as linhas com `--agenda-rule` e o fundo das marcações com `--agenda-paper` (RacingCar em
+  papel creme, Boat em branco), em vez de desenharem as linhas antigas de 27 px.
+
 ## 24/09/2026, noite (9): os extras do «90's Boat»: sons, cursor e o quarto da noite (α.30.0)
 
 **Decisão.**

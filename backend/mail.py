@@ -107,6 +107,16 @@ def find_all_mailbox(mail):
             return candidate
     raise GmailReadError("Não consegui localizar a pasta All Mail do Gmail.")
 
+def find_sent_mailbox(mail):
+    """Gmail's Sent folder, found by its \\Sent flag (its name follows the account's language), or None."""
+    status, boxes = mail.list()
+    if status == "OK" and boxes:
+        for raw in boxes:
+            parsed = mailbox_name_from_list(raw)
+            if parsed and "\\Sent" in parsed[0].split():
+                return parsed[1]
+    return None
+
 def connect(account: str, password: str):
     try:
         mail = imaplib.IMAP4_SSL("imap.gmail.com", 993, timeout=30)
@@ -128,20 +138,23 @@ def meta_from_fetch(meta: bytes):
     }
 
 def read_messages(account, password, subject_contains, date_from, date_to,
-                  mailbox="all", incoming_only=True, accept=None):
+                  mailbox="all", incoming_only=True, accept=None, outgoing=None, accept_outgoing=None):
     """Messages between two dates, as dicts: (messages, number scanned, mailbox).
 
     Headers first; accept(item) decides on them, so mail that is not ours never has its text fetched.
     Everything is read with BODY.PEEK: nothing is marked as read, and read or unread does not matter.
+    outgoing: a list that receives the account's own messages that accept_outgoing(item) takes, with their
+    text — the replies the owner wrote straight from Gmail. All Mail holds them already; with the INBOX
+    mailbox, the Sent folder is read too.
     """
     start = datetime.strptime(date_from, "%Y-%m-%d")
     end = datetime.strptime(date_to, "%Y-%m-%d")
     if end < start:
         raise GmailReadError("Data final anterior à inicial.")
+    wanted = normalise(subject_contains)
+    result = []
 
-    mail = connect(account, password)
-    try:
-        box = "INBOX" if mailbox == "inbox" else find_all_mailbox(mail)
+    def scan(box, own_only=False):
         status, _ = mail.select('"' + box.replace('"', r'\"') + '"', readonly=True)
         if status != "OK":
             raise GmailReadError(f"Não consegui abrir {box}.")
@@ -153,9 +166,6 @@ def read_messages(account, password, subject_contains, date_from, date_to,
         )
         if status != "OK":
             raise GmailReadError("Erro na pesquisa IMAP.")
-
-        wanted = normalise(subject_contains)
-        result = []
         uids = data[0].split() if data and data[0] else []
 
         for uid in uids:
@@ -182,14 +192,12 @@ def read_messages(account, password, subject_contains, date_from, date_to,
 
             msg = BytesParser(policy=policy.default).parsebytes(raw)
             subject = decode_mime(msg.get("Subject"))
-            if wanted and wanted not in normalise(subject):
-                continue
-
             from_list = parse_addresses(msg.get_all("From", []))
-            if incoming_only:
-                from_emails = {x["email"].casefold() for x in from_list if x["email"]}
-                if account.casefold() in from_emails:
-                    continue
+            own = account.casefold() in {x["email"].casefold() for x in from_list if x["email"]}
+            if not own and (own_only or (wanted and wanted not in normalise(subject))):
+                continue
+            if own and incoming_only and outgoing is None:
+                continue
 
             raw_date = msg.get("Date", "") or ""
             iso_date = ""
@@ -215,13 +223,30 @@ def read_messages(account, password, subject_contains, date_from, date_to,
                 "in_reply_to": (msg.get("In-Reply-To", "") or "").strip(),
                 "references": (msg.get("References", "") or "").strip(),
             }
+            if own and outgoing is not None and accept_outgoing and accept_outgoing(item):
+                item["body_text"], item["body_truncated"] = fetch_text_only(mail, uid, structure_bytes)
+                outgoing.append(item)
+                continue
+            if own_only or (own and incoming_only):
+                continue
+            if wanted and wanted not in normalise(subject):
+                continue
             # Headers decide first: unrelated mail never has its text fetched.
             if accept and not accept(item):
                 continue
             item["body_text"], item["body_truncated"] = fetch_text_only(mail, uid, structure_bytes)
             result.append(item)
+        return len(uids)
 
-        return result, len(uids), box
+    mail = connect(account, password)
+    try:
+        box = "INBOX" if mailbox == "inbox" else find_all_mailbox(mail)
+        scanned = scan(box)
+        if outgoing is not None and mailbox == "inbox":
+            sent_box = find_sent_mailbox(mail)
+            if sent_box:
+                scan(sent_box, own_only=True)
+        return result, scanned, box
     finally:
         try:
             mail.logout()

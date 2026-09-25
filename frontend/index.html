@@ -182,11 +182,17 @@
     <div class="row agenda-controls">
       <label class="muted">Imóvel <select id="agenda-property"><option value="">Todos</option></select></label>
       <div class="agenda-nav">
-        <button id="agenda-prev" class="link" type="button">← Semana anterior</button>
-        <button id="agenda-today" class="link" type="button">Esta semana</button>
-        <button id="agenda-next" class="link" type="button">Semana seguinte →</button>
+        <strong id="agenda-range" class="agenda-range"></strong>
+        <div class="agenda-nav-buttons">
+          <button id="agenda-prev" class="link" type="button">← Semana anterior</button>
+          <button id="agenda-today" class="link" type="button">Esta semana</button>
+          <button id="agenda-next" class="link" type="button">Semana seguinte →</button>
+        </div>
       </div>
-      <span id="agenda-range" class="muted small"></span>
+    </div>
+    <div class="row agenda-options">
+      <div id="agenda-days" class="agenda-days" role="group" aria-label="Dias disponíveis para visitas"></div>
+      <p class="agenda-legend muted small"><span class="window">Janela proposta</span><span class="accepted">Aceite pelo cliente, por confirmar</span><span class="confirmed">Confirmada por ti (email enviado)</span><span class="overbooked">Sobreposta (overbooking)</span></p>
     </div>
     <div id="agenda-week" class="filofax"></div>
   </section>

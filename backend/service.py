@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta, timezone
 import hashlib
 import json
 from pathlib import Path
+import re
 import secrets
 import smtplib
 import time
@@ -19,7 +20,7 @@ from .mail import build_digest, build_reply, read_messages
 from .openai_client import MODEL_DEFAULT, complete, estimate_cost_usd
 from .rules import (DAY, EMAIL, KNOWLEDGE_FILE, RGPD_STATES, SUBJECT_DEFAULT, VISIT_SLOT_DEFAULT, VISIT_STATES,
                     build_profile, check_profile, check_slot, check_window, clean_property, consent_yes, free_times,
-                    knowledge, photo_of, prepare, route, subject_of)
+                    knowledge, photo_of, prepare, route, subject_of, QUOTE, addresses)
 from .secrets import app_password, has_app_password, has_openai_api_key, openai_api_key
 from .store import (CONTACT_FIELDS, add_contacts, add_note, find_photo, knowledge_files, load_contacts, load_digest,
                     load_events, load_knowledge, load_panel, load_visits, locked, load_json, load_profiles, load_voice,
@@ -121,6 +122,44 @@ def message_key(item):
     raise ValueError("Email sem identificador estável.")
 
 
+def recipient_email(item):
+    return ((item.get("recipient") or {}).get("email") or "").casefold()
+
+
+def aware(value):
+    """An ISO date as an aware datetime (UTC when it has no offset), or None."""
+    try:
+        moment = datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
+    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+
+
+def plain_subject(value):
+    """The subject without Re:/Fwd:/Enc: prefixes, for comparing a reply with what it answers."""
+    subject = " ".join(str(value or "").split())
+    while True:
+        shorter = re.sub(r"^(re|res|fw|fwd|enc|rv)\s*:\s*", "", subject, flags=re.I)
+        if shorter == subject:
+            return subject.casefold()
+        subject = shorter
+
+
+def own_text(body):
+    """What the owner wrote in a reply, without the quoted email under it (and Gmail's «Em … escreveu:» line)."""
+    lines = str(body or "").splitlines()
+    cut = next((i for i, line in enumerate(lines) if QUOTE.match(line.strip())), len(lines))
+    lines = lines[:cut]
+    while lines and not lines[-1].strip():
+        lines.pop()
+    # Gmail wraps a long «Em …, Nome <email> escreveu:» over two or three lines: drop it from its start.
+    if lines and re.search(r"(escreveu|wrote):?$", lines[-1].strip()):
+        start = next((i for i in range(len(lines) - 1, max(len(lines) - 4, -1), -1)
+                      if re.match(r"^(Em|On|No dia) ", lines[i].strip())), None)
+        lines = lines[:start] if start is not None else lines
+    return "\n".join(lines).strip()
+
+
 class MailService:
     """The calls of one data folder: read, drafts, preview, send, dismiss, resolve and the settings.
 
@@ -209,16 +248,26 @@ class MailService:
             return ((item.get("recipient") or {}).get("email") or "").casefold()
         conversations = data["conversations"]
         counts = Counter(customer(item) for item in data["emails"])
+        # Still arranging a time: while a window the customer was invited to is open and they have no visit
+        # booked, every reply after the proposal is the 4th interaction (book it, or offer the time left),
+        # never a 5th without a prompt. A window from before the invitees were kept (α.19.0) invites everyone.
+        windows = (visits or {}).get("windows") or []
+        invited = {(person.get("email") or "").casefold() for window in windows for person in window.get("recipients") or []}
+        everyone = any("recipients" not in window for window in windows)
+        booked = set((visits or {}).get("booked") or ())
         emails = []
         for item in data["emails"]:
             email = customer(item)
             warnings = list(item.get("warnings", []))
             if email and counts[email] > 1:
                 warnings.append("Há outro email pendente deste cliente neste imóvel; evita respostas repetidas.")
-            stage = conversations.get(email, {}).get("stage", 0)
+            conversation = conversations.get(email, {})
+            interaction = 3 if item.get("kind") == "visit_proposal" else conversation.get("stage", 0) + 1
+            if (interaction > 4 and (everyone or email in invited) and email not in booked
+                    and conversation.get("visit") != "nao_quer"):
+                interaction = 4
             emails.append({key: item.get(key) for key in VIEW_FIELDS} | {
-                "interaction": (3 if item.get("kind") == "visit_proposal" else stage + 1) if email else None,
-                "warnings": warnings})
+                "interaction": interaction if email else None, "warnings": warnings})
         result = {"property_ref": ref, "revision": data["revision"], "last_read_at": data.get("last_read_at"),
                   "instructions": instructions(profile, voice, visits), "emails": emails}
         if added is not None:
@@ -270,12 +319,26 @@ class MailService:
                 # Decided on headers: known IDs and, with profiles, mail outside their families are skipped.
                 return message_key(item) not in seen and (not profiles or route(item, profiles, queues)[1] is not None)
 
+            # The owner's own replies, written straight from Gmail: to someone we know, or in a thread we know.
+            # Never one this page sent: its Message-ID is in the conversation already.
+            outgoing = [] if profiles else None
+            talks = [conversation for data in queues.values() for conversation in data.get("conversations", {}).values()]
+            ours = {sent for conversation in talks for sent in conversation.get("sent_message_ids", [])}
+            people = ({email for data in queues.values() for email in data.get("conversations", {})}
+                      | {recipient_email(item) for data in queues.values() for item in data["emails"]}) - {""}
+            threads = ({item.get("thread_id") for data in queues.values() for item in data["emails"]}
+                       | {thread for conversation in talks for thread in conversation.get("thread_ids", [])}) - {None, ""}
+
+            def accept_outgoing(item):
+                recipients = {a.casefold() for a in addresses((item.get("to") or []) + (item.get("cc") or []))}
+                return item.get("message_id") not in ours and bool(recipients & people or item.get("thread_id") in threads)
+
             messages, scanned, mailbox = read_messages(
                 cfg["account"], app_password(self.folder, cfg["account"]),
                 "" if profiles else cfg.get("subject_contains", ""), start.isoformat(),
                 datetime.now(timezone.utc).date().isoformat(),
                 mailbox=cfg.get("mailbox", "all"), incoming_only=bool(profiles) or cfg.get("incoming_only", True),
-                accept=accept)
+                accept=accept, outgoing=outgoing, accept_outgoing=accept_outgoing)
             added, ambiguous, contacts, received = dict.fromkeys(refs, 0), 0, [], {}
             for item in messages:
                 ref, kind, customer = route(item, profiles, queues) if profiles else (None, "general", None)
@@ -322,10 +385,13 @@ class MailService:
                 known[ref].add(key)
                 added[ref] += 1
                 received[key] = contact_day(item)
+            # After the customers' emails, so a direct reply can answer one that arrived in this same read.
+            direct = self.record_direct_replies(queues, outgoing) if profiles else Counter()
             add_contacts(self.folder, contacts)
             for ref, data in queues.items():
                 data["last_read_at"] = start_at
-                data["stats"] = {"new_this_read": added[ref], "scanned": scanned, "mailbox": mailbox}
+                data["stats"] = {"new_this_read": added[ref], "scanned": scanned, "mailbox": mailbox,
+                                 "direct_replies": direct[ref]}
                 if ref and voice_ok:
                     self.schedule_reminders(ref, data, voice_ok)
                 self.save(data, ref)
@@ -333,15 +399,105 @@ class MailService:
                 self.prepare_digest(profiles, queues)
             # received: message ID → the day the customer's email arrived, so the dashboard still counts it
             # after it is answered or dismissed and leaves the queue. IDs and dates only, never an address.
-            self.log("read", added=sum(added.values()), ambiguous=ambiguous,
+            self.log("read", added=sum(added.values()), ambiguous=ambiguous, direct=sum(direct.values()),
                      pending=sum(len(data["emails"]) for data in queues.values()), received=received)
             if not profiles:
                 data = queues[None]
                 return {"added": added[None], "revision": data["revision"], "emails": data["emails"]}
             voice = load_voice(self.folder)
-            return {"scanned": scanned, "ambiguous": ambiguous,
+            return {"scanned": scanned, "ambiguous": ambiguous, "direct": sum(direct.values()),
                     "properties": [self.view(ref, profiles[ref], queues[ref], voice, added[ref], self.open_visits(ref, voice))
                                    for ref in refs]}
+
+    def record_direct_replies(self, queues, outgoing):
+        """The replies the owner wrote straight from Gmail, found at READ in All Mail (or in Sent).
+
+        Each is tied to one customer of one property: by the pending emails it answers (the same Gmail thread,
+        or sent to their author), else by a conversation it went to; the subject settles a customer known in
+        two properties, and one still unclear is left alone. That customer's emails from before it leave the
+        queue as answered, with any reminder now out of date; the conversation moves on one interaction when
+        it answered something; and what the owner wrote joins the history — the conversation's and that of
+        the customer's later emails still waiting — so the next prompt reads it. Counted like a send.
+        """
+        recorded = Counter()
+        ours = {sent for data in queues.values() for conversation in data["conversations"].values()
+                for sent in conversation.get("sent_message_ids", [])}
+        dated = [(aware(message.get("date")), message) for message in outgoing or []]
+        for sent_at, message in sorted((pair for pair in dated if pair[0]), key=lambda pair: pair[0]):
+            key = message.get("message_id")
+            if not key or key in ours:
+                continue
+            recipients = {a.casefold() for a in addresses((message.get("to") or []) + (message.get("cc") or []))}
+            thread = message.get("thread_id") or None
+
+            def answers(item):
+                arrived = aware(item.get("date"))
+                return (item.get("kind") not in PROGRAM_KINDS and bool(recipient_email(item))
+                        and item.get("reply_status") not in ("sending", "uncertain")
+                        and (arrived is None or arrived <= sent_at))
+
+            pairs = {(ref, recipient_email(item)) for ref, data in queues.items() for item in data["emails"]
+                     if answers(item) and ((thread and item.get("thread_id") == thread)
+                                           or recipient_email(item) in recipients)}
+            if not pairs:
+                pairs = {(ref, email) for ref, data in queues.items()
+                         for email, conversation in data["conversations"].items()
+                         if email in recipients or (thread and thread in conversation.get("thread_ids", []))}
+            if len(pairs) > 1:
+                subject = plain_subject(message.get("subject"))
+                same = {(ref, email) for ref, email in pairs if subject and subject in (
+                    {plain_subject(item.get("subject")) for item in queues[ref]["emails"] if recipient_email(item) == email}
+                    | {plain_subject((queues[ref]["conversations"].get(email) or {}).get("subject"))})}
+                pairs = same or pairs
+            if len(pairs) != 1:
+                continue
+            [(ref, email)] = pairs
+            data = queues[ref]
+            if (data["conversations"].get(email) or {}).get("ignored"):
+                continue
+            mine = [item for item in data["emails"] if recipient_email(item) == email]
+            answered = [item for item in mine if answers(item)]
+            stale = [item for item in mine if item.get("kind") == "reminder"
+                     and (aware(item.get("date")) or sent_at) <= sent_at]
+            gone = {id(item) for item in answered + stale}
+            data["emails"] = [item for item in data["emails"] if id(item) not in gone]
+            data["replied_message_ids"].extend(item["id"] for item in answered)
+
+            conversation = data["conversations"].setdefault(email, {"stage": 0, "sent_message_ids": [], "thread_ids": []})
+            if answered:
+                conversation["stage"] = conversation.get("stage", 0) + 1
+                name = next(((item.get("recipient") or {}).get("name") or (item.get("customer") or {}).get("name")
+                             for item in answered
+                             if (item.get("recipient") or {}).get("name") or (item.get("customer") or {}).get("name")), "")
+                if name and not conversation.get("name"):
+                    conversation["name"] = name
+            conversation.setdefault("sent_message_ids", []).append(key)
+            if thread and thread not in conversation.setdefault("thread_ids", []):
+                conversation["thread_ids"].append(thread)
+            if not conversation.get("subject") and message.get("subject"):
+                conversation["subject"] = message["subject"]
+            text = own_text(message.get("body_text"))
+            if text:
+                conversation["last_text"] = text
+                turn = {"who": "nos", "text": text[:4000], "at": sent_at.date().isoformat()}
+                for holder in [conversation] + [item for item in data["emails"] if recipient_email(item) == email
+                                                and item.get("kind") not in PROGRAM_KINDS
+                                                and (aware(item.get("date")) or sent_at) > sent_at]:
+                    history = holder.setdefault("history", [])
+                    history.append(dict(turn))
+                    history.sort(key=lambda entry: entry.get("at") or "")  # stable: same-day order kept
+                    del history[:-HISTORY_LIMIT]
+            last = aware(conversation.get("last_sent_at"))
+            if last is None or sent_at > last:
+                conversation["last_sent_at"] = sent_at.astimezone(timezone.utc).isoformat()
+            ours.add(key)
+            recorded[ref] += 1
+            if answered:
+                first = min((aware(item.get("date")) for item in answered if aware(item.get("date"))), default=None)
+                self.log("send", message_id=answered[0]["id"], status="sent", kind="direct", reference=ref,
+                         at=sent_at.astimezone(timezone.utc).isoformat(),
+                         waited_hours=round((sent_at - first).total_seconds() / 3600, 1) if first else None)
+        return recorded
 
     @staticmethod
     def check_revision(data, expected):
@@ -766,7 +922,7 @@ class MailService:
                 "rental": visits.get("rental") or "", "sale": visits.get("sale") or ""}
 
     def open_visits(self, ref, voice):
-        """The windows still to come and their free times, for the assistant's instructions."""
+        """The windows still to come and their free times, for the assistant's instructions, and who is booked."""
         if not ref:
             return None
         rules = self.visit_rules(voice)
@@ -774,7 +930,8 @@ class MailService:
         booked = {slot["at"] for slot in agenda["slots"]}
         today = date.today().isoformat()
         return {**rules, "windows": [{**window, "free": free_times(window, rules["slot"], booked)}
-                                     for window in agenda["windows"] if window["day"] >= today]}
+                                     for window in agenda["windows"] if window["day"] >= today],
+                "booked": sorted({slot["customer"] for slot in agenda["slots"] if slot["at"][:10] >= today})}
 
     def check_visits(self, ref, data, entries, visits):
         """The visit marks of a pasted answer: known emails, a known status, and a free time on the agenda."""

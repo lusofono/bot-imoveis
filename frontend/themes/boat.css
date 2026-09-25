@@ -291,11 +291,11 @@
 /* Agenda: the ship's logbook, a navy canvas binding with white ruled pages */
 :root[data-theme="boat"] .filofax{border:6px solid var(--navy);background:var(--navy);box-shadow:0 0 0 1px #0a1d33,inset 0 0 0 1px #2a4a6e,0 16px 40px #0f2a4733}
 :root[data-theme="boat"] .filofax-page{border-color:#d9e3ec;background-color:#fff;color:#13233a;
-  background-image:repeating-linear-gradient(#0000 0 26px,#dbe7f1 26px 27px)}
+  --agenda-rule:#bfd3e3;--agenda-paper:#fff}
 :root[data-theme="boat"] .filofax-page.today{background-color:#f1f8fd}
 :root[data-theme="boat"] .filofax-page .muted,:root[data-theme="boat"] .filofax-weekday{color:#6b7a89}
 :root[data-theme="boat"] .filofax-head{border-bottom-color:var(--navy)}
-:root[data-theme="boat"] .filofax-page.today .filofax-weekday,:root[data-theme="boat"] .filofax-entry.slot strong{color:var(--accent)}
+:root[data-theme="boat"] .filofax-page.today .filofax-weekday{color:var(--accent)}
 :root[data-theme="boat"] .filofax-page:before{background-image:radial-gradient(circle,#aab1b8 1.6px,#0000 1.8px)}
 
 /* Messages: the toast is a marine screen in a chrome bezel; an empty inbox drops anchor */

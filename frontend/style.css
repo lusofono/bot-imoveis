@@ -146,31 +146,71 @@
 .workflow li.done .num{display:none}
 .workflow li.done .done-mark{display:inline;color:var(--ok);font-weight:700}
 
-/* Agenda: a weekly planner, filofax-style — one ruled paper page per day, side by side, with a punched-hole
-   left edge, not a Google-Calendar time grid. */
-.agenda-controls{margin-bottom:20px}
-.agenda-nav{display:flex;gap:2px;align-items:center;margin-left:auto}
+/* Agenda: a weekly planner, filofax-style — one paper page per day, side by side, with a punched-hole left
+   edge. Each day is a time column ruled every 15 minutes; app.js sets --quarter so it reaches the bottom of the
+   window. Themes paint it with --agenda-rule (the 15/30-minute rules) and --agenda-paper (behind a visit). */
+.agenda-controls{margin-bottom:10px;align-items:flex-end}
+.agenda-nav{display:flex;flex-direction:column;align-items:flex-end;gap:0;margin-left:auto}
+.agenda-range{font-size:20px;font-weight:600;letter-spacing:-.3px;font-variant-numeric:tabular-nums}
+.agenda-nav-buttons{display:flex;gap:2px;align-items:center}
 .agenda-nav button{padding:8px 10px;font-size:12px}
-#agenda-range{margin-left:4px;font-size:12px}
-.filofax{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));border:1px solid var(--line);
-  border-radius:14px;overflow:hidden;background:var(--card);box-shadow:var(--shadow)}
-.filofax-page{position:relative;padding:16px 14px 18px 24px;border-right:1px solid var(--line);
-  border-bottom:1px solid var(--line);background-image:repeating-linear-gradient(transparent 0 26px,var(--line) 26px 27px);
-  background-position:0 58px;min-height:170px}
+.agenda-nav button:disabled{opacity:.4}
+/* The four states of a visit time, the same in every theme: grey proposed, orange accepted (draft), green
+   confirmed (sent), brick overbooked (hatched too, so it reads without colour). */
+#tab-agenda{--agenda-grey:#8b929c;--agenda-orange:#ea8a12;--agenda-green:#2f9e5c;--agenda-brick:#b0442c}
+.agenda-options{justify-content:space-between;gap:10px 24px;margin-bottom:16px}
+.agenda-days{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.agenda-day{min-height:30px;padding:4px 10px;font-size:12px;border-radius:8px}
+.agenda-day[aria-pressed="false"]{opacity:.55;text-decoration:line-through;background:repeating-linear-gradient(135deg,
+  color-mix(in srgb,currentColor 12%,transparent) 0 4px,transparent 4px 8px)}
+.agenda-legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin:0}
+.agenda-legend span:before{content:"";display:inline-block;width:11px;height:11px;margin-right:6px;border-radius:3px;
+  vertical-align:-1px;background:var(--tone)}
+.agenda-legend .window{--tone:var(--agenda-grey)}.agenda-legend .accepted{--tone:var(--agenda-orange)}
+.agenda-legend .confirmed{--tone:var(--agenda-green)}
+.agenda-legend .overbooked:before{background:repeating-linear-gradient(135deg,var(--agenda-brick) 0 3px,
+  color-mix(in srgb,var(--agenda-brick) 55%,transparent) 3px 6px)}
+.filofax{--quarter:14px;--gutter:26px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card);box-shadow:var(--shadow)}
+.filofax-page{position:relative;min-width:0;padding:16px 12px 16px 24px;border-right:1px solid var(--line);
+  border-bottom:1px solid var(--line)}
 .filofax-page:before{content:"";position:absolute;left:0;top:0;bottom:0;width:10px;
   background-image:radial-gradient(circle,var(--control-border) 1.6px,transparent 1.8px);
   background-size:100% 20px;background-position:0 8px}
 .filofax-page.today{background-color:var(--accent-soft)}
-.filofax-head{display:flex;flex-direction:column;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid var(--text)}
+.filofax-head{position:relative;display:flex;flex-direction:column;margin-bottom:12px;padding-bottom:8px;
+  border-bottom:2px solid var(--text)}
+.filofax-off{position:absolute;top:-4px;right:0;min-height:0;padding:2px 0;font-size:10px;font-weight:600;
+  letter-spacing:.3px;opacity:.7}
+.filofax-off:hover{opacity:1}
+.filofax-page.blackout{background-image:repeating-linear-gradient(135deg,color-mix(in srgb,currentColor 7%,transparent) 0 6px,
+  transparent 6px 12px)}
+.filofax-none{grid-column:1/-1;margin:0}
 .filofax-weekday{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
 .filofax-page.today .filofax-weekday{color:var(--accent);font-weight:700}
 .filofax-date{font-size:19px;font-weight:600;letter-spacing:-.5px}
-.filofax-lines{display:grid;gap:9px;font-size:12px}
-.filofax-entry strong{display:block;font-size:12.5px;font-weight:600}
-.filofax-entry.slot strong{color:var(--accent)}
-.filofax-empty{margin:2px 0 0;font-style:italic}
+.filofax-summary{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-style:italic}
+.filofax-day{position:relative}
+.filofax-rule{position:absolute;left:var(--gutter);right:0;border-top:1px dotted var(--agenda-rule,var(--line))}
+.filofax-rule.half{border-top-style:dashed}
+.filofax-rule.hour{left:0;border-top:1px solid color-mix(in srgb,currentColor 30%,transparent)}
+.filofax-hour{position:absolute;left:0;padding-top:3px;font:600 10px/1 ui-monospace,SFMono-Regular,monospace;
+  color:color-mix(in srgb,currentColor 60%,transparent)}
+.filofax-entry{position:absolute;overflow:hidden;border-radius:3px}
+.filofax-entry.window{z-index:1;background:color-mix(in srgb,var(--agenda-grey) 16%,transparent);
+  border-left:3px solid var(--agenda-grey)}
+.filofax-entry.visit{--tone:var(--agenda-green);z-index:2;display:flex;flex-direction:column;justify-content:center;
+  padding:0 6px;background:color-mix(in srgb,var(--tone) 24%,var(--agenda-paper,var(--card)));
+  border-left:4px solid var(--tone);font-size:10px;line-height:1.2}
+.filofax-entry.accepted{--tone:var(--agenda-orange)}
+.filofax-entry.overbooked{--tone:var(--agenda-brick);background-image:repeating-linear-gradient(135deg,
+  color-mix(in srgb,var(--agenda-brick) 28%,transparent) 0 5px,transparent 5px 10px)}
+.filofax-entry strong,.filofax-entry span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.filofax-entry strong{font-size:11.5px;font-weight:600}
+.filofax-entry span{opacity:.75}
 @media(max-width:760px){.filofax{grid-template-columns:1fr}.filofax-page{border-right:0}
-  .agenda-nav{margin-left:0;width:100%;justify-content:space-between}.agenda-nav button{padding:8px 4px}}
+  .agenda-nav{margin-left:0;width:100%;align-items:stretch}.agenda-nav-buttons{justify-content:space-between}
+  .agenda-nav button{padding:8px 4px}}
 
 /* The digest and visits-round cards sit side by side above the activity row; each wrapper div is
    display:contents so its one rendered .card becomes the grid's direct child (margin:0, like the rest). */

@@ -83,6 +83,7 @@ def web_app(folder, token):
         result = service.read(body.get("days"))
         current = state()
         current["added"] = sum(item.get("added", 0) for item in result.get("properties", [])) or result.get("added", 0)
+        current["direct"] = result.get("direct", 0)
         return current
 
     def prompt(body):

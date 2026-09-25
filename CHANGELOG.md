@@ -15,6 +15,73 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.35.0 — 25/09/2026
+
+- **A leitura passa a ver também o que enviaste diretamente do Gmail.** Quando respondes a um cliente fora
+  da página, a próxima leitura encontra essa resposta (pelo endereço do cliente ou pela conversa do Gmail; o
+  assunto desempata quando o mesmo cliente está em dois imóveis) e:
+  - tira da fila, como respondidos, os emails desse cliente que chegaram antes da tua resposta, e os
+    lembretes que já não fazem sentido;
+  - avança a conversa uma interação (quando respondeu a algum email), para a próxima resposta da IA ser a
+    etapa certa;
+  - junta ao histórico o que escreveste, sem o email citado por baixo, para a IA ter esse contexto — também
+    nos emails do cliente que chegaram depois e ainda esperam resposta;
+  - conta-a no Painel como uma resposta enviada, com o tempo que o cliente esperou.
+- Os emails enviados pela própria página nunca contam duas vezes, e o correio para quem a página não
+  conhece fica de fora. No fim da leitura, a mensagem diz quantas respostas tuas foram registadas.
+- Num ensaio com uma cópia dos teus dados, a leitura encontrou 13 respostas tuas dos últimos 5 dias; na
+  Ramada, 6 emails que continuavam por responder já tinham resposta tua.
+
+## α.34.0 — 25/09/2026
+
+- **Marcar visitas: quando o cliente pede uma hora fora do intervalo (ou já ocupada), a resposta oferece-lhe
+  a hora que nos convém**, para juntar as visitas do dia: a primeira hora livre, com início e fim, por
+  exemplo «Lamentamos, mas para esse dia já só temos o período das 15:00 (início da visita) às 15:30 (fim).
+  Caso não encontremos um cliente indicado para o arrendamento nas visitas desse dia, voltaremos a organizar
+  visitas e iremos propor outra data e horário em breve.» Não fica nada marcado até o cliente aceitar.
+- **A resposta seguinte do cliente («pode ser às 15:00») continua a ser a 4.ª interação**, e por isso pode ser
+  marcada. Antes passava a 5.ª, que não tem prompt, e ficava parada à espera do proprietário. Vale enquanto
+  a janela para que o cliente foi convidado estiver aberta e ele ainda não tiver visita marcada; quem já tem
+  visita marcada, ou disse que não quer visitar, continua a ir para o proprietário.
+- O prompt da 4.ª interação dos dois imóveis foi atualizado com esta resposta (nos teus dados, não no Git).
+
+## α.33.1 — 25/09/2026
+
+- **90's RacingCar: o texto que vai ser enviado passa a estar em papel claro, com letra preta** — o rascunho de
+  cada email, o ponto de situação diário e a pré-visualização do envio. É mais fácil de ler e de rever antes de
+  enviar. As outras caixas (instruções, JSON, prompts) continuam escuras, como o resto do cockpit.
+
+## α.33.0 — 25/09/2026
+
+- **Agenda: dias em blackout.** Cada dia tem um botão «Blackout»: o dia sai da semana e os outros alargam.
+  Os dias também se ligam e desligam na fila «Dias: Seg … Dom», por cima da semana, que é por onde voltas a
+  pôr um dia em blackout como disponível. A escolha vale para esse dia da semana (todos os domingos, por
+  exemplo) e fica guardada neste browser, como o tema. Um dia em blackout que ainda tenha visitas não
+  desaparece: fica às riscas, com «Blackout, mas com visitas», para nenhuma visita ficar escondida.
+- **As datas da semana ficam por cima dos botões** (por exemplo, «21/09 – 27/09/2026»), em vez do «Esta
+  semana» repetido; o botão «Esta semana» fica apagado quando já estás nela.
+
+## α.32.0 — 25/09/2026
+
+- **Agenda com quatro cores**, com legenda por cima da semana:
+  - **cinzento**: a janela de horários proposta na ronda de visitas;
+  - **laranja**: a hora que o cliente aceitou, ainda num rascunho por enviar;
+  - **verde**: a visita que confirmaste, ou seja, cujo email já foi enviado;
+  - **tijolo, às riscas**: visitas sobrepostas (overbooking) — duas visitas, de qualquer imóvel, a horas que
+    se cruzam. Aparece mesmo com o filtro num só imóvel, e passar o rato diz com que visita choca.
+- Por baixo da data, o resumo do dia conta as confirmadas, as por confirmar e as sobrepostas.
+
+## α.31.0 — 25/09/2026
+
+- **Agenda: cada dia vai agora até ao fundo da janela**, com as horas escritas na margem e uma linha a cada
+  15 minutos (a meia hora a tracejado, a hora cheia a traço contínuo). Cada visita marcada fica à sua hora,
+  com a altura do tempo que ocupa, e a proposta de visitas aparece como uma faixa do início ao fim do
+  intervalo. A largura dos dias não muda.
+- O dia mostra sempre das 9h às 19h; uma visita mais cedo ou mais tarde alarga a semana toda, para os dias
+  continuarem alinhados. Por baixo da data, uma linha resume o dia («Proposta: 12:00–16:00 · 2 marcadas»).
+- Em «Todos», duas visitas à mesma hora (de imóveis diferentes) ficam lado a lado; as outras mantêm a
+  largura inteira. Passar o rato por cima de uma marcação mostra o nome completo e o imóvel.
+
 ## α.30.0 — 24/09/2026
 
 - **«90's Boat» ganha os extras:**
