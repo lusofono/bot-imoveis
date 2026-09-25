@@ -85,22 +85,22 @@ def test_lead_is_extracted_into_its_property_queue_and_answered_at_reply_to(serv
     conversation = service.load(REF)["conversations"][CUSTOMER]
     assert conversation["stage"] == 1 and conversation["thread_ids"] == ["t1"]
 
-    # Same customer again through the portal, and a direct answer to our email: both are the 2nd interaction.
+    # Same customer again through the portal, and a direct answer to our email: one card, the 2nd interaction,
+    # that answers both at once (merged, 25/09) — never two replies to the same person.
     answer = {"gmail_message_id": "3", "from": [{"name": "Ana Exemplo", "email": CUSTOMER}],
               "in_reply_to": str(SMTP.sent[0]["Message-ID"]), "subject": "Re: Nova mensagem",
               "body_text": "Sou enfermeira.\n\nOn Thu, 17 Sep 2026, Owner <owner@example.com> wrote:\n> Olá, Ana."}
-    emails = {e["id"]: e for e in read(service, [lead("2"), answer])["properties"][0]["emails"]}
-    assert emails["2"]["interaction"] == emails["3"]["interaction"] == 2
-    assert (emails["3"]["kind"], emails["3"]["recipient"]["email"]) == ("follow_up", CUSTOMER)
-    assert emails["3"]["customer"]["message"] == "Sou enfermeira."
-    assert any("outro email pendente" in warning for warning in emails["3"]["warnings"])
-    # Both a repeat portal lead and a direct follow_up from a known customer carry the prior exchange:
-    # what we sent, then what they wrote in their second message via the portal.
-    expected_history = [{"who": "nos", "text": "Olá, Ana.", "at": emails["2"]["history"][0]["at"]}]
-    assert emails["2"]["history"] == expected_history
-    assert emails["3"]["history"] == expected_history + [
-        {"who": "cliente", "text": "Bom dia, gostaria de visitar o imóvel.\nPode ser ao fim da tarde?",
-         "at": emails["3"]["history"][1]["at"]}]
+    [merged] = read(service, [lead("2"), answer])["properties"][0]["emails"]
+    assert (merged["id"], merged["merged_ids"], merged["interaction"]) == ("2", ["3"], 2)
+    assert (merged["kind"], merged["recipient"]["email"]) == ("follow_up", CUSTOMER)
+    assert "Pode ser ao fim da tarde?" in merged["customer"]["message"] and "Sou enfermeira." in merged["customer"]["message"]
+    assert not any("outro email pendente" in warning for warning in merged["warnings"])
+    # It carries the prior exchange: what we sent before these messages.
+    expected_history = [{"who": "nos", "text": "Olá, Ana.", "at": merged["history"][0]["at"]}]
+    untimed = lambda turns: [{key: value for key, value in turn.items() if key != "ts"} for turn in turns]  # noqa: E731
+    assert untimed(merged["history"]) == expected_history
+    # Read again: neither email comes back on its own.
+    assert [e["id"] for e in read(service, [lead("2"), answer])["properties"][0]["emails"]] == ["2"]
     # A brand-new customer (first message ever) starts with no history.
     novo = lead("9", reply_to=("novo@example.com",), body_email="novo@example.com")
     new_email = next(e for e in read(service, [novo])["properties"][0]["emails"] if e["id"] == "9")

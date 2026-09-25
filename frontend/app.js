@@ -1,7 +1,7 @@
 // The page's logic. It only talks to the API (fetch); every rule is decided there.
 // TOKEN is written into index.html by the server at each start and goes with every API call.
 const STATUS ={pending: 'por responder', draft: 'rascunho', error: 'erro no envio', sending: 'a enviar', uncertain: 'envio incerto'};
-const AUX_KINDS = ['reminder', 'consent_request', 'visits_closed'];
+const AUX_KINDS = ['reminder', 'consent_request', 'visits_closed', 'addition'];
 const FIELDS = ['reference', 'sender', 'listing_id', 'listing_url', 'advertiser', 'advertised_rent_eur', 'description'];
 const $ = id => document.getElementById(id);
 let state = {properties: []}, settings = null, preview = null;
@@ -382,12 +382,40 @@ function renderState() {
   const emails = queue?.emails || [];
   $('emails').replaceChildren(...(emails.length ? emails.map(card)
     : [el('div', {class: 'empty-state'}, el('strong', {}, state.error ? 'Configuração pendente' : 'Tudo em dia.'), state.error ? 'Verifica o aviso acima para continuar.' : 'Não há emails pendentes. Faz uma nova leitura quando quiseres.')]));
+  const active = queue?.active || [];
+  $('active-cards').replaceChildren(...(active.length ? [
+    el('div', {class: 'section-heading active-heading'}, el('h2', {}, 'Enviados · clientes ativos'), el('span', {class: 'tag'}, String(active.length))),
+    el('p', {class: 'step'}, 'Já respondidos, pela página ou no teu Gmail. Ficam aqui até haver visita marcada ou até os retirares; «Escrever mais» abre um rascunho na conversa do cliente.'),
+    ...active.map(activeCard)] : []));
   $('instructions').textContent = queue?.instructions || '';
   preview = null; $('preview-box').replaceChildren();
   // A fresh batch of emails makes any earlier "done" (import, send) stale: back to work, not finished.
   $('import-status').hidden = true; markStep('import-step', false); markStep('send-step', false);
   updateSelection();
   holdFuelButtons();  // the email cards were just rebuilt (or the queue changed), their API buttons with them
+}
+
+// A sent card: an active customer already answered, until a visit is booked or the owner takes it out.
+function activeCard(active) {
+  const act = (path, message) => run(async () => {
+    state = (await call(path, {property_ref: queueRef(), email: active.email})).state; renderState(); toast(message);
+  });
+  return el('article', {class: 'card email-card sent-card'},
+    el('div', {class: 'card-head'},
+      el('span', {class: 'who'}, el('strong', {}, active.name || active.email)),
+      el('span', {class: 'tag sent'}, 'enviado'),
+      el('span', {class: 'tag'}, active.stage + '.ª interação'),
+      active.visit_accepted && el('span', {class: 'tag visit'}, 'aceite ' + slotLabel(active.visit_accepted)),
+      active.visit && el('span', {class: 'tag warn'}, VISIT_STATES[active.visit] || active.visit),
+      el('span', {class: 'muted small'}, when(active.last_sent_at))),
+    el('div', {class: 'muted small'}, active.email),
+    active.last_text && el('details', {}, el('summary', {}, 'O que enviámos por último'), el('blockquote', {}, active.last_text)),
+    (active.history || []).length > 1 && el('details', {},
+      el('summary', {}, `Conversa (${active.history.length} trocas, mais recente primeiro)`),
+      conversationTurns(active.history, null)),
+    el('div', {class: 'actions'},
+      el('button', {type: 'button', onclick: () => act('api/active/write', 'Rascunho de acrescento criado na fila, acima.')}, 'Escrever mais'),
+      el('button', {type: 'button', class: 'link', onclick: () => act('api/active/remove', 'Retirado da fila até a conversa voltar a mexer.')}, 'Retirar da fila')));
 }
 
 function updateSelection() {
@@ -402,17 +430,51 @@ function updateSelection() {
   markStep('prepare-step', false);
 }
 
-// The whole exchange with this customer, oldest first, ending in the current message: what the
-// assistant also gets in the prompt, so the page never shows less context than it hands over.
+// The whole exchange with this customer, newest first: this email, and — when ours is the latest word —
+// the reply we sent after it (in Gmail, or one more email), marked as still unanswered. Never less than
+// the prompt gets (which keeps the conversation oldest first).
+// Day AND time of a turn («qui., 24/09, 21:40»): with only the day, two messages of the same day cannot be told
+// apart. Older turns kept only the day; a merged card still knows each message's own time (dates).
+function turnWhen(turn, dates) {
+  const moment = new Date(turn.ts || dates?.get((turn.text || '').trim()) || '');
+  if (!isNaN(moment)) {
+    return moment.toLocaleString('pt-PT', {weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
+  }
+  return turn.at ? turn.at.slice(8, 10) + '/' + turn.at.slice(5, 7) : '';
+}
+
+function conversationTurns(turns, current, dates) {
+  const newest = [...turns].reverse();
+  return newest.map((turn, index) => el('div', {class: 'history-turn' + (current?.has(turn) ? ' current' : '')},
+    el('p', {class: 'muted small'}, turn.who === 'cliente' ? 'Cliente' : 'Nós', ' · ' + turnWhen(turn, dates),
+      current?.has(turn) ? ' · neste cartão' : '',
+      index === 0 && turn.who !== 'cliente' ? ' · a nossa última resposta, ainda sem resposta do cliente' : ''),
+    el('pre', {}, turn.text)));
+}
+
 function historyBlock(email) {
-  if (email.visit_window || AUX_KINDS.includes(email.kind) || email.closing) return false;
-  const history = email.history || [];
-  const turns = [...history, {who: 'cliente', text: email.body_text || '', at: (email.date || '').slice(0, 10)}];
+  // The customer's message(s) of this card: one, or several merged into one card (one reply answers all).
+  const parts = email.merged?.length ? email.merged : [{message: (email.customer || {}).message || email.body_text || '', date: email.date}];
+  const texts = new Set(parts.map(part => (part.message || '').trim()).filter(Boolean));
+  const dates = new Map(parts.filter(part => part.date).map(part => [(part.message || '').trim(), part.date]));
+  let turns = [...(email.conversation || [])];
+  if (!turns.length) turns = [...(email.history || [])];
+  const current = new Set(turns.filter(turn => turn.who === 'cliente' && texts.has(turn.text.trim())));
+  const program = email.visit_window || AUX_KINDS.includes(email.kind) || email.closing;
+  if (!current.size && !program) {
+    // Not in the conversation yet: put each where it belongs in time, not simply last.
+    for (const part of parts) {
+      const own = {who: 'cliente', text: part.message || '', at: (part.date || '').slice(0, 10), ts: part.date || undefined};
+      const stamp = part.date ? new Date(part.date).toISOString() : own.at;
+      const later = turns.findIndex(turn => turn.ts ? turn.ts > stamp : (turn.at || '') > own.at);
+      turns.splice(later < 0 ? turns.length : later, 0, own); current.add(own);
+    }
+  }
+  if (!turns.length) return false;
   return el('details', {},
-    el('summary', {class: 'muted small'}, 'Email completo' + (history.length ? ` (${history.length + 1} trocas)` : '')),
-    turns.map(turn => el('div', {class: 'history-turn'},
-      el('p', {class: 'muted small'}, turn.who === 'cliente' ? 'Cliente' : 'Nós', turn.at ? ' · ' + turn.at : ''),
-      el('pre', {}, turn.text))));
+    el('summary', {class: 'muted small'}, (program ? 'Conversa' : 'Email completo')
+      + (turns.length > 1 ? ` (${turns.length} trocas, mais recente primeiro)` : '')),
+    conversationTurns(turns, current, dates));
 }
 
 function card(email) {
@@ -461,7 +523,10 @@ function card(email) {
     el('div', {class: 'card-head'},
       el('label', {class: 'who'}, el('input', {type: 'checkbox', class: 'pick', 'data-id': email.id, checked: !email.blocked, disabled: !!email.blocked}),
         el('strong', {}, customer.name || sender.name || sender.email || 'Sem nome')),
-      email.interaction && el('span', {class: 'tag'}, email.interaction + '.ª interação'),
+      email.kind === 'addition' ? el('span', {class: 'tag visit'}, 'acrescento')
+        : email.interaction && el('span', {class: 'tag'}, email.interaction + '.ª interação'),
+      email.merged?.length > 1 && el('span', {class: 'tag visit', title: 'Vários emails deste cliente juntos: uma só resposta responde a todos.'},
+        email.merged.length + ' mensagens'),
       el('span', {class: 'tag' + (email.reply_status === 'draft' ? ' draft' : '')}, STATUS[email.reply_status] || email.reply_status || ''),
       email.kind === 'visit_proposal' && el('span', {class: 'tag visit'}, 'proposta de visita'),
       email.kind === 'reminder' && el('span', {class: 'tag visit'}, email.reminder === '4d' ? 'lembrete aos 4 dias' : 'lembrete aos 2 dias'),
@@ -478,6 +543,7 @@ function card(email) {
     email.consent_suggested && el('p', {class: 'alert warn'}, 'O cliente parece ter dito que sim: confirma para gravar em contactos.csv.'),
     el('blockquote', {}, email.visit_window
       ? `Proposta de visita: ${dayLabel(email.visit_window.day)}, das ${email.visit_window.start} às ${email.visit_window.end}.`
+      : email.kind === 'addition' ? '(acrescento teu a esta conversa: escreve-o abaixo, ou pede-o à IA nas instruções extra)'
       : AUX_KINDS.includes(email.kind) || email.closing ? '(sem mensagem nova do cliente: email preparado automaticamente, ver o rascunho abaixo)'
       : customer.message || email.body_text || ''),
     historyBlock(email),
@@ -1192,8 +1258,8 @@ function minutesOf(time) {
   return hours * 60 + (minutes || 0);
 }
 
-const AGENDA_KINDS = {window: 'Janela proposta', accepted: 'Aceite pelo cliente, por confirmar (rascunho por enviar)',
-  confirmed: 'Confirmada (email enviado)'};
+const AGENDA_KINDS = {window: 'Janela proposta', accepted: 'Aceite pelo cliente, por confirmar',
+  offered: 'Proposta nossa, à espera do cliente', confirmed: 'Confirmada'};
 
 // Every entry of one day, of every property: the filter only hides, so a clash with a hidden property still shows.
 function agendaEntries(iso) {
@@ -1202,17 +1268,29 @@ function agendaEntries(iso) {
     [property.reference, property.reference || property.description || 'Imóvel']));
   const length = settings?.voice?.visits?.slot_minutes || 30;  // a visit fills its whole slot
   const entries = [];
-  const visit = (ref, at, name, kind) => {
+  const visit = (ref, at, name, kind, evidence, before) => {
     const [day, time] = String(at).split(' ');
     if (day === iso) entries.push({ref, label: labels[ref] || ref || 'Imóvel', kind, start: minutesOf(time),
-      end: Math.min(minutesOf(time) + length, 24 * 60), text: `${time} · ${name || 'visita'}`});
+      end: Math.min(minutesOf(time) + length, 24 * 60), text: `${time} · ${name || 'visita'}`,
+      evidence: [evidence && `lido nos emails pela IA: «${evidence}»`, before && `antes: ${String(before).slice(11)}`]
+        .filter(Boolean).join(' · ')});
   };
   for (const property of properties) {
     for (const window of property.visits?.windows || []) {
       if (window.day === iso) entries.push({ref: property.reference, label: labels[property.reference], kind: 'window',
         start: minutesOf(window.start), end: minutesOf(window.end), text: `Janela: ${window.start}–${window.end}`});
     }
-    for (const slot of property.visits?.slots || []) visit(property.reference, slot.at, slot.name || slot.customer, 'confirmed');
+    for (const slot of property.visits?.slots || []) {
+      visit(property.reference, slot.at, slot.name || slot.customer, 'confirmed', slot.source === 'api' && slot.evidence,
+        slot.previous);
+    }
+    // Still to be agreed, found by «Atualizar agenda»: accepted by the customer (orange), offered by us (blue).
+    for (const accepted of property.visits?.accepted || []) {
+      visit(property.reference, accepted.at, accepted.name || accepted.customer, 'accepted', accepted.evidence, accepted.replaces);
+    }
+    for (const offered of property.visits?.offered || []) {
+      visit(property.reference, offered.at, offered.name || offered.customer, 'offered', offered.evidence, offered.replaces);
+    }
   }
   // The time a customer accepted sits in a draft until the owner sends it; only then is it booked (green).
   for (const queue of state?.properties || []) {
@@ -1310,13 +1388,14 @@ function renderAgenda() {
     const windows = entries.filter(entry => entry.kind === 'window'), visits = entries.filter(entry => entry.kind !== 'window');
     agendaLanes(visits);
     const tip = entry => [entry.clashes?.length ? 'Sobreposta (overbooking)' : AGENDA_KINDS[entry.kind], entry.text,
-      showLabel && entry.label,
+      showLabel && entry.label, entry.evidence,
       entry.clashes?.length && 'com ' + entry.clashes.map(other => `${other.text} (${other.label})`).join(', ')]
       .filter(Boolean).join(' · ');
     const count = (items, one, many) => items.length && `${items.length} ${items.length === 1 ? one : many}`;
     const summary = [...windows.map(entry => entry.text),
       count(visits.filter(entry => entry.kind === 'confirmed'), 'confirmada', 'confirmadas'),
       count(visits.filter(entry => entry.kind === 'accepted'), 'por confirmar', 'por confirmar'),
+      count(visits.filter(entry => entry.kind === 'offered'), 'proposta nossa', 'propostas nossas'),
       count(visits.filter(entry => entry.clashes.length), 'sobreposta', 'sobrepostas')].filter(Boolean).join(' · ');
     const day = el('div', {class: 'filofax-day'}, agendaRuling(from, quarters),
       windows.map(entry => agendaPlace(el('div', {class: 'filofax-entry window', title: tip(entry)}), from, entry)),
@@ -1337,6 +1416,19 @@ function renderAgenda() {
   if (!week.length) box.replaceChildren(el('p', {class: 'empty-state filofax-none'}, 'Todos os dias estão em blackout. Liga um dia em «Dias».'));
   fitAgenda();
 }
+
+// «Atualizar agenda»: the API reads the active customers' conversations and updates the agenda by itself.
+async function syncAgenda() {
+  const result = await call('api/agenda/sync', {});
+  settings = result.settings; state = result.state; renderSettings(); renderState();
+  if (activeTab === 'agenda') renderAgenda();
+  const done = result.properties.map(item => item.skipped ? `${item.property_ref}: ${item.skipped}`
+    : `${item.property_ref}: ${item.confirmed} nova(s), ${item.moved} mudada(s) de hora, ${item.accepted} aceite(s) `
+      + `por confirmar, ${item.offered} proposta(s) nossa(s)`);
+  toast('Agenda atualizada. ' + done.join(' · '));
+}
+$('agenda-sync').addEventListener('click', event => run(syncAgenda, event.currentTarget));
+$('agenda-sync-here').addEventListener('click', event => run(syncAgenda, event.currentTarget));
 
 $('agenda-prev').addEventListener('click', () => { agendaWeekOffset--; renderAgenda(); });
 $('agenda-next').addEventListener('click', () => { agendaWeekOffset++; renderAgenda(); });

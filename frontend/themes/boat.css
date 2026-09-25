@@ -149,12 +149,18 @@
 :root[data-theme="boat"] :is(button,.button).primary{color:#fff;border-color:#0a1d33;text-shadow:0 1px 1px #0008;
   background:linear-gradient(180deg,#2a649f,#0f2a47);box-shadow:inset 0 1px 0 #ffffff4d,0 0 0 2px #fdfbf7,0 0 0 3.5px #aab1b8,0 6px 14px #0f2a4740}
 :root[data-theme="boat"] :is(button,.button).primary:hover{border-color:#0a1d33;background:linear-gradient(180deg,#3274b5,#123356)}
-:root[data-theme="boat"] :is(button,.button).send-action{border:3px solid #0000;color:#fff;font-size:12px;font-weight:700;letter-spacing:.8px;
-  text-transform:uppercase;text-shadow:0 1px 1px #0009;
-  background:linear-gradient(180deg,#cc2d24,#a61b14) padding-box,repeating-linear-gradient(-45deg,#fff 0 7px,#d7261e 7px 14px) border-box;
-  box-shadow:0 0 0 1px #8f1510,0 4px 12px #a61b1440}
-:root[data-theme="boat"] :is(button,.button).send-action:hover{border-color:#0000;filter:brightness(1.08);
-  background:linear-gradient(180deg,#d7342a,#b01e16) padding-box,repeating-linear-gradient(-45deg,#fff 0 7px,#d7261e 7px 14px) border-box}
+/* Send buttons: a navy instrument key with a thin metal ring and an aqua pilot light — sending is the
+   normal end of the work, not an alarm; red stays for alarms and destructive actions */
+:root[data-theme="boat"] :is(button,.button).send-action{border:1px solid #a9b5bb;color:#f5f2ea;font-size:13px;font-weight:600;
+  letter-spacing:.2px;text-transform:none;text-shadow:0 1px 0 #0006;
+  background:linear-gradient(180deg,#21506a,#173b4d 55%,#12303f);
+  box-shadow:inset 0 1px 0 #ffffff2e,inset 0 -1px 0 #0000004d,0 2px 4px #0f2a4740}
+:root[data-theme="boat"] :is(button,.button).send-action::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;
+  background:#48b8ac;box-shadow:0 0 0 1px #0f2a4799,0 0 6px #48b8ac99}
+:root[data-theme="boat"] :is(button,.button).send-action:hover{border-color:#c4ced3;
+  background:linear-gradient(180deg,#27607e,#1a4458 55%,#143545)}
+:root[data-theme="boat"] :is(button,.button).send-action:active{transform:translateY(1px);
+  box-shadow:inset 0 1px 3px #0000004d,0 1px 2px #0f2a4733}
 :root[data-theme="boat"] :is(button,.button):disabled{filter:grayscale(.8);opacity:.55;transform:none}
 :root[data-theme="boat"] button.link{color:var(--accent);font-family:var(--ui);font-weight:600}
 :root[data-theme="boat"] button.link:hover{color:var(--accent-hover);text-decoration:underline;text-underline-offset:4px}

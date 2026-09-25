@@ -157,7 +157,7 @@
 .agenda-nav button:disabled{opacity:.4}
 /* The four states of a visit time, the same in every theme: grey proposed, orange accepted (draft), green
    confirmed (sent), brick overbooked (hatched too, so it reads without colour). */
-#tab-agenda{--agenda-grey:#8b929c;--agenda-orange:#ea8a12;--agenda-green:#2f9e5c;--agenda-brick:#b0442c}
+#tab-agenda{--agenda-grey:#8b929c;--agenda-orange:#ea8a12;--agenda-blue:#2f6fce;--agenda-green:#2f9e5c;--agenda-brick:#b0442c}
 .agenda-options{justify-content:space-between;gap:10px 24px;margin-bottom:16px}
 .agenda-days{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .agenda-day{min-height:30px;padding:4px 10px;font-size:12px;border-radius:8px}
@@ -167,6 +167,7 @@
 .agenda-legend span:before{content:"";display:inline-block;width:11px;height:11px;margin-right:6px;border-radius:3px;
   vertical-align:-1px;background:var(--tone)}
 .agenda-legend .window{--tone:var(--agenda-grey)}.agenda-legend .accepted{--tone:var(--agenda-orange)}
+.agenda-legend .offered{--tone:var(--agenda-blue)}
 .agenda-legend .confirmed{--tone:var(--agenda-green)}
 .agenda-legend .overbooked:before{background:repeating-linear-gradient(135deg,var(--agenda-brick) 0 3px,
   color-mix(in srgb,var(--agenda-brick) 55%,transparent) 3px 6px)}
@@ -203,6 +204,7 @@
   padding:0 6px;background:color-mix(in srgb,var(--tone) 24%,var(--agenda-paper,var(--card)));
   border-left:4px solid var(--tone);font-size:10px;line-height:1.2}
 .filofax-entry.accepted{--tone:var(--agenda-orange)}
+.filofax-entry.offered{--tone:var(--agenda-blue)}
 .filofax-entry.overbooked{--tone:var(--agenda-brick);background-image:repeating-linear-gradient(135deg,
   color-mix(in srgb,var(--agenda-brick) 28%,transparent) 0 5px,transparent 5px 10px)}
 .filofax-entry strong,.filofax-entry span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
@@ -340,3 +342,9 @@
 .trip-title{font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--accent)}
 .trip-reading{flex-basis:100%;text-align:center;color:var(--text)}
 #fuel-panel .fuel-row{margin:4px 0 8px}
+/* Sent cards (active customers already answered): quieter than the emails still to answer */
+.active-heading{margin-top:26px}
+.sent-card{opacity:.92;border-style:dashed}
+.sent-card .tag.sent{color:var(--ok);border-color:var(--success-border)}
+.history-turn{margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.history-turn.current{border-left:3px solid var(--accent);padding-left:10px}

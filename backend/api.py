@@ -169,6 +169,16 @@ def web_app(folder, token):
     def visit_analyze(body):
         return service.analyze_visits(body.get("property_ref") or None)
 
+    def active_write(body):
+        return {**service.write_more(body.get("property_ref") or None, body.get("email")), "state": state()}
+
+    def active_remove(body):
+        return {**service.remove_active(body.get("property_ref") or None, body.get("email")), "state": state()}
+
+    def agenda_sync(body):
+        # «Atualizar agenda»: the API reads the conversations and updates the agenda by itself.
+        return {**service.sync_agenda(body.get("property_ref") or None), "settings": service.settings(), "state": state()}
+
     def visit_propose(body):
         emails = body.get("emails")
         if not isinstance(emails, list) or not all(isinstance(email, str) for email in emails):
@@ -329,6 +339,8 @@ def web_app(folder, token):
                 "visits/candidates": ("POST", visit_candidates), "visits/propose": ("POST", visit_propose),
                 "visits/analysis-prompt": ("POST", visit_analysis_prompt), "visits/analyze": ("POST", visit_analyze),
                 "visits/round-summary": ("POST", visit_round_summary), "visits/close": ("POST", visits_close),
+                "agenda/sync": ("POST", agenda_sync),
+                "active/write": ("POST", active_write), "active/remove": ("POST", active_remove),
                 "consent/request": ("POST", consent_request), "consent/confirm": ("POST", consent_confirm),
                 "contacts": ("GET", lambda body: service.contacts()),
                 "contacts/save": ("POST", contact_save), "contacts/delete": ("POST", contact_delete),

@@ -3,6 +3,68 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 25/09/2026, tarde (6): um cliente, um cartão (α.38.0)
+
+**Decisão.**
+- **Pedido do utilizador** (com o exemplo de uma cliente real): se há dois ou três emails do mesmo cliente por responder,
+  responde-se a todos juntos. Na fila real havia 5 clientes da Ramada com 2 ou 3 emails cada.
+- `merge_pending` corre em cada leitura, depois das respostas diretas: junta os emails do mesmo cliente no
+  mesmo imóvel (não os lembretes, propostas, acrescentos ou bloqueados; só os que estão por responder ou em
+  rascunho). A base é o mais antigo ainda por responder (fica o id dele e a espera do cliente no Painel),
+  guarda `merged` (as mensagens, com data e se já tiveram resposta no Gmail) e `merged_ids`, e responde ao mais
+  recente (Message-ID, References, fio, assunto, tipo). Os `merged_ids` contam como conhecidos na leitura e vão
+  para `replied_message_ids`/`dismissed_message_ids` com o cartão.
+- **Com um email já respondido no Gmail:** junta-se como contexto; se há algo por responder, o cartão perde a
+  marca `answered_directly` (é uma etapa nova), com a nota de que parte já teve resposta. Rascunho anterior à
+  junção → volta a `pending` com aviso, para não sair uma resposta que ignora a mensagem nova.
+
+## 25/09/2026, tarde (5): a agenda segue a última mensagem, e as nossas propostas a azul (α.37.0)
+
+**Decisão.**
+- **Porquê:** na Ramada, um cliente estava a verde às 12:00 (marcado pela página), mas depois, no Gmail, o
+  proprietário escreveu «Fica então marcado hoje Sexta às 13:00»; e a outro (marcado às 14:00) escreveu
+  «It's available 14:30 tomorrow», ainda sem resposta. A α.36.0 não perguntava pelos já marcados, e não tinha
+  estado para uma proposta nossa.
+- **Todos os ativos são revistos** (menos quem recusou), com a hora que está na agenda no prompt («na agenda
+  agora»). Novo estado `proposta` (nós propusemos um dia e hora concretos, sem resposta a aceitar), guardado em
+  `visit_offered` e mostrado a azul. Regra: **vale o último estado de cada cliente** — `confirmada` noutra hora
+  muda a marcação (`previous`); `aceite` ou `proposta` noutra hora tiram a marcação antiga (`replaces`), porque
+  ela já não está combinada. `nenhuma` nunca desmarca: é um sinal vago de mais para apagar uma visita.
+- O utilizador pediu explicitamente que se analise também o último envio dele, mesmo sem resposta: é o que
+  alimenta a `proposta`, e as respostas escritas no Gmail já estão no histórico que vai para a IA.
+
+## 25/09/2026, tarde (4): a conversa inteira, a mais recente primeiro (α.36.1)
+
+**Decisão.**
+- **Pedido do utilizador:** no «Email completo», o mais recente primeiro, e a nossa última resposta ainda sem
+  resposta também. Antes, o cartão só mostrava `history`, o retrato tirado na leitura (tudo antes daquele
+  email). Agora `view()` junta `conversation` (a conversa como está agora) e a página mostra-a ao contrário;
+  o prompt continua a usar `history`, em ordem cronológica, que é o que a IA lê melhor.
+- **Hora em cada troca nova** (`ts`, UTC): o email do cliente leva a hora do cabeçalho Date, o envio a hora do
+  envio, a resposta no Gmail a hora dela. As trocas continuam a entrar por ordem de chegada; só a resposta do
+  Gmail, encontrada mais tarde, é inserida no sítio certo (`insert_turn`), e uma troca antiga sem hora conta
+  como anterior no mesmo dia. Uma primeira mensagem respondida só no Gmail passa a abrir a conversa com o que
+  o cliente escreveu, antes da resposta.
+
+## 25/09/2026, tarde (3): «Atualizar agenda» pela API e os enviados ficam na fila (α.36.0)
+
+**Decisão (as duas escolhidas pelo utilizador numa pergunta com opções).**
+- **Agenda: «API, automático»** (em vez de «API com revisão», que era a recomendação). `sync_agenda` pede à
+  IA, por imóvel, um JSON com o estado de cada cliente ativo (`confirmada`, `aceite`, `nenhuma`), a hora e uma
+  frase de prova; `parse_agenda` só aceita ids conhecidos e uma data e hora reais. `confirmada` → uma marcação
+  em `visitas.json` (`source: api`, com a prova); `aceite` → `visit_accepted` na conversa (laranja na Agenda,
+  via `settings().visits.accepted`), apagado quando a hora é marcada. Os clientes vão como `c1…cN`: os
+  endereços nunca saem para a OpenAI. Nada no passado; quem já está marcado, recusou ou é ignorado não entra.
+  Custo registado por imóvel e depósito respeitado (imóvel com depósito vazio fica de fora, com o motivo).
+  Uma confirmação lida pela IA pode ficar fora da janela ou da grelha de meia em meia hora — é o que foi
+  combinado —, e uma sobreposição aparece a tijolo, como qualquer outra.
+- **Fila: «Enviados ficam na fila».** Os cartões **calculam-se a partir das conversas** (`view().active`), sem
+  guardar cópias: cada conversa com pelo menos uma etapa, sem email na fila, sem visita marcada, que não
+  recusou nem é ignorada, e com as visitas do imóvel abertas. «Retirar da fila» grava `queue_removed_at` =
+  `last_sent_at`: o cartão volta quando houver outro envio. «Escrever mais» cria um item `addition` (novo tipo
+  auxiliar, com o histórico) na conversa: não sobe a etapa mas conta como a nossa última mensagem para os
+  lembretes (`last_sent_at`); no prompt aparece como «acrescento», sem mensagem do cliente.
+
 ## 25/09/2026, tarde (2): a resposta direta não tira nada da fila (α.35.1)
 
 **Decisão (revê a α.35.0).**

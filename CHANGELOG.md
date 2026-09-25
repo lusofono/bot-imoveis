@@ -15,6 +15,70 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.38.2 — 25/09/2026
+
+- **Cada troca da conversa mostra o dia e a hora** («qui., 24/09, 22:40»), no «Email completo» e nos cartões
+  «Enviados»: com só o dia, não se percebia qual de duas mensagens do mesmo dia era a mais recente.
+- As trocas antigas, que só tinham o dia, receberam a hora exata do Gmail (lido, nunca alterado): as 87
+  trocas dos dois imóveis têm hora, e ficaram pela ordem certa.
+
+## α.38.1 — 25/09/2026
+
+- **90's Boat: os botões de envio deixam de parecer um botão de emergência.** Em vez de vermelho com riscas
+  brancas e maiúsculas, «Enviar só este» (e o «Enviar» do lote e do ponto de situação) é agora uma tecla
+  azul-marinho (#173B4D, com degradé discreto), letra marfim (#F5F2EA) em semibold, aro fino metálico
+  (#A9B5BB) e uma pequena luz verde-água (#48B8AC), com relevo subtil. O vermelho fica para alarmes e ações
+  destrutivas.
+
+## α.38.0 — 25/09/2026
+
+- **Vários emails do mesmo cliente passam a ser um só cartão**, com uma só resposta para todos (marca
+  «N mensagens»). As mensagens aparecem juntas, da mais antiga para a mais recente, e a resposta vai em
+  resposta à mais recente. Ao enviar, ficam todas respondidas e a conversa avança uma única etapa.
+- Um email a que já respondeste no Gmail também entra no cartão, como contexto, com a nota «já respondida no
+  Gmail»; se houver alguma mensagem ainda por responder, o cartão é uma resposta nova.
+- Se já havia um rascunho escrito antes de chegarem as outras mensagens, volta a «por responder», com o
+  aviso para o reveres antes de enviar.
+- Lembretes, propostas de visita, acrescentos e emails bloqueados nunca se juntam.
+
+## α.37.0 — 25/09/2026
+
+- **«Atualizar agenda» passa a rever também quem já tem visita marcada**, e vale sempre a mensagem mais
+  recente: se no Gmail mudaste a hora (por exemplo, de 12:00 para 13:00), a visita muda de hora, com a nota
+  «antes: 12:00» ao passar o rato.
+- **Azul: proposta nossa, à espera do cliente.** Quando a última palavra é tua a propor um dia e uma hora
+  («It's available 14:30 tomorrow»), mesmo sem resposta do cliente, a Agenda mostra essa hora a azul. Se o
+  cliente tinha outra hora marcada, essa sai (a proposta nova substitui-a) e fica a nota «antes: 14:00».
+- Uma resposta vaga da IA sobre quem já está marcado nunca desmarca: só o laranja e o azul se apagam.
+
+## α.36.1 — 25/09/2026
+
+- **«Email completo» mostra a conversa inteira, da mais recente para a mais antiga**, e já não só o que havia
+  antes desta mensagem. A mensagem do cartão aparece destacada («esta mensagem»). Se a última palavra for
+  nossa — uma resposta que escreveste no Gmail, ou um acrescento —, aparece em cima, marcada «a nossa última
+  resposta, ainda sem resposta do cliente». O mesmo nos cartões «Enviados» («Conversa»).
+- Cada troca nova da conversa guarda também a hora, para as do mesmo dia ficarem pela ordem certa (a tua
+  resposta no Gmail às 10h antes do email do cliente às 12h). As trocas antigas, só com o dia, mantêm a ordem
+  que tinham.
+
+## α.36.0 — 25/09/2026
+
+- **«Atualizar agenda»** (em Respostas, ao lado de «Ler emails do Gmail», e na Agenda): a IA (API) lê as
+  conversas dos clientes ativos de cada imóvel — os emails deles e os nossos, também os que escreveste
+  diretamente no Gmail — e atualiza a Agenda sozinha, como escolheste:
+  - **verde**: um dia e uma hora que nós confirmámos ao cliente ficam marcados como visita;
+  - **laranja**: um dia e uma hora que o cliente propôs ou aceitou, mas que ainda não confirmámos.
+  Passar o rato mostra a frase do email em que a IA se baseou. Nunca marca no passado nem inventa horas, não
+  pergunta pelos clientes já marcados, que recusaram ou que ignoras, e os endereços nunca vão para a IA.
+  Gasta do depósito de cada imóvel; um imóvel com o depósito vazio fica de fora e a mensagem diz porquê.
+- **Os enviados ficam na fila.** Por baixo dos emails por responder, em «Enviados · clientes ativos», fica um
+  cartão por cada cliente ativo já respondido (pela página ou no teu Gmail), com o que enviámos por último e
+  a conversa. Sai quando há visita marcada, quando o cliente recusa ou é ignorado, quando fechas as visitas,
+  ou quando carregas em «Retirar da fila» (volta se a conversa mexer outra vez).
+  - **«Escrever mais»** cria um rascunho «acrescento» na conversa desse cliente (Re: o nosso último email):
+    escreves tu, ou pedes à IA nas instruções extra, e segue o caminho de sempre até «Enviar». Não gasta
+    uma etapa da conversa.
+
 ## α.35.1 — 25/09/2026
 
 - **Uma resposta tua escrita no Gmail já não tira nada da fila.** Enquanto não há dia e hora acordados, podes

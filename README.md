@@ -122,6 +122,11 @@ Com pelo menos um perfil, o READ só guarda:
 
 O resto do correio é ignorado, sem descarregar o texto.
 
+**«Atualizar agenda»** (Respostas e Agenda): a IA (API) lê as conversas dos clientes ativos e atualiza a
+Agenda sozinha — verde o dia e a hora que confirmámos, laranja os que o cliente aceitou. **Os enviados ficam na
+fila**, em «Enviados · clientes ativos», até haver visita marcada ou até os retirares; «Escrever mais» abre um
+rascunho de acrescento na conversa do cliente.
+
 **O assunto e o remetente das respostas.** O cliente nunca viu o aviso do portal, escrito para o
 proprietário, com emoji, a referência interna e o anunciante. Por isso a resposta a um pedido do portal
 leva o assunto definido na voz, que por omissão é a descrição do imóvel (`{imovel}` e `{referencia}` são

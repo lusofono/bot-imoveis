@@ -44,8 +44,11 @@ def test_a_reply_written_in_gmail_keeps_the_email_in_the_queue_marked_and_with_t
     assert kept["history"][-1]["text"] == "Olá Ana, pode visitar amanhã às 18:00."
     conversation = service.load(REF)["conversations"][CUSTOMER]
     assert conversation["stage"] == 1 and conversation["name"] == "Ana Exemplo"  # the Gmail reply was that step
-    assert conversation["history"][-1] == {"who": "nos", "text": "Olá Ana, pode visitar amanhã às 18:00.",
-                                          "at": at(2)[:10]}
+    last = conversation["history"][-1]
+    assert (last["who"], last["text"], last["at"]) == ("nos", "Olá Ana, pode visitar amanhã às 18:00.", at(2)[:10])
+    assert last["ts"][:16] == datetime.fromisoformat(at(2)).astimezone(timezone.utc).isoformat()[:16]
+    # «Email completo» shows the whole conversation: our reply in Gmail comes after the customer's email.
+    assert [turn["who"] for turn in kept["conversation"]][-2:] == ["cliente", "nos"]
     assert "<d1@mail.gmail.com>" in conversation["sent_message_ids"]
     [sent] = [event for event in events(service) if event["event"] == "send"]
     assert (sent["kind"], sent["reference"], sent["waited_hours"]) == ("direct", REF, 3.0)
@@ -87,7 +90,10 @@ def test_a_reply_older_than_the_customers_new_email_leaves_it_waiting_with_the_c
     assert result["direct"] == 1
     [waiting] = service.pending()["properties"][0]["emails"]
     assert waiting["id"] == "c2" and waiting["interaction"] == 2  # nothing pending was answered: no extra step
-    assert waiting["history"][-1]["text"] == "Já agora: a renda inclui o condomínio."
+    assert "Já agora: a renda inclui o condomínio." in [turn["text"] for turn in waiting["history"]]
+    # Same day, but in their real order: the reply in Gmail (3 h ago) before the customer's email (1 h ago).
+    texts = [turn["text"] for turn in waiting["conversation"]]
+    assert texts.index("Já agora: a renda inclui o condomínio.") < texts.index("Obrigada, e o estacionamento?")
 
 
 def test_mail_to_someone_the_page_does_not_know_is_left_alone(service):
