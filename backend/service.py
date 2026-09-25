@@ -263,6 +263,8 @@ class MailService:
                 warnings.append("Há outro email pendente deste cliente neste imóvel; evita respostas repetidas.")
             conversation = conversations.get(email, {})
             interaction = 3 if item.get("kind") == "visit_proposal" else conversation.get("stage", 0) + 1
+            if (item.get("answered_directly") or {}).get("interaction"):
+                interaction = item["answered_directly"]["interaction"]  # answered in Gmail: it keeps its step
             if (interaction > 4 and (everyone or email in invited) and email not in booked
                     and conversation.get("visit") != "nao_quer"):
                 interaction = 4
@@ -414,10 +416,11 @@ class MailService:
 
         Each is tied to one customer of one property: by the pending emails it answers (the same Gmail thread,
         or sent to their author), else by a conversation it went to; the subject settles a customer known in
-        two properties, and one still unclear is left alone. That customer's emails from before it leave the
-        queue as answered, with any reminder now out of date; the conversation moves on one interaction when
-        it answered something; and what the owner wrote joins the history — the conversation's and that of
-        the customer's later emails still waiting — so the next prompt reads it. Counted like a send.
+        two properties, and one still unclear is left alone. Nothing leaves the queue (the owner may still add
+        something): the customer's emails from before it are marked answered in Gmail, keep the step they had
+        and warn the owner; that step is spent once, by the reply in Gmail. What the owner wrote joins the
+        history of the conversation and of every email of that customer in the queue, so the next prompt reads
+        it. Counted like a send, with the customer's wait.
         """
         recorded = Counter()
         ours = {sent for data in queues.values() for conversation in data["conversations"].values()
@@ -455,16 +458,19 @@ class MailService:
             data = queues[ref]
             if (data["conversations"].get(email) or {}).get("ignored"):
                 continue
-            mine = [item for item in data["emails"] if recipient_email(item) == email]
-            answered = [item for item in mine if answers(item)]
-            stale = [item for item in mine if item.get("kind") == "reminder"
-                     and (aware(item.get("date")) or sent_at) <= sent_at]
-            gone = {id(item) for item in answered + stale}
-            data["emails"] = [item for item in data["emails"] if id(item) not in gone]
-            data["replied_message_ids"].extend(item["id"] for item in answered)
-
             conversation = data["conversations"].setdefault(email, {"stage": 0, "sent_message_ids": [], "thread_ids": []})
+            mine = [item for item in data["emails"] if recipient_email(item) == email and item.get("kind") not in PROGRAM_KINDS]
+            # Nothing leaves the queue: the owner may still add something from the page, or take it out.
+            answered = [item for item in mine if answers(item) and not item.get("answered_directly")]
+            local = sent_at.astimezone()
+            for item in answered:
+                item["answered_directly"] = {"at": sent_at.astimezone(timezone.utc).isoformat(),
+                                             "interaction": conversation.get("stage", 0) + 1}
+                item.setdefault("warnings", []).append(
+                    f"Já respondeste a este email diretamente no Gmail em {local:%d/%m} às {local:%H:%M}. "
+                    "Envia outro só se quiseres acrescentar algo; senão, retira-o da fila.")
             if answered:
+                # The reply written in Gmail is that step of the conversation.
                 conversation["stage"] = conversation.get("stage", 0) + 1
                 name = next(((item.get("recipient") or {}).get("name") or (item.get("customer") or {}).get("name")
                              for item in answered
@@ -480,9 +486,7 @@ class MailService:
             if text:
                 conversation["last_text"] = text
                 turn = {"who": "nos", "text": text[:4000], "at": sent_at.date().isoformat()}
-                for holder in [conversation] + [item for item in data["emails"] if recipient_email(item) == email
-                                                and item.get("kind") not in PROGRAM_KINDS
-                                                and (aware(item.get("date")) or sent_at) > sent_at]:
+                for holder in [conversation] + mine:
                     history = holder.setdefault("history", [])
                     history.append(dict(turn))
                     history.sort(key=lambda entry: entry.get("at") or "")  # stable: same-day order kept
@@ -584,7 +588,8 @@ class MailService:
         # turns of the conversation (ours and the customer's), for context in the next prompt.
         conversation = data["conversations"].setdefault(
             item["recipient"]["email"].casefold(), {"stage": 0, "sent_message_ids": [], "thread_ids": []})
-        aux = item.get("kind") in AUX_KINDS
+        # An email the owner already answered in Gmail spent its step then: one more email to it is an addition.
+        aux = item.get("kind") in AUX_KINDS or bool(item.get("answered_directly"))
         if not aux:
             stage = conversation["stage"] + 1
             conversation["stage"] = max(stage, 3) if item.get("kind") == "visit_proposal" else stage
@@ -863,7 +868,8 @@ class MailService:
                     # Program-made emails (visit proposal, reminder, closing, consent) answer no customer email:
                     # no waiting time, so they never skew the average or count as a request received.
                     self.log("send", message_id=item["id"], status=status, kind=item.get("kind"), reference=ref,
-                             waited_hours=None if item.get("kind") in PROGRAM_KINDS else waited_hours(item))
+                             waited_hours=None if item.get("kind") in PROGRAM_KINDS or item.get("answered_directly")
+                             else waited_hours(item))
                     if status == "uncertain":
                         break
             return {"results": results, "remaining": len(data["emails"])}

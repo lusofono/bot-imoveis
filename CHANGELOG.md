@@ -15,6 +15,17 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.35.1 — 25/09/2026
+
+- **Uma resposta tua escrita no Gmail já não tira nada da fila.** Enquanto não há dia e hora acordados, podes
+  sempre enviar mais um email; por isso os emails do cliente continuam na fila, com o aviso «Já respondeste a
+  este email diretamente no Gmail em dd/mm às hh:mm» e o teu texto no histórico. Podes acrescentar algo pela
+  página ou retirá-los da fila.
+- **A etapa conta uma só vez:** a tua resposta no Gmail é essa interação. Um email que envies depois pela
+  página a esse mesmo email é um acrescento: sai normalmente, mas não gasta outra etapa (nem volta a contar
+  o tempo de espera do cliente no Painel).
+- Os lembretes também ficam na fila, para decidires tu.
+
 ## α.35.0 — 25/09/2026
 
 - **A leitura passa a ver também o que enviaste diretamente do Gmail.** Quando respondes a um cliente fora

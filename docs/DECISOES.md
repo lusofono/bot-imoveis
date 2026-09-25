@@ -3,6 +3,24 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 25/09/2026, tarde (2): a resposta direta não tira nada da fila (α.35.1)
+
+**Decisão (revê a α.35.0).**
+- **Pedido do utilizador:** «enquanto não está acordada uma hora e data, podemos sempre enviar mais um email,
+  não fica fora da fila»; e, a seguir, «deveriam estar todos os ativos na fila, mesmo os respondidos».
+  Por isso a resposta escrita no Gmail já não retira emails nem lembretes: os emails do cliente anteriores
+  a ela ficam marcados `answered_directly` (`at`, `interaction`), com um aviso no cartão e o texto do
+  proprietário no histórico.
+- **Uma etapa por resposta:** a resposta no Gmail avança a conversa (é essa interação). O email marcado guarda
+  a etapa que tinha (`view()` usa `answered_directly.interaction`, e a regra da negociação de visitas continua
+  a aplicar-se por cima), e enviá-lo depois pela página é um acrescento: `advance()` trata-o como os
+  auxiliares (não sobe a etapa) e o `send` não volta a contar a espera do cliente. Retirá-lo da fila não
+  mexe na etapa.
+- Ensaio numa cópia dos dados reais (apagada): 13 respostas diretas; na Ramada, a fila fica com os 10
+  emails, 6 marcados «já respondeste».
+- **Em aberto:** «todos os ativos na fila, mesmo os respondidos pela página» é uma mudança maior (hoje um
+  envio pela página tira o email da fila) e fica para decidir com o utilizador.
+
 ## 25/09/2026, tarde: as respostas escritas diretamente no Gmail contam (α.35.0)
 
 **Decisão.**

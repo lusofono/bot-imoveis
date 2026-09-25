@@ -114,8 +114,9 @@ Com pelo menos um perfil, o READ só guarda:
 - avisos do portal com o remetente exato (`from_address_equals`) e a referência exata no assunto;
 - respostas diretas de um cliente a um email enviado por esta ferramenta (mesma conversa no Gmail);
 - as tuas próprias respostas escritas diretamente no Gmail a um cliente que a página conhece (pelo endereço
-  ou pela conversa do Gmail; o assunto desempata um cliente de dois imóveis). Os emails desse cliente
-  anteriores à tua resposta saem da fila como respondidos, a conversa avança uma interação e o que
+  ou pela conversa do Gmail; o assunto desempata um cliente de dois imóveis). Nada sai da fila: os emails
+  desse cliente anteriores à tua resposta ficam marcados «Já respondeste … no Gmail» (podes ainda
+  acrescentar algo, sem gastar outra etapa, ou retirá-los), a conversa avança uma interação e o que
   escreveste (sem a parte citada) entra no histórico, que a IA lê. Com «Todo o correio» já lá estão; com
   só a INBOX, a leitura abre também a pasta dos enviados.
 

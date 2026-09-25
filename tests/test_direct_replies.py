@@ -31,25 +31,33 @@ def events(service):
     return [json.loads(line) for line in (service.folder / "logs" / "events.jsonl").read_text().splitlines()]
 
 
-def test_a_reply_written_in_gmail_answers_the_pending_email_and_joins_the_history(service):
+def test_a_reply_written_in_gmail_keeps_the_email_in_the_queue_marked_and_with_the_context(service):
     read(service, [dict(lead("1"), date=at(5))])
     reply = direct("d1", 2, "Olá Ana, pode visitar amanhã às 18:00.\n\nEm qui., 24/09/2026 às 10:00, Ana <\n"
                             "ana.exemplo@example.com> escreveu:\n> Bom dia, gostaria de visitar o imóvel.")
     result = read_with_sent(service, [], [reply])
     assert result["direct"] == 1
-    assert service.pending()["properties"][0]["emails"] == []
-    queue = service.load(REF)
-    conversation = queue["conversations"][CUSTOMER]
-    assert conversation["stage"] == 1 and conversation["name"] == "Ana Exemplo"
+    # Nothing leaves the queue: the owner may still add something, or take it out.
+    [kept] = service.pending()["properties"][0]["emails"]
+    assert kept["id"] == "1" and kept["interaction"] == 1
+    assert any("diretamente no Gmail" in warning for warning in kept["warnings"])
+    assert kept["history"][-1]["text"] == "Olá Ana, pode visitar amanhã às 18:00."
+    conversation = service.load(REF)["conversations"][CUSTOMER]
+    assert conversation["stage"] == 1 and conversation["name"] == "Ana Exemplo"  # the Gmail reply was that step
     assert conversation["history"][-1] == {"who": "nos", "text": "Olá Ana, pode visitar amanhã às 18:00.",
                                           "at": at(2)[:10]}
-    assert "1" in queue["replied_message_ids"] and "<d1@mail.gmail.com>" in conversation["sent_message_ids"]
+    assert "<d1@mail.gmail.com>" in conversation["sent_message_ids"]
     [sent] = [event for event in events(service) if event["event"] == "send"]
     assert (sent["kind"], sent["reference"], sent["waited_hours"]) == ("direct", REF, 3.0)
 
     # Read again: the same reply is never counted twice.
     assert read_with_sent(service, [], [reply])["direct"] == 0
     assert service.load(REF)["conversations"][CUSTOMER]["stage"] == 1
+
+    # One more email to it from the page is an addition: it goes out, but spends no second step.
+    draft_and_send(service, "1", "Acrescento: o estacionamento está incluído.")
+    assert service.load(REF)["conversations"][CUSTOMER]["stage"] == 1
+    assert [event["waited_hours"] for event in events(service) if event["event"] == "send"][-1] is None
 
     # The customer answers the reply written in Gmail: a follow-up, the 2nd interaction, with the context.
     read(service, [{"gmail_message_id": "c2", "thread_id": "t1", "from": [{"email": CUSTOMER}],
