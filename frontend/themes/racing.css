@@ -1,4 +1,4 @@
-/* 90's RacingCar (theme id "racing") — a 90s Italian GT cockpit: carbon fibre where it races, figured walnut where it tours, black
+/* 80's RacingCar (theme id "racing") — an 80s Italian GT cockpit: carbon fibre where it races, figured walnut where it tours, black
    leather with rosso stitching, chrome and brushed aluminium; switches for buttons, a gated gearbox for the
    tabs, an analog dash clock and the full instrument cluster. Everything is under :root[data-theme="racing"]:
    the page draws the same elements in every theme, and app.js (SKINS.racing) adds this skin's words,
@@ -73,7 +73,9 @@
 :root[data-theme="racing"] .tab.active{background:linear-gradient(90deg,#0000006b,#0000001a);border-color:#0000005c;color:#fff;box-shadow:inset 0 1px 0 #ffffff14}
 :root[data-theme="racing"] .tab.active::before{background:radial-gradient(circle at 35% 30%,#ff7a6f,#e8140c 45%,#7d0904);
   box-shadow:0 0 0 2px #eceef1,0 0 0 3px #2a2a2c,0 0 14px #ff2a1a99}
-:root[data-theme="racing"] .nav-count{background:#050506;color:var(--amber);font:700 11px/1.6 var(--lcd);box-shadow:inset 0 1px 3px #000,0 0 0 1px #5a4a2a}
+:root[data-theme="racing"] .nav-count{background:#050506;color:var(--amber);font:700 10px/1.5 var(--lcd);box-shadow:inset 0 1px 3px #000,0 0 0 1px #5a4a2a;
+  margin-left:3px;padding:0 5px;align-self:flex-start;transform:translateY(-7px)}
+/* 26/09: the count is a superscript on the tab's name («Comunicações¹⁶»), not pushed to the far side */
 
 /* The gated gearbox (drawn by app.js): brushed aluminium, a black gate, a walnut knob */
 :root[data-theme="racing"] .skin-selector{display:block;margin:22px 4px 0}
@@ -162,7 +164,7 @@
 :root[data-theme="racing"] input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
 :root[data-theme="racing"] select{-webkit-appearance:none;appearance:none;padding-right:40px;border:1px solid #000;color:var(--text);font-family:var(--din);
   background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3CradialGradient id='k' cx='.35' cy='.3' r='.8'%3E%3Cstop offset='0' stop-color='%23fdfdfd'/%3E%3Cstop offset='.45' stop-color='%23a3a8ae'/%3E%3Cstop offset='1' stop-color='%233b3e43'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='12' cy='12' r='11.5' fill='%23050506'/%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='%238a8f96' stroke-width='2.4' stroke-dasharray='1.05 1.05'/%3E%3Ccircle cx='12' cy='12' r='7.6' fill='url(%23k)'/%3E%3Cpath d='M12 5.6v4.2' stroke='%23e8140c' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 8px center/22px 22px,linear-gradient(180deg,#1f1f23,#0d0d0f);box-shadow:inset 0 1px 0 #ffffff14,0 1px 3px #000a}
-:root[data-theme="racing"] :is(input:not([type=checkbox]),textarea){border:1px solid #000;background-color:#0b0b0d;box-shadow:inset 0 2px 7px #000e,0 1px 0 #ffffff12}
+:root[data-theme="racing"] :is(input:not([type=checkbox],[type=radio]),textarea){border:1px solid #000;background-color:#0b0b0d;box-shadow:inset 0 2px 7px #000e,0 1px 0 #ffffff12}
 :root[data-theme="racing"] textarea{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='turbulence' baseFrequency='.62' numOctaves='2' seed='3' stitchTiles='stitch'/%3E %3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 -1.6 .9'/%3E%3C/filter%3E %3Crect width='220' height='220' filter='url(%23n)' opacity='.07'/%3E%3C/svg%3E");outline:1px dashed #d2291e59;outline-offset:-7px}
 :root[data-theme="racing"] :is(input,textarea,select):focus{border-color:#000;outline:2px solid var(--amber);outline-offset:2px}
 /* The text that goes out — reply drafts, the daily digest and the send preview — is on light paper in black ink:
@@ -324,7 +326,7 @@
 }
 @media(prefers-reduced-motion:reduce){:root[data-theme="racing"] .shift-lights i,:root[data-theme="racing"] .gauge-alert .gauge-readout{animation:none}}
 
-/* A red 90s GT (F40-style wedge, big rear wing, NACA ducts, five-spoke wheels — no badge, no name) flashes across the
+/* A red 80s GT (F40-style wedge, big rear wing, NACA ducts, five-spoke wheels — no badge, no name) flashes across the
    top bar behind its text now and then, the way the sloop sails in 90's Boat. Pure design: transform only, clipped
    by the bar, first pass soon after the page opens, and gone with "reduce motion" */
 :root[data-theme="racing"] .topbar::before{content:"";position:absolute;left:0;bottom:3px;width:150px;height:35px;z-index:-1;
@@ -355,3 +357,16 @@
 @keyframes racing-return{0%{transform:translateX(-140px) scaleX(-1);animation-timing-function:cubic-bezier(.3,.3,.6,1)}
   20%,100%{transform:translateX(calc(100vw + 20px)) scaleX(-1)}}
 @media(prefers-reduced-motion:reduce){:root[data-theme="racing"] .workspace::after{display:none}}
+
+/* The Sons switch (26/09): at the right of the top bar, as in the boat, with a speaker that says off (crossed out) or
+   on (sound waves); rosso, like a lit switch on the dash, when on. app.js shows it only in a skin with sounds. */
+:root[data-theme="racing"] .sound-toggle{margin-left:auto;min-height:32px;padding:4px 12px 4px 9px;gap:7px;font-size:11px;
+  letter-spacing:.6px;text-transform:uppercase}
+:root[data-theme="racing"] .sound-toggle::before{content:"";width:16px;height:16px;flex:none;background:currentColor;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 9.5h3.5L12 5.5v13l-4.5-4H4Z'/%3E%3Cpath d='M16 9.5l5 5M21 9.5l-5 5'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 9.5h3.5L12 5.5v13l-4.5-4H4Z'/%3E%3Cpath d='M16 9.5l5 5M21 9.5l-5 5'/%3E%3C/svg%3E") center/contain no-repeat}
+:root[data-theme="racing"] .sound-toggle[aria-pressed="true"]{color:#fff;border-color:#5a0400;text-shadow:0 1px 1px #0008;
+  background:linear-gradient(180deg,#ff3b2f,#a30d06);box-shadow:0 0 14px #e8140c55}
+:root[data-theme="racing"] .sound-toggle[aria-pressed="true"]::before{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 9.5h3.5L12 5.5v13l-4.5-4H4Z'/%3E%3Cpath d='M15.5 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 9.5h3.5L12 5.5v13l-4.5-4H4Z'/%3E%3Cpath d='M15.5 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11'/%3E%3C/svg%3E")}
+:root[data-theme="racing"] .sound-toggle:not([hidden])+.theme-control{margin-left:0}
+@media(max-width:760px){:root[data-theme="racing"] .sound-toggle{padding:4px 8px;font-size:0;gap:0}}
+:root[data-theme="racing"] :is(button,.button).shortlist-toggle.on{background:linear-gradient(180deg,#ff3b2f,#a30d06);color:#fff;border-color:#5a0400}

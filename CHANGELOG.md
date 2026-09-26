@@ -15,6 +15,331 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.48.12 — 26/09/2026
+
+- **Contactos:** «Descarregar CSV» sai do cabeçalho da página e passa para o canto direito da linha dos filtros, logo
+  acima da tabela de todos os contactos.
+
+## α.48.11 — 26/09/2026
+
+- **Short list em Contactos: 3 cartões por linha**, a toda a largura; o quarto em diante passa para a linha de baixo
+  (2 por linha em ecrãs médios, 1 no telemóvel).
+- **Inquérito: o comentário acaba na despedida** («Obrigada», «Com os melhores cumprimentos»…) e já não apanha o
+  cabeçalho do email citado no formato do Gmail («<…> escreveu (sexta, 25/09/2026 à(s) 18:17):»).
+
+## α.48.10 — 26/09/2026
+
+- **70's Scooter:** a versão, no logótipo, passa de uma pílula vermelha a uma plaquinha bege com moldura cromada.
+
+## α.48.9 — 26/09/2026
+
+- **Horas com três algarismos no máximo:** de 100 h para cima sem decimais («214 h»), abaixo com uma casa («45,3 h»);
+  o «h» já não salta para a linha de baixo. No Painel, em cada imóvel e nos mostradores.
+
+## α.48.8 — 26/09/2026
+
+- **70's Scooter, logótipo tricolor completo:** «by BigLearn PT» passa a branco e a negrito, entre o verde de «AI
+  ASSISTANT» e o vermelho de «Real Estate».
+
+## α.48.7 — 26/09/2026
+
+- **70's Scooter, logótipo tricolor:** «AI ASSISTANT» passa a verde italiano com um fio branco, ao lado do «Real
+  Estate» vermelho.
+
+## α.48.6 — 26/09/2026
+
+- **Imóveis: o computador de bordo («Diário de viagem» no 70's Scooter) passa para o início, antes dos instrumentos,**
+  numa só linha mais baixa: título, distância, consumo, guardar e a leitura à direita.
+
+## α.48.5 — 26/09/2026
+
+- **Imóveis: os seis números do Painel, só deste imóvel**, logo a seguir aos instrumentos — pedidos por responder,
+  rascunhos prontos, bloqueados, a precisar de atenção, respostas enviadas e tempo médio até resposta. Um clique nos
+  da fila abre as Comunicações já neste imóvel.
+
+## α.48.4 — 26/09/2026
+
+- **Comunicações: «Rever e enviar» junta-se aos rascunhos.** Deixa de ser um cartão à parte e passa a uma barra no topo
+  da coluna dos emails, com «Pré-visualizar envio dos selecionados»; a pré-visualização abre logo abaixo, antes da
+  lista. Em cima fica só «Gerar respostas», a toda a largura.
+- **70's Scooter:** os três sons ganham mais 2 segundos, a desvanecer até ao silêncio (arranque 9 s, acelerada 8,3 s,
+  mudança 4,3 s).
+- **Corrigido:** o quadro da short list em Contactos usava o mesmo `id` que o contador de emails selecionados nas
+  Comunicações, e o número de candidatos ia parar ao sítio errado. Um teste garante agora que nenhum `id` se repete.
+
+## α.48.3 — 26/09/2026
+
+- **Quarto mostrador de satisfação: «Interesse em arrendar»** — «sim» 100, «talvez» 50, «não» 0, em média — no Painel e
+  em cada imóvel. Os mostradores ficam todos numa linha (até 4), dois por linha em ecrãs médios, um no telemóvel.
+
+## α.48.2 — 26/09/2026
+
+- **70's Scooter:** no fundo da barra lateral, a bota de Itália dá lugar a um emblema oval cromado — aro cromado, a
+  tricolor sob uma cúpula de vidro com o reflexo, e «Italia» em cursiva preta cromada (sem marca).
+
+## α.48.1 — 26/09/2026
+
+- **Painel, depósitos da API:** cada imóvel mostra por baixo do seu depósito o seu próprio gasto (neste período e
+  desde sempre); o total de todos os imóveis fica à parte, em linhas a toda a largura, com esse nome. Antes, as duas
+  linhas do total ficavam lado a lado, uma debaixo de cada imóvel, e pareciam ser de cada um.
+- **70's Scooter, sons mais longos:** o arranque com o ralenti (7 s), a acelerada com o andamento a seguir (6,3 s) e a
+  mudança de separador (2,3 s), com saídas mais suaves; um separador novo esbate o som do anterior.
+
+## α.48.0 — 26/09/2026
+
+- **70's Scooter: som de uma scooter a sério.** Três cortes de uma gravação real de uma PX 200 a dois tempos
+  (Freesound n.º 158891, *druki*, licença CC0 — domínio público, também para uso comercial): o arranque e o ralenti
+  quando chegam emails, uma acelerada ao enviar, e um pedaço de andamento a cada separador, mais agudo a cada mudança.
+  Ficam em `frontend/sounds/` (AAC, cerca de 100 KB no total), servidos pela própria página; os créditos estão em
+  `frontend/sounds/CREDITS.md`. Os sons sintetizados ficam como reserva, se um corte não puder tocar.
+- **«Escolher» o inquilino é um botão de emergência:** laranja, atrás de uma moldura às riscas amarelas e pretas; o
+  primeiro clique levanta a tampa (fica vermelho, a pulsar, «Confirmar: … é o inquilino», com «cancelar»), o segundo
+  escolhe; ao fim de 6 s sem confirmação, volta a fechar.
+- **Mostradores de qualidade em grelha de 3 por linha** (3 lado a lado; 6 em duas linhas), e sem o «null» que aparecia
+  no Painel.
+
+## α.47.6 — 26/09/2026
+
+- **Comunicações:** «Gerar respostas» e «Rever e enviar» passam para cima, lado a lado, e a lista de emails fica por
+  baixo, a toda a largura.
+
+## α.47.5 — 26/09/2026
+
+- **Short list como interruptor**, em Imóveis («Quem já visitou») e nas fichas de Contactos: «☆ Short list» junta o
+  cliente; aceso, «★ Na short list» (ou «★ Escolhido» / «★ Suplente»), tira-o, pedindo confirmação para o escolhido e o
+  suplente. O cartão atualiza-se logo a seguir ao clique.
+
+## α.47.4 — 26/09/2026
+
+- **Os mostradores de satisfação mostram já as respostas guardadas.** As que ficaram sem notas (escritas por
+  extenso) são relidas ao abrir a página, sem esperar pela leitura seguinte. O leitor também percebe respostas que
+  descrevem em vez de dar nota: «Rápida e clara», «eficiente», «profissional» valem 5; «lenta», «confusa» valem 2.
+- **70's Scooter: o tambor do punho de mudanças para sempre no número certo.** Antes, no Safari, ficava entre dois
+  números (metade do 3, metade do 4). Agora desliza em unidades do próprio desenho, com um pequeno ressalto ao
+  encaixar.
+
+## α.47.3 — 26/09/2026
+
+- **Mostradores de satisfação sempre à vista:** no Painel e, em Imóveis, num cartão novo «Satisfação dos clientes»
+  logo a seguir aos instrumentos. Sem respostas, o ponteiro fica a meio (como o meio-dia) e o visor diz «sem
+  respostas».
+
+## α.47.2 — 26/09/2026
+
+- **Inquérito: o leitor das respostas reescrito.** Lê pergunta a pergunta: a resposta é o que vem depois dos dois
+  pontos, mesmo quando a pergunta ocupa duas linhas; o negrito do Gmail (*…*) e o email citado não contam; uma nota
+  pode ser um algarismo ou uma palavra («Excelente», «Muito bom», «Razoável», «Fraco», «Mau», também em inglês e
+  francês). Antes só contava um algarismo no fim da linha, e o interesse era tirado das opções «(sim / não / talvez)»
+  da própria pergunta. As respostas já guardadas sem notas voltam a ser lidas na leitura seguinte — com os dados
+  reais, a de uma cliente passa a dar 5, 5 e 5 nos mostradores.
+- **80's RacingCar:** o número das Comunicações fica em expoente, junto ao nome, e não encostado ao lado direito.
+- **Imóveis:** «Quem já visitou · finalistas» passa para logo a seguir aos instrumentos, antes da blacklist, da
+  greylist e da última ronda.
+
+## α.47.1 — 26/09/2026
+
+- **90's Boat: os separadores cabem na barra lateral.** A bandeira, o ícone, o nome e o número não cabiam (cerca de
+  210 px para «Comunicações»), e o separador passava por baixo da calha cromada: menos espaço entre eles, a bandeira
+  um pouco mais pequena e o número numa bolha no canto do separador.
+
+## α.47.0 — 26/09/2026
+
+- **Imóveis: «Quem já visitou · finalistas».** Um cartão com quem apareceu às visitas do imóvel, do mais recente para
+  o mais antigo: o dia, as notas do inquérito e o interesse, a ficha, e se está na short list, é o escolhido ou o
+  suplente; «+ Short list» junta-o ao quadro no topo de Contactos. Quem faltou aparece numa linha à parte.
+- **O gráfico do imóvel** («O ritmo deste imóvel», «O percurso deste imóvel» no 70's Scooter) sai do quadro de
+  instrumentos e passa para o fim, depois da blacklist, da greylist e da última ronda.
+- **70's Scooter:** a bandeira do separador aberto fica com o dobro da largura e já não deixa linhas a sair pelos
+  outros lados.
+
+## α.46.12 — 26/09/2026
+
+- **70's Scooter:** os títulos ganham um toque de sol por baixo — uma só sombra mostarda, suave, a 2 px.
+
+## α.46.11 — 26/09/2026
+
+- **70's Scooter:** a tricolor no guiador dos instrumentos passa a ser um friso pintado nele — centrado, fino, com as
+  pontas redondas e um fio cromado à volta — em vez de uma faixa retangular que saía pelos cantos redondos.
+
+## α.46.10 — 26/09/2026
+
+- **Os botões redondos «Apareceu / Não apareceu» (Agenda) ficam alinhados com o texto**, em todos os temas: a regra
+  que faz os campos ocuparem a largura toda apanhava-os, e no 70's Scooter ainda levavam o aspeto de campo de texto.
+- **70's Scooter, mais Itália:** as riscas passam de mostarda, laranja, vermelho e castanho ao verde, branco e vermelho
+  (topo dos cartões e dos números, friso da barra de cima, barra sob os títulos, topo do guiador e os arcos do fundo).
+
+## α.46.9 — 26/09/2026
+
+- **70's Scooter:** os títulos perdem a sombra às riscas e ficam limpos, em Futura itálico castanho-escuro; as quatro
+  riscas dos anos 70 passam a uma barra curta por baixo de cada título.
+
+## α.46.8 — 26/09/2026
+
+- **70's Scooter:** os painéis acabam antes da vila: no fim da página, o rodapé (a vila, os jardins e a estrada) vê-se
+  inteiro.
+
+## α.46.7 — 26/09/2026
+
+- **70's Scooter:** as casinhas e os jardins saem da barra de cima e ficam só no rodapé; em cima fica o céu de fim de
+  tarde, com a scooter a passar.
+
+## α.46.6 — 26/09/2026
+
+- **70's Scooter: a scooter redesenhada a partir de uma fotografia de referência** — cava traseira grande e redonda
+  com o farolim, banco preto comprido, piso baixo com o quadro a descer do banco, escudo alto com friso cromado,
+  farol redondo no guiador com espelho e punhos, guarda-lamas da frente grande, suspensão à vista, silenciador e
+  rodas pequenas. Vermelha, sem marca nem nome, virada para onde anda (a esquerda); sem a bandeirinha.
+
+## α.46.5 — 26/09/2026
+
+- **70's Scooter:** a scooter passa a vermelha, com a silhueta de uma 125 clássica italiana do fim dos anos 70 (escudo
+  alto com a grelha da buzina, guiador com o farol redondo, cavas traseiras redondas, banco comprido preto, grade
+  cromada, rodas pequenas), sem marca nem nome. A vila tem casas mais largas de dois ou três pisos, jardins com
+  árvores, ciprestes e sebes pelo meio, e cafés com toldos às riscas e mesinhas com guarda-sol. O título do Painel
+  passa a «O teu dia, a passear numa vila costeira.»
+
+## α.46.4 — 26/09/2026
+
+- **WhatsApp: a linha 🏠 do imóvel junta-se à saudação.** «Cara Ana Exemplo, relativo ao seu contacto via Idealista
+  do T3 na Rua … — link», em vez da linha solta «🏠 Apartamento T3 …». A frase segue a língua da saudação (inglês,
+  francês ou espanhol, senão português); o título e o link do imóvel ficam exatamente como estão. O email não muda.
+
+## α.46.3 — 26/09/2026
+
+- **70's Scooter:** no rodapé, a estrada fica direita, com o lancil branco e o tracejado, e os prédios da vila, maiores,
+  ficam por cima dela, com o mar por trás; a scooter passa pela estrada a direito, para a esquerda. Na barra lateral,
+  as flores saem e entra uma faixa de corrida vermelha com um friso branco e um preto.
+
+## α.46.2 — 26/09/2026
+
+- **70's Scooter:** a sombra às riscas dos títulos fica colada às letras (6 px em vez de 15) e o título já não pisa
+  o subtítulo.
+
+## α.46.1 — 26/09/2026
+
+- **70's Scooter, a costa:** no rodapé, uma vila à beira-mar (casinhas em tons pastel com portadas verdes e um
+  campanário) e a estrada a descer da encosta, da direita para a esquerda, com o muro branco e o tracejado; a
+  scooter desce por ela, inclinada, para a esquerda. Na barra de cima, a mesma vila ao longe, e a scooter a
+  atravessá-la para a esquerda.
+
+## α.46.0 — 26/09/2026
+
+- **70's Scooter, muito mais anos 70:**
+  - **Fundo:** um sol com raios no canto e as quatro riscas em grandes arcos, e cartões com uma faixa grossa às riscas
+    e sombra sólida.
+  - **Títulos e rótulos:** títulos maiores, com as riscas a sair por trás, e os rótulos são autocolantes colados tortos.
+  - **Barra lateral:** florzinhas «flower power» e um autocolante da bota de Itália tricolor ao fundo, com espaço
+    próprio (já não tapa o email da conta); o separador aberto leva a tricolor na ponta.
+  - **Movimento:** os botões dão um «vroom» ao passar o rato, e a scooter passa maior, com fumo do escape, a cada 45 s.
+- **Som de scooter a sério:** o motor de 125 a dois tempos passa a um zumbido agudo e metálico («ring-ding-ding»), mais
+  estalidos por segundo e sem graves; a buzina também fica mais aguda.
+
+## α.45.2 — 26/09/2026
+
+- **Painel: o ponto de situação diário redesenhado.** Em vez de uma caixa de texto: para quem vai, quatro números
+  grandes (conversas, na fila, rascunhos prontos, por preparar), um bloco por imóvel com os seus números e os nomes
+  de quem falta preparar, e o botão «Enviar o ponto de situação». O texto do email fica em «Ver e editar o texto do
+  email». Os números são sempre os de agora; **«Atualizar com a situação de agora»** reescreve o texto, que antes
+  ficava como na primeira leitura do dia.
+
+## α.45.1 — 26/09/2026
+
+- **90's Boat: o separador aberto já não passa por baixo da calha cromada** da barra lateral, e o número das
+  Comunicações volta a ver-se inteiro.
+
+## α.45.0 — 26/09/2026
+
+- **Tema novo: 70's Scooter.** Uma scooter italiana dos anos 70 na estrada da costa: creme e cromados, o escudo da
+  scooter em verde-menta na barra lateral (com a tricolor ao fundo), o banco vermelho no separador aberto e nos
+  botões principais, e as quatro riscas dos anos 70 (mostarda, laranja, vermelho, castanho) nos cartões, na barra de
+  cima e na sombra dos títulos, em Futura itálico. Os instrumentos de cada imóvel são o guiador: mostradores creme
+  com números em itálico e aros cromados. Os separadores mudam-se com um **punho de mudanças**, com o tambor numerado
+  de 1 a 6. Os contadores são tambores de conta-quilómetros. Uma scooter com a sua bandeirinha passa na barra de
+  cima e volta pela estrada, no fundo da janela. Sons: a buzina ao enviar, o arranque ao pedal quando chegam
+  emails, uma mudança por separador e um clique cromado nos botões. Sem marcas nem nomes, como os outros temas.
+- **O tema 90's RacingCar passa a chamar-se 80's RacingCar** (o `id` continua `racing`, a escolha guardada não se
+  perde).
+- **90's Boat, Contactos:** a tabela lê-se bem também no turno da noite (o email estava quase invisível), e os campos
+  do nome e do telefone deixam de ter caixa até lhes passares o rato ou os editares.
+
+## α.44.4 — 26/09/2026
+
+- **90's RacingCar: o botão «Sons» fica à direita da barra de cima**, como no barco, com um altifalante que mostra
+  desligado (riscado) ou ligado (com ondas), e fica vermelho quando está ligado. No telemóvel, só o ícone.
+
+## α.44.3 — 26/09/2026
+
+- **A Agenda mostra todas as visitas e janelas passadas**, em qualquer semana para trás: ficam registadas para
+  sempre (só saem se apagares o contacto, pelo RGPD). A tarefa «visitas por registar» continua a olhar só para os
+  últimos 14 dias.
+- **«Preencher fichas com a IA (lê as conversas)»**, em Contactos: a API lê a conversa de cada cliente ativo e
+  preenche a ficha, sem perder o que já se sabia. Em lotes de 10, com o modelo escolhido e o custo no depósito
+  do imóvel.
+- **A primeira mensagem do cliente (a do portal) passa a ficar no histórico** da conversa quando respondes. Até
+  aqui só ficavam as mensagens seguintes, e por isso as fichas e os prompts perdiam o que o cliente disse
+  primeiro. As conversas antigas não a têm e não é possível recuperá-la.
+
+## α.44.2 — 26/09/2026
+
+- **Imóveis numa só coluna:** os dados do imóvel em cima e, por baixo, cada painel (relatório dos inquéritos,
+  clientes ativos, análise e visitas) sozinho, a toda a largura, em vez de ao lado dos dados do imóvel.
+
+## α.44.1 — 26/09/2026
+
+- **Avisos do portal sem Reply-To já não ficam bloqueados quando trazem o email no corpo.** Esse email passa a ser o
+  destinatário, com o aviso «Sem Reply-To: o destinatário é o email do corpo do aviso… Confirma antes de enviar».
+  No cartão há um campo **Destinatário** para o confirmares ou mudares à mão, que também desbloqueia um aviso sem
+  email nenhum. Os que já estavam bloqueados na fila são corrigidos na leitura seguinte. O endereço do portal e a
+  tua própria conta continuam recusados.
+- **Lembretes de 2 e 4 dias só na qualificação** (antes da proposta de visita) e nunca depois de 6 dias de
+  silêncio. Com os dados reais, a regra de α.44.0 criaria de uma vez 28 lembretes a clientes que receberam a
+  proposta de uma ronda já passada.
+- **Agenda: as janelas propostas dos últimos 14 dias continuam desenhadas**, como as marcações (antes, a janela de
+  um dia que já passou desaparecia). As rondas e as propostas continuam a usar só as janelas por vir.
+
+## α.44.0 — 26/09/2026
+
+- **Inquérito pós-visita: agradecimento, aviso e relatório.** A resposta do cliente ao inquérito chega marcada
+  «resposta ao inquérito» e a IA agradece-lhe, sem se justificar perante uma nota má. Uma nota 1 ou 2, ou um «não»
+  ao interesse, aparece em destaque no cartão e em «A fazer». Cada imóvel tem o **relatório dos inquéritos**
+  (Imóveis): um mostrador por parte perguntada (imóvel, consultor, marcação e emails), o interesse e cada resposta
+  com o comentário. No **Painel**, os mesmos três mostradores com o total de todos os imóveis.
+- **Mostradores de qualidade:** de 0 a 100, com verde a partir de 80 (excelente) e vermelho abaixo de 40. É uma
+  média ponderada em que um 1 pesa três vezes e um 2 duas vezes: poucos 1 puxam o mostrador para baixo, e só 1
+  dá 0.
+- **Seleção em Contactos, logo no início:** a short list de 2 ou 3 candidatos, lado a lado, com a ficha, a visita
+  (veio ou não, notas), o inquérito e os documentos. Escolhes o inquilino e um suplente. «+ Short list» em cada
+  ficha. Os documentos (recibos de vencimento, IRS do ano anterior ou dos dois anteriores, e, opcionais, o email
+  oficial do emprego e a declaração ou contrato de trabalho; os mesmos do fiador, se houver) pedem-se só à short
+  list, com «Pedir documentos», que põe um rascunho nas Comunicações. Os ficheiros ficam no Gmail: aqui só se
+  marca o que chegou.
+- **Silêncio:** os lembretes de 2 e 4 dias, sem frase em Voz e estilo, passam a ser escritos pela IA, e não saem
+  para quem tem visita marcada ou feita. Dois emails nossos seguidos sem resposta, o último há 4 dias, deixam o
+  cliente **inativo**: sai das rondas, dos lembretes e das fichas, com a etiqueta «inativo» na lista de contactos.
+  Se voltar a escrever e o imóvel estiver ativo, volta a ativo.
+- **Faltou à visita:** marcar «não veio» na Agenda põe um rascunho a lamentar que não tenha sido possível, sem
+  culpar ninguém, a dizer que pode responder e que ficamos a aguardar uma nova ronda. Se corrigires para «veio»,
+  o rascunho sai.
+- **Abrir no WhatsApp:** cada cartão com telefone abre o WhatsApp do Mac na conversa do cliente, com o rascunho
+  escrito. Envias tu, lá. O telefone nunca vai para a IA.
+- **Verificação do rascunho:** o cartão avisa se a assinatura não aparece uma vez, se ficou um <campo> por
+  preencher, se falta a linha 🏠 que o know-how pede, ou se a hora da visita marcada não está no texto.
+- **Colar perfil do Idealista** em cada ficha: o perfil do inquilino não vem no email (está atrás de «Ver
+  perfil»); colas o texto e a API preenche a ficha.
+- **RGPD, 6 meses:** os contactos sem consentimento com mais de 6 meses sem movimento aparecem em Contactos e em
+  «A fazer», e apagam-se de vez com «Apagar agora», depois de confirmares.
+
+## α.43.0 — 26/09/2026
+
+- **«Modo: só API».** A página trabalha só com a API da OpenAI. As Comunicações passam a 3 passos: Selecionar,
+  Gerar respostas e Rever e enviar. «Gerar respostas» parte seleções grandes em chamadas de 5 emails e mostra
+  «Ver o que foi enviado à IA». O copiar/colar do ChatGPT e o MCP ficam escondidos, não apagados: voltam com
+  `"ai_mode": "copy_paste"` no `config.json`.
+- **Escolha do modelo em «Voz e estilo»:** `gpt-4o-mini` (por defeito) ou `gpt-4o`, com o preço de cada um. Um
+  modelo para tudo; o custo continua a contar no depósito de cada imóvel.
+- **Criar imóvel pelo texto do anúncio:** colas o texto copiado da página do portal (e o link) e a API extrai os
+  campos, que revês antes de guardar.
+
 ## α.42.0 — 26/09/2026
 
 - **Lembretes de visita: na véspera e no próprio dia.** A primeira leitura de cada um desses dias põe um rascunho

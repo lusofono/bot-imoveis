@@ -305,3 +305,21 @@ def test_visit_settings_live_in_the_voice(service):
         service.save_voice({**choices, "visits": {"slot_minutes": 5}})
     # Without a window to come, the assistant gets no visit section at all.
     assert "- Marcam-se de" not in service.pending()["properties"][0]["instructions"]
+
+
+def test_the_agenda_keeps_every_past_window_and_visit(service):
+    from backend.store import load_visits, save_visits
+    agenda = load_visits(service.folder, REF)
+    past = (date.today() - timedelta(days=1)).isoformat()
+    old = (date.today() - timedelta(days=30)).isoformat()
+    agenda["windows"] += [{"id": "w-past", "day": past, "start": "12:00", "end": "16:00"},
+                          {"id": "w-old", "day": old, "start": "12:00", "end": "16:00"}]
+    save_visits(service.folder, REF, agenda)
+    visits = service.settings()["properties"][0]["visits"]
+    assert sorted(w["day"] for w in visits["past_windows"]) == sorted([past, old])  # drawn in the agenda, for good
+    assert all(w["day"] >= date.today().isoformat() for w in visits["windows"])  # rounds: only what is still to come
+    agenda = load_visits(service.folder, REF)
+    agenda["slots"].append({"at": f"{old} 13:00", "customer": "a@example.com", "name": "Ana Exemplo"})
+    save_visits(service.folder, REF, agenda)
+    assert [s["at"] for s in service.settings()["properties"][0]["visits"]["slots"]] == [f"{old} 13:00"]
+    assert service.agenda_slots(REF, date.today().isoformat()) == []  # «visitas por registar»: still 14 days

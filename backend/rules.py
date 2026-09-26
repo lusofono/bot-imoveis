@@ -129,6 +129,91 @@ def ficha_summary(ficha):
             "known": sum(1 for key in FICHA_REQUIRED if ficha.get(key)), "total": len(FICHA_REQUIRED)}
 
 
+# The after-visit survey (26/09): the three parts asked, each read on its own dial. A 1 weighs three times and a 2
+# twice as much as a 3, 4 or 5, so a few very bad answers pull the dial down hard; all 1s read 0, all 5s 100.
+SURVEY_PARTS = {"imovel": "Imóvel", "consultor": "Consultor", "marcacao": "Marcação e emails"}
+SCORE_WEIGHTS = {1: 3, 2: 2, 3: 1, 4: 1, 5: 1}
+QUALITY_GREEN = 80  # at or above: excellent (the dial's green)
+QUALITY_RED = 40    # below: the dial's red
+
+
+def quality(scores):
+    """0 to 100 from 1-to-5 answers, weighted so the 1s and 2s count more; None without answers."""
+    scores = [score for score in scores if score in SCORE_WEIGHTS]
+    if not scores:
+        return None
+    weight = sum(SCORE_WEIGHTS[score] for score in scores)
+    return round(sum(SCORE_WEIGHTS[score] * (score - 1) * 25 for score in scores) / weight)
+
+
+def survey_alerts(survey):
+    """What in a survey answer the owner must see: a 1 or a 2, or «não» to still being interested."""
+    survey = survey or {}
+    alerts = [f"{label}: {survey[part]}/5" for part, label in SURVEY_PARTS.items() if survey.get(part) in (1, 2)]
+    if survey.get("interesse") == "não":
+        alerts.append("já não tem interesse")
+    return alerts
+
+
+def survey_report(surveys):
+    """The dials and the detail for a set of survey answers: one dial per part, interest and comments."""
+    surveys = [survey for survey in surveys if survey]
+    parts = {}
+    for part, label in SURVEY_PARTS.items():
+        scores = [survey.get(part) for survey in surveys if survey.get(part) in SCORE_WEIGHTS]
+        parts[part] = {"label": label, "score": quality(scores), "count": len(scores),
+                       "average": round(sum(scores) / len(scores), 1) if scores else None,
+                       "ones": scores.count(1)}
+    interest = {key: sum(1 for survey in surveys if survey.get("interesse") == key) for key in ("sim", "talvez", "não")}
+    # The fourth dial (26/09): still interested in renting — «sim» 100, «talvez» 50, «não» 0, averaged.
+    answered = interest["sim"] + interest["talvez"] + interest["não"]
+    parts["interesse"] = {"label": "Interesse em arrendar", "count": answered, "average": None, "ones": 0, "no": interest["não"],
+                          "score": round((100 * interest["sim"] + 50 * interest["talvez"]) / answered) if answered else None}
+    return {"responses": len(surveys), "parts": parts, "interest": interest,
+            "alerts": sum(1 for survey in surveys if survey_alerts(survey)), "green": QUALITY_GREEN, "red": QUALITY_RED}
+
+
+# The selection (26/09): 2 or 3 candidates on a short list; one chosen and one reserve (suplente). The documents are
+# asked only of the short list, and the program keeps a checklist of what arrived, never the files themselves.
+SELECTION_STATES = {"shortlist": "Short list", "chosen": "Escolhido", "suplente": "Suplente"}
+DOCUMENTS = {"recibos": ("Recibos de vencimento", True), "email_emprego": ("Email oficial do emprego (se tiver)", False),
+             "contrato": ("Declaração ou contrato de trabalho (opcional)", False),
+             "irs": ("IRS do ano anterior (ou dos dois anteriores)", True)}
+
+
+def documents_summary(selection):
+    """Which documents arrived, for the candidate and, when there is one, the guarantor (fiador)."""
+    selection = selection or {}
+    received = selection.get("docs") or {}
+    people = ["candidato"] + (["fiador"] if selection.get("fiador") else [])
+    missing = [f"{DOCUMENTS[key][0]}{' do fiador' if who == 'fiador' else ''}" for who in people
+               for key, (_, required) in DOCUMENTS.items() if required and not received.get(f"{who}:{key}")]
+    return {"received": received, "fiador": bool(selection.get("fiador")), "missing": missing, "complete": not missing}
+
+
+PLACEHOLDER = re.compile(r"<[^<>\n@]{2,40}>")
+
+
+def draft_checks(text, signature="", house_line=False, visit_slot=None):
+    """What the program checks in a draft before it goes (26/09): the voice's signature once, no <field> left from a
+    template, the 🏠 line when the agency's know-how asks for it, and a booked time written in the text."""
+    text = str(text or "")
+    if not text.strip():
+        return []
+    found = []
+    signature = " ".join(str(signature or "").split())
+    if signature and " ".join(text.split()).count(signature) != 1:
+        found.append("A assinatura da voz devia aparecer uma vez, exatamente como está em Voz e estilo.")
+    left = PLACEHOLDER.findall(text)
+    if left:
+        found.append("Ficou por preencher: " + ", ".join(dict.fromkeys(left)) + ".")
+    if house_line and "🏠" not in text:
+        found.append("Falta a linha 🏠 com o imóvel e o link, que o know-how pede em todas as respostas.")
+    if visit_slot and str(visit_slot).split(" ")[-1] not in text:
+        found.append(f"A visita marcada ({visit_slot}) não aparece no texto.")
+    return found
+
+
 def parse_rent(value):
     """Monthly euros from a number or text such as "1.500 €", "1 500,50", "1,500.00" or "850.00".
 
@@ -317,14 +402,20 @@ def prepare(item, kind, customer, profile, account):
 
     reply_to = item.get("reply_to") or []
     valid = [a for a in reply_to if EMAIL.fullmatch(str(a.get("email", "")).strip())]
-    if not reply_to:
+    body_email = head[email_at] if email_at is not None else None
+    if not reply_to and body_email and body_email.casefold() not in never:
+        # 26/09: some portal notices come without Reply-To but with the customer's email in the body, in the
+        # contact lines. The notice came from the portal sender (route checked it), so that email is used, with
+        # a warning to confirm. Without one in the body, it stays blocked as before.
+        recipient = {"name": name or "", "email": body_email}
+        warnings.append(f"Sem Reply-To: o destinatário é o email do corpo do aviso ({body_email}). Confirma antes de enviar.")
+    elif not reply_to:
         blocked = reply.get("missing_reply_to_notice") or "Sem Reply-To: confirma o destinatário."
     elif len(reply_to) != 1 or len(valid) != 1 or valid[0]["email"].strip().casefold() in never:
         blocked = reply.get("invalid_reply_to_notice") or "Reply-To inválido: confirma o destinatário."
     else:
         recipient = {"name": str(valid[0].get("name", "")).strip(), "email": valid[0]["email"].strip()}
 
-    body_email = head[email_at] if email_at is not None else None
     if recipient and body_email and body_email.casefold() != recipient["email"].casefold():
         warnings.append(f"O email no corpo ({body_email}) difere do Reply-To; confirma o contacto.")
     listing = LISTING.search(str(item.get("body_text", "")))

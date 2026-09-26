@@ -5,7 +5,7 @@ import pytest
 from backend.cli import main
 from backend.rules import check_voice, clean_property
 from backend.service import MailService
-from backend.store import save_json
+from backend.store import load_contacts, save_json
 
 ROOT = Path(__file__).resolve().parent.parent
 TEMPLATES = ROOT / "backend" / "templates"
@@ -96,7 +96,10 @@ def test_lead_is_extracted_into_its_property_queue_and_answered_at_reply_to(serv
     assert "Pode ser ao fim da tarde?" in merged["customer"]["message"] and "Sou enfermeira." in merged["customer"]["message"]
     assert not any("outro email pendente" in warning for warning in merged["warnings"])
     # It carries the prior exchange: what we sent before these messages.
-    expected_history = [{"who": "nos", "text": "Olá, Ana.", "at": merged["history"][0]["at"]}]
+    # The portal notice that started it is in the history too, before our reply (26/09).
+    expected_history = [{"who": "cliente", "text": "Bom dia, gostaria de visitar o imóvel.\nPode ser ao fim da tarde?",
+                         "at": merged["history"][0]["at"]},
+                        {"who": "nos", "text": "Olá, Ana.", "at": merged["history"][1]["at"]}]
     untimed = lambda turns: [{key: value for key, value in turn.items() if key != "ts"} for turn in turns]  # noqa: E731
     assert untimed(merged["history"]) == expected_history
     # Read again: neither email comes back on its own.
@@ -178,7 +181,7 @@ def test_language_option_adds_an_english_translation_below_portuguese_english_sp
     (("owner@example.com",), "não identifica um único"),
 ])
 def test_missing_or_invalid_reply_to_blocks_sending_until_dismissed(service, reply_to, notice):
-    queue = read(service, [lead("1", reply_to=reply_to)])["properties"][0]
+    queue = read(service, [lead("1", reply_to=reply_to, body_email="" if not reply_to else CUSTOMER)])["properties"][0]
     [email] = queue["emails"]
     assert notice in email["blocked"] and email["recipient"] is None and email["interaction"] is None
     service.drafts([{"id": "1", "reply_text": "Olá"}], queue["revision"])
@@ -186,7 +189,7 @@ def test_missing_or_invalid_reply_to_blocks_sending_until_dismissed(service, rep
         service.preview(["1"])
     revision = service.pending()["properties"][0]["revision"]
     assert service.dismiss(["1"], revision)["dismissed"] == 1
-    assert read(service, [lead("1", reply_to=reply_to)])["properties"][0]["added"] == 0
+    assert read(service, [lead("1", reply_to=reply_to, body_email="" if not reply_to else CUSTOMER)])["properties"][0]["added"] == 0
     assert service.load(REF)["conversations"] == {}
 
 
@@ -291,7 +294,7 @@ def test_ambiguous_or_impossible_rent_is_refused(rent):
 
 
 def test_dashboard_carries_first_names_only_never_contacts(service):
-    read(service, [lead("1"), lead("2", reply_to=())])
+    read(service, [lead("1"), lead("2", reply_to=(), body_email="")])
     with patch("backend.service.has_app_password", return_value=False):
         metrics = service.metrics()
     assert metrics["totals"] == {"pending": 2, "drafts": 0, "blocked": 1, "attention": 0, "answered": 0, "customers": 0}
@@ -382,3 +385,38 @@ def test_a_new_property_starts_active_even_from_an_inactive_template(service):
                            "sender": "reply@idealista.pt"})
     active = {item["reference"]: item["active"] for item in service.settings()["properties"]}
     assert active == {REF: False, "NOVO": True}
+
+
+def test_without_reply_to_the_email_in_the_body_is_the_recipient_and_the_owner_can_change_it(service):
+    [email] = read(service, [lead("1", reply_to=())])["properties"][0]["emails"]
+    assert email["blocked"] is None and email["recipient"]["email"] == CUSTOMER and email["recipient_editable"]
+    assert any(w.startswith("Sem Reply-To: o destinatário é o email do corpo") for w in email["warnings"])
+    assert load_contacts(service.folder)[(CUSTOMER, REF)]["nome"] == "Ana Exemplo"
+
+    # Neither a Reply-To nor an email in the body: blocked, until the owner types who it goes to.
+    [_, other] = read(service, [lead("2", reply_to=(), body_email="")])["properties"][0]["emails"]
+    assert other["blocked"] and other["recipient"] is None and other["recipient_editable"]
+    with pytest.raises(ValueError, match="portal ou teu"):
+        service.set_recipient(REF, "2", "reply@idealista.pt")
+    with pytest.raises(ValueError, match="email válido"):
+        service.set_recipient(REF, "2", "nao-e-email")
+    service.set_recipient(REF, "2", "rui.exemplo@example.com")
+    fixed = next(e for e in service.pending()["properties"][0]["emails"] if e["id"] == "2")
+    assert fixed["blocked"] is None and fixed["recipient"]["email"] == "rui.exemplo@example.com"
+    assert "Destinatário indicado à mão: rui.exemplo@example.com." in fixed["warnings"]
+    assert ("rui.exemplo@example.com", REF) in load_contacts(service.folder)
+    with pytest.raises(ValueError, match="não permite"):
+        read(service, [lead("3")])
+        service.set_recipient(REF, "3", "outro@example.com")  # a valid Reply-To stays as it came
+
+
+def test_a_notice_blocked_before_the_fix_is_repaired_on_the_next_read(service):
+    read(service, [lead("1", reply_to=())])
+    data = service.load(REF)
+    [item] = data["emails"]
+    notice = json.loads((service.folder / "properties" / REF / "profile.json").read_text())["reply"]["missing_reply_to_notice"]
+    item.update(recipient=None, blocked=notice, warnings=[], customer={**item["customer"], "email": None})  # as before 26/09
+    service.save(data, REF)
+    read(service, [])
+    [item] = service.pending()["properties"][0]["emails"]
+    assert item["blocked"] is None and item["recipient"]["email"] == CUSTOMER

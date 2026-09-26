@@ -77,3 +77,17 @@ def test_save_digest_text_edits_the_draft_before_sending(service):
 def test_digest_recipient_must_look_like_an_email(service):
     with pytest.raises(ValueError, match="email"):
         service.save_voice({**VOICE_BASE, "digest_recipient": "não é um email"})
+
+
+def test_the_digest_card_gets_the_numbers_of_now_and_the_text_can_be_refreshed(service):
+    service.save_voice({**VOICE_BASE, "digest_recipient": RECIPIENT})
+    read(service, [lead("1")])
+    view = service.digest_view()
+    assert view["recipient"] == RECIPIENT
+    assert view["summary"]["totals"] == {"conversations": 0, "pending": 1, "drafted": 0, "awaiting": 1}
+    [row] = view["summary"]["properties"]
+    assert row["property_ref"] == REF and row["awaiting"] == ["Ana Exemplo"] and row["active"] is True
+    service.drafts([{"id": "1", "reply_text": "Olá, Ana."}], service.pending()["properties"][0]["revision"])
+    assert service.digest_view()["summary"]["totals"]["drafted"] == 1  # the numbers are always today's, now
+    assert "1 com rascunho pronto" not in load_digest(service.folder)["reply_text"]  # the text is the morning's…
+    assert "1 com rascunho pronto" in service.refresh_digest()["reply_text"]  # …until refreshed

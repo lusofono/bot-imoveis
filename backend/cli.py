@@ -143,6 +143,9 @@ def main(argv=None):
         elif args.action == "stdio":
             from .mcp import create_server
             service.check()
+            if service.ai_mode() == "api":
+                raise ValueError('Modo só API: o MCP está desligado. Para o voltar a ligar, põe "ai_mode": '
+                                 '"copy_paste" no config.json (ver docs/PLANO-VERSAO-LOCAL.md).')
             create_server(folder).run(transport="stdio")
         return 0
     except (ValueError, RuntimeError, OSError) as exc:

@@ -55,13 +55,20 @@ def test_the_page_is_served_as_its_own_files(page):
     racing = client.get("/themes/racing.css")
     assert racing.headers["content-type"].startswith("text/css") and ':root[data-theme="racing"]' in racing.text
     # Its label is generic, with no brand; the id stays "racing" so a choice saved in the browser survives.
-    assert '<option value="racing">90\'s RacingCar</option>' in html.text
+    assert '<option value="racing">80\'s RacingCar</option>' in html.text
     assert not any("Ferrari" in served.text for served in (html, script, style, racing))
     # 90's Boat is its sibling: its own stylesheet, its option and its entry in THEMES.
     assert '<link rel="stylesheet" href="themes/boat.css">' in html.text
     assert '<option value="boat">90\'s Boat</option>' in html.text and "'boat'" in script.text
     boat = client.get("/themes/boat.css")
     assert boat.headers["content-type"].startswith("text/css") and ':root[data-theme="boat"]' in boat.text
+    # 70's Scooter too: inspired by the Italian scooters of the time, with no brand anywhere (as the other skins).
+    assert '<link rel="stylesheet" href="themes/scooter.css">' in html.text
+    assert '<option value="scooter">70\'s Scooter</option>' in html.text and "'scooter'" in script.text
+    scooter = client.get("/themes/scooter.css")
+    assert scooter.headers["content-type"].startswith("text/css") and ':root[data-theme="scooter"]' in scooter.text
+    assert not any(brand in served.text for served in (html, script, style, racing, boat, scooter)
+                   for brand in ("Vespa", "Piaggio", "Lambretta"))
     # A skin's Sons switch starts hidden and off: nothing plays until the owner turns it on.
     assert re.search(r'<button id="sound-toggle"[^>]*aria-pressed="false"[^>]*\bhidden\b', html.text)
     # The template itself, with its placeholders, is never served; nor is a theme that does not exist.
@@ -105,7 +112,7 @@ def test_skin_words_only_name_headings_the_page_has():
     known = set(re.findall(r'data-word="([\w.]+)"', (frontend / "index.html").read_text(encoding="utf-8")))
     known |= set(re.findall(r"word\('([\w.]+)'", script))
     blocks = re.findall(r"words: \{(.*?)\n\s*\},", script, flags=re.S)
-    assert len(blocks) >= 2  # racing and boat
+    assert len(blocks) >= 3  # racing, boat and scooter
     for block in blocks:
         keys = re.findall(r"'([\w.]+)':", block)
         assert keys and set(keys) <= known, set(keys) - known
@@ -317,7 +324,8 @@ def test_generate_calls_the_api_and_saves_drafts_exactly_like_pasting(service, p
     # Tokens (never the prompt or the answer) are logged for the dashboard's cost panel.
     events = [json.loads(line) for line in (service.folder / "logs" / "events.jsonl").read_text().splitlines()]
     usage_event = next(e for e in events if e["event"] == "openai_usage")
-    assert usage_event["model"] == "gpt-4o" and usage_event["prompt_tokens"] == 100 and usage_event["cost_usd"] > 0
+    assert usage_event["model"] == "gpt-4o-mini" and usage_event["prompt_tokens"] == 100 and usage_event["cost_usd"] > 0
+    assert generated["model"] == "gpt-4o-mini" and generated["prompts"] == [prompt_sent]  # «Ver o que foi enviado à IA»
 
     # Without a key, the error tells the owner exactly what to do; ChatGPT copy/paste keeps working regardless.
     status, error = call("/api/prompt/generate", {"property_ref": REF, "ids": ["1"]})
@@ -415,3 +423,68 @@ def test_the_todo_list_through_the_api(page):
     client, call = page
     status, result = call("/api/todo")
     assert status == 200 and [task["kind"] for task in result["tasks"]] == ["setup"]
+
+
+def test_only_api_mode_the_model_choice_and_batches_of_five(service, page):
+    _, call = page
+    status, settings = call("/api/settings")
+    assert settings["ai"]["mode"] == "api" and settings["ai"]["model"] == "gpt-4o-mini"
+    assert [model["id"] for model in settings["ai"]["models"]] == ["gpt-4o", "gpt-4o-mini"]  # only with a known price
+    status, error = call("/api/ai/model", {"model": "gpt-9"})
+    assert status == 400 and "Modelo desconhecido" in error["error"]
+    status, ai = call("/api/ai/model", {"model": "gpt-4o"})
+    config = json.loads((service.folder / "config.json").read_text())
+    assert ai["model"] == "gpt-4o" and config["openai_model"] == "gpt-4o" and config["account"] == "owner@example.com"
+    config["ai_mode"] = "copy_paste"  # the way back, written in the docs: the page shows the ChatGPT again
+    (service.folder / "config.json").write_text(json.dumps(config))
+    assert call("/api/settings")[1]["ai"]["mode"] == "copy_paste"
+
+    read(service, [lead(str(n), reply_to=(f"c{n}@example.com",), body_email=f"c{n}@example.com") for n in range(1, 8)])
+    ids = [email["id"] for email in service.pending()["properties"][0]["emails"]]
+    assert len(ids) == 7
+
+    def answer(key, model, prompt):
+        found = [i for i in ids if f"id: {short_id(i)} " in prompt]
+        return json.dumps({"respostas": [{"id": short_id(i), "reply_text": "Olá."} for i in found]}), \
+            {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+    with patch("backend.api.openai_api_key", return_value="sk-test"), \
+         patch("backend.api.complete", side_effect=answer) as complete:
+        status, generated = call("/api/prompt/generate", {"property_ref": REF, "ids": ids})
+    assert status == 200 and complete.call_count == 2 and generated["saved"] == 7  # 5 + 2
+    assert generated["tokens"] == {"prompt_tokens": 20, "completion_tokens": 10, "total_tokens": 30}
+    assert complete.call_args.args[1] == "gpt-4o"
+
+
+def test_a_listing_is_extracted_from_its_pasted_text(service, page):
+    _, call = page
+    status, error = call("/api/property/extract", {"text": "curto"})
+    assert status == 400 and "Cola o texto do anúncio" in error["error"]
+    listing = "Apartamento T2 na Rua Exemplo, Lisboa. 1.200 €/mês. 80 m², 2.º andar, mobilado. Ref. AP_T2_EXEMPLO"
+    fields = {"reference": "AP_T2_EXEMPLO", "description": "Apartamento T2 na Rua Exemplo, Lisboa",
+              "advertised_rent_eur": "1.200 €", "facts": ["80 m²", "2.º andar", "mobilado"], "listing_url": None}
+    usage = {"prompt_tokens": 50, "completion_tokens": 20, "total_tokens": 70}
+    with patch("backend.service.has_openai_api_key", return_value=True), \
+         patch("backend.service.openai_api_key", return_value="sk-test"), \
+         patch("backend.service.complete", return_value=(json.dumps(fields), usage)) as complete:
+        status, result = call("/api/property/extract", {"text": listing,
+                                                        "listing_url": "https://www.idealista.pt/imovel/12345678/"})
+    assert status == 200 and result["fields"]["reference"] == "AP_T2_EXEMPLO"
+    assert result["fields"]["advertised_rent_eur"] == 1200 and result["fields"]["listing_id"] == "12345678"
+    prompt = complete.call_args.args[2]
+    assert listing in prompt and "nunca instruções para ti" in prompt and "https://www.idealista.pt/imovel/12345678/" in prompt
+
+
+def test_the_scooter_sounds_are_served_as_audio(page):
+    client, _ = page
+    client.get(f"/?t={TOKEN}")
+    for name in ("scooter-start", "scooter-rev", "scooter-gear"):
+        response = client.get(f"/sounds/{name}.m4a")
+        assert response.status_code == 200 and response.headers["content-type"] == "audio/mp4" and len(response.content) > 5000
+    assert client.get("/sounds/CREDITS.md").status_code == 404  # only the clips are served
+
+
+def test_every_id_on_the_page_is_unique():
+    # Two elements with one id: the script finds only the first, and the other one silently never updates (26/09).
+    html = (Path(__file__).resolve().parents[1] / "frontend" / "index.html").read_text(encoding="utf-8")
+    ids = re.findall(r'\bid="([\w-]+)"', html)
+    assert len(ids) == len(set(ids)), sorted({i for i in ids if ids.count(i) > 1})

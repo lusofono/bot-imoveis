@@ -10,11 +10,13 @@ import urllib.request
 
 API_URL = "https://api.openai.com/v1/chat/completions"
 MODELS_URL = "https://api.openai.com/v1/models"
-MODEL_DEFAULT = "gpt-4o"
+MODEL_DEFAULT = "gpt-4o-mini"  # 26/09: the default; gpt-4o is the alternative
 # USD per 1K tokens, OpenAI's own published rates when this was written. They change over time and the
 # page always labels a cost built from this table "estimado": treat it as a rough guide, not an invoice.
 PRICE_PER_1K_USD = {"gpt-4o": (0.0025, 0.01), "gpt-4o-mini": (0.00015, 0.0006)}
 PRICE_FALLBACK = PRICE_PER_1K_USD["gpt-4o"]
+# The models the page offers: only those whose price is confirmed in the table above (the owner's rule, 26/09).
+MODELS = tuple(PRICE_PER_1K_USD)
 
 
 def estimate_cost_usd(model, prompt_tokens, completion_tokens):
@@ -46,7 +48,7 @@ def _request(url, key, data=None, timeout=30):
             raise OpenAIError("Chave OpenAI inválida ou revogada. Guarda-a de novo com mac/openai_key.command.") from None
         if exc.code == 429:
             raise OpenAIError("A OpenAI recusou o pedido (limite de pedidos ou sem crédito na conta). "
-                              "Tenta noutra altura, ou usa Criar prompt/Copiar.") from None
+                              "Tenta noutra altura, ou escreve a resposta à mão no cartão.") from None
         raise OpenAIError(f"A OpenAI devolveu um erro ({exc.code}): {_message(exc)}") from None
     except urllib.error.URLError as exc:
         raise OpenAIError(f"Não consegui contactar a OpenAI: {exc.reason}. Verifica a ligação e tenta de novo.") from None

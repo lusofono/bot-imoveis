@@ -22,16 +22,19 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from starlette.routing import Route
 from .ai import listing_prompt, parse_fichas, parse_listing, parse_replies, parse_visits, reply_prompt, short_id
-from .openai_client import MODEL_DEFAULT, complete, estimate_cost_usd
+from .openai_client import complete, estimate_cost_usd
 from .secrets import openai_api_key
 from .service import MailService
 
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
 COOKIE = "bot_mail_web"
+GENERATE_BATCH = 5  # emails per API call in «Gerar respostas»
 # The page's own files. index.html is only served at "/", with the token written into it. A rich theme (a
-# "skin": 90's RacingCar now, more to come) keeps its stylesheet in frontend/themes/, listed once at start.
+# "skin": 80's RacingCar now, more to come) keeps its stylesheet in frontend/themes/, listed once at start.
 ASSETS = {"app.js": "text/javascript", "style.css": "text/css",
-          **{f"themes/{sheet.name}": "text/css" for sheet in sorted((FRONTEND / "themes").glob("*.css"))}}
+          **{f"themes/{sheet.name}": "text/css" for sheet in sorted((FRONTEND / "themes").glob("*.css"))},
+          # A skin's recorded sounds (26/09: the 70's Scooter's engine, CC0 — see frontend/sounds/CREDITS.md).
+          **{f"sounds/{clip.name}": "audio/mp4" for clip in sorted((FRONTEND / "sounds").glob("*.m4a"))}}
 HEADERS = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
 # pyproject.toml is the one place the version is written; CHANGELOG.md logs what changed at each one.
 VERSION = tomllib.loads((Path(__file__).resolve().parents[1] / "pyproject.toml").read_text())["project"]["version"]
@@ -65,9 +68,13 @@ def web_app(folder, token):
             return {"error": str(exc), "properties": []}
         queues = data.get("properties") or [{"property_ref": None, "revision": data["revision"], "instructions": "",
                                              "last_read_at": data.get("last_read_at"), "emails": data["emails"]}]
+        phones = service.phones() if queues and queues[0].get("property_ref") else {}
         for queue in queues:
             for email in queue["emails"]:
                 email["short_id"] = short_id(email["id"])
+                # The WhatsApp button's number (26/09): the page only, never in a prompt.
+                address = ((email.get("recipient") or {}).get("email") or (email.get("customer") or {}).get("email") or "").casefold()
+                email["whatsapp"] = (email.get("customer") or {}).get("phone") or phones.get((address, queue.get("property_ref")), "")
         return {"account": data["account"], "error": None, "properties": queues}
 
     def queue(ref):
@@ -104,22 +111,33 @@ def web_app(folder, token):
         return save_drafts_from(queue(body.get("property_ref")), str(body.get("text") or ""))
 
     def generate(body):
-        # The alternative to steps 02+03 by hand: the same prompt, answered by the OpenAI API instead of
-        # a human pasting it into ChatGPT. Everything after that — parsing, drafts, preview, send — is
-        # identical and needs the same review and confirmation before anything goes out.
-        current = queue(body.get("property_ref"))
-        service.require_fuel(current["property_ref"])
-        ids = ids_of(body)
-        prompt_text = reply_prompt(current, ids, str(body.get("extra") or ""))
+        # «Gerar respostas» (the only path in «Modo: só API»): the same prompt as the copy/paste, answered by the
+        # OpenAI API. Everything after that — parsing, drafts, preview, send — is identical and needs the same
+        # review and confirmation before anything goes out. A big selection goes in calls of GENERATE_BATCH
+        # emails: past that, answers get worse and a long JSON risks being cut.
+        ref = queue(body.get("property_ref"))["property_ref"]
+        ids, extra = ids_of(body), str(body.get("extra") or "")
         cfg = service.config()
         key = openai_api_key(service.folder, cfg["account"])
-        model = str(cfg.get("openai_model") or MODEL_DEFAULT)
-        answer, usage = complete(key, model, prompt_text)  # raises OpenAIError, shown to the owner like any other
-        # Tokens only: never the prompt or the answer, same rule as every other log entry.
-        service.log("openai_usage", model=model, **usage, reference=current["property_ref"],
-                    cost_usd=round(estimate_cost_usd(model, **{
-                        k: usage[k] for k in ("prompt_tokens", "completion_tokens")}), 6))
-        return {**save_drafts_from(current, answer), "tokens": usage, "fuel": service.api_fuel(current["property_ref"])}
+        model = service.model(cfg)
+        totals = {"saved": 0, "notes": [], "visits": 0, "fichas": 0, "prompts": []}
+        usage_total = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        for start in range(0, len(ids), GENERATE_BATCH):
+            service.require_fuel(ref)
+            current = queue(ref)  # fresh each time: the previous batch's drafts changed its revision
+            prompt_text = reply_prompt(current, ids[start:start + GENERATE_BATCH], extra)
+            answer, usage = complete(key, model, prompt_text)  # raises OpenAIError, shown to the owner like any other
+            # Tokens only: never the prompt or the answer, same rule as every other log entry.
+            service.log("openai_usage", model=model, **usage, reference=ref,
+                        cost_usd=round(estimate_cost_usd(model, **{
+                            k: usage[k] for k in ("prompt_tokens", "completion_tokens")}), 6))
+            result = save_drafts_from(current, answer)
+            for field in ("saved", "visits", "fichas"):
+                totals[field] += result[field]
+            totals["notes"] += result["notes"]
+            totals["prompts"].append(prompt_text)  # «Ver o que foi enviado à IA», in the page only
+            usage_total = {k: usage_total[k] + (usage.get(k) or 0) for k in usage_total}
+        return {**totals, "model": model, "state": state(), "tokens": usage_total, "fuel": service.api_fuel(ref)}
 
     def drafts(body):
         current = queue(body.get("property_ref"))
@@ -241,11 +259,22 @@ def web_app(folder, token):
         return {"panel": service.save_panel(body.get("property_ref") or None, body.get("reply_hours_max"),
                                             body.get("distance_km"), body.get("l_per_100km"))}
 
+    def selection(action):
+        def handler(body):
+            ref, email = body.get("property_ref") or None, body.get("email")
+            result = {"set": lambda: service.set_selection(ref, email, body.get("status") or None),
+                      "doc": lambda: service.set_document(ref, email, body.get("document"), body.get("received"),
+                                                          body.get("fiador")),
+                      "request": lambda: service.request_documents(ref, email)}[action]()
+            return {**result, **service.contacts(), "state": state()}
+        return handler
+
     def contacts_ignored(body):
         return service.ignored_contacts(body.get("property_ref") or None)
 
     def digest_save(body):
-        return service.save_digest_text(body.get("text"))
+        service.save_digest_text(body.get("text"))
+        return service.digest_view()
 
     def digest_send(body):
         if body.get("confirmed") is not True:
@@ -351,19 +380,32 @@ def web_app(folder, token):
                 "property/parse": ("POST", lambda body: {"fields": parse_listing(str(body.get("text") or ""))}),
                 "property/save": ("POST", property_save), "property/prompts": ("POST", property_prompts),
                 "property/photo": ("POST", property_photo), "property/panel": ("POST", property_panel),
+                "property/extract": ("POST", lambda body: service.extract_listing(body.get("text"), body.get("listing_url"))),
+                "ai/model": ("POST", lambda body: service.set_model(str(body.get("model") or ""))),
                 "property/active": ("POST", property_active),
                 "visits/candidates": ("POST", visit_candidates), "visits/propose": ("POST", visit_propose),
                 "visits/analysis-prompt": ("POST", visit_analysis_prompt), "visits/analyze": ("POST", visit_analyze),
                 "visits/round-summary": ("POST", visit_round_summary), "visits/close": ("POST", visits_close),
                 "agenda/sync": ("POST", agenda_sync), "visits/check": ("POST", visit_check), "visits/thanks": ("POST", visit_thanks),
                 "active/write": ("POST", active_write), "active/remove": ("POST", active_remove),
+                "recipient": ("POST", lambda body: {**service.set_recipient(body.get("property_ref") or None, str(body.get("id") or ""),
+                                                                            body.get("email")), "state": state()}),
                 "consent/request": ("POST", consent_request), "consent/confirm": ("POST", consent_confirm),
                 "contacts": ("GET", lambda body: service.contacts()),
                 "contacts/save": ("POST", contact_save), "contacts/delete": ("POST", contact_delete),
-                "contacts/ignore": ("POST", contact_ignore), "contacts/ignored": ("POST", contacts_ignored),
+                "contacts/ignore": ("POST", contact_ignore),
+                "selection/set": ("POST", selection("set")), "selection/doc": ("POST", selection("doc")),
+                "selection/request": ("POST", selection("request")),
+                "contacts/purge": ("POST", lambda body: {**service.purge_expired(), **service.contacts(), "state": state()}),
+                "fichas/fill": ("POST", lambda body: {**service.fill_fichas(body.get("property_ref") or None),
+                                                      **service.contacts()}),
+                "fichas/import": ("POST", lambda body: {**service.import_profile(body.get("property_ref") or None,
+                                                                                 body.get("email"), body.get("text")),
+                                                        **service.contacts()}), "contacts/ignored": ("POST", contacts_ignored),
                 "fuel/fill": ("POST", fuel_fill),
                 "digest": ("GET", lambda body: service.digest_view()), "todo": ("GET", lambda body: service.todo()),
                 "digest/save": ("POST", digest_save), "digest/send": ("POST", digest_send),
+                "digest/refresh": ("POST", lambda body: service.refresh_digest()),
                 "knowledge": ("POST", lambda body: service.knowledge(body.get("property_ref") or None)),
                 "knowledge/note": ("POST", note), "knowledge/save": ("POST", knowledge_save)}
     routes = ([Route("/", page), Route("/photo/{ref}", photo), Route("/contactos.csv", contacts_csv)]

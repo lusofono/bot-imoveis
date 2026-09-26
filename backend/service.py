@@ -14,13 +14,17 @@ import secrets
 import smtplib
 import time
 import os
-from .ai import (AFTER_VISIT_RULE, AFTER_VISIT_TEMPLATE, KNOWLEDGE_RULE, VISIT_REMINDER_RULE, agenda_prompt, describe, instructions,
+from .ai import (AFTER_VISIT_RULE, AFTER_VISIT_TEMPLATE, KNOWLEDGE_RULE, VISIT_REMINDER_RULE, extract_json, ficha_profile_prompt,
+                 fichas_prompt, parse_fichas_batch,
+                 listing_text_prompt, parse_listing, agenda_prompt, describe, instructions,
                  parse_agenda, parse_survey, visit_analysis_prompt)
 from .configure import STARTER, example_profile
 from .mail import build_digest, build_reply, read_messages
-from .openai_client import MODEL_DEFAULT, complete, estimate_cost_usd
+from .openai_client import MODEL_DEFAULT, MODELS, PRICE_PER_1K_USD, complete, estimate_cost_usd
 from .rules import (DAY, EMAIL, KNOWLEDGE_FILE, RGPD_STATES, SUBJECT_DEFAULT, VISIT_SLOT_DEFAULT, VISIT_STATES,
-                    FICHA_FIELDS, build_profile, check_profile, ficha_summary, merge_ficha, check_slot, check_window, clean_property, consent_yes, free_times,
+                    DOCUMENTS, FICHA_FIELDS, SELECTION_STATES, build_profile, check_profile, clean_ficha, documents_summary, draft_checks,
+                    ficha_summary, merge_ficha,
+                    survey_alerts, survey_report, check_slot, check_window, clean_property, consent_yes, free_times,
                     knowledge, photo_of, prepare, property_active, route, subject_of, QUOTE, addresses)
 from .secrets import app_password, has_app_password, has_openai_api_key, openai_api_key
 from .store import (CONTACT_FIELDS, add_contacts, add_note, find_photo, knowledge_files, load_contacts, load_digest,
@@ -31,9 +35,15 @@ from .store import (CONTACT_FIELDS, add_contacts, add_note, find_photo, knowledg
 CONTACT_SOURCE = "Idealista"  # today's only portal; see README for the family of emails it accepts.
 # Sent automatically or by a one-click button, in the customer's conversation, but never counted as one
 # of the four interactions and never resetting the clock the 2/4-day reminders are measured from.
-AUX_KINDS = {"reminder", "consent_request", "visits_closed", "addition", "visit_thanks", "visit_reminder"}  # "addition": «Escrever mais»; "visit_thanks": after the visit
+AI_MODES = ("api", "copy_paste")
+AUX_KINDS = {"reminder", "consent_request", "visits_closed", "addition", "visit_thanks", "visit_reminder", "docs_request",
+             "visit_missed"}  # "addition": «Escrever mais»; "visit_thanks": after the visit
 PROGRAM_KINDS = AUX_KINDS | {"visit_proposal"}  # drafts the program creates; not an email a customer sent
 REMINDER_HOURS = {"2d": 48, "4d": 96}
+REMINDER_MAX_HOURS = 144  # 6 days of silence: no more reminders (26/09)
+FICHAS_BATCH = 10  # customers per call in «Preencher fichas com a IA»
+CONTACT_RETENTION_DAYS = 183  # 6 months without consent (decided 21/09); erased on the owner's click
+INACTIVE_AFTER_EMAILS, INACTIVE_AFTER_HOURS = 2, 96  # 26/09: two of ours unanswered, the last four days ago
 HISTORY_LIMIT = 20  # turns kept per conversation, oldest dropped first; also what the prompt gets
 # Dashboard chart: period in days → days per bar (90 days per day would be 90 unreadable bars).
 CHART_PERIODS = {3: 1, 7: 1, 14: 1, 30: 1, 90: 7}
@@ -41,7 +51,7 @@ CHART_PERIODS = {3: 1, 7: 1, 14: 1, 30: 1, 90: 7}
 VIEW_FIELDS = ("id", "kind", "date", "subject", "customer", "recipient", "blocked", "body_text", "body_truncated",
                "reply_text", "reply_status", "reply_error", "reply_message_id", "visit_window", "visit_slot",
                "visit_status", "reminder", "closing", "consent_suggested", "consent_confirmed", "history", "merged",
-               "merged_ids", "visit_done", "visit_reminder")
+               "merged_ids", "visit_done", "visit_reminder", "survey_reply", "docs_request", "visit_missed")
 # Page field → (profile prompt, key), the same prompts the terminal setup asks for.
 PROMPT_FIELDS = {"general": ("general", "text"), "first": ("first_interaction", "text"),
                  "first_template": ("first_interaction", "reply_template"), "second": ("second_interaction", "text"),
@@ -104,6 +114,19 @@ def shut_out(conversation):
     """Blacklist: nothing of theirs comes in again. Greylist (26/09): we stop writing first — no reminders, rounds,
     consent or closing — but what they write still comes in, and can be answered."""
     return bool(conversation.get("ignored")) and ignore_kind(conversation) == "black"
+
+
+def survey_of(conversation):
+    """The customer's survey answer as read today: one kept before 26/09 without any mark (written as words, or over
+    two lines) is read again, on the spot, from their own reply in the history; nothing is written."""
+    survey = (conversation or {}).get("visit_survey")
+    if not survey or any(survey.get(part) for part in ("imovel", "consultor", "marcacao")):
+        return survey
+    for turn in reversed(conversation.get("history") or []):
+        again = parse_survey(turn["text"]) if turn.get("who") == "cliente" else None
+        if again and any(again.get(part) for part in ("imovel", "consultor", "marcacao")):
+            return {**again, "at": survey.get("at")}
+    return survey
 
 
 def was_proposed(conversation, email, proposed):
@@ -212,6 +235,53 @@ class MailService:
                              "properties/<REF>/profile.json. Copia os perfis reais: não estão no Git.")
         return profiles
 
+    def ai_mode(self):
+        """«Modo: só API» (26/09), on unless config.json says "ai_mode": "copy_paste": then the page shows the
+        ChatGPT copy/paste again. The MCP (mcp.py) only runs if the Claude Desktop is set to start it."""
+        mode = load_json(self.folder / "config.json", {}).get("ai_mode")
+        return mode if mode in AI_MODES else "api"
+
+    def model(self, cfg=None):
+        """The one model for everything (replies, agenda, analysis, listings); an unknown one reads as the default."""
+        model = (cfg if cfg is not None else load_json(self.folder / "config.json", {})).get("openai_model")
+        return model if model in MODELS else MODEL_DEFAULT
+
+    def set_model(self, model):
+        """The page's model choice, kept in config.json with everything else there untouched."""
+        if model not in MODELS:
+            raise ValueError("Modelo desconhecido: escolhe " + " ou ".join(MODELS) + ".")
+        with locked(self.folder):
+            cfg = load_json(self.folder / "config.json", {})
+            cfg["openai_model"] = model
+            save_json(self.folder / "config.json", cfg)
+            self.log("model_set", model=model)
+            return self.ai_settings()
+
+    def ai_settings(self):
+        return {"mode": self.ai_mode(), "model": self.model(),
+                "models": [{"id": model, "input_usd_per_1m": round(rates[0] * 1000, 4), "output_usd_per_1m": round(rates[1] * 1000, 4)}
+                           for model, rates in PRICE_PER_1K_USD.items() if model in MODELS]}
+
+    def extract_listing(self, text, url=None):
+        """«Extrair com a API»: the listing's text, pasted by the owner, becomes the fields they review. Charged to
+        the property it names when that one already exists (its tank); a new property's first call is unattributed."""
+        text = str(text or "").strip()
+        if len(text) < 40:
+            raise ValueError("Cola o texto do anúncio: abre-o no browser, seleciona tudo (⌘A), copia e cola aqui.")
+        cfg = self.config()
+        if not has_openai_api_key(self.folder, cfg["account"]):
+            raise ValueError("Sem chave da OpenAI: guarda-a com mac/openai_key.command para usar a API.")
+        url = str(url or "").strip() or None
+        model = self.model(cfg)
+        answer, usage = complete(openai_api_key(self.folder, cfg["account"]), model, listing_text_prompt(text, url))
+        fields = parse_listing(answer)
+        if url and not fields.get("listing_url"):
+            fields = parse_listing(json.dumps({**fields, "listing_url": url}))
+        known = fields.get("reference") in load_profiles(self.folder, cfg["account"])
+        self.log("openai_usage", model=model, **usage, **({"reference": fields["reference"]} if known else {}),
+                 cost_usd=round(estimate_cost_usd(model, **{k: usage[k] for k in ("prompt_tokens", "completion_tokens")}), 6))
+        return {"fields": fields, "tokens": usage}
+
     def check(self):
         """Refuse to start with an incomplete setup: account, profiles and, with profiles, the voice."""
         if self.profiles():
@@ -281,6 +351,9 @@ class MailService:
         everyone = any("recipients" not in window for window in windows)
         booked = set((visits or {}).get("booked") or ())
         proposed = set((visits or {}).get("proposed") or ())
+        signature = (((voice or {}).get("style") or {}).get("signature") or {})
+        signature = "" if signature.get("translate") else signature.get("text") or ""
+        house = any("🏠" in part.get("text", "") for part in (voice or {}).get("_knowledge") or [])
         emails = []
         for item in data["emails"]:
             email = customer(item)
@@ -316,6 +389,10 @@ class MailService:
             emails.append({key: item.get(key) for key in VIEW_FIELDS} | {
                 "interaction": interaction if email else None, "warnings": warnings,
                 "ficha": ficha, "ficha_summary": ficha_summary(ficha) if ref else None, "qualifying_limit": limit,
+                "draft_checks": draft_checks(item.get("reply_text"), signature, house, item.get("visit_slot")),
+                # A portal notice without a (valid) Reply-To: the owner may set or correct the recipient (26/09).
+                "recipient_editable": bool(ref and item.get("kind") == "lead" and (not item.get("reply_to") or item.get("blocked"))
+                                           and item.get("reply_status") in (None, "pending", "draft")),
                 # The whole conversation as it stands now — also what came after this email (a reply
                 # written in Gmail, one more email) — for «Email completo»; the prompt keeps «history».
                 "conversation": list(conversation.get("history") or [])})
@@ -440,14 +517,21 @@ class MailService:
                         survey = parse_survey(item["customer"].get("message") or item.get("body_text"))
                         if survey:
                             conversation["visit_survey"] = {**survey, "at": item.get("date") or now()}
+                            # 26/09: the assistant thanks them (see ai.SURVEY_REPLY_RULE), and a bad mark is flagged.
+                            item["survey_reply"] = {"alerts": survey_alerts(survey)}
                             item.setdefault("warnings", []).append(
-                                "Resposta ao inquérito pós-visita registada (vê-a na Agenda, na visita deste cliente).")
+                                "Resposta ao inquérito pós-visita registada (vê-a na Agenda e no relatório do imóvel).")
+                            if item["survey_reply"]["alerts"]:
+                                item["warnings"].append("Atenção ao inquérito: " + "; ".join(item["survey_reply"]["alerts"])
+                                                        + ". Lê o comentário antes de responder.")
                     if conversation is not None:
                         # A snapshot of everything before this message: shown in "Email completo" and sent
                         # in the prompt, so the assistant (ChatGPT or the API) sees the whole exchange.
                         item["history"] = list(conversation.get("history") or [])
                         self.append_history(conversation, "cliente", item["customer"].get("message"),
                                             contact_day(item), item.get("date"))
+                        if conversation.get("inactive") and property_active(profiles[ref]):
+                            conversation.pop("inactive")  # they wrote again: active again (26/09)
                     else:
                         item["history"] = []
                 item.update(id=key, reply_text="", send_reply=False, reply_status="pending")
@@ -467,7 +551,9 @@ class MailService:
             # After the customers' emails, so a direct reply can answer one that arrived in this same read.
             direct = self.record_direct_replies(queues, outgoing) if profiles else Counter()
             if profiles:
-                for data in queues.values():
+                for ref, data in queues.items():
+                    contacts += self.repair_missing_reply_to(ref, data, profiles[ref], cfg["account"])
+                    self.repair_surveys(data)
                     self.merge_pending(data)
             add_contacts(self.folder, contacts)
             for ref, data in queues.items():
@@ -476,6 +562,7 @@ class MailService:
                                  "direct_replies": direct[ref]}
                 if ref and voice_ok:
                     self.schedule_reminders(ref, data, voice_ok)
+                    self.mark_inactive(ref, data)
                     self.schedule_visit_reminders(ref, data)
                 self.save(data, ref)
             if profiles:
@@ -754,8 +841,14 @@ class MailService:
         # The stage outlives the email in the queue. Kept: address, name, our last subject, IDs, dates,
         # the last text sent (so a reminder can quote it), the visit status, and the last HISTORY_LIMIT
         # turns of the conversation (ours and the customer's), for context in the next prompt.
+        created = item["recipient"]["email"].casefold() not in data["conversations"]
         conversation = data["conversations"].setdefault(
             item["recipient"]["email"].casefold(), {"stage": 0, "sent_message_ids": [], "thread_ids": []})
+        message = (item.get("customer") or {}).get("message")
+        if created and item.get("kind") == "lead" and message:
+            # 26/09: the portal notice that started it all goes into the history too, before our first reply (until
+            # then only later messages were kept, and the file and the prompts lost what the customer first said).
+            cls.append_history(conversation, "cliente", message, contact_day(item), item.get("date"))
         # An email the owner already answered in Gmail spent its step then: one more email to it is an addition.
         aux = item.get("kind") in AUX_KINDS or bool(item.get("answered_directly"))
         if not aux:
@@ -810,40 +903,146 @@ class MailService:
     def schedule_reminders(self, ref, data, voice):
         """One draft per customer at 2 and at 4 days without an answer, capped at two, in order.
 
-        Stops for a customer who answered (a pending email from them), whose reminder was dismissed, or
-        once visits are closed. The phrase comes from the voice; the body under it is the last text sent.
+        Stops for a customer who answered (a pending email from them), whose reminder was dismissed, who has a
+        visit booked or done, who is inactive, or once visits are closed. With a phrase in the voice, the phrase
+        goes over the last text sent; without one (26/09), the assistant writes the reminder (REMINDER_RULE).
         """
-        if load_visits(self.folder, ref).get("closed_at"):
+        agenda = load_visits(self.folder, ref)
+        if agenda.get("closed_at"):
             return 0
+        booked = {slot["customer"] for slot in agenda["slots"] if slot["at"][:10] >= date.today().isoformat()}
+        proposed = self.proposed_to(agenda)
         phrases = (voice.get("style", {}).get("reminders") or {})
         text = {key: (phrases.get(key) or {}).get("text") or "" for key in ("day2", "day4")}
-        if not text["day2"] and not text["day4"]:
-            return 0
         waiting = {((item.get("recipient") or {}).get("email") or "").casefold() for item in data["emails"]}
         already = {(((item.get("recipient") or {}).get("email") or "").casefold(), item.get("reminder"))
                   for item in data["emails"] if item.get("kind") == "reminder"}
         created = 0
         for email, conversation in data.get("conversations", {}).items():
             if (email in waiting or conversation.get("reminders_stopped") or conversation.get("ignored")
-                    or not conversation.get("last_sent_at")):
+                    or not conversation.get("last_sent_at") or email in booked or conversation.get("visit_check")
+                    or conversation.get("inactive") or was_proposed(conversation, email, proposed)
+                    or conversation.get("stage", 0) >= 3):
+                # Only in the qualification (26/09): after a visit proposal the round, the agenda and the visit
+                # reminders take over; a «did you get our email?» about a day already gone would be wrong.
                 continue
             sent = set(conversation.get("reminders_sent") or [])
             hours = (datetime.now(timezone.utc)
                     - datetime.fromisoformat(conversation["last_sent_at"])).total_seconds() / 3600
-            if "2d" not in sent and text["day2"] and hours >= REMINDER_HOURS["2d"]:
+            # A ceiling (26/09): someone silent for more than REMINDER_MAX_HOURS gets no reminder any more, so a
+            # backlog of old conversations never turns into a pile of reminders on one read.
+            if hours >= REMINDER_MAX_HOURS:
+                continue
+            if "2d" not in sent and hours >= REMINDER_HOURS["2d"]:
                 threshold = "2d"
-            elif "2d" in sent and "4d" not in sent and text["day4"] and hours >= REMINDER_HOURS["4d"]:
+            elif "2d" in sent and "4d" not in sent and hours >= REMINDER_HOURS["4d"]:
                 threshold = "4d"
             else:
                 continue
             if (email, threshold) in already:
                 continue
             phrase = text["day2"] if threshold == "2d" else text["day4"]
-            body = f"{phrase}\n\n{conversation['last_text']}" if conversation.get("last_text") else phrase
             key = f"lembrete-{threshold}-{hashlib.sha256(email.encode()).hexdigest()[:8]}"
-            data["emails"].append(self.aux_item(key, "reminder", email, conversation, body, reminder=threshold))
+            if key in set(data.get("dismissed_message_ids") or []):
+                continue
+            if phrase:
+                body = f"{phrase}\n\n{conversation['last_text']}" if conversation.get("last_text") else phrase
+                data["emails"].append(self.aux_item(key, "reminder", email, conversation, body, reminder=threshold))
+            else:  # no fixed phrase: the assistant writes it, with the conversation in front of it
+                data["emails"].append(self.aux_item(key, "reminder", email, conversation, "", reminder=threshold,
+                                                    reply_status="pending",
+                                                    history=list(conversation.get("history") or [])))
             created += 1
         return created
+
+    def set_recipient(self, property_ref, key, email):
+        """«Mudar destinatário»: on a portal notice without a valid Reply-To, the owner sets who the reply goes to.
+        The portal's address and the account itself are refused, as for a Reply-To."""
+        email = str(email or "").strip()
+        if not EMAIL.fullmatch(email):
+            raise ValueError("Indica um email válido.")
+        with locked(self.folder):
+            profiles = self.profiles()
+            ref = self.pick(profiles, property_ref)
+            account = self.config()["account"]
+            never = {a.casefold() for a in profiles[ref].get("reply", {}).get("never_reply_to", [])} | {account.casefold()}
+            if email.casefold() in never:
+                raise ValueError("Esse endereço é do portal ou teu: indica o email do cliente.")
+            data = self.load(ref)
+            item = next((entry for entry in data["emails"] if entry["id"] == key), None)
+            if (not item or item.get("kind") != "lead" or (item.get("reply_to") and not item.get("blocked"))
+                    or item.get("reply_status") not in (None, "pending", "draft")):
+                raise ValueError("Este email não permite mudar o destinatário.")
+            name = (item.get("customer") or {}).get("name") or ""
+            item["recipient"] = {"name": name, "email": email}
+            item["customer"] = {**(item.get("customer") or {}), "email": email}
+            item["blocked"] = None
+            item["warnings"] = [w for w in item.get("warnings") or [] if not w.startswith("Sem Reply-To")]
+            item["warnings"].append(f"Destinatário indicado à mão: {email}.")
+            data.pop("send_preview", None)
+            add_contacts(self.folder, [{"email": email.casefold(), "nome": name, "telefone": (item["customer"].get("phone") or ""),
+                                        "primeiro_contacto": contact_day(item), "imovel": ref, "fonte": CONTACT_SOURCE}])
+            self.save(data, ref)
+            self.log("recipient_set", reference=ref)
+            return {"property_ref": ref}
+
+    @staticmethod
+    def repair_surveys(data):
+        """Survey answers kept before 26/09 without any mark (written as words, or wrapped over two lines): read again
+        from the customer's own reply in the history, with the reader of today."""
+        fixed = 0
+        for conversation in data.get("conversations", {}).values():
+            survey = conversation.get("visit_survey")
+            if not survey or any(survey.get(part) for part in ("imovel", "consultor", "marcacao")):
+                continue
+            for turn in reversed(conversation.get("history") or []):
+                again = parse_survey(turn["text"]) if turn.get("who") == "cliente" else None
+                if again and any(again.get(part) for part in ("imovel", "consultor", "marcacao")):
+                    conversation["visit_survey"] = {**again, "at": survey.get("at")}
+                    fixed += 1
+                    break
+        return fixed
+
+    def repair_missing_reply_to(self, ref, data, profile, account):
+        """Portal notices already in the queue, blocked only for lacking Reply-To before 26/09: prepared again, so
+        the email in their body becomes the recipient (with the warning) when there is one. Returns their contacts."""
+        notice = profile.get("reply", {}).get("missing_reply_to_notice") or "Sem Reply-To: confirma o destinatário."
+        found = []
+        for item in data["emails"]:
+            if (item.get("kind") != "lead" or item.get("recipient") or item.get("blocked") != notice
+                    or item.get("reply_status") not in (None, "pending", "draft")):
+                continue
+            fixed = prepare(item, "lead", None, profile, account)
+            if fixed["recipient"]:
+                item.update(fixed)
+                found.append({"email": fixed["recipient"]["email"].casefold(), "nome": fixed["customer"].get("name") or "",
+                              "telefone": fixed["customer"].get("phone") or "", "primeiro_contacto": contact_day(item),
+                              "imovel": ref, "fonte": CONTACT_SOURCE})
+        return found
+
+    def mark_inactive(self, ref, data, moment=None):
+        """Silence (26/09): a customer who left at least two of our emails in a row unanswered, the last one four
+        days ago or more, becomes inactive: no rounds, reminders or active card. Nothing is sent to them, and
+        nothing is deleted; their next email brings them back while the property is ATIVO."""
+        moment = moment or datetime.now(timezone.utc)
+        waiting = {recipient_email(item) for item in data["emails"]}
+        count = 0
+        for email, conversation in data.get("conversations", {}).items():
+            if conversation.get("inactive") or conversation.get("ignored") or email in waiting:
+                continue
+            history = conversation.get("history") or []
+            ours = 0
+            for turn in reversed(history):
+                if turn.get("who") != "nos":
+                    break
+                ours += 1
+            if ours < INACTIVE_AFTER_EMAILS:
+                continue
+            last = aware(history[-1].get("ts") or history[-1].get("at") or "")
+            if last and (moment - last).total_seconds() >= INACTIVE_AFTER_HOURS * 3600:
+                conversation["inactive"] = {"at": moment.isoformat(), "reason": f"{ours} emails nossos sem resposta"}
+                count += 1
+        return count
 
     def schedule_visit_reminders(self, ref, data, moment=None):
         """Visit reminders (26/09): one the day before the visit and one on the day, drafted at the first read of
@@ -916,9 +1115,46 @@ class MailService:
         save_digest(self.folder, {"date": today, "reply_text": self.digest_text(profiles, queues, today),
                                   "reply_status": "draft", "reply_error": None, "created_at": now(), "sent_at": None})
 
+    @staticmethod
+    def digest_summary(profiles, queues):
+        """The same numbers as the digest's text, structured for the Painel's card (26/09): per property and in total."""
+        rows, totals = [], Counter()
+        for ref, profile in profiles.items():
+            emails = queues[ref]["emails"]
+            awaiting = [item for item in emails if item.get("reply_status") not in ("draft", "sent")]
+            row = {"property_ref": ref, "description": profile["property"].get("description") or ref,
+                   "active": property_active(profile), "conversations": len(queues[ref].get("conversations", {})),
+                   "pending": len(emails), "drafted": sum(1 for item in emails if item.get("reply_status") == "draft"),
+                   "awaiting": [(item.get("customer") or {}).get("name") or (item.get("recipient") or {}).get("name")
+                                or "sem nome" for item in awaiting]}
+            rows.append(row)
+            totals.update(conversations=row["conversations"], pending=row["pending"], drafted=row["drafted"],
+                          awaiting=len(awaiting))
+        return {"properties": rows, "totals": {key: totals[key] for key in ("conversations", "pending", "drafted", "awaiting")}}
+
     def digest_view(self):
+        """Today's digest as saved, with the situation as it stands now and who it goes to, for the Painel's card."""
         with locked(self.folder):
-            return load_digest(self.folder)
+            digest = load_digest(self.folder)
+            if not digest:
+                return None
+            profiles = load_profiles(self.folder, self.config()["account"])
+            return {**digest, "recipient": self.digest_recipient(),
+                    "summary": self.digest_summary(profiles, {ref: self.load(ref) for ref in profiles})}
+
+    def refresh_digest(self):
+        """«Atualizar com a situação de agora»: the draft is made at the day's first read; this rewrites its text
+        from the queues as they are now. A digest already sent is left alone."""
+        with locked(self.folder):
+            digest = load_digest(self.folder)
+            if not digest:
+                raise ValueError("Ainda não há ponto de situação preparado.")
+            if digest.get("reply_status") not in ("draft", "error"):
+                raise ValueError("O ponto de situação de hoje já foi enviado.")
+            profiles = load_profiles(self.folder, self.config()["account"])
+            digest["reply_text"] = self.digest_text(profiles, {ref: self.load(ref) for ref in profiles}, digest["date"])
+            save_digest(self.folder, digest)
+        return self.digest_view()
 
     def save_digest_text(self, text):
         text = str(text or "")
@@ -1191,9 +1427,10 @@ class MailService:
         waiting = {((item.get("recipient") or {}).get("email") or "").casefold() for item in data["emails"]}
         found = []
         for email, conversation in sorted(data.get("conversations", {}).items()):
-            if conversation.get("ignored"):
-                # On the ignore list: never a visit candidate, never counted as active anywhere else
-                # that reuses this list (round proposals, the analysis prompt, "Clientes ativos").
+            if conversation.get("ignored") or conversation.get("inactive"):
+                # On the ignore list, or inactive after two unanswered emails: never a visit candidate, never
+                # counted as active anywhere else that reuses this list (round proposals, the analysis prompt,
+                # "Clientes ativos", the files in Contactos).
                 continue
             if email in booked:
                 state, reason = "booked", "já tem visita marcada"
@@ -1335,7 +1572,8 @@ class MailService:
         """Refuses an API call once that property's tank is empty — here, not only in the page's buttons."""
         if self.api_fuel(ref)["empty"]:
             raise ValueError(f"O depósito da API{' de ' + ref if ref else ''} está vazio: enche-o no painel do imóvel "
-                             "(Imóveis) para voltar a usar a API. O copiar/colar com o ChatGPT continua a funcionar.")
+                             "(Imóveis) para voltar a usar a API." + ("" if self.ai_mode() == "api" else
+                                                                      " O copiar/colar com o ChatGPT continua a funcionar."))
 
     def analyze_visits(self, property_ref=None):
         """Same prompt as visit_analysis_prompt, answered by the OpenAI API instead of pasted by hand."""
@@ -1349,20 +1587,21 @@ class MailService:
             prompt_text = visit_analysis_prompt(profiles[ref], self.candidates(ref, data), data.get("conversations", {}))
             cfg = self.config()
             key = openai_api_key(self.folder, cfg["account"])
-            model = str(cfg.get("openai_model") or MODEL_DEFAULT)
+            model = self.model(cfg)
             summary, usage = complete(key, model, prompt_text, json_mode=False)
             self.log("openai_usage", model=model, **usage, reference=ref, cost_usd=round(estimate_cost_usd(model, **{
                 k: usage[k] for k in ("prompt_tokens", "completion_tokens")}), 6))
             return {"property_ref": ref, "summary": summary, "tokens": usage, "fuel": self.api_fuel(ref)}
 
     def agenda_slots(self, ref, today, back_days=14):
-        """The booked visits for the agenda: the coming ones and those of the last back_days, so a visit can be
-        checked after it happened; each with its check (who came, the notes) and the survey answered."""
-        since = (date.fromisoformat(today) - timedelta(days=back_days)).isoformat()
+        """The booked visits: the coming ones and those of the last back_days (None: every one, as the agenda shows
+        them since 26/09 — a visit stays on record for good); each with its check and the survey answered."""
+        since = "" if back_days is None else (date.fromisoformat(today) - timedelta(days=back_days)).isoformat()
         conversations = self.load(ref).get("conversations", {})
         # Every booking shows whether the customer's file is complete (live: it fills as their answers arrive).
-        return sorted(({**slot, "survey": (conversations.get(slot["customer"]) or {}).get("visit_survey"),
+        return sorted(({**slot, "survey": survey_of(conversations.get(slot["customer"])),
                         "ficha": ficha_summary((conversations.get(slot["customer"]) or {}).get("ficha")),
+                        "selection": ((conversations.get(slot["customer"]) or {}).get("selection") or {}).get("status"),
                         "thanks_sent_at": ((conversations.get(slot["customer"]) or {}).get("visit_check") or {}).get("thanks_sent_at")}
                        for slot in load_visits(self.folder, ref)["slots"] if slot["at"][:10] >= since),
                       key=lambda slot: slot["at"])
@@ -1402,6 +1641,18 @@ class MailService:
             if conversation is not None:
                 conversation["visit_check"] = {**(conversation.get("visit_check") or {}), "at": slot["at"],
                                                "attended": attended, **notes}
+                # 26/09: a no-show gets a draft (the assistant writes it, VISIT_MISSED_RULE); changed back, it goes.
+                missed = [item for item in data["emails"] if item.get("kind") == "visit_missed" and recipient_email(item) == email]
+                if attended is False and not missed and (conversation.get("visit_missed_for") != slot["at"]):
+                    key = f"visita-falhada-{hashlib.sha256((email + slot['at']).encode()).hexdigest()[:12]}"
+                    data["emails"].append(self.aux_item(key, "visit_missed", email, conversation, "", reply_status="pending",
+                                                        visit_missed={"at": slot["at"]},
+                                                        history=list(conversation.get("history") or [])))
+                    conversation["visit_missed_for"] = slot["at"]
+                elif attended is not False:
+                    data["emails"] = [item for item in data["emails"] if item not in missed]
+                    if missed:
+                        conversation.pop("visit_missed_for", None)
                 self.save(data, ref)
             self.log("visit_checked", reference=ref, attended=attended)
             return {"property_ref": ref, "at": slot["at"], "check": slot["check"]}
@@ -1490,7 +1741,7 @@ class MailService:
             if not has_openai_api_key(self.folder, cfg["account"]):
                 raise ValueError("Sem chave da OpenAI: guarda-a com mac/openai_key.command para usar a API.")
             key = openai_api_key(self.folder, cfg["account"])
-            model = str(cfg.get("openai_model") or MODEL_DEFAULT)
+            model = self.model(cfg)
             today = date.today().isoformat()
             results = []
             for ref in [self.pick(profiles, property_ref)] if property_ref else list(profiles):
@@ -1733,15 +1984,105 @@ class MailService:
         with locked(self.folder):
             profiles = self.profiles()
             self.sync_contacts(profiles)
-            stages = {(email, ref): conversation.get("stage", 0)
-                      for ref in profiles for email, conversation in self.load(ref).get("conversations", {}).items()}
-            rows = sorted(({**row, "interactions": stages.get((row["email"], row["imovel"]), 0)}
+            conversations = {(email, ref): conversation for ref in profiles
+                             for email, conversation in self.load(ref).get("conversations", {}).items()}
+            rows = sorted(({**row, "interactions": (conversations.get((row["email"], row["imovel"])) or {}).get("stage", 0),
+                            "inactive": bool((conversations.get((row["email"], row["imovel"])) or {}).get("inactive"))}
                            for row in load_contacts(self.folder).values()),
                           key=lambda row: (row["imovel"], (row["nome"] or row["email"]).casefold()))
             return {"contacts": rows, "properties": list(profiles), "rgpd_states": RGPD_STATES,
                     "inactive": [ref for ref, profile in profiles.items() if not property_active(profile)],
                     "fichas": [ficha for ref in profiles for ficha in self.fichas(ref, self.load(ref))],
+                    "selection": [item for ref in profiles for item in self.selection(ref, self.load(ref))],
+                    "documents": {key: label for key, (label, _) in DOCUMENTS.items()},
+                    "expired": self.expired_contacts(),
                     "ficha_fields": FICHA_FIELDS}
+
+    def selection(self, ref, data):
+        """The short list of one property, for the top of Contactos: each candidate's file, the visit (who came and
+        the notes), the survey and the documents' checklist. The chosen one first, then the reserve."""
+        slots = {slot["customer"]: slot for slot in load_visits(self.folder, ref)["slots"]}
+        order = {"chosen": 0, "suplente": 1, "shortlist": 2}
+        board = []
+        for email, conversation in data.get("conversations", {}).items():
+            selection = conversation.get("selection") or {}
+            if selection.get("status") not in SELECTION_STATES or conversation.get("ignored"):
+                continue
+            check = conversation.get("visit_check") or (slots.get(email) or {}).get("check") or {}
+            board.append({"property_ref": ref, "email": email, "name": conversation.get("name") or "",
+                          "status": selection["status"], "label": SELECTION_STATES[selection["status"]],
+                          "ficha": {key: (conversation.get("ficha") or {}).get(key) for key in FICHA_FIELDS},
+                          **{"ficha_" + key: value for key, value in ficha_summary(conversation.get("ficha")).items()},
+                          "visit": {"at": (slots.get(email) or {}).get("at"), "attended": check.get("attended"),
+                                    "private": check.get("private") or "", "public": check.get("public") or ""},
+                          "survey": survey_of(conversation), "documents": documents_summary(selection),
+                          "docs_requested_at": selection.get("docs_requested_at")})
+        return sorted(board, key=lambda item: (order[item["status"]], item["name"].casefold()))
+
+    def set_selection(self, property_ref, email, status):
+        """Short list, chosen or reserve (None takes them off). One chosen and one reserve per property: choosing
+        another puts the previous one back on the short list. The owner decides; nothing is sent from here."""
+        email = str(email or "").strip().casefold()
+        if status is not None and status not in SELECTION_STATES:
+            raise ValueError("Estado de seleção inválido.")
+        with locked(self.folder):
+            ref = self.pick(self.profiles(), property_ref)
+            data = self.load(ref)
+            conversation = data.get("conversations", {}).get(email)
+            if not conversation:
+                raise ValueError("Cliente desconhecido neste imóvel.")
+            if status in ("chosen", "suplente"):
+                for other in data["conversations"].values():
+                    if other is not conversation and (other.get("selection") or {}).get("status") == status:
+                        other["selection"]["status"] = "shortlist"
+            if status is None:
+                conversation.pop("selection", None)
+            else:
+                conversation.setdefault("selection", {}).update(status=status, at=now())
+            self.save(data, ref)
+            self.log("selection_set", reference=ref, status=status or "removed")
+            return {"property_ref": ref}
+
+    def set_document(self, property_ref, email, document=None, received=None, fiador=None):
+        """The documents' checklist of a short-listed candidate: what arrived (ticked by the owner), and whether a
+        guarantor's documents are also needed. Only ticks: the files stay in the owner's Gmail."""
+        email = str(email or "").strip().casefold()
+        with locked(self.folder):
+            ref = self.pick(self.profiles(), property_ref)
+            data = self.load(ref)
+            selection = ((data.get("conversations", {}).get(email) or {}).get("selection"))
+            if not selection:
+                raise ValueError("Este cliente não está na short list.")
+            if fiador is not None:
+                selection["fiador"] = bool(fiador)
+            if document is not None:
+                who, _, key = str(document).partition(":")
+                if who not in ("candidato", "fiador") or key not in DOCUMENTS:
+                    raise ValueError("Documento desconhecido.")
+                selection.setdefault("docs", {})[document] = bool(received)
+            self.save(data, ref)
+            return {"property_ref": ref}
+
+    def request_documents(self, property_ref, email):
+        """«Pedir documentos»: a draft in the candidate's conversation, written by the assistant with the list;
+        reviewed and sent like any other. Only for the short list."""
+        email = str(email or "").strip().casefold()
+        with locked(self.folder):
+            ref = self.pick(self.profiles(), property_ref)
+            data = self.load(ref)
+            conversation = data.get("conversations", {}).get(email)
+            if not conversation or not (conversation.get("selection") or {}).get("status"):
+                raise ValueError("Só se pedem documentos a quem está na short list.")
+            if any(recipient_email(item) == email and item.get("kind") == "docs_request" for item in data["emails"]):
+                raise ValueError("O pedido de documentos deste cliente já está na fila das Comunicações.")
+            key = f"documentos-{hashlib.sha256((email + now()).encode()).hexdigest()[:12]}"
+            data["emails"].append(self.aux_item(key, "docs_request", email, conversation, "", reply_status="pending",
+                                                docs_request={"fiador": bool(conversation["selection"].get("fiador"))},
+                                                history=list(conversation.get("history") or [])))
+            conversation["selection"]["docs_requested_at"] = now()
+            self.save(data, ref)
+            self.log("docs_request_created", reference=ref)
+            return {"id": key, "property_ref": ref}
 
     def fichas(self, ref, data):
         """Each active customer's file (the ignored ones are left out), the most recent conversation first."""
@@ -1758,6 +2099,7 @@ class MailService:
             last = max([conversation.get("last_sent_at") or ""] + [turn.get("ts") or turn.get("at") or "" for turn in history])
             ficha = conversation.get("ficha") or {}
             found.append({"property_ref": ref, "email": customer["email"], "name": customer["name"], "phase": phase,
+                          "selection": (conversation.get("selection") or {}).get("status"),
                           "pending": customer["state"] == "pending", "stage": customer["stage"], "last": last,
                           "ficha": {key: ficha.get(key) for key in FICHA_FIELDS}, "updated": ficha.get("at"),
                           **ficha_summary(ficha)})
@@ -1834,6 +2176,111 @@ class MailService:
             self.log("contact_deleted", reference=ref, pending=len(pending))
             return {"pending_removed": len(pending), "conversation_removed": conversation is not None}
 
+    def expired_contacts(self, moment=None):
+        """RGPD (26/09): contacts without consent («sim») whose last movement — their first contact, an email of
+        theirs or of ours — is more than CONTACT_RETENTION_DAYS old. Listed for the owner; erased only on a click."""
+        moment = moment or datetime.now(timezone.utc)
+        limit = (moment - timedelta(days=CONTACT_RETENTION_DAYS)).isoformat()
+        profiles = load_profiles(self.folder, self.config()["account"])
+        conversations = {(email, ref): conversation for ref in profiles
+                         for email, conversation in self.load(ref).get("conversations", {}).items()}
+        expired = []
+        for (email, ref), row in load_contacts(self.folder).items():
+            if row.get("rgpd") == "sim" or ref not in profiles:
+                continue
+            conversation = conversations.get((email, ref)) or {}
+            stamps = [row.get("primeiro_contacto") or "", conversation.get("last_sent_at") or ""]
+            stamps += [turn.get("ts") or turn.get("at") or "" for turn in conversation.get("history") or []]
+            last = max(stamps)[:10]  # by day: some stamps are days, others full times
+            if last and last < limit[:10]:
+                expired.append({"email": email, "imovel": ref, "name": ((row.get("nome") or "").split() or ["sem nome"])[0],
+                                "last": last})
+        return sorted(expired, key=lambda item: item["last"])
+
+    def purge_expired(self):
+        """«Apagar»: the right to erasure applied to every expired contact, one by one, as delete_contact does."""
+        with locked(self.folder):
+            expired = self.expired_contacts()
+        for item in expired:
+            self.delete_contact(item["email"], item["imovel"])
+        self.log("contacts_purged", count=len(expired))
+        return {"purged": len(expired)}
+
+    def import_profile(self, property_ref, email, text):
+        """«Colar perfil do Idealista»: the portal's tenant profile (behind «Ver perfil», never in the email) pasted
+        by the owner; the API turns it into the customer's file, merged with what was already known."""
+        email, text = str(email or "").strip().casefold(), str(text or "").strip()
+        if len(text) < 20:
+            raise ValueError("Cola o perfil do cliente, copiado da página do Idealista.")
+        with locked(self.folder):
+            ref = self.pick(self.profiles(), property_ref)
+            self.require_fuel(ref)
+            if email not in self.load(ref).get("conversations", {}):
+                raise ValueError("Cliente desconhecido neste imóvel.")
+            cfg = self.config()
+            if not has_openai_api_key(self.folder, cfg["account"]):
+                raise ValueError("Sem chave da OpenAI: guarda-a com mac/openai_key.command para usar a API.")
+            model = self.model(cfg)
+        answer, usage = complete(openai_api_key(self.folder, cfg["account"]), model, ficha_profile_prompt(text))
+        data = extract_json(answer)
+        ficha = clean_ficha((data.get("ficha") if isinstance(data, dict) and "ficha" in data else data))
+        if not ficha:
+            raise ValueError("A resposta da API não trouxe a ficha.")
+        with locked(self.folder):
+            data = self.load(ref)
+            conversation = data["conversations"][email]
+            conversation["ficha"] = {**merge_ficha(conversation.get("ficha"), ficha), "at": now()}
+            self.save(data, ref)
+            self.log("openai_usage", model=model, **usage, reference=ref, cost_usd=round(estimate_cost_usd(
+                model, **{k: usage[k] for k in ("prompt_tokens", "completion_tokens")}), 6))
+            return {"property_ref": ref, "ficha": conversation["ficha"], "fuel": self.api_fuel(ref)}
+
+    def fill_fichas(self, property_ref=None):
+        """«Preencher fichas com a IA»: the API reads each active customer's conversation and fills their file,
+        merged with what was known (nothing known is lost). Every ATIVO property, or one; FICHAS_BATCH customers
+        per call; a property whose tank is empty is skipped and says why."""
+        with locked(self.folder):
+            profiles = self.profiles()
+            if not profiles:
+                raise ValueError("As fichas só existem com imóveis.")
+            cfg = self.config()
+            if not has_openai_api_key(self.folder, cfg["account"]):
+                raise ValueError("Sem chave da OpenAI: guarda-a com mac/openai_key.command para usar a API.")
+            key, model = openai_api_key(self.folder, cfg["account"]), self.model(cfg)
+            refs = [self.pick(profiles, property_ref)] if property_ref else [
+                ref for ref, profile in profiles.items() if property_active(profile)]
+            results = []
+            for ref in refs:
+                result = {"property_ref": ref, "asked": 0, "filled": 0}
+                if self.api_fuel(ref)["empty"]:
+                    results.append({**result, "skipped": "o depósito da API está vazio"})
+                    continue
+                data = self.load(ref)
+                conversations = data.get("conversations", {})
+                people = [customer["email"] for customer in self.candidates(ref, data)
+                          if any(turn.get("who") == "cliente" for turn in conversations[customer["email"]].get("history") or [])]
+                result["asked"] = len(people)
+                for start in range(0, len(people), FICHAS_BATCH):
+                    ids = {f"c{number}": email for number, email in enumerate(people[start:start + FICHAS_BATCH], 1)}
+                    prompt_text = fichas_prompt(profiles[ref], [(key_id, conversations[email].get("name"),
+                                                                 conversations[email].get("history") or [])
+                                                                for key_id, email in ids.items()])
+                    answer, usage = complete(key, model, prompt_text)
+                    self.log("openai_usage", model=model, **usage, reference=ref, cost_usd=round(estimate_cost_usd(
+                        model, **{k: usage[k] for k in ("prompt_tokens", "completion_tokens")}), 6))
+                    for key_id, ficha in parse_fichas_batch(answer, set(ids)).items():
+                        conversation = conversations[ids[key_id]]
+                        conversation["ficha"] = {**merge_ficha(conversation.get("ficha"), ficha), "at": now()}
+                        result["filled"] += 1
+                self.save(data, ref)
+                self.log("fichas_filled", reference=ref, asked=result["asked"], filled=result["filled"])
+                results.append(result)
+            return {"fill": results}
+
+    def phones(self):
+        """(email, property) → phone, from contactos.csv: only for the page's WhatsApp button, never for the AI."""
+        return {key: row.get("telefone") or "" for key, row in load_contacts(self.folder).items() if row.get("telefone")}
+
     def set_ignored(self, property_ref, email, ignored=True, reason="", kind=None):
         """Ignore list, per property: unlike "Retirar da fila" (one email, once), this covers every future
         message from them too — they stop being a visit candidate and stop getting reminders, consent
@@ -1902,8 +2349,20 @@ class MailService:
             return False
 
     # «A fazer», most urgent first: what goes out to customers today, then the queue, the agenda, the rounds, setup.
-    TODO_ORDER = ("visit_reminder", "uncertain", "blocked", "reply", "draft", "accepted", "check", "thanks", "ready",
+    TODO_ORDER = ("expired", "survey_alert", "visit_reminder", "uncertain", "blocked", "reply", "draft", "accepted", "check", "thanks", "ready",
                   "brake", "setup")
+
+    def survey_report(self, ref, data=None):
+        """A property's survey report: one dial per part asked, interest, and each answer with its comment."""
+        conversations = (data or self.load(ref)).get("conversations", {})
+        answers = [(conversation.get("name") or "", survey_of(conversation)) for conversation in conversations.values()
+                   if conversation.get("visit_survey")]
+        answers.sort(key=lambda pair: pair[1].get("at") or "", reverse=True)
+        return {**survey_report([survey for _, survey in answers]),
+                "answers": [{"name": (name.split() or ["sem nome"])[0], "at": survey.get("at"), "comment": survey.get("comentario"),
+                             "interest": survey.get("interesse"), "alerts": survey_alerts(survey),
+                             **{part: survey.get(part) for part in ("imovel", "consultor", "marcacao")}}
+                            for name, survey in answers]}
 
     def todo(self):
         """«A fazer» (26/09), right under the dashboard's telemetry: what needs doing now, worked out from the data.
@@ -1931,9 +2390,14 @@ class MailService:
                 data = self.load(ref)
                 emails, conversations = data["emails"], data.get("conversations", {})
                 reminders = [item for item in emails if item.get("kind") == "visit_reminder"]
+                surveys = [item for item in emails if (item.get("survey_reply") or {}).get("alerts")]
+                add("survey_alert", "replies", ref, [name_of(item) or (conversations.get(
+                    ((item.get("recipient") or {}).get("email") or "").casefold()) or {}).get("name") for item in surveys],
+                    "Inquéritos com nota má ou sem interesse: ler e responder")
                 uncertain = [item for item in emails if item.get("reply_status") in ("sending", "uncertain")]
                 blocked = [item for item in emails if item.get("blocked")]
-                rest = [item for item in emails if item not in reminders and item not in uncertain and item not in blocked]
+                rest = [item for item in emails if item not in reminders and item not in uncertain and item not in blocked
+                        and item not in surveys]
                 add("visit_reminder", "replies", ref, [name_of(item) for item in reminders], "Lembretes de visita por enviar")
                 add("uncertain", "replies", ref, [name_of(item) for item in uncertain],
                     "Envios com resultado incerto: confirmar no Gmail")
@@ -1968,9 +2432,13 @@ class MailService:
                         brake.append(customer["name"])
                 add("ready", "properties", ref, ready, "Ficha completa, sem proposta de visita: incluir na próxima ronda")
                 add("brake", "contacts", ref, brake, "Três pedidos de informação sem ficha completa: decidir se propões visita")
-            reminders = style.get("reminders") or {}
+            expired = self.expired_contacts(moment.astimezone(timezone.utc))
+            if expired:
+                tasks.append({"kind": "expired", "tab": "contacts", "property_ref": None, "count": len(expired),
+                              "names": [item["name"] for item in expired][:8],
+                              "text": "Contactos sem consentimento com mais de 6 meses: apagar (RGPD)"})
+            # The 2- and 4-day reminders are no gap any more (26/09): without a phrase, the assistant writes them.
             gaps = [label for label, done in (
-                ("lembretes de 2 e 4 dias", any((reminders.get(key) or {}).get("text") for key in ("day2", "day4"))),
                 ("visitas fechadas", (style.get("visits_closed") or {}).get("text")),
                 ("pedido de consentimento", (style.get("consent_request") or {}).get("text"))) if not done]
             if gaps and profiles:
@@ -2114,7 +2582,10 @@ class MailService:
                                      "sent": mine["sent"].get(day, 0)} for day in starts],
                             reply_hours=round(sum(mine["waited"]) / len(mine["waited"]), 1) if mine["waited"] else None,
                             openai_usage={"period": usage_of(mine["period"]), "all_time": usage_of(mine["all_time"])})
-            return {"account": account, "last_read_at": last_read, "properties": properties,
+            # The Painel's quality dials: every property's survey answers together (first names never leave here).
+            quality_all = survey_report([survey_of(conversation) for ref in refs if ref
+                                         for conversation in self.load(ref).get("conversations", {}).values()])
+            return {"account": account, "last_read_at": last_read, "properties": properties, "quality": quality_all,
                     "totals": {key: totals[key] for key in
                                ("pending", "drafts", "blocked", "attention", "answered", "customers")},
                     "period_days": days, "bucket_days": step,
@@ -2158,6 +2629,7 @@ class MailService:
             for ref, profile in load_profiles(self.folder, account).items():
                 prompts = profile.get("reply", {}).get("prompts", {})
                 properties.append({"sender": profile["match"]["from_address_equals"], "active": property_active(profile),
+                                   "survey_report": self.survey_report(ref),
                                    "prompts": {name: (prompts.get(key) or {}).get(field) or ""
                                                for name, (key, field) in PROMPT_FIELDS.items()},
                                    "knowledge_files": [part["file"] for part in profile["_knowledge"]],
@@ -2165,7 +2637,11 @@ class MailService:
                                    "api_fuel": self.api_fuel(ref, events),
                                    "visits": {"windows": [window for window in load_visits(self.folder, ref)["windows"]
                                                           if window["day"] >= today],
-                                              "slots": self.agenda_slots(ref, today),
+                                              # For the agenda only (26/09): every past window stays drawn, like the
+                                              # bookings; the rounds and proposals still use only "windows".
+                                              "past_windows": [window for window in load_visits(self.folder, ref)["windows"]
+                                                               if window["day"] < today],
+                                              "slots": self.agenda_slots(ref, today, back_days=None),
                                               "closed_at": load_visits(self.folder, ref)["closed_at"],
                                               # Accepted by the customer, not yet confirmed (found by «Atualizar agenda»).
                                               "accepted": self.pending_visits(ref, today, "visit_accepted"),
@@ -2173,7 +2649,7 @@ class MailService:
                                    **{key: profile["property"].get(key) for key in (
                                        "reference", "listing_id", "listing_url", "advertiser", "description",
                                        "advertised_rent_eur")}})
-            return {"account": account, "voice": voice, "properties": properties,
+            return {"account": account, "voice": voice, "properties": properties, "ai": self.ai_settings(),
                     "lookback_days": int(self.config().get("lookback_days", 7)),
                     "openai_configured": has_openai_api_key(self.folder, account), "api_fuel": self.api_fuel(None, events)}
 

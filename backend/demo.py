@@ -39,7 +39,8 @@ def picture(color, width=320, height=200):
 def lead(key, ref, listing, name, phone, message, date, reply_to=True):
     """A portal notice as the Gmail reader returns it (fictitious customer)."""
     email = name.lower().replace(" ", ".") + "@example.com"
-    body = "\n".join(["Tens uma nova mensagem que aguarda resposta", name, phone, email, message,
+    # The blocked example has neither a Reply-To nor an email in its body (with one there, it is used since 26/09).
+    body = "\n".join(["Tens uma nova mensagem que aguarda resposta", name, phone, *([email] if reply_to else []), message,
                       f"Ref. {ref} | Anunciante Exemplo", f"Código do anúncio: {listing}"])
     return {"uid": key, "gmail_message_id": key, "thread_id": f"t{key}", "date": date.isoformat(),
             "from": [{"name": "idealista", "email": "reply@idealista.pt"}], "to": [{"name": "", "email": ACCOUNT}],

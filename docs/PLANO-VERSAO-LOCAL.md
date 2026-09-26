@@ -124,6 +124,8 @@ Lead_Imoveis/             (repositório bot-imoveis; o nome decide-se com a .app
 - Para distribuir fora da App Store é preciso assinatura e notarização da Apple, com conta de programador.
 - Os dados passam para `~/Library/Application Support/<nome>/`. O caminho de `data/` já é configurável
   (`--instance` ou `BOT_MAIL_INSTANCE`).
+- **A 26/09/2026 decidiu-se vender a app para Mac e Windows, numa pen USB:** o plano detalhado está em
+  [ProduçãoPackAPP.md](ProduçãoPackAPP.md).
 
 ## Da versão de referência para a nova (feito na etapa 1)
 
@@ -254,6 +256,19 @@ Regra comum: o programa prepara, e nada sai sem a pré-visualização do lote e 
 **Fora do plano por agora:** o botão para carregar a fotografia do imóvel. A API aceita-a
 (`POST /api/property/photo`) e a página mostra-a quando existe, mas extrair fotos do Idealista à mão não é
 viável no dia a dia deste utilizador (ver `docs/DECISOES.md`, 22/09, à noite).
+
+## Evolução futura: voltar ao ChatGPT, ao MCP ou a um LLM local
+
+Desde α.43.0 (26/09/2026) a página trabalha em **«Modo: só API»** (OpenAI, `gpt-4o-mini` por defeito ou `gpt-4o`).
+O resto ficou escondido, não apagado, para poder voltar daqui a um mês:
+- **Copiar/colar com o ChatGPT:** `"ai_mode": "copy_paste"` no `config.json`. A página volta a mostrar «Criar
+  prompt / Copiar», o passo «Importar», a extração do anúncio pelo link e o prompt de análise. As rotas
+  (`api/prompt`, `api/paste`, `api/property/prompt`, `api/property/parse`, `api/visits/analysis-prompt`) nunca
+  deixaram de funcionar e continuam testadas.
+- **MCP local:** com o mesmo `ai_mode`, `bot-mail stdio` volta a arrancar (em modo só API recusa, com a explicação).
+- **LLM local (por exemplo Ollama) ou outro fornecedor:** entra como um segundo cliente ao lado de
+  `openai_client.py`, com a mesma assinatura de `complete(key, model, prompt)`; a escolha fica no mesmo seletor de
+  modelo. Um modelo só entra na lista com o preço confirmado (regra do utilizador, 26/09).
 
 ## Pendentes que passam para a nova versão
 

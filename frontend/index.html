@@ -5,11 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Real Estate AI Assistant</title>
 <link rel="stylesheet" href="style.css">
-<!-- Rich themes ("skins") keep their own stylesheet: 90's RacingCar now; a yacht or a grand-luxury one fits the same slot. -->
+<!-- Rich themes ("skins") keep their own stylesheet: 80's RacingCar now; a yacht or a grand-luxury one fits the same slot. -->
 <link rel="stylesheet" href="themes/racing.css">
 <link rel="stylesheet" href="themes/boat.css">
+<link rel="stylesheet" href="themes/scooter.css">
 </head>
-<body>
+<body class="api-only">
 <a class="skip-link" href="#main">Saltar para o conteúdo</a>
 <header class="sidebar">
   <div class="brand"><span class="brand-mark" aria-hidden="true">⌂</span><div class="brand-text"><strong class="brand-name">Real Estate <span>AI Assistant</span></strong><span class="brand-by">by BigLearn PT</span><span class="app-version" title="Versão da aplicação (ver CHANGELOG.md)">version: v{{VERSION}}</span><span class="app-build" title="Quando este processo arrancou com este código">{{BUILD_AT}}</span></div></div>
@@ -22,13 +23,13 @@
     <button class="tab" data-tab="agenda" data-gear="5"><span aria-hidden="true" class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/><path d="M8 13.5h2M12 13.5h2M16 13.5h.01M8 16.8h2M12 16.8h2"/></svg></span>Agenda</button>
     <button class="tab" data-tab="voice" data-gear="6"><span aria-hidden="true" class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7"/><circle cx="12" cy="12" r="6.6"/></svg></span>Voz e estilo</button>
   </nav>
-  <!-- A skin's own tab selector (90's RacingCar: the gated gearbox); a copy of the nav above, for the mouse only. -->
+  <!-- A skin's own tab selector (80's RacingCar: the gated gearbox); a copy of the nav above, for the mouse only. -->
   <div id="skin-selector" class="skin-selector" aria-hidden="true"></div>
   <div class="sidebar-note"><span class="status-dot"></span> Ambiente local<p>O envio fica sempre<br>sob o teu controlo.</p></div>
   <div class="account-card"><span class="avatar" aria-hidden="true">@</span><div><span class="small muted">A tua conta</span><span id="account"></span></div></div>
 </header>
 <div class="workspace">
-<div class="topbar"><span>Workspace <span class="breadcrumb">/</span> <strong id="page-label">Painel</strong></span><span id="busy" role="status" hidden><span class="shift-lights" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>A trabalhar…</span><button id="sound-toggle" class="sound-toggle" type="button" aria-pressed="false" hidden title="Sons deste tema: buzina ao enviar, sino quando chegam emails novos">Sons</button><label class="theme-control" for="theme-select"><span>Tema</span><select id="theme-select" aria-label="Tema visual"><option value="night">Noite</option><option value="day">Dia</option><option value="indigo">Índigo</option><option value="amber">Âmbar</option><option value="racing">90's RacingCar</option><option value="boat">90's Boat</option></select></label><span class="local-label"><span class="status-dot"></span> Local</span></div>
+<div class="topbar"><span>Workspace <span class="breadcrumb">/</span> <strong id="page-label">Painel</strong></span><span id="busy" role="status" hidden><span class="shift-lights" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>A trabalhar…</span><button id="sound-toggle" class="sound-toggle" type="button" aria-pressed="false" hidden title="Sons deste tema: buzina ao enviar, sino quando chegam emails novos">Sons</button><label class="theme-control" for="theme-select"><span>Tema</span><select id="theme-select" aria-label="Tema visual"><option value="night">Noite</option><option value="day">Dia</option><option value="indigo">Índigo</option><option value="amber">Âmbar</option><option value="racing">80's RacingCar</option><option value="boat">90's Boat</option><option value="scooter">70's Scooter</option></select></label><span class="local-label"><span class="status-dot"></span> Local</span></div>
 <main id="main">
 
   <p id="error" class="alert bad" role="alert" hidden></p>
@@ -47,6 +48,7 @@
     <div class="metrics" id="metric-cards"></div>
     <p id="dashboard-read" class="muted small"></p>
     <article class="card todo-card" id="dashboard-todo" hidden></article>
+    <article class="card quality-card" id="dashboard-quality" hidden></article>
 
     <div class="dashboard-grid digest-row"><div id="digest-panel"></div><div id="visits-round-panel"></div></div>
 
@@ -63,8 +65,8 @@
     <article class="card" id="openai-usage-card"><p class="eyebrow">DEPÓSITOS · API OPENAI</p><h2>Um depósito de tokens por imóvel</h2>
       <div id="fuel-panel"></div>
       <div class="usage-rows" title="Estimativa a partir dos tokens exatos que a OpenAI devolve; os preços por token podem já ter mudado. Confirma a fatura real em platform.openai.com/usage.">
-        <div class="usage-row"><span>No período escolhido acima</span><strong id="usage-period"></strong></div>
-        <div class="usage-row"><span>Desde sempre, nesta pasta</span><strong id="usage-all-time"></strong></div></div></article></div>
+        <div class="usage-row"><span>Total de todos os imóveis · no período escolhido acima</span><strong id="usage-period"></strong></div>
+        <div class="usage-row"><span>Total de todos os imóveis · desde sempre</span><strong id="usage-all-time"></strong></div></div></article></div>
     <div class="section-heading portfolio-heading"><div><p class="eyebrow" data-word="portfolio.eyebrow">POR IMÓVEL</p><h2 data-word="portfolio.title">A tua carteira</h2></div><button data-tab="properties">Gerir imóveis →</button></div>
     <div id="dashboard-properties" class="portfolio-grid"></div>
   </section>
@@ -74,7 +76,7 @@
     <ol class="workflow">
       <li data-step="inbox-step"><a href="#inbox-step"><span class="num">01</span><span class="done-mark" aria-hidden="true">✓</span> Selecionar</a></li>
       <li data-step="prepare-step"><a href="#prepare-step"><span class="num">02</span><span class="done-mark" aria-hidden="true">✓</span> Preparar</a></li>
-      <li data-step="import-step"><a href="#import-step"><span class="num">03</span><span class="done-mark" aria-hidden="true">✓</span> Importar</a></li>
+      <li data-step="import-step" class="copy-only"><a href="#import-step"><span class="num">03</span><span class="done-mark" aria-hidden="true">✓</span> Importar</a></li>
       <li data-step="send-step"><a href="#send-step"><span class="num">04</span><span class="done-mark" aria-hidden="true">✓</span> Rever e enviar</a></li>
     </ol>
     <div class="row">
@@ -87,30 +89,34 @@
 
     <div class="reply-layout"><div class="inbox-column" id="inbox-step"><div class="section-heading"><h2>Emails pendentes</h2><span id="selection-count" class="tag" aria-live="polite"></span></div>
     <p class="step">Seleciona os emails a tratar. Os bloqueados não se podem enviar: trata-os à mão e retira-os da fila.</p>
+    <!-- «Rever e enviar» (26/09): with the drafts it sends, at the top of their column, not a card of its own -->
+    <div class="send-bar" id="send-step"><span class="eyebrow" id="send-step-label">PASSO 04</span>
+      <div class="send-bar-text"><strong>Rever e enviar</strong><span class="muted small">Revê e corrige os rascunhos abaixo; o envio mostra primeiro os destinatários e os textos finais.</span></div>
+      <button id="preview" class="primary">Pré-visualizar envio dos selecionados</button></div>
+    <div id="preview-box"></div>
     <div id="emails"></div>
     <div id="active-cards"></div>
     <details><summary class="muted small">Instruções deste imóvel (voz, contexto, interações)</summary><pre id="instructions"></pre></details>
 
-    </div><aside class="batch-column" aria-label="Preparação do lote"><article class="card" id="prepare-step"><p class="eyebrow">PASSO 02</p><h2>Preparar no ChatGPT <span class="kind kind-copy">Copiar/colar</span></h2>
+    </div><aside class="batch-column" aria-label="Preparação do lote"><article class="card" id="prepare-step"><p class="eyebrow">PASSO 02</p><h2 class="copy-only">Preparar no ChatGPT <span class="kind kind-copy">Copiar/colar</span></h2>
+    <h2 class="api-only-show">Gerar respostas <span class="kind" id="ai-model-label">API</span></h2>
     <p class="step">O prompt leva as instruções e as mensagens, sem o email nem o telefone dos clientes.</p>
     <textarea id="extra" aria-label="Instruções extra para o lote" rows="2" placeholder="Instruções extra para este lote (opcional), ex.: sê breve"></textarea>
-    <div class="actions"><button id="build-prompt" class="primary">Criar prompt</button><button id="copy-prompt" disabled>Copiar</button></div>
-    <details id="prompt-box"><summary class="muted small">Prompt criado</summary><pre id="prompt"></pre></details>
-    <div class="api-generate"><p class="muted small">Ou, sem sair da página:</p>
-      <div class="actions"><button id="generate-api" class="needs-fuel">Gerar respostas via API</button></div>
+    <div class="actions copy-only"><button id="build-prompt" class="primary">Criar prompt</button><button id="copy-prompt" disabled>Copiar</button></div>
+    <details id="prompt-box" class="copy-only"><summary class="muted small">Prompt criado</summary><pre id="prompt"></pre></details>
+    <div class="api-generate"><p class="muted small copy-only">Ou, sem sair da página:</p>
+      <div class="actions"><button id="generate-api" class="needs-fuel">Gerar respostas</button></div>
       <p id="api-hint" class="muted small" hidden></p>
     </div>
+    <details id="sent-prompt-box" class="api-only-show" hidden><summary class="muted small">Ver o que foi enviado à IA</summary><pre id="sent-prompt"></pre></details>
+    <div id="notes"></div>
 
-    </article><article class="card" id="import-step"><p class="eyebrow">PASSO 03</p><h2>Importar respostas <span class="kind kind-copy">Copiar/colar</span></h2>
+    </article><article class="card copy-only" id="import-step"><p class="eyebrow">PASSO 03</p><h2>Importar respostas <span class="kind kind-copy">Copiar/colar</span></h2>
     <textarea id="answer" aria-label="Resposta do ChatGPT" rows="6" placeholder="Cola aqui a resposta completa do ChatGPT (o bloco JSON)"></textarea>
     <div class="actions"><button id="paste" class="primary">Guardar rascunhos</button></div>
     <p id="import-status" class="alert ok" hidden></p>
-    <div id="notes"></div>
 
-    </article><article class="card" id="send-step"><p class="eyebrow">PASSO 04</p><h2>Rever e enviar</h2>
-    <p class="step">Revê e corrige os rascunhos no passo 1. O envio mostra primeiro os destinatários e os textos finais.</p>
-    <div class="actions"><button id="preview">Pré-visualizar envio dos selecionados</button></div>
-    <div id="preview-box"></div></article></aside></div>
+    </article></aside></div>
   </section>
 
   <section id="tab-properties" hidden>
@@ -127,15 +133,18 @@
     </div>
     <div id="new-property-view" hidden>
     <article class="card editor-card" id="property-editor">
-      <p class="eyebrow">FICHA DO IMÓVEL</p><h2><span id="editor-title">Novo imóvel</span> <span class="kind kind-copy">Copiar/colar</span></h2>
-      <p class="step">À mão, ou com o ChatGPT: cola o link do anúncio, copia o prompt, cola a resposta e revê os campos.</p>
+      <p class="eyebrow">FICHA DO IMÓVEL</p><h2><span id="editor-title">Novo imóvel</span> <span class="kind kind-copy copy-only">Copiar/colar</span></h2>
+      <p class="step copy-only">À mão, ou com o ChatGPT: cola o link do anúncio, copia o prompt, cola a resposta e revê os campos.</p>
+      <p class="step api-only-show">À mão, ou com a API: abre o anúncio no browser, seleciona o texto todo (⌘A), copia e cola aqui com o link. A API extrai os campos e tu revês antes de guardar.</p>
       <div class="row">
-        <input id="listing-url" aria-label="Link do anúncio para importar" placeholder="https://www.idealista.pt/imovel/…">
-        <button id="listing-prompt">Copiar prompt do anúncio</button>
+        <input id="listing-url" aria-label="Link do anúncio" placeholder="https://www.idealista.pt/imovel/…">
+        <button id="listing-prompt" class="copy-only">Copiar prompt do anúncio</button>
       </div>
-      <details id="listing-prompt-box"><summary class="muted small">Ver o prompt</summary><pre id="listing-prompt-text"></pre></details>
-      <textarea id="listing-answer" aria-label="Dados do anúncio do ChatGPT" rows="4" placeholder="Cola aqui a resposta do ChatGPT"></textarea>
-      <div class="actions"><button id="listing-parse">Preencher com a resposta</button></div>
+      <details id="listing-prompt-box" class="copy-only"><summary class="muted small">Ver o prompt</summary><pre id="listing-prompt-text"></pre></details>
+      <textarea id="listing-answer" class="copy-only" aria-label="Dados do anúncio do ChatGPT" rows="4" placeholder="Cola aqui a resposta do ChatGPT"></textarea>
+      <div class="actions copy-only"><button id="listing-parse">Preencher com a resposta</button></div>
+      <textarea id="listing-text" class="api-only-show" aria-label="Texto do anúncio" rows="6" placeholder="Cola aqui o texto do anúncio, copiado da página do portal"></textarea>
+      <div class="actions api-only-show"><button id="listing-extract" class="primary">Extrair com a API</button></div>
       <div class="grid">
         <label class="field">Referência (a que aparece nos avisos do portal)<input id="f-reference"></label>
         <label class="field">Remetente dos avisos do portal<input id="f-sender" placeholder="reply@idealista.pt"></label>
@@ -152,11 +161,21 @@
   </section>
 
   <section id="tab-contacts" hidden>
-    <div class="page-heading"><div><p class="eyebrow" data-word="contacts.eyebrow">CONTACTOS</p><h1 data-word="contacts.title">Quem te escreveu, num só registo.</h1><p class="step">É o <code>data/contactos.csv</code>: cada leitura acrescenta os clientes novos, e aqui corriges, acrescentas à mão ou apagas a pedido do cliente.</p></div><a class="button" href="contactos.csv">Descarregar CSV</a></div>
+    <div class="page-heading"><div><p class="eyebrow" data-word="contacts.eyebrow">CONTACTOS</p><h1 data-word="contacts.title">Quem te escreveu, num só registo.</h1><p class="step">É o <code>data/contactos.csv</code>: cada leitura acrescenta os clientes novos, e aqui corriges, acrescentas à mão ou apagas a pedido do cliente.</p></div></div>
+    <p id="contacts-expired" class="alert warn" hidden></p>
+    <div class="row contacts-property-row"><label class="muted">Imóvel <select id="fichas-property"></select></label></div>
+    <article class="card selection-card">
+      <div class="section-heading"><div><p class="eyebrow">SELEÇÃO · SHORT LIST</p><h2>Os candidatos finais, lado a lado</h2></div>
+        <span id="shortlist-count" class="tag" aria-live="polite"></span></div>
+      <p class="step">Junta 2 ou 3 clientes a partir das fichas abaixo. Os documentos pedem-se só a estes; aqui marcas o que chegou (os ficheiros ficam no teu Gmail). Escolhes tu o inquilino e um suplente.</p>
+      <div id="selection-board" class="selection-grid"></div>
+    </article>
     <article class="card fichas-card">
       <div class="section-heading"><div><p class="eyebrow">FICHAS DE CLIENTES</p><h2>O que já sabemos de cada cliente</h2></div>
-        <div class="row"><label class="muted">Imóvel <select id="fichas-property"></select></label><span id="fichas-count" class="tag" aria-live="polite"></span></div></div>
-      <p class="step">Preenchidas pela IA a cada resposta, só com o que o cliente disse. Com a ficha completa, o cliente está pronto para a proposta de visita.</p>
+        <span id="fichas-count" class="tag" aria-live="polite"></span></div>
+      <p class="step">Preenchidas pela IA a cada resposta, só com o que o cliente disse. Com a ficha completa, o cliente está pronto para a proposta de visita.
+        Para os clientes que já tinham conversa antes das fichas existirem, usa «Preencher fichas com a IA».</p>
+      <div class="actions"><button id="fichas-fill" type="button" class="needs-fuel">Preencher fichas com a IA (lê as conversas)</button></div>
       <div id="fichas-list" class="fichas-grid"></div>
       <div class="actions"><button id="fichas-prev" type="button">‹ Anteriores</button><button id="fichas-next" type="button">Seguintes ›</button></div>
     </article>
@@ -165,6 +184,7 @@
       <label class="muted">RGPD <select id="contacts-rgpd"><option value="">Todos</option></select></label>
       <input id="contacts-search" type="search" placeholder="Procurar nome, email ou telefone" aria-label="Procurar contactos">
       <span id="contacts-count" class="tag" aria-live="polite"></span>
+      <a class="button contacts-csv" href="contactos.csv">Descarregar CSV</a>
     </div>
     <div class="table-wrap"><table class="contacts-table">
       <thead><tr><th>Nome</th><th>Email</th><th>Telefone</th><th>Imóvel</th><th>1.º contacto</th><th>Respostas</th><th>RGPD</th><th><span class="sr-only">Ações</span></th></tr></thead>

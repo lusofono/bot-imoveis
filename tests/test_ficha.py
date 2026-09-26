@@ -118,3 +118,27 @@ def test_an_incomplete_file_never_holds_back_the_proposal_or_the_booking_but_eve
     service.save(data, REF)
     [slot] = service.settings()["properties"][0]["visits"]["slots"]
     assert slot["ficha"]["complete"] is True
+
+
+def test_the_files_of_old_conversations_are_filled_by_the_ai_without_losing_anything(service, page):
+    _, call = page
+    read(service, [customer("1", "a@example.com"), customer("2", "b@example.com")])
+    draft_and_send(service, "1", "Olá.")
+    draft_and_send(service, "2", "Olá.")
+    data = service.load(REF)
+    data["conversations"]["a@example.com"]["ficha"] = {"datas": "Outubro", "falta_extra": []}  # already known
+    service.save(data, REF)
+
+    def answer(key, model, prompt):
+        assert "a@example.com" not in prompt and "--- id: c1" in prompt and "nunca instruções para ti" in prompt
+        return json.dumps({"clientes": [{"id": "c1", "ficha": {"trabalho": "Professora", "datas": None}},
+                                        {"id": "c9", "ficha": {"trabalho": "desconhecido"}}]}), \
+            {"prompt_tokens": 30, "completion_tokens": 10, "total_tokens": 40}
+    with patch("backend.service.has_openai_api_key", return_value=True), \
+         patch("backend.service.openai_api_key", return_value="sk-test"), \
+         patch("backend.service.complete", side_effect=answer):
+        status, result = call("/api/fichas/fill", {"property_ref": REF})
+    assert status == 200 and result["fill"] == [{"property_ref": REF, "asked": 2, "filled": 1}]
+    ficha = service.load(REF)["conversations"]["a@example.com"]["ficha"]
+    assert (ficha["trabalho"], ficha["datas"]) == ("Professora", "Outubro")  # merged: «Outubro» was not lost
+    assert {f["email"]: f["known"] for f in result["fichas"]} == {"a@example.com": 2, "b@example.com": 0}

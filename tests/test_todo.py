@@ -14,7 +14,7 @@ def kinds(service):
 def test_the_queue_the_agenda_and_the_setup_become_tasks_that_go_away_when_done(service):
     tasks = kinds(service)
     assert set(tasks) == {"setup"} and tasks["setup"]["tab"] == "voice"
-    assert "lembretes de 2 e 4 dias" in tasks["setup"]["text"]
+    assert "visitas fechadas" in tasks["setup"]["text"] and "lembretes" not in tasks["setup"]["text"]  # the AI writes them
 
     read(service, [lead("1")])
     task = kinds(service)["reply"]

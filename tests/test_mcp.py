@@ -18,7 +18,15 @@ TOOLS = {
 }
 
 
+def test_the_mcp_is_off_in_only_api_mode(service, capsys):
+    from backend.cli import main
+    assert main(["--instance", str(service.folder), "stdio"]) == 1
+    assert "Modo só API: o MCP está desligado" in capsys.readouterr().err
+
+
 def test_local_mcp_over_stdio_keeps_the_six_tools(service):
+    config = service.folder / "config.json"
+    config.write_text(json.dumps({**json.loads(config.read_text()), "ai_mode": "copy_paste"}))  # the way back
     read(service, [lead("1")])
 
     async def session():

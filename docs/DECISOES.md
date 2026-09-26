@@ -3,6 +3,124 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 26/09/2026, noite (4): o tema 70's Scooter, e 80's RacingCar (α.45.0)
+
+**Decisão.**
+- **O tema pedido como «70's Vespa» chama-se «70's Scooter»** (id `scooter`): inspirado nas scooters italianas dos
+  anos 70, sem o nome, o logótipo ou os emblemas de nenhuma marca. Segue a decisão de 24/09 (o «Ferrari» saiu da
+  página), agora mais importante com a app a ser vendida. Um teste confirma que as páginas e as folhas de estilo não
+  trazem «Vespa», «Piaggio» nem «Lambretta».
+- **Mesmos espaços que os outros temas ricos:** palavras, instrumentos (`scooterInstruments`), seletor
+  (`twistGrip`, o punho de mudanças) e sons (`scooterHorn`, `kickStart`, `scooterShift`, `chromeTick`), tudo desenhado
+  e sintetizado na página, sem ficheiros de fora. O `api.py` lista as folhas dos temas ao arrancar: um tema novo só
+  aparece depois de reiniciar a página.
+- **«90's RacingCar» passa a «80's RacingCar»** (pedido do utilizador); o `id` fica `racing`.
+- **90's Boat, turno da noite:** a tabela de Contactos (`.table-wrap`) juntou-se às zonas «iluminadas», que guardam as
+  cores do dia; faltava, e o texto ficava claro sobre branco.
+
+## 26/09/2026, noite (3): visitas para sempre, fichas a partir das conversas (α.44.3)
+
+**Decisão.**
+- **As visitas ficam registadas para sempre** (pedido do utilizador): a Agenda recebe todas as marcações e janelas
+  passadas; só o direito ao esquecimento as tira. «Visitas por registar» continua limitada a 14 dias, para não
+  encher «A fazer» com o passado.
+- **Fichas das conversas antigas por botão, não sozinhas:** custa chamadas à API, por isso é o dono que decide
+  quando. Só entram clientes com pelo menos uma mensagem sua no histórico.
+- **Encontrado ao fazê-lo:** o aviso do portal que abre a conversa nunca entrava no histórico (só as mensagens
+  seguintes). Nos dados reais, 11 de 41 conversas de um imóvel e 1 de 4 do outro tinham alguma mensagem do cliente.
+  Passa a entrar no primeiro envio. As antigas ficam sem ela; para essas, a ficha enche-se na próxima troca de
+  emails ou com «Colar perfil do Idealista».
+- **Lembrete operacional:** o servidor da página tem de ser reiniciado depois de cada atualização do backend; a
+  página lê o `index.html` e o `app.js` do disco a cada pedido, mas o Python só o que carregou ao arrancar.
+
+## 26/09/2026, noite (2): sem Reply-To, o email do corpo; lembretes só na qualificação (α.44.1)
+
+**Decisão.**
+- **Sem Reply-To, usa-se o email do corpo do aviso**, se houver exatamente um nas linhas de contacto e não for do
+  portal nem da conta; fica um aviso a pedir confirmação. O aviso só chega à fila se vier do remetente do portal
+  (`route`), por isso o email do corpo tem a mesma origem que teria o Reply-To. Um Reply-To presente mas inválido
+  continua bloqueado.
+- **O dono pode confirmar ou mudar o destinatário** no cartão (pedido do utilizador), só nos avisos sem Reply-To
+  válido e antes do envio.
+- **Os bloqueados antigos corrigem-se na leitura seguinte** (`repair_missing_reply_to`), porque o destinatário fixa-se
+  à leitura e os IDs já vistos nunca são importados de novo.
+- **Lembretes de 2 e 4 dias só antes da proposta de visita, e nunca depois de 6 dias.** Encontrado ao verificar
+  α.44.0 numa cópia dos dados reais: 28 clientes com a proposta de uma ronda já passada recebiam de uma vez um
+  «recebeu o nosso email?». Depois da proposta tratam disso a ronda, a agenda e os lembretes de visita.
+
+## 26/09/2026, noite: fechar o ciclo do cliente e a seleção (α.44.0)
+
+**Decisão (respostas do utilizador, 26/09).**
+- **Mostradores de qualidade:** um por parte do inquérito (imóvel, consultor, marcação e emails), no imóvel e no
+  Painel. Média ponderada de 0 a 100 (`rules.quality`): um 1 pesa 3, um 2 pesa 2, 3 a 5 pesam 1; só 1 dá 0, só 5
+  dá 100. Verde a partir de 80, vermelho abaixo de 40.
+- **Nota má** = um 1 ou um 2 em qualquer parte, ou «não» ao interesse: aviso no cartão e em «A fazer». A IA
+  agradece sempre, sem se justificar.
+- **Seleção em Contactos, no topo, mesmo vazia.** Um escolhido e um suplente por imóvel; escolher outro devolve o
+  anterior à short list. Nada é enviado automaticamente, nem quando o imóvel é arrendado: esse aviso é feito à
+  mão, e o Idealista já avisa quando o anúncio fica inativo.
+- **Documentos só da short list**, como lista de verificação: os ficheiros nunca entram na pasta de dados.
+- **Inativo:** dois emails nossos seguidos sem resposta e 4 dias desde o último. Reativa-se quando o cliente
+  escreve, se o imóvel estiver ativo. Não se apaga nada.
+- **Lembretes de 2 e 4 dias escritos pela IA** quando não há frase em Voz e estilo (antes: sem frase, nenhum).
+  Decisão da IA, a partir da proposta feita ao utilizador e da regra dos «dois emails sem resposta»; a frase fixa
+  continua a mandar quando existe. Deixam de sair para quem tem visita marcada ou feita.
+- **Faltou à visita:** rascunho automático ao marcar «não veio», com a mensagem pedida (lamentar, sem culpar,
+  ficar a aguardar uma nova ronda).
+- **WhatsApp por link oficial (`whatsapp://send`)**, com o texto do rascunho, sem resumo. Automatizar o envio
+  dentro da app ficou de fora: vai contra as regras do WhatsApp e arrisca o bloqueio do número. O telefone só vai
+  para a página (em `api.state`), nunca para o prompt nem para o MCP.
+- **«Com perfil» do Idealista:** o email não traz o perfil (só «Ver perfil», com login), por isso não há nada a
+  ler automaticamente; o dono cola o perfil na ficha e a API preenche-a.
+- **RGPD:** a purga dos 6 meses (decidida a 21/09, nunca feita) lista os contactos sem consentimento sem
+  movimento há mais de 6 meses e apaga-os como o direito ao esquecimento, **só com o clique e a confirmação do
+  dono**, porque apagar não se desfaz.
+- **Aviso de pedidos novos: não**, por agora, porque a leitura dos emails é manual.
+
+## 26/09/2026, fim do dia: «Modo: só API» (α.43.0)
+
+**Decisão.**
+- **Uma definição geral, «Modo: só API», ligada:** `ai_mode` no `config.json` (sem campo = `api`). A página esconde
+  o copiar/colar do ChatGPT (por CSS, `.copy-only`), e o MCP (`bot-mail stdio`) recusa arrancar. **Nada foi
+  apagado:** as rotas do copiar/colar continuam a funcionar e testadas, e `"ai_mode": "copy_paste"` traz tudo de
+  volta. Não há botão na página para o modo antigo, de propósito: «por agora paramos».
+- **Modelos: `gpt-4o-mini` por defeito e `gpt-4o` como alternativa**, escolhidos em «Voz e estilo» e guardados em
+  `openai_model` no `config.json`. Só entram modelos com o preço confirmado na tabela de `openai_client.py`. Um
+  modelo para tudo (respostas, agenda, análise e anúncios); o custo continua contado por imóvel, no depósito.
+  Como o `config.json` real não tinha modelo, passa de `gpt-4o` para `gpt-4o-mini` ao atualizar.
+- **Comunicações em 3 passos:** Selecionar, Gerar e Rever e enviar. «Gerar respostas» parte seleções grandes em
+  chamadas de 5 emails (qualidade e JSON sem cortes) e mostra «Ver o que foi enviado à IA», fechado por defeito.
+- **Criar imóvel:** o modelo não abre links e o programa nunca descarrega do Idealista (decisão de 21/09), por
+  isso colas o texto do anúncio e a API extrai os campos, que revês antes de guardar.
+- **Decidido por defeito, sem resposta do utilizador:** gerar só com clique (não a cada leitura); a chave continua
+  a guardar-se no Terminal (`mac/openai_key.command`) até a configuração passar para a página (app em pen USB).
+
+**Porquê.** Pedido direto do utilizador (26/09): gastar cerca de 1 € por imóvel para 500 emails está bem, e uma
+interface só com API é mais simples. Pelos registos, cada chamada com `gpt-4o` custou cerca de 2 cêntimos; com
+`gpt-4o-mini` fica perto de 15 vezes menos.
+
+## 26/09/2026, mais tarde: vender como app para Mac e Windows, numa pen USB
+
+**Decisão.**
+- **A ferramenta passa a ser um produto vendido:** uma app de secretária para Mac e Windows, entregue numa pen
+  USB, sem lojas (nem a App Store nem a Microsoft Store). Cada cliente instala a app no seu computador e usa o
+  seu Gmail (uma pasta de dados = uma conta Gmail).
+- **O plano completo está em [ProduçãoPackAPP.md](ProduçãoPackAPP.md):** o que falta decidir antes do código
+  (repositório privado e licença, App Passwords, atualizações, nome), as assinaturas, o conteúdo da pen e as
+  etapas. Ainda não há nada implementado.
+- **O servidor alojado (cPanel e AWS) continua em pausa.** A app vem primeiro, como o plano já dizia.
+
+**Porquê.**
+- **Comparado com o cPanel**, a app evita o login novo, as portas do Gmail fechadas no alojamento partilhado, os
+  vários processos do Passenger e os cortes aos pedidos longos: a página continua em `127.0.0.1`, num só
+  processo.
+- **Cada agente trabalha no seu computador, com o seu Gmail,** e os dados dos clientes nunca passam pela BigLearn.
+
+**Consequências.**
+- O Windows exige primeiro correções no código: o `fcntl` do `store.py`, o `fsync` da pasta no `save_json`, os
+  segredos (sem Keychain nem permissões 600) e o `ps` do `api.py`. A lista está em `ProduçãoPackAPP.md`, etapa 1.
+- Uma app não abre no telemóvel nem partilha a fila entre pessoas: isso continua a precisar de um servidor.
+
 ## 26/09/2026: lembretes de visita e «A fazer» no Painel (α.42.0)
 
 **Decisão.**
