@@ -20,8 +20,8 @@ from .configure import STARTER, example_profile
 from .mail import build_digest, build_reply, read_messages
 from .openai_client import MODEL_DEFAULT, complete, estimate_cost_usd
 from .rules import (DAY, EMAIL, KNOWLEDGE_FILE, RGPD_STATES, SUBJECT_DEFAULT, VISIT_SLOT_DEFAULT, VISIT_STATES,
-                    build_profile, check_profile, check_slot, check_window, clean_property, consent_yes, free_times,
-                    knowledge, photo_of, prepare, route, subject_of, QUOTE, addresses)
+                    FICHA_FIELDS, build_profile, check_profile, ficha_summary, merge_ficha, check_slot, check_window, clean_property, consent_yes, free_times,
+                    knowledge, photo_of, prepare, property_active, route, subject_of, QUOTE, addresses)
 from .secrets import app_password, has_app_password, has_openai_api_key, openai_api_key
 from .store import (CONTACT_FIELDS, add_contacts, add_note, find_photo, knowledge_files, load_contacts, load_digest,
                     load_events, load_knowledge, load_panel, load_visits, locked, load_json, load_profiles, load_voice,
@@ -98,6 +98,20 @@ def ignore_kind(conversation):
     """Which ignore list: stored since 24/09; before that, a reason meant the customer opted out."""
     kind = conversation.get("ignored_kind")
     return kind if kind in IGNORE_KINDS else "grey" if conversation.get("ignored_reason") else "black"
+
+
+def shut_out(conversation):
+    """Blacklist: nothing of theirs comes in again. Greylist (26/09): we stop writing first — no reminders, rounds,
+    consent or closing — but what they write still comes in, and can be answered."""
+    return bool(conversation.get("ignored")) and ignore_kind(conversation) == "black"
+
+
+def was_proposed(conversation, email, proposed):
+    """A visit was already proposed to them: by a round (proposed: everyone ever invited or booked), or as the
+    conversation shows (offered, accepted, another date asked, or checked after a visit)."""
+    return bool(email in proposed or conversation.get("visit_proposed") or conversation.get("visit_offered")
+                or conversation.get("visit_accepted") or conversation.get("visit") == "outra_data"
+                or conversation.get("visit_check"))
 
 
 def waited_hours(item):
@@ -266,6 +280,7 @@ class MailService:
         invited = {(person.get("email") or "").casefold() for window in windows for person in window.get("recipients") or []}
         everyone = any("recipients" not in window for window in windows)
         booked = set((visits or {}).get("booked") or ())
+        proposed = set((visits or {}).get("proposed") or ())
         emails = []
         for item in data["emails"]:
             email = customer(item)
@@ -278,11 +293,29 @@ class MailService:
                 interaction = conversation.get("stage", 0)  # one more email within the step already reached
             if (item.get("answered_directly") or {}).get("interaction"):
                 interaction = item["answered_directly"]["interaction"]  # answered in Gmail: it keeps its step
+            # Qualification (26/09): until a visit is proposed, every email of theirs is the 2nd interaction —
+            # ask only what their file still lacks — never the 3rd (the proposal) just by counting emails.
+            qualifying = bool(ref and email and item.get("kind") not in PROGRAM_KINDS
+                              and not item.get("answered_directly") and not was_proposed(conversation, email, proposed))
+            if qualifying and interaction > 2:
+                interaction = 2
+            limit = qualifying and conversation.get("stage", 0) >= 4  # the 1st reply and three questions already
+            ficha = conversation.get("ficha") or item.get("ficha")
+            missing = ficha_summary(ficha)["falta"] if ref and email else []
+            if missing and not qualifying and (item.get("kind") == "visit_proposal" or interaction == 4):
+                # 26/09: an incomplete file never holds back the proposal or the booking; the customer is
+                # reminded, and the owner decides whether to confirm.
+                warnings.append("Ficha incompleta (falta: " + ", ".join(FICHA_FIELDS[key] for key in missing).lower()
+                                + "): a IA lembra o cliente; decides tu se confirmas a visita.")
+            if limit:
+                warnings.append("Já pedimos informação três vezes sem a ficha ficar completa: a IA não volta a "
+                                "perguntar. Decide se lhe propões visita na mesma.")
             if (interaction > 4 and (everyone or email in invited) and email not in booked
                     and conversation.get("visit") != "nao_quer"):
                 interaction = 4
             emails.append({key: item.get(key) for key in VIEW_FIELDS} | {
                 "interaction": interaction if email else None, "warnings": warnings,
+                "ficha": ficha, "ficha_summary": ficha_summary(ficha) if ref else None, "qualifying_limit": limit,
                 # The whole conversation as it stands now — also what came after this email (a reply
                 # written in Gmail, one more email) — for «Email completo»; the prompt keeps «history».
                 "conversation": list(conversation.get("history") or [])})
@@ -304,7 +337,8 @@ class MailService:
                                "visit_accepted": (conversation.get("visit_accepted") or {}).get("at"),
                                "history": list(conversation.get("history") or [])})
         result = {"property_ref": ref, "revision": data["revision"], "last_read_at": data.get("last_read_at"),
-                  "instructions": instructions(profile, voice, visits), "emails": emails, "active": active}
+                  "instructions": instructions(profile, voice, visits), "emails": emails, "active": active,
+                  "inactive": not property_active(profile)}
         if added is not None:
             result["added"] = added
         return result
@@ -387,9 +421,12 @@ class MailService:
                 if profiles:
                     item.update(prepare(item, kind, customer, profiles[ref], cfg["account"]), kind=kind)
                     email = str(item["customer"].get("email") or "").strip().casefold()
-                    if email and (queues[ref]["conversations"].get(email) or {}).get("ignored"):
-                        # On the ignore list for this property: never re-enters, whatever they write.
+                    if email and shut_out(queues[ref]["conversations"].get(email) or {}):
+                        # On the blacklist for this property: never re-enters, whatever they write.
                         continue
+                    if email and (queues[ref]["conversations"].get(email) or {}).get("ignored"):
+                        item.setdefault("warnings", []).append(
+                            "Cliente na greylist: não recebe envios nossos, mas escreveu. Responde só se fizer sentido.")
                     if email:
                         contacts.append({"email": email, "nome": item["customer"].get("name") or "",
                                          "telefone": item["customer"].get("phone") or "",
@@ -563,7 +600,7 @@ class MailService:
                 continue
             [(ref, email)] = pairs
             data = queues[ref]
-            if (data["conversations"].get(email) or {}).get("ignored"):
+            if shut_out(data["conversations"].get(email) or {}):
                 continue
             created = email not in data["conversations"]
             conversation = data["conversations"].setdefault(email, {"stage": 0, "sent_message_ids": [], "thread_ids": []})
@@ -621,16 +658,17 @@ class MailService:
         if data["revision"] != expected:
             raise ValueError("O JSON mudou. Volta a ler os pendentes antes de guardar.")
 
-    def drafts(self, replies, expected_revision, property_ref=None, visits=None):
-        """Saves drafts in a batch; visits: the visit time or the visit status the assistant marked per email."""
-        visits = visits or []
+    def drafts(self, replies, expected_revision, property_ref=None, visits=None, fichas=None):
+        """Saves drafts in a batch; visits: the visit time or the visit status the assistant marked per email;
+        fichas: the customer's file as the assistant updated it, kept at once (like a visit status)."""
+        visits, fichas = visits or [], fichas or []
         with locked(self.folder):
             ref = self.pick(self.profiles(), property_ref)
             data = self.load(ref)
             self.check_revision(data, expected_revision)
             entries = {e["id"]: e for e in data["emails"]}
             ids = [r["id"] for r in replies]
-            if (not ids and not visits) or len(ids) != len(set(ids)):
+            if (not ids and not visits and not fichas) or len(ids) != len(set(ids)):
                 raise ValueError("Indica uma lista não vazia, sem IDs repetidos.")
             self.check_visits(ref, data, entries, visits)
             for reply in replies:
@@ -653,9 +691,19 @@ class MailService:
                     email = ((item.get("recipient") or {}).get("email") or "").casefold()
                     if email in data.get("conversations", {}):
                         data["conversations"][email]["visit"] = visit["visit_status"]
+            for entry in fichas:
+                item = entries.get(entry["id"])
+                if not item or not ref:
+                    continue
+                email = ((item.get("recipient") or {}).get("email") or "").casefold()
+                conversation = data.get("conversations", {}).get(email)
+                item["ficha"] = {**merge_ficha((conversation or {}).get("ficha") or item.get("ficha"), entry["ficha"]),
+                                 "at": now()}
+                if conversation is not None:
+                    conversation["ficha"] = item["ficha"]  # a new customer's is kept on their email until it is sent
             data.pop("send_preview", None)
             self.save(data, ref)
-            self.log("drafts_saved", count=len(replies), visits=len(visits), reference=ref)
+            self.log("drafts_saved", count=len(replies), visits=len(visits), fichas=len(fichas), reference=ref)
             return {"saved": len(replies), "revision": data["revision"]}
 
     @staticmethod
@@ -712,6 +760,10 @@ class MailService:
         if not aux:
             stage = conversation["stage"] + 1
             conversation["stage"] = max(stage, 3) if item.get("kind") == "visit_proposal" else stage
+        if item.get("kind") == "visit_proposal":
+            conversation["visit_proposed"] = True  # the qualification is over for them
+        if item.get("ficha") and (conversation.get("ficha") or {}).get("at", "") <= item["ficha"].get("at", ""):
+            conversation["ficha"] = item["ficha"]
         if item.get("kind") == "reminder" and item.get("reminder"):
             conversation.setdefault("reminders_sent", []).append(item["reminder"])
         name = (item.get("recipient") or {}).get("name") or (item.get("customer") or {}).get("name")
@@ -1062,7 +1114,14 @@ class MailService:
         return {**rules, "windows": [{**window, "free": free_times(window, rules["slot"], booked)}
                                      for window in agenda["windows"] if window["day"] >= today],
                 "booked": sorted({slot["customer"] for slot in agenda["slots"] if slot["at"][:10] >= today}),
+                "proposed": sorted(self.proposed_to(agenda)),
                 "closed": bool(agenda.get("closed_at"))}
+
+    @staticmethod
+    def proposed_to(agenda):
+        """Everyone a visit was ever proposed to on this property's agenda: invited by a round, or booked."""
+        return ({(person.get("email") or "").casefold() for window in agenda["windows"]
+                 for person in window.get("recipients") or []} | {slot["customer"] for slot in agenda["slots"]}) - {""}
 
     def check_visits(self, ref, data, entries, visits):
         """The visit marks of a pasted answer: known emails, a known status, and a free time on the agenda."""
@@ -1109,7 +1168,7 @@ class MailService:
             else:
                 state, reason = "ok", ""
             found.append({"email": email, "name": conversation.get("name") or "", "state": state, "reason": reason,
-                          "stage": conversation.get("stage", 0)})
+                          "stage": conversation.get("stage", 0), "ficha": ficha_summary(conversation.get("ficha"))})
         return found
 
     def visit_candidates(self, property_ref=None):
@@ -1265,7 +1324,9 @@ class MailService:
         checked after it happened; each with its check (who came, the notes) and the survey answered."""
         since = (date.fromisoformat(today) - timedelta(days=back_days)).isoformat()
         conversations = self.load(ref).get("conversations", {})
+        # Every booking shows whether the customer's file is complete (live: it fills as their answers arrive).
         return sorted(({**slot, "survey": (conversations.get(slot["customer"]) or {}).get("visit_survey"),
+                        "ficha": ficha_summary((conversations.get(slot["customer"]) or {}).get("ficha")),
                         "thanks_sent_at": ((conversations.get(slot["customer"]) or {}).get("visit_check") or {}).get("thanks_sent_at")}
                        for slot in load_visits(self.folder, ref)["slots"] if slot["at"][:10] >= since),
                       key=lambda slot: slot["at"])
@@ -1641,7 +1702,30 @@ class MailService:
             rows = sorted(({**row, "interactions": stages.get((row["email"], row["imovel"]), 0)}
                            for row in load_contacts(self.folder).values()),
                           key=lambda row: (row["imovel"], (row["nome"] or row["email"]).casefold()))
-            return {"contacts": rows, "properties": list(profiles), "rgpd_states": RGPD_STATES}
+            return {"contacts": rows, "properties": list(profiles), "rgpd_states": RGPD_STATES,
+                    "inactive": [ref for ref, profile in profiles.items() if not property_active(profile)],
+                    "fichas": [ficha for ref in profiles for ficha in self.fichas(ref, self.load(ref))],
+                    "ficha_fields": FICHA_FIELDS}
+
+    def fichas(self, ref, data):
+        """Each active customer's file (the ignored ones are left out), the most recent conversation first."""
+        agenda = load_visits(self.folder, ref)
+        proposed = self.proposed_to(agenda)
+        phases = {"booked": "visita marcada", "nao_quer": "não quer visitar", "outra_data": "pediu outra data"}
+        found = []
+        for customer in self.candidates(ref, data):
+            conversation = data["conversations"][customer["email"]]
+            came = (conversation.get("visit_check") or {}).get("attended")
+            phase = ("visitou" if came is True else "faltou à visita" if came is False else phases.get(customer["state"])
+                     or ("proposta de visita" if was_proposed(conversation, customer["email"], proposed) else "qualificação"))
+            history = conversation.get("history") or []
+            last = max([conversation.get("last_sent_at") or ""] + [turn.get("ts") or turn.get("at") or "" for turn in history])
+            ficha = conversation.get("ficha") or {}
+            found.append({"property_ref": ref, "email": customer["email"], "name": customer["name"], "phase": phase,
+                          "pending": customer["state"] == "pending", "stage": customer["stage"], "last": last,
+                          "ficha": {key: ficha.get(key) for key in FICHA_FIELDS}, "updated": ficha.get("at"),
+                          **ficha_summary(ficha)})
+        return sorted(found, key=lambda item: item["last"], reverse=True)
 
     def save_contact(self, fields):
         """Adds a contact by hand (a phone call, someone at the door) or edits one; the key is email + property.
@@ -1720,7 +1804,8 @@ class MailService:
         requests or the closing email. Nothing is deleted (unlike the RGPD erasure): the conversation and
         its history stay, only muted. reason is free text (e.g. "cliente disse que não tem interesse"),
         kept only to explain later why someone is on the list — it changes nothing about the effect.
-        kind: "black" (the owner decided) or "grey" (the customer opted out); same effect, two lists."""
+        kind: "black" (the owner decided): nothing of theirs comes in again. "grey" (the customer opted out):
+        we never write first again, but what they write still comes in (see shut_out)."""
         email = str(email or "").strip().casefold()
         if not email:
             raise ValueError("Falta o email do contacto.")
@@ -1957,7 +2042,7 @@ class MailService:
             events = load_events(self.folder, limit=100000)  # once, for every property's tank
             for ref, profile in load_profiles(self.folder, account).items():
                 prompts = profile.get("reply", {}).get("prompts", {})
-                properties.append({"sender": profile["match"]["from_address_equals"],
+                properties.append({"sender": profile["match"]["from_address_equals"], "active": property_active(profile),
                                    "prompts": {name: (prompts.get(key) or {}).get(field) or ""
                                                for name, (key, field) in PROMPT_FIELDS.items()},
                                    "knowledge_files": [part["file"] for part in profile["_knowledge"]],
@@ -2137,6 +2222,25 @@ class MailService:
             add_note(property_folder(self.folder, ref) if ref else self.folder, text, date.today())
             self.log("note_added", scope=scope, reference=ref)
             return {"scope": scope, "property_ref": ref}
+
+    def set_property_active(self, ref, active):
+        """ATIVO / INATIVO (26/09): an inactive property leaves the page's property menus, but still shows in
+        Imóveis and keeps everything it has; nothing else changes (emails are still read and answered)."""
+        if not isinstance(active, bool):
+            raise ValueError("Indica se o imóvel fica ativo ou inativo.")
+        with locked(self.folder):
+            profiles = load_profiles(self.folder, self.config()["account"])
+            if ref not in profiles:
+                raise ValueError("Imóvel desconhecido.")
+            profile = profiles[ref]
+            profile.pop("_knowledge", None)  # runtime only, never written to profile.json
+            if active:
+                profile.pop("active", None)  # active is the default: nothing to store
+            else:
+                profile["active"] = False
+            save_json(self.folder / "properties" / ref / "profile.json", profile)
+            self.log("property_active" if active else "property_inactive", reference=ref)
+            return {"reference": ref, "active": active}
 
     def save_prompts(self, ref, texts):
         with locked(self.folder):

@@ -8,7 +8,7 @@ import hashlib
 import json
 import re
 from datetime import date, datetime
-from .rules import VISIT_STATES, clean_property
+from .rules import FICHA_FIELDS, FICHA_OPTIONAL, VISIT_STATES, clean_ficha, clean_property
 
 NOT_INVENT = {"visit_availability": "disponibilidade para visitas", "rental_conditions": "condições do arrendamento",
               "property_facts": "factos sobre o imóvel"}
@@ -21,8 +21,10 @@ KNOWLEDGE_RULE = ("Esta base tem dois tipos de conteúdo, os dois obrigatórios:
 
 REPLY_FORMAT = """FORMATO DA RESPOSTA
 Responde só com um bloco JSON, sem mais texto:
-{"respostas": [{"id": "<id do email>", "reply_text": "<email completo: saudação, texto, fecho e assinatura>", "nota": "<opcional: o que o proprietário deve saber>", "visita": "<opcional: AAAA-MM-DD HH:MM, só quando marcas uma hora de visita>", "visita_estado": "<opcional: nao_quer ou outra_data, só se o cliente disser que não quer visitar ou que só pode noutra data>"}]}
-Um objeto por email, com o id exatamente como aparece acima. Se não deves responder a um email
+{"respostas": [{"id": "<id do email>", "reply_text": "<email completo: saudação, texto, fecho e assinatura>", "nota": "<opcional: o que o proprietário deve saber>", "visita": "<opcional: AAAA-MM-DD HH:MM, só quando marcas uma hora de visita>", "visita_estado": "<opcional: nao_quer ou outra_data, só se o cliente disser que não quer visitar ou que só pode noutra data>", "ficha": {"trabalho": "<ou null>", "agregado": "<ou null>", "datas": "<ou null>", "disponibilidade": "<ou null>", "empresa": "<ou null>", "animais": "<ou null>", "falta": ["<empresa e/ou animais, só se o cliente os referiu e ainda faltam dados>"]}}]}
+Um objeto por email, com o id exatamente como aparece acima.
+"ficha": a ficha do cliente atualizada — a ficha até agora (indicada em cada email) mais o que ele disse nesta
+mensagem, em frases curtas e só com o que ele disse (nunca inventes nem avalies); null no que ainda não se sabe. Se não deves responder a um email
 (por exemplo, uma interação sem prompt configurada), deixa reply_text vazio e explica em nota."""
 
 LISTING_FIELDS = {
@@ -132,6 +134,10 @@ def instructions(profile, voice, visits=None):
         else:
             out.append(f"- {number}.ª: " + (prompt.get("when_not_configured")
                                             or "Sem prompt configurada: avisa o proprietário e aguarda instruções."))
+    out.append("- A 2.ª interação é a qualificação e repete-se até haver proposta de visita: um email de um cliente "
+               "a quem ainda não propusemos visita vem sempre como 2.ª, seja a segunda troca ou a sexta. Em cada "
+               "um, pede só o que ainda falta na ficha do cliente (indicada em cada email), nunca o que já se sabe, "
+               "mesmo que tenha sido dito em emails anteriores; com a ficha completa, não faças perguntas novas.")
     out.append("- 5.ª e seguintes: sem prompt configurada; avisa o proprietário e aguarda instruções.")
     after = style.get("after_visit") or {}
     after_template = style.get("after_visit_template") or {}
@@ -227,9 +233,44 @@ def reply_prompt(queue, ids, extra=""):
         parts += ["Mensagem" + (" nova" if history and not window and not addition and not visited else "") + ":", message[:4000]]
         if email.get("visit_status"):
             parts.append("Visita: " + VISIT_STATES.get(email["visit_status"], email["visit_status"]) + ".")
+        if not addition and not visited:
+            parts.append(ficha_line(email.get("ficha")))
+        missing = (email.get("ficha_summary") or {}).get("falta") or []
+        if missing and (window or email.get("interaction") == 4):
+            needed = ", ".join(FICHA_FIELDS[key].split(" (")[0].lower() for key in missing)
+            parts.append(("No fim da proposta" if window else "Podes marcar a hora como pedido, mas no fim")
+                         + f", lembra com cordialidade que, para a visita ficar confirmada, precisamos ainda de saber: "
+                         f"{needed}. Não digas que a visita depende de mais nada.")
+        if email.get("qualifying_limit"):
+            parts.append("Já lhe pedimos informação três vezes: não voltes a perguntar nada. Responde ao que disse e "
+                         "explica na nota ao proprietário o que ainda falta na ficha.")
         if email.get("warnings"):
             parts.append("Avisos: " + " ".join(email["warnings"]))
     return "\n".join(parts + ["---", "", REPLY_FORMAT])
+
+
+def ficha_line(ficha):
+    """The customer's file as the prompt shows it: what we know, and «falta» where nothing is known yet."""
+    ficha = ficha or {}
+    shown = [key for key in FICHA_FIELDS if key not in FICHA_OPTIONAL or ficha.get(key)
+             or key in (ficha.get("falta_extra") or [])]
+    return "Ficha do cliente até agora: " + "; ".join(
+        f"{FICHA_FIELDS[key].split(' (')[0].lower()}: {ficha.get(key) or 'falta'}" for key in shown) + "."
+
+
+def parse_fichas(text, queue):
+    """The customer files of the pasted answer: [{"id", "ficha"}], ids as in the queue."""
+    data = extract_json(text)
+    items = data.get("respostas", data.get("replies")) if isinstance(data, dict) else data
+    known = {short_id(email["id"]): email["id"] for email in queue["emails"]}
+    known.update({email["id"]: email["id"] for email in queue["emails"]})
+    found = []
+    for item in items if isinstance(items, list) else []:
+        key = str(item.get("id", "")).strip() if isinstance(item, dict) else ""
+        ficha = clean_ficha(item.get("ficha")) if key in known else None
+        if ficha and (len(ficha) > 1 or ficha["falta_extra"]):
+            found.append({"id": known[key], "ficha": ficha})
+    return found
 
 
 def parse_replies(text, queue):

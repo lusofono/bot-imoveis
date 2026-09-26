@@ -21,7 +21,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from starlette.routing import Route
-from .ai import listing_prompt, parse_listing, parse_replies, parse_visits, reply_prompt, short_id
+from .ai import listing_prompt, parse_fichas, parse_listing, parse_replies, parse_visits, reply_prompt, short_id
 from .openai_client import MODEL_DEFAULT, complete, estimate_cost_usd
 from .secrets import openai_api_key
 from .service import MailService
@@ -94,10 +94,11 @@ def web_app(folder, token):
         # same safety checks, same drafts-only save. Only where the text comes from differs.
         replies, notes = parse_replies(text, current)
         visits = parse_visits(text, current)
+        fichas = parse_fichas(text, current) if current["property_ref"] else []
         saved = 0
-        if replies or visits:
-            saved = service.drafts(replies, current["revision"], current["property_ref"], visits)["saved"]
-        return {"saved": saved, "notes": notes, "visits": len(visits), "state": state()}
+        if replies or visits or fichas:
+            saved = service.drafts(replies, current["revision"], current["property_ref"], visits, fichas)["saved"]
+        return {"saved": saved, "notes": notes, "visits": len(visits), "fichas": len(fichas), "state": state()}
 
     def paste(body):
         return save_drafts_from(queue(body.get("property_ref")), str(body.get("text") or ""))
@@ -215,6 +216,10 @@ def web_app(folder, token):
     def property_prompts(body):
         service.save_prompts(str(body.get("reference") or ""), body.get("prompts") or {})
         return service.settings()
+
+    def property_active(body):
+        service.set_property_active(str(body.get("reference") or ""), body.get("active"))
+        return {"settings": service.settings(), "state": state()}
 
     def contact_save(body):
         return {**service.save_contact(body.get("contact") or {}), **service.contacts()}
@@ -346,6 +351,7 @@ def web_app(folder, token):
                 "property/parse": ("POST", lambda body: {"fields": parse_listing(str(body.get("text") or ""))}),
                 "property/save": ("POST", property_save), "property/prompts": ("POST", property_prompts),
                 "property/photo": ("POST", property_photo), "property/panel": ("POST", property_panel),
+                "property/active": ("POST", property_active),
                 "visits/candidates": ("POST", visit_candidates), "visits/propose": ("POST", visit_propose),
                 "visits/analysis-prompt": ("POST", visit_analysis_prompt), "visits/analyze": ("POST", visit_analyze),
                 "visits/round-summary": ("POST", visit_round_summary), "visits/close": ("POST", visits_close),

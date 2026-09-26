@@ -398,3 +398,14 @@ def test_the_visits_petrol_is_set_on_the_property_s_panel(service, page):
     assert (petrol["distance_km"], petrol["l_per_100km"], petrol["trips"], petrol["litres"]) == (18, 6.5, 0, 0)
     for bad in ({"property_ref": REF, "distance_km": -1}, {"property_ref": REF, "l_per_100km": 90}):
         assert call("/api/property/panel", bad)[0] == 400
+
+
+def test_the_active_switch_through_the_api(page):
+    client, call = page
+    status, result = call("/api/property/active", {"reference": REF, "active": False})
+    assert status == 200 and result["settings"]["properties"][0]["active"] is False
+    assert result["state"]["properties"][0]["inactive"] is True
+    status, result = call("/api/property/active", {"reference": REF, "active": "sim"})
+    assert status == 400
+    status, result = call("/api/property/active", {"reference": REF, "active": True})
+    assert result["settings"]["properties"][0]["active"] is True

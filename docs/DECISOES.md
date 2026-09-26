@@ -3,6 +3,55 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 26/09/2026: ficha de cliente e qualificação repetida (α.41.0)
+
+**Decisão.**
+- **A ficha vem no mesmo JSON das respostas** (campo `ficha`), sem outra chamada nem outro prompt. Os seis
+  pontos são os que a 1.ª e a 2.ª interações dos prompts do proprietário já pediam; os quatro primeiros são
+  obrigatórios, a empresa e os animais só contam se o cliente os referiu (a IA diz isso em `falta`). A regra de
+  «completa» está no código (`ficha_summary`), não na IA. A IA só resume o que o cliente disse; não avalia se o
+  rendimento chega, como os prompts do proprietário já exigiam.
+- **Fundir, nunca substituir:** um ponto em branco numa resposta nova não apaga o que já se sabia
+  (`merge_ficha`). Um cliente novo ainda não tem conversa: a ficha fica no email e passa para a conversa quando
+  a resposta sai.
+- **A qualificação decide-se pelo estado, não pela contagem:** um email de cliente a quem ainda não se propôs
+  visita é sempre a 2.ª (`was_proposed`: convidado numa ronda, com hora marcada, com proposta, aceite ou pedido de
+  outra data, ou com visita registada). Antes, o 3.º email de um cliente sem proposta recebia o prompt da 3.ª
+  («envias a proposta de visita»), sem proposta nenhuma. Conversas antigas funcionam sem migração, porque os
+  sinais de proposta já estavam guardados. A regra está nas instruções geradas pelo código, não no texto dos
+  prompts (que fica no `profile.json` do proprietário).
+- **Travão ao fim de três pedidos de informação** (a 1.ª e mais três enviadas sem proposta): a IA deixa de
+  perguntar e o proprietário decide.
+- **Ficha incompleta não trava nada** (pedido do utilizador, no mesmo dia): a proposta de visita e a marcação da
+  hora saem na mesma, com um lembrete ao cliente do que falta para a visita ficar confirmada; quem decide se
+  confirma é o proprietário, avisado no cartão. Cada marcação da Agenda mostra o estado da ficha, calculado na
+  hora a partir da conversa (não uma fotografia do momento da marcação), para se ver quando a informação chega.
+- **Nos Contactos, as fichas ficam por cima e a tabela por baixo, sem mudar.** Mostram 3 a 5 de cada vez, uma
+  linha só, conforme a largura. Não aparecem os clientes da blacklist nem da greylist; esses continuam na tabela.
+- **Privacidade:** a ficha resume dados que já estavam no histórico da conversa em `data/` (fora do Git); não
+  junta nada novo e nunca vai para o painel, que só leva nomes próprios.
+
+**Porquê.** Pedido direto do utilizador (26/09): as respostas até à proposta de visita são a qualificação, e
+quer ver, por imóvel, o que já se sabe de cada cliente.
+
+## 26/09/2026: imóveis ativos e inativos, e a greylist deixa responder (α.40.0)
+
+**Decisão.**
+- **ATIVO / INATIVO é um campo do `profile.json`** (`"active": false`; sem campo = ativo, e voltar a ativar
+  apaga-o). Só muda os menus de imóvel da página: a leitura dos emails, a fila e os envios não mudam. Um
+  inativo com emails por tratar continua no menu das Respostas, marcado «(inativo)»: escondê-lo deixava
+  emails sem ninguém os ver. Um imóvel novo copia o perfil do primeiro, e por isso tira o campo, para nunca
+  nascer inativo.
+- **A greylist deixa de ter o mesmo efeito que a blacklist**, ao contrário do que ficou decidido a 24/09.
+  Na greylist deixamos de escrever primeiro, mas o que o cliente escreve entra na fila (com aviso) e pode ser
+  respondido, e as respostas escritas no Gmail também contam. A blacklist continua a não deixar entrar nada.
+  A regra está num sítio só, em `shut_out()`.
+- **Fluxo revisto com o utilizador:** a 2.ª à 5.ª interação, até se propor uma visita, são a qualificação.
+  Pergunta-se até haver toda a informação do cliente. A candidatura (documentos) junta-se à seleção, porque
+  são 2 ou 3 candidatos. O fecho (aceitação, recusas) ainda não se automatiza.
+
+**Porquê.** Pedido direto do utilizador (26/09), ao rever o fluxograma dos prompts.
+
 ## 25/09/2026, noite: o carro no topo do RacingCar e um Painel mais compacto (α.39.0)
 
 **Decisão.**

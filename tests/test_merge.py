@@ -38,7 +38,8 @@ def test_a_message_answered_in_gmail_joins_as_context_and_the_rest_is_a_new_step
     assert service.load(REF)["conversations"][CUSTOMER]["stage"] == 2  # the Gmail reply was that step
     read(service, [follow_up("c3", 1, "Afinal só posso às 16:00.", service)])
     [card] = service.pending()["properties"][0]["emails"]
-    assert (card["id"], card["merged_ids"], card["interaction"]) == ("c3", ["c2"], 3)
+    # A new step (stage 2 → the next email), but no visit was proposed yet: it is still the qualification, the 2nd.
+    assert (card["id"], card["merged_ids"], card["interaction"]) == ("c3", ["c2"], 2)
     assert "answered_directly" not in card
     assert "já respondida no Gmail" in card["customer"]["message"]
     assert any("Já respondeste no Gmail" in warning for warning in card["warnings"])

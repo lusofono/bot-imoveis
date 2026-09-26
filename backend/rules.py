@@ -84,6 +84,51 @@ def check_profile(ref, profile, account):
         raise ValueError(f"O perfil {ref} pertence a outra conta.")
 
 
+def property_active(profile):
+    """ATIVO unless the owner set it INATIVO (26/09); a profile from before then has no field and is active."""
+    return profile.get("active") is not False
+
+
+# The customer's file (26/09): what the qualification (the 2nd interaction, repeated until a visit is proposed)
+# gathers. The first four always count; the company and the pets only when the customer brought them up.
+FICHA_FIELDS = {"trabalho": "Situação profissional e rendimentos", "agregado": "Agregado familiar",
+                "datas": "Datas ou duração do contrato", "disponibilidade": "Disponibilidade para visitas",
+                "empresa": "Empresa (se arrenda por uma)", "animais": "Animais (qual, tamanho, quantos)"}
+FICHA_REQUIRED = ("trabalho", "agregado", "datas", "disponibilidade")
+FICHA_OPTIONAL = ("empresa", "animais")
+FICHA_VALUE_MAX = 300
+
+
+def clean_ficha(raw):
+    """The assistant's file for one customer: short plain texts, and which optional points it says are missing."""
+    if not isinstance(raw, dict):
+        return None
+    ficha = {key: " ".join(str(raw[key]).split())[:FICHA_VALUE_MAX] for key in FICHA_FIELDS
+             if isinstance(raw.get(key), (str, int, float)) and not isinstance(raw.get(key), bool)
+             and str(raw[key]).strip() and str(raw[key]).strip().casefold() not in ("null", "none", "-", "?")}
+    missing = raw.get("falta") if isinstance(raw.get("falta"), list) else []
+    ficha["falta_extra"] = [key for key in FICHA_OPTIONAL if key in missing and key not in ficha]
+    return ficha
+
+
+def merge_ficha(old, new):
+    """What we knew, with what the customer just told us on top; nothing known is ever lost to a blank."""
+    merged = {key: value for key, value in (old or {}).items() if key in FICHA_FIELDS}
+    merged.update({key: value for key, value in (new or {}).items() if key in FICHA_FIELDS})
+    extra = (new or {}).get("falta_extra", (old or {}).get("falta_extra")) or []
+    merged["falta_extra"] = [key for key in FICHA_OPTIONAL if key in extra and key not in merged]
+    return merged
+
+
+def ficha_summary(ficha):
+    """What is still missing, and whether the file is complete (the four required points and any optional
+    one the customer raised)."""
+    ficha = ficha or {}
+    missing = [key for key in FICHA_REQUIRED if not ficha.get(key)] + list(ficha.get("falta_extra") or [])
+    return {"falta": missing, "complete": not missing,
+            "known": sum(1 for key in FICHA_REQUIRED if ficha.get(key)), "total": len(FICHA_REQUIRED)}
+
+
 def parse_rent(value):
     """Monthly euros from a number or text such as "1.500 €", "1 500,50", "1,500.00" or "850.00".
 
@@ -155,6 +200,8 @@ def build_profile(fields, account, template, existing, today):
     come from the template or the existing profile (None for a new one), plus the portal sender the owner typed."""
     profile = copy.deepcopy(existing or template)
     profile.pop("_knowledge", None)  # runtime only, never written to profile.json
+    if not existing:
+        profile.pop("active", None)  # a new property starts ATIVO, even when its template is INATIVO
     ref = fields["reference"]
     prop, match = profile.setdefault("property", {}), profile.setdefault("match", {})
     reply = profile.setdefault("reply", {})

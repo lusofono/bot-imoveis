@@ -108,6 +108,17 @@
 /* Contactos: the CSV as a table; wide, so it scrolls sideways inside its box on a small screen. */
 .contacts-filters{margin-bottom:16px}
 .contacts-filters input[type=search]{flex:1 1 240px;width:auto}
+.fichas-card{margin:0 0 22px}
+.fichas-card .section-heading{flex-wrap:wrap}
+.fichas-grid{display:grid;grid-template-columns:repeat(var(--fichas-columns,3),minmax(0,1fr));gap:14px;margin-top:6px}
+.ficha-card{border:1px solid var(--line);border-radius:12px;padding:16px;background:var(--card);min-width:0}
+.ficha-card .card-head{margin-bottom:4px}
+.ficha-card .ficha-email{overflow-wrap:anywhere}
+.ficha-card dl{display:grid;gap:3px;margin:12px 0 0}
+.ficha-card dt{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-top:6px}
+.ficha-card dd{margin:0;font-size:12px;overflow-wrap:anywhere}
+.ficha-card dd.ficha-missing{color:var(--warn)}
+@media (max-width:760px){.fichas-grid{grid-template-columns:minmax(0,1fr)}}
 .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--card)}
 .contacts-table{width:100%;border-collapse:collapse;font-size:13px}
 .contacts-table th{text-align:left;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);

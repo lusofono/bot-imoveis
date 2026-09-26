@@ -152,6 +152,13 @@
 
   <section id="tab-contacts" hidden>
     <div class="page-heading"><div><p class="eyebrow" data-word="contacts.eyebrow">CONTACTOS</p><h1 data-word="contacts.title">Quem te escreveu, num só registo.</h1><p class="step">É o <code>data/contactos.csv</code>: cada leitura acrescenta os clientes novos, e aqui corriges, acrescentas à mão ou apagas a pedido do cliente.</p></div><a class="button" href="contactos.csv">Descarregar CSV</a></div>
+    <article class="card fichas-card">
+      <div class="section-heading"><div><p class="eyebrow">FICHAS DE CLIENTES</p><h2>O que já sabemos de cada cliente</h2></div>
+        <div class="row"><label class="muted">Imóvel <select id="fichas-property"></select></label><span id="fichas-count" class="tag" aria-live="polite"></span></div></div>
+      <p class="step">Preenchidas pela IA a cada resposta, só com o que o cliente disse. Com a ficha completa, o cliente está pronto para a proposta de visita.</p>
+      <div id="fichas-list" class="fichas-grid"></div>
+      <div class="actions"><button id="fichas-prev" type="button">‹ Anteriores</button><button id="fichas-next" type="button">Seguintes ›</button></div>
+    </article>
     <div class="row contacts-filters">
       <label class="muted">Imóvel <select id="contacts-property"><option value="">Todos</option></select></label>
       <label class="muted">RGPD <select id="contacts-rgpd"><option value="">Todos</option></select></label>

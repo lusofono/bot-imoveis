@@ -350,3 +350,35 @@ def test_notes_never_push_the_knowledge_past_its_limit(service):
     with pytest.raises(ValueError, match="limite"):
         service.add_note(REF, "Mais uma informação útil.")
     assert not (base / "notas.md").exists()
+
+
+def test_an_inactive_property_leaves_the_menus_but_keeps_everything(service):
+    assert service.settings()["properties"][0]["active"] is True
+    assert service.pending()["properties"][0]["inactive"] is False
+    service.set_property_active(REF, False)
+    profile_path = service.folder / "properties" / REF / "profile.json"
+    assert json.loads(profile_path.read_text(encoding="utf-8"))["active"] is False
+    assert service.settings()["properties"][0]["active"] is False  # Imóveis still lists it
+    assert service.contacts()["inactive"] == [REF]
+    # Nothing else changes: its emails are still read into its queue, which says it is inactive.
+    read(service, [lead("1")])
+    queue = service.pending()["properties"][0]
+    assert queue["inactive"] is True and len(queue["emails"]) == 1
+    service.set_property_active(REF, True)
+    assert "active" not in json.loads(profile_path.read_text(encoding="utf-8"))  # active is the default
+    assert service.contacts()["inactive"] == []
+
+
+def test_the_active_switch_refuses_unknown_properties_and_values(service):
+    with pytest.raises(ValueError, match="desconhecido"):
+        service.set_property_active("OUTRO", False)
+    with pytest.raises(ValueError, match="ativo ou inativo"):
+        service.set_property_active(REF, "não")
+
+
+def test_a_new_property_starts_active_even_from_an_inactive_template(service):
+    service.set_property_active(REF, False)
+    service.save_property({"reference": "NOVO", "description": "Apartamento T2 na Rua Exemplo",
+                           "sender": "reply@idealista.pt"})
+    active = {item["reference"]: item["active"] for item in service.settings()["properties"]}
+    assert active == {REF: False, "NOVO": True}

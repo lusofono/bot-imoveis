@@ -485,7 +485,10 @@ function renderState() {
   $('nav-count').textContent = state.properties.reduce((n, q) => n + q.emails.length, 0);
   $('error').hidden = !state.error; $('error').textContent = state.error || '';
   const select = $('queue'), chosen = select.value;
-  select.replaceChildren(...state.properties.map(queue => el('option', {value: queue.property_ref ?? ''}, queue.property_ref ?? 'Todos')));
+  // Only ATIVO properties; an INATIVO one still shows while it has emails waiting, so none gets lost.
+  const listed = state.properties.filter(queue => !queue.inactive || queue.emails.length);
+  select.replaceChildren(...(listed.length ? listed : state.properties).map(queue => el('option', {value: queue.property_ref ?? ''},
+    (queue.property_ref ?? 'Todos') + (queue.inactive ? ' (inativo)' : ''))));
   if ([...select.options].some(option => option.value === chosen)) select.value = chosen;
   const queue = currentQueue();
   $('last-read').textContent = queue?.last_read_at ? 'Última leitura: ' + when(queue.last_read_at) : '';
@@ -646,6 +649,7 @@ function card(email) {
       email.consent_confirmed && el('span', {class: 'tag visit'}, 'consentimento: sim'),
       email.visit_slot && el('span', {class: 'tag visit'}, 'visita ' + slotLabel(email.visit_slot)),
       email.visit_status && el('span', {class: 'tag warn'}, VISIT_STATES[email.visit_status] || email.visit_status),
+      email.interaction === 2 && fichaTag(email.ficha_summary),
       el('span', {class: 'muted small'}, when(email.date))),
     contact && el('div', {class: 'muted small'}, contact),
     email.blocked && el('p', {class: 'alert bad'}, email.blocked),
@@ -1017,7 +1021,7 @@ function roundSummaryContent(data) {
 let roundPanelProperty = null;
 function renderVisitsRound() {
   const box = $('visits-round-panel');
-  const properties = (settings?.properties || []).filter(property => !property.visits?.closed_at);
+  const properties = activeProperties().filter(property => !property.visits?.closed_at);
   const card = (...body) => box.replaceChildren(el('article', {class: 'card'},
     el('p', {class: 'eyebrow'}, 'RONDA DE VISITAS'), el('h2', {}, 'Avisa os clientes ativos'), ...body));
   if (!properties.length) {
@@ -1063,6 +1067,9 @@ function renderVisitsRound() {
 let contactsData = {contacts: [], properties: [], rgpd_states: {}};
 const fullDay = day => day ? day.split('-').reverse().join('/') : '—';
 
+// The property menus list only ATIVO properties; Imóveis shows them all, with the switch.
+function activeProperties() { return (settings?.properties || []).filter(property => property.active !== false); }
+
 function fillSelect(select, options, first) {
   const chosen = select.value;
   select.replaceChildren(...(first ? [el('option', {value: ''}, first)] : []),
@@ -1098,8 +1105,61 @@ function contactRow(contact) {
       }, event.currentTarget)}, 'Apagar')));
 }
 
+// Customer files (26/09): what the qualification gathered, per property, a few at a time above the full list.
+const FICHA_LABELS = {trabalho: 'Situação profissional e rendimentos', agregado: 'Agregado familiar',
+  datas: 'Datas ou duração do contrato', disponibilidade: 'Disponibilidade para visitas', empresa: 'Empresa',
+  animais: 'Animais'};
+function fichaTag(summary) {
+  if (!summary) return false;
+  const missing = summary.falta.map(key => FICHA_LABELS[key] || key).join(', ');
+  return el('span', {class: 'tag ' + (summary.complete ? 'draft' : 'warn'),
+    title: summary.complete ? 'Ficha completa: pronto para proposta de visita.' : 'Falta: ' + missing},
+    summary.complete ? 'ficha completa' : `ficha ${summary.known}/${summary.total}`);
+}
+
+let fichasPage = 0;
+function fichasPerPage() {  // one row: 3 to 5 cards, as many as the width fits
+  return Math.max(3, Math.min(5, Math.floor(($('fichas-list').clientWidth || 960) / 250)));
+}
+function fichaCard(item) {
+  const optional = ['empresa', 'animais'].filter(key => item.ficha[key] || item.falta.includes(key));
+  const rows = ['trabalho', 'agregado', 'datas', 'disponibilidade', ...optional].flatMap(key => [
+    el('dt', {}, FICHA_LABELS[key]),
+    el('dd', {class: item.ficha[key] ? '' : 'ficha-missing'}, item.ficha[key] || 'falta')]);
+  return el('article', {class: 'ficha-card'},
+    el('div', {class: 'card-head'}, el('strong', {}, item.name || item.email),
+      fichaTag({falta: item.falta, complete: item.complete, known: item.known, total: item.total})),
+    el('div', {class: 'muted small'}, [item.phase, item.pending && 'email por responder',
+      item.last && 'última troca ' + when(item.last)].filter(Boolean).join(' · ')),
+    el('div', {class: 'muted small ficha-email'}, item.email),
+    el('dl', {}, rows));
+}
+function renderFichas() {
+  const inactive = new Set(contactsData.inactive || []);
+  const refs = contactsData.properties.filter(ref => !inactive.has(ref));
+  const select = $('fichas-property');
+  fillSelect(select, Object.fromEntries(refs.map(ref => [ref, ref])), refs.length > 1 ? 'Todos' : undefined);
+  if (!select.dataset.touched && refs.length > 1 && !select.value) select.value = refs[0];
+  const all = (contactsData.fichas || []).filter(item => select.value ? item.property_ref === select.value
+    : !inactive.has(item.property_ref));
+  const size = fichasPerPage(), pages = Math.max(1, Math.ceil(all.length / size));
+  fichasPage = Math.min(fichasPage, pages - 1);
+  const shown = all.slice(fichasPage * size, fichasPage * size + size);
+  $('fichas-list').style.setProperty('--fichas-columns', size);
+  $('fichas-list').replaceChildren(...(shown.length ? shown.map(fichaCard)
+    : [el('p', {class: 'muted small'}, 'Ainda não há fichas: enchem-se a cada resposta preparada pela IA.')]));
+  $('fichas-count').textContent = all.length ? `${fichasPage * size + 1}–${fichasPage * size + shown.length} de ${all.length}` : '0';
+  $('fichas-prev').disabled = fichasPage === 0;
+  $('fichas-next').disabled = fichasPage >= pages - 1;
+}
+$('fichas-property').addEventListener('change', event => { event.target.dataset.touched = '1'; fichasPage = 0; renderFichas(); });
+$('fichas-prev').addEventListener('click', () => { fichasPage--; renderFichas(); });
+$('fichas-next').addEventListener('click', () => { fichasPage++; renderFichas(); });
+
 function renderContacts() {
-  const properties = Object.fromEntries(contactsData.properties.map(ref => [ref, ref]));
+  renderFichas();
+  const inactive = new Set(contactsData.inactive || []);
+  const properties = Object.fromEntries(contactsData.properties.filter(ref => !inactive.has(ref)).map(ref => [ref, ref]));
   fillSelect($('contacts-property'), properties, 'Todos');
   fillSelect($('contacts-rgpd'), contactsData.rgpd_states, 'Todos');
   fillSelect($('c-imovel'), properties);
@@ -1168,7 +1228,8 @@ function propertyCard(property) {
   return el('article', {class: 'card property-slide'}, el('div', {class: 'property-identity'},
     propertyCover(property.reference, property.photo),
     el('div', {class: 'card-head'}, el('strong', {}, property.reference), el('span', {}, property.description || ''),
-      property.advertised_rent_eur != null && el('span', {class: 'tag'}, property.advertised_rent_eur + ' €')),
+      property.advertised_rent_eur != null && el('span', {class: 'tag'}, property.advertised_rent_eur + ' €'),
+      el('span', {class: property.active === false ? 'tag warn' : 'tag draft'}, property.active === false ? 'INATIVO' : 'ATIVO')),
     el('div', {class: 'muted small'}, [property.sender, property.listing_id && 'anúncio ' + property.listing_id,
       property.knowledge_files.length ? 'conhecimento: ' + property.knowledge_files.join(', ') : 'base de conhecimento vazia']
       .filter(Boolean).join(' · ')),
@@ -1186,11 +1247,24 @@ function propertyCard(property) {
         settings = await call('api/property/prompts', {reference: property.reference, prompts});
         renderSettings(); await refreshState(); toast('Prompts guardados.');
       }, event.currentTarget)}, 'Guardar prompts')),
-    el('button', {class: 'link', onclick: () => openPropertyEditor(property, property.reference)}, 'Editar dados do anúncio')),
+    el('button', {class: 'link', onclick: () => openPropertyEditor(property, property.reference)}, 'Editar dados do anúncio'),
+    activeSwitch(property)),
     el('div', {class: 'property-operations'},
       activeClientsList(property),
       analysisPanel(property),
       visitsPanel(property)));
+}
+
+// ATIVO / INATIVO: an inactive property leaves the property menus (Respostas, Agenda, Contactos, ronda de
+// visitas) but stays here with everything it has; switching back brings it all back.
+function activeSwitch(property) {
+  const active = property.active !== false;
+  return el('button', {class: 'link', onclick: event => run(async () => {
+    const result = await call('api/property/active', {reference: property.reference, active: !active});
+    settings = result.settings; state = result.state;
+    renderSettings(); renderState();
+    toast(active ? `${property.reference} ficou inativo: sai dos menus, mas continua aqui.` : `${property.reference} está outra vez ativo.`);
+  }, event.currentTarget)}, active ? 'Marcar como inativo' : 'Voltar a ativar');
 }
 
 function knowledgeDetails(ref) {
@@ -1246,6 +1320,7 @@ function activeClientsList(property) {
         el('span', {}, customer.name || customer.email),
         el('span', {class: 'tag' + (customer.state === 'booked' ? ' visit' : customer.state === 'ok' ? ' draft' : '')},
           CLIENT_STATE_LABEL[customer.state] || customer.state),
+        fichaTag(customer.ficha),
         el('span', {class: 'muted small'}, customer.reason || `${customer.stage} interaç${customer.stage === 1 ? 'ão' : 'ões'}`)))
         : [el('p', {class: 'muted small'}, 'Ainda não escrevemos a nenhum cliente deste imóvel.')]));
     });
@@ -1386,8 +1461,9 @@ function agendaEntries(iso) {
     const came = slot?.check?.attended;
     if (day === iso) entries.push({ref, label: labels[ref] || ref || 'Imóvel', kind, start: minutesOf(time), at, name,
       end: Math.min(minutesOf(time) + length, 24 * 60),
-      text: `${came === true ? '✓ ' : came === false ? '✗ ' : ''}${time} · ${name || 'visita'}${slot?.survey ? ' ★' : ''}`,
-      customer: slot?.customer, check: slot?.check, survey: slot?.survey, thanksSentAt: slot?.thanks_sent_at,
+      text: `${came === true ? '✓ ' : came === false ? '✗ ' : ''}${time} · ${name || 'visita'}${slot?.survey ? ' ★' : ''}`
+        + (slot?.ficha ? (slot.ficha.complete ? ' · ficha ok' : ` · ficha ${slot.ficha.known}/${slot.ficha.total}`) : ''),
+      customer: slot?.customer, check: slot?.check, survey: slot?.survey, thanksSentAt: slot?.thanks_sent_at, ficha: slot?.ficha,
       came, evidence: [evidence && `lido nos emails pela IA: «${evidence}»`, before && `antes: ${String(before).slice(11)}`]
         .filter(Boolean).join(' · ')});
   };
@@ -1493,7 +1569,7 @@ function focusAgenda(key, target, from) {
 }
 
 function renderAgenda() {
-  const properties = Object.fromEntries((settings?.properties || []).map(property =>
+  const properties = Object.fromEntries(activeProperties().map(property =>
     [property.reference, property.reference || property.description || 'Imóvel']));
   fillSelect($('agenda-property'), properties, 'Todos');
   const monday = startOfWeek(new Date());
@@ -1609,6 +1685,10 @@ function openVisitCheck(entry) {
     el('div', {class: 'section-heading'}, el('h2', {}, `Visita · ${entry.name || entry.customer}`),
       el('button', {type: 'button', class: 'link', onclick: () => box.replaceChildren()}, 'Fechar')),
     el('p', {class: 'muted small'}, `${slotLabel(entry.at)} · ${entry.label} · ${entry.customer}`),
+    entry.ficha && el('p', {class: 'alert ' + (entry.ficha.complete ? 'ok' : 'warn')}, entry.ficha.complete
+      ? 'Ficha do cliente completa: temos toda a informação necessária.'
+      : 'Ficha incompleta. Falta: ' + entry.ficha.falta.map(key => FICHA_LABELS[key] || key).join(', ').toLowerCase()
+        + '. Decides tu se confirmas a visita.'),
     el('div', {class: 'row'}, el('label', {}, came, 'Apareceu'), el('label', {}, missed, 'Não apareceu')),
     el('label', {class: 'field'}, 'Nota privada (só para ti)', privateNote),
     el('label', {class: 'field'}, 'Nota pública (vai no agradecimento ao cliente)', publicNote),
@@ -1702,7 +1782,7 @@ function renderPropertySlider() {
   $('property-slider').replaceChildren(...el('div', {},
     many && el('button', {class: 'slider-arrow prev', 'aria-label': 'Imóvel anterior', onclick: () => stepProperty(-1)}, '‹'),
     el('div', {class: 'slider-title'},
-      el('span', {class: 'property-ref'}, property.reference),
+      el('span', {class: 'property-ref'}, property.reference + (property.active === false ? ' · INATIVO' : '')),
       el('strong', {}, property.description || ''),
       many && el('div', {class: 'slider-dots'}, properties.map((other, i) => el('button', {
         class: 'slider-dot' + (i === index ? ' active' : ''), 'aria-label': other.reference, title: other.reference,
@@ -2064,8 +2144,8 @@ function propertyCluster(property, data, metrics) {
       + 'o imóvel: contam no custo total do Painel, mas não aqui.') : null);
 }
 
-// Black list (the owner decided) and grey list (the customer opted out): the same effect — never queued
-// again, never sent anything automatic — kept apart so it is clear, later, whose choice it was.
+// Black list (the owner decided): never queued again, whatever they write. Grey list (the customer opted out,
+// 26/09): we never write first again, but what they write still comes in and can be answered.
 function ignoreListCard(property, kind, customers) {
   const grey = kind === 'grey';
   const input = el('input', {type: 'email', placeholder: 'email@exemplo.com', 'aria-label': `Email para a ${grey ? 'greylist' : 'blacklist'}`});
@@ -2076,7 +2156,7 @@ function ignoreListCard(property, kind, customers) {
         el('h2', {}, grey ? 'Pediram para parar' : 'Decidiste parar')),
       el('span', {class: 'tag'}, String(customers.length))),
     el('p', {class: 'step'}, grey
-      ? 'Disseram que não têm interesse: não voltam a receber nada deste imóvel.'
+      ? 'Disseram que não têm interesse: não recebem mais nada nosso (lembretes, rondas, fecho). Se voltarem a escrever, o email entra na fila e podes responder.'
       : 'Por decisão tua: nunca mais entram nas Comunicações, mesmo que escrevam, nem recebem envios automáticos.'),
     el('div', {class: 'client-list'}, customers.length ? customers.map(customer => el('div', {class: 'client-row'},
       el('span', {}, customer.name || customer.email,

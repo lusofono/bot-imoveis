@@ -15,6 +15,37 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.41.0 — 26/09/2026
+
+- **Ficha de cliente.** Em cada resposta, a IA devolve também a ficha do cliente: situação profissional e
+  rendimentos, agregado familiar, datas ou duração do contrato, disponibilidade para visitas e, só se o cliente
+  falar nisso, empresa e animais. Só com o que o cliente disse. O programa junta-a à que já havia (nada do que se
+  sabe se perde) e guarda-a logo, como o estado da visita.
+- **Contactos: fichas por imóvel, de 3 a 5 de cada vez** (quantas couberem na largura), com setas para as
+  seguintes e um menu de imóvel só com os ativos. Mostra a fase (qualificação, proposta de visita, visita marcada,
+  visitou…) e o que falta. A lista completa de contactos continua por baixo, igual.
+- **A qualificação repete a 2.ª interação.** Até haver proposta de visita, cada email do cliente é a 2.ª, que
+  pede só o que falta na ficha, e nunca a 3.ª só por contagem de emails. Ao fim de três pedidos de informação sem
+  a ficha completa, a IA deixa de perguntar e o cartão avisa-te para decidires se propões visita na mesma.
+- **Etiqueta «ficha 2/4» ou «ficha completa»** nos cartões da 2.ª interação, nas Respostas, e nos clientes ativos
+  de cada imóvel.
+- **A ficha incompleta não trava a visita.** O cliente recebe na mesma a proposta de visita, e a marcação da hora,
+  com um lembrete no fim do que ainda precisamos de saber para a visita ficar confirmada. O cartão avisa-te de que
+  decides tu se confirmas.
+- **Cada marcação na Agenda mostra a ficha:** «ficha ok» ou «ficha 2/4», e ao abrir a visita diz o que falta. É
+  atualizada à medida que as respostas chegam.
+
+## α.40.0 — 26/09/2026
+
+- **Imóveis ATIVOS e INATIVOS.** Em Imóveis, cada imóvel mostra a etiqueta ATIVO ou INATIVO e o botão
+  «Marcar como inativo» / «Voltar a ativar». Um imóvel inativo sai dos menus de imóvel (Respostas, Agenda,
+  Contactos e ronda de visitas), mas continua em Imóveis com tudo o que tem. Se ainda tiver emails por tratar,
+  continua no menu das Respostas, marcado «(inativo)», para nenhum ficar perdido. Um imóvel novo começa sempre
+  ativo.
+- **Greylist diferente da blacklist.** Na greylist deixamos de escrever primeiro (lembretes, rondas,
+  consentimento, fecho), mas se o cliente voltar a escrever o email entra na fila, com um aviso, e pode ser
+  respondido. A blacklist continua a não deixar entrar nada.
+
 ## α.39.6 — 26/09/2026
 
 - **90's RacingCar: na rua do fundo passa só o mesmo carro vermelho**, no regresso depois de passar no topo; a

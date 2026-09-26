@@ -126,6 +126,22 @@ def test_an_ignored_contact_is_never_a_candidate_and_new_messages_are_dropped(se
     assert service.ignored_contacts()["customers"] == []
 
 
+def test_a_greylisted_contact_gets_nothing_from_us_but_can_still_write_and_be_answered(service):
+    read(service, [customer("1", "a@example.com")])
+    draft_and_send(service, "1", "Olá.")
+    service.set_ignored(REF, "a@example.com", True, kind="grey")
+    assert service.visit_candidates()["customers"] == []  # no rounds, reminders, consent or closing
+
+    # They write again: unlike the blacklist, it comes into the queue, with a warning, and can be answered.
+    last = service.load(REF)["conversations"]["a@example.com"]["sent_message_ids"][-1]
+    read(service, [{"gmail_message_id": "again", "from": [{"email": "a@example.com"}], "in_reply_to": last,
+                    "subject": "Re: resposta", "body_text": "Afinal ainda tenho interesse."}])
+    [email] = service.pending()["properties"][0]["emails"]
+    assert any("greylist" in warning for warning in email["warnings"])
+    draft_and_send(service, email["id"], "Com certeza.")
+    assert service.load(REF)["conversations"]["a@example.com"]["ignored"] is True  # still on the greylist
+
+
 def test_the_ignore_reason_is_kept_to_explain_later_and_cleared_on_undo(service):
     read(service, [customer("1", "a@example.com")])
     draft_and_send(service, "1", "Olá.")
