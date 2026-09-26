@@ -1463,12 +1463,33 @@ function agendaRuling(from, quarters) {
 
 // Down to the bottom of the window: a quarter of an hour gets whatever whole pixels the room below the day
 // heads allows (so every rule lands on a pixel), never fewer than 12, so a 15-minute mark is never lost.
+// The week shows four hours of the day at a time (about half the height it used to take), scrolling inside, with
+// the day heads kept on top; a quarter of an hour keeps the size it had when the whole day filled the window.
+// On a phone the days stack, so each still shows whole.
+const AGENDA_VIEW_HOURS = 4;
+let agendaScroll = {key: '', top: 0};
+
 function fitAgenda() {
   const box = $('agenda-week'), day = box.querySelector('.filofax-day');
   if (!day || $('tab-agenda').hidden) return;
-  const room = window.innerHeight - (day.getBoundingClientRect().top + window.scrollY) - 34;
   const narrow = window.matchMedia('(max-width: 760px)').matches;
-  box.style.setProperty('--quarter', `${narrow ? 12 : Math.max(12, Math.floor(room / Number(box.dataset.quarters)))}px`);
+  if (narrow) { box.style.setProperty('--quarter', '12px'); box.style.removeProperty('--agenda-view'); return; }
+  const top = box.getBoundingClientRect().top;
+  const offset = day.getBoundingClientRect().top - top + box.scrollTop;  // the page's padding and the day's head
+  const room = window.innerHeight - (top + window.scrollY) - offset - 34;
+  const quarter = Math.max(12, Math.floor(room / Number(box.dataset.quarters)));
+  box.style.setProperty('--quarter', `${quarter}px`);
+  box.style.setProperty('--agenda-view', `${Math.round(offset + AGENDA_VIEW_HOURS * 4 * quarter)}px`);
+}
+
+// Where the four hours open: where you left them (same week, same property), else the week's first visit or
+// window, else now (this week), else the start of the day.
+function focusAgenda(key, target, from) {
+  const box = $('agenda-week');
+  if (agendaScroll.key === key) { box.scrollTop = agendaScroll.top; return; }
+  const quarter = parseFloat(box.style.getPropertyValue('--quarter')) || 14;
+  box.scrollTop = Math.max(0, Math.round(((target - from) / 15 - 1) * quarter));
+  agendaScroll = {key, top: box.scrollTop};
 }
 
 function renderAgenda() {
@@ -1543,6 +1564,10 @@ function renderAgenda() {
   }));
   if (!week.length) box.replaceChildren(el('p', {class: 'empty-state filofax-none'}, 'Todos os dias estão em blackout. Liga um dia em «Dias».'));
   fitAgenda();
+  const clock = new Date(), minutesNow = clock.getHours() * 60 + clock.getMinutes();
+  const target = all.length ? Math.min(...all.map(entry => entry.start))
+    : agendaWeekOffset === 0 && minutesNow >= from && minutesNow < to ? minutesNow : from;
+  focusAgenda(`${agendaWeekOffset}|${filter}`, target, from);
 }
 
 // After the visit: did the customer come, a private note (only for the owner: never in an email nor to the AI),
@@ -1616,6 +1641,7 @@ async function syncAgenda() {
 $('agenda-sync').addEventListener('click', event => run(syncAgenda, event.currentTarget));
 $('agenda-sync-here').addEventListener('click', event => run(syncAgenda, event.currentTarget));
 
+$('agenda-week').addEventListener('scroll', () => { agendaScroll.top = $('agenda-week').scrollTop; }, {passive: true});
 $('agenda-prev').addEventListener('click', () => { agendaWeekOffset--; renderAgenda(); });
 $('agenda-next').addEventListener('click', () => { agendaWeekOffset++; renderAgenda(); });
 $('agenda-today').addEventListener('click', () => { agendaWeekOffset = 0; renderAgenda(); });

@@ -15,6 +15,33 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.39.5 — 26/09/2026
+
+- **O carro e o barco fazem a volta completa.** No 90's RacingCar, depois de passar no topo para a esquerda, o
+  carro vermelho volta pela rua do fundo, virado ao contrário, para a direita (e a lambreta passa noutra altura).
+  No 90's Boat, o veleiro atravessa o topo para a esquerda e depois volta espelhado pelo mar, para a direita, com
+  as luzes de noite no quarto da noite.
+- **Ícones do menu iguais em todos os temas:** Painel um mostrador, Comunicações a antena, Imóveis uma casa,
+  Contactos uma pessoa, Agenda uma agenda e Voz e estilo uma roda dentada. No 90's RacingCar ficam ao lado do número
+  da mudança e no 90's Boat ao lado da bandeira náutica; o microfone de rádio do barco sai e Comunicações volta à
+  sua bandeira.
+
+## α.39.4 — 25/09/2026
+
+- **Agenda: quatro horas de cada vez.** A semana passa a ocupar cerca de metade da altura e rola por dentro, com o
+  dia e a data sempre no topo; cada quarto de hora mantém o tamanho que tinha. Abre na primeira visita da semana
+  (ou na hora atual, ou no início do dia) e, enquanto não mudares de semana nem de imóvel, fica onde a deixaste.
+  No telemóvel os dias continuam uns por baixo dos outros, inteiros.
+- **Linhas mais finas:** as de 15 minutos ficam o mais finas possível e as de meia hora um pouco mais marcadas; as
+  das horas ficam como estavam.
+
+## α.39.3 — 25/09/2026
+
+- **90's RacingCar: uma rua de vila italiana no fundo da janela**, como o mar no 90's Boat. Casas em ocre,
+  terracota e rosa com portadas verdes, uma arcada, um campanário, a cúpula de um duomo e ciprestes, por cima de
+  um passeio de sampietrini, do lancil e do asfalto com a linha tracejada. A estrada corre depressa e a vila
+  devagar, e de vez em quando passa uma lambreta creme. Fica por trás de tudo, e para com «reduzir movimento».
+
 ## α.39.2 — 25/09/2026
 
 - **Agenda, «Depois das visitas»:** por cima da semana aparece a lista das visitas que já passaram (até 14 dias)

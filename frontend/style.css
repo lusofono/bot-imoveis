@@ -355,11 +355,12 @@
 .filofax-entry.noshow strong{text-decoration:line-through}
 .visit-check{margin-top:18px}
 .visit-check .row label{font-size:13px;white-space:nowrap}
-/* Comunicações: a comms tower drawn in the text colour. 90's RacingCar hides the tab glyphs for its gear numbers;
-   this one stays beside the number (the rule lives here while another agent works on racing.css) */
+/* The menu's icons, the same in every theme (25/09): Painel a gauge, Comunicações the comms tower, Imóveis a house,
+   Contactos a person, Agenda a planner, Voz e estilo a cog — drawn in the text colour. 90's RacingCar keeps them
+   beside its gear numbers, 90's Boat beside its signal flags */
 .tab-icon svg{display:block;width:21px;height:21px}
-:root[data-theme="racing"] .tab[data-tab="replies"]>span.tab-icon{display:grid;place-items:center;width:20px;flex:none}
-:root[data-theme="racing"] .tab[data-tab="replies"]>span.tab-icon svg{width:18px;height:18px}
+:root:is([data-theme="racing"],[data-theme="boat"]) .tab[data-tab]>span.tab-icon{display:grid;place-items:center;width:20px;flex:none}
+:root:is([data-theme="racing"],[data-theme="boat"]) .tab[data-tab]>span.tab-icon svg{width:18px;height:18px}
 
 /* Painel, «Depósitos · API OpenAI»: the properties' tanks side by side across the whole card, in one row
    (two properties used to stack and double the card's height) */
@@ -383,3 +384,11 @@
   border:1px dashed var(--accent);border-radius:12px;background:var(--accent-tint)}
 .agenda-todo-item{min-height:30px;padding:4px 12px;font-size:12px;border-left:4px solid var(--agenda-green)}
 .agenda-todo-item.offered{border-left-color:var(--agenda-blue)}.agenda-todo-item.accepted{border-left-color:var(--agenda-orange)}
+/* Agenda: four hours of the day at a time, about half the height, scrolling inside the week (app.js sets --quarter
+   and --agenda-view); the day heads stay on top. Quarter-hour rules as fine as they go, half hours a little stronger */
+.filofax{overflow-x:hidden;overflow-y:auto;max-height:var(--agenda-view,none);overscroll-behavior:contain}
+.filofax-page{--page-bg:var(--card)}
+.filofax-page.today{--page-bg:var(--accent-soft)}
+.filofax-head{position:sticky;top:0;z-index:3;background:var(--page-bg);padding-top:6px;margin-top:-6px}
+.filofax-rule{border-top:.5px solid var(--agenda-rule,var(--line))}
+.filofax-rule.half{border-top:.5px solid color-mix(in srgb,currentColor 24%,transparent)}
