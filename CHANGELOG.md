@@ -15,6 +15,20 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.42.0 — 26/09/2026
+
+- **Lembretes de visita: na véspera e no próprio dia.** A primeira leitura de cada um desses dias põe um rascunho
+  nas Comunicações, marcado «lembrete de visita · amanhã/hoje» e a hora. A IA escreve-o no idioma do cliente, com o
+  dia, a hora, onde fica o imóvel e o pedido de WhatsApp ao agente (se estiver no conhecimento do imóvel), e lembra
+  o que ainda falta na ficha. Revês e envias como qualquer outro. No dia, o da véspera que ficou por enviar é
+  substituído. Não conta como interação nem mexe nos lembretes de 2 e 4 dias. Não sai para quem já tem a visita
+  registada, está numa lista, pediu outra data, ou se o retiraste da fila. As instruções editam-se em Voz e estilo.
+- **Painel: «A fazer», logo a seguir aos números.** Calculado a partir dos dados, do mais urgente para o menos:
+  lembretes de visita por enviar, envios incertos, emails bloqueados, emails por responder, rascunhos por enviar,
+  horas aceites por confirmar, visitas por registar, agradecimentos por criar, clientes com ficha completa sem
+  proposta, clientes no travão e textos em falta em Voz e estilo. Cada linha diz quantos, em que imóvel e os
+  primeiros nomes, e leva ao separador onde se faz. Uma tarefa desaparece quando fica feita.
+
 ## α.41.0 — 26/09/2026
 
 - **Ficha de cliente.** Em cada resposta, a IA devolve também a ficha do cliente: situação profissional e

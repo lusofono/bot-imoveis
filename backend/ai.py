@@ -61,6 +61,13 @@ AFTER_VISIT_RULE = ("Depois da visita, agradece ao cliente ter vindo, de forma b
                     "conteúdo base, preenchendo o imóvel, a morada, o dia e a hora, o consultor e o nome do visitante com "
                     "os dados que tens (nunca inventes); traduz tudo para o idioma do cliente, mas mantém a numeração de "
                     "1 a 5, para ele responder na mesma linha. Não peças documentos nem prometas nada sobre a candidatura.")
+# Visit reminders (26/09): one the day before, one on the day. Used when Voz e estilo has none of its own.
+VISIT_REMINDER_RULE = ("Lembra o cliente, de forma breve e cordial, da visita marcada: o dia e a hora (amanhã ou hoje, "
+                       "como indicado no email). Diz onde fica o imóvel: se o conhecimento do imóvel tiver o link do "
+                       "Google Maps e a morada para a visita, usa-os exatamente como lá estão; se não, só a morada do "
+                       "anúncio, sem inventar. Se o conhecimento do imóvel tiver o telefone do agente, pede que envie "
+                       "uma mensagem por WhatsApp para esse número 30 minutos antes de chegar. Se já não puder vir, "
+                       "pede que avise, para libertarmos a hora. Não faças perguntas novas.")
 AFTER_VISIT_TEMPLATE = """Para melhorarmos, pedimos-lhe um minuto: responda a este email escrevendo, à frente de cada número, uma nota de 1 (mau) a 5 (excelente).
 1. O imóvel:
 2. O consultor que o recebeu na visita:
@@ -142,7 +149,9 @@ def instructions(profile, voice, visits=None):
     after = style.get("after_visit") or {}
     after_template = style.get("after_visit_template") or {}
     out += ["- Pós-visita (agradecimento, emails marcados «pós-visita»): " + (after.get("text") or AFTER_VISIT_RULE),
-            "  Conteúdo base:\n" + (after_template.get("text") or AFTER_VISIT_TEMPLATE)]
+            "  Conteúdo base:\n" + (after_template.get("text") or AFTER_VISIT_TEMPLATE),
+            "- Lembrete de visita (emails marcados «lembrete de visita»): "
+            + ((style.get("visit_reminder") or {}).get("text") or VISIT_REMINDER_RULE)]
     if visits and visits.get("windows"):
         durations = [f"arrendamento {visits['rental']}" if visits.get("rental") else "",
                      f"compra {visits['sale']}" if visits.get("sale") else ""]
@@ -221,7 +230,12 @@ def reply_prompt(queue, ids, extra=""):
             message = (f"(sem mensagem nova do cliente: é o agradecimento pela visita de {slot_label(visited.get('at'))}; "
                        f"visitante: {visited.get('name') or 'o cliente'}) Nota pública do consultor para este cliente: "
                        f"{visited.get('public') or '(nenhuma)'}")
-        step = "acrescento" if addition else "pós-visita" if visited else f"{email.get('interaction') or 1}.ª"
+        reminder = email.get("visit_reminder") if email.get("kind") == "visit_reminder" else None
+        if reminder:
+            message = (f"(sem mensagem nova do cliente: é o lembrete da visita marcada para {slot_label(reminder.get('at'))}, "
+                       f"{'amanhã' if reminder.get('when') == 'vespera' else 'hoje'})")
+        step = ("acrescento" if addition else "pós-visita" if visited else "lembrete de visita" if reminder
+                else f"{email.get('interaction') or 1}.ª")
         parts += [f"--- id: {short_id(email['id'])} | interação: {step}"
                   f" | data: {email.get('date') or '?'}", f"Cliente: {name}"]
         history = email.get("history") or []
@@ -230,15 +244,17 @@ def reply_prompt(queue, ids, extra=""):
             for turn in history:
                 parts.append(f"[{turn.get('at', '?')}] {'Cliente' if turn['who'] == 'cliente' else 'Nós'}: "
                              f"{turn['text'][:1000]}")
-        parts += ["Mensagem" + (" nova" if history and not window and not addition and not visited else "") + ":", message[:4000]]
+        parts += ["Mensagem" + (" nova" if history and not window and not addition and not visited and not reminder else "")
+                  + ":", message[:4000]]
         if email.get("visit_status"):
             parts.append("Visita: " + VISIT_STATES.get(email["visit_status"], email["visit_status"]) + ".")
         if not addition and not visited:
             parts.append(ficha_line(email.get("ficha")))
         missing = (email.get("ficha_summary") or {}).get("falta") or []
-        if missing and (window or email.get("interaction") == 4):
+        if missing and (window or reminder or email.get("interaction") == 4):
             needed = ", ".join(FICHA_FIELDS[key].split(" (")[0].lower() for key in missing)
-            parts.append(("No fim da proposta" if window else "Podes marcar a hora como pedido, mas no fim")
+            parts.append(("No fim da proposta" if window else "No fim do lembrete" if reminder
+                          else "Podes marcar a hora como pedido, mas no fim")
                          + f", lembra com cordialidade que, para a visita ficar confirmada, precisamos ainda de saber: "
                          f"{needed}. Não digas que a visita depende de mais nada.")
         if email.get("qualifying_limit"):

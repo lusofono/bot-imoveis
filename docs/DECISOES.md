@@ -3,6 +3,27 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 26/09/2026: lembretes de visita e «A fazer» no Painel (α.42.0)
+
+**Decisão.**
+- **Os lembretes de visita são emails, por isso vivem nas Comunicações** e passam pela mesma revisão e envio que
+  os outros; o «A fazer» é uma lista de tarefas de todos os separadores, por isso vive no Painel, a primeira coisa
+  que se vê, logo a seguir aos números. O roadmap do produto (o que falta programar) fica em
+  `docs/PLANO-VERSAO-LOCAL.md`, fora da página, para não misturar o trabalho do dia com o de programação.
+- **Lembrete de visita pela IA, não frase fixa** (ao contrário dos de 2 e 4 dias): leva dia, hora, morada ou link
+  do mapa e o WhatsApp do agente, que estão no conhecimento de cada imóvel, e tem de sair no idioma do cliente. É
+  um tipo auxiliar (`visit_reminder`): não gasta interação nem mexe em `last_sent_at`. Regra por defeito no código
+  (`VISIT_REMINDER_RULE`), editável em Voz e estilo, como o pós-visita.
+- **Sem relógio por trás:** o programa só corre quando há uma leitura, por isso os lembretes nascem na primeira
+  leitura da véspera e do próprio dia (este só antes da hora da visita). Um dia sem leitura é um dia sem lembrete.
+  Cada lembrete tem uma chave fixa (cliente + hora da visita), para não se repetir nem voltar depois de retirado;
+  os enviados ficam em `visit_reminders_sent`.
+- **O «A fazer» calcula-se, nunca se escreve à mão,** a partir das filas, da agenda e das fichas. Como o resto do
+  Painel, só leva primeiros nomes. Um imóvel INATIVO só mostra as tarefas da fila (emails que já lá estão).
+
+**Porquê.** Pedido direto do utilizador (26/09): lembrete na véspera e no próprio dia, e um sítio que diga o que
+há para fazer; a pergunta «Painel ou Comunicações?» foi respondida pela IA e aceite.
+
 ## 26/09/2026: ficha de cliente e qualificação repetida (α.41.0)
 
 **Decisão.**

@@ -409,3 +409,9 @@ def test_the_active_switch_through_the_api(page):
     assert status == 400
     status, result = call("/api/property/active", {"reference": REF, "active": True})
     assert result["settings"]["properties"][0]["active"] is True
+
+
+def test_the_todo_list_through_the_api(page):
+    client, call = page
+    status, result = call("/api/todo")
+    assert status == 200 and [task["kind"] for task in result["tasks"]] == ["setup"]

@@ -362,7 +362,7 @@ def web_app(folder, token):
                 "contacts/save": ("POST", contact_save), "contacts/delete": ("POST", contact_delete),
                 "contacts/ignore": ("POST", contact_ignore), "contacts/ignored": ("POST", contacts_ignored),
                 "fuel/fill": ("POST", fuel_fill),
-                "digest": ("GET", lambda body: service.digest_view()),
+                "digest": ("GET", lambda body: service.digest_view()), "todo": ("GET", lambda body: service.todo()),
                 "digest/save": ("POST", digest_save), "digest/send": ("POST", digest_send),
                 "knowledge": ("POST", lambda body: service.knowledge(body.get("property_ref") or None)),
                 "knowledge/note": ("POST", note), "knowledge/save": ("POST", knowledge_save)}

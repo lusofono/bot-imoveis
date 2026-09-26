@@ -107,6 +107,12 @@
 
 /* Contactos: the CSV as a table; wide, so it scrolls sideways inside its box on a small screen. */
 .contacts-filters{margin-bottom:16px}
+.todo-card{margin:0 0 22px}
+.todo-list{list-style:none;padding:0;margin:14px 0 0;display:grid;gap:8px}
+.todo-item{width:100%;justify-content:flex-start;gap:12px;text-align:left;font-weight:500}
+.todo-item .todo-text{flex:1;min-width:0;overflow-wrap:anywhere}
+.todo-count{min-width:30px;text-align:center;border-radius:6px;background:var(--accent-tint);padding:2px 8px;font-weight:700;font-variant-numeric:tabular-nums}
+.todo-item.urgent .todo-count{color:var(--warn)}
 .contacts-filters input[type=search]{flex:1 1 240px;width:auto}
 .fichas-card{margin:0 0 22px}
 .fichas-card .section-heading{flex-wrap:wrap}

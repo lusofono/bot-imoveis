@@ -637,6 +637,9 @@ function card(email) {
       el('label', {class: 'who'}, el('input', {type: 'checkbox', class: 'pick', 'data-id': email.id, checked: !email.blocked, disabled: !!email.blocked}),
         el('strong', {}, customer.name || sender.name || sender.email || 'Sem nome')),
       email.kind === 'visit_thanks' ? el('span', {class: 'tag visit'}, 'pós-visita')
+        : email.kind === 'visit_reminder' ? el('span', {class: 'tag visit'},
+          (email.visit_reminder?.when === 'vespera' ? 'lembrete de visita · amanhã ' : 'lembrete de visita · hoje ')
+          + String(email.visit_reminder?.at || '').slice(11))
         : email.kind === 'addition' ? el('span', {class: 'tag visit'}, 'acrescento')
         : email.interaction && el('span', {class: 'tag'}, email.interaction + '.ª interação'),
       email.merged?.length > 1 && el('span', {class: 'tag visit', title: 'Vários emails deste cliente juntos: uma só resposta responde a todos.'},
@@ -946,7 +949,45 @@ function renderDashboard(data) {
   renderFuelOverview(data);
 }
 
-async function loadMetrics() { renderDashboard(await call('api/metrics', {days: Number($('chart-period').value) || 14})); }
+async function loadMetrics() {
+  renderDashboard(await call('api/metrics', {days: Number($('chart-period').value) || 14}));
+  renderTodo(await call('api/todo'));
+}
+
+// «A fazer» (26/09): worked out from the data, most urgent first; each line takes you to where it is done.
+const TODO_URGENT = new Set(['visit_reminder', 'uncertain', 'blocked', 'reply', 'accepted', 'check']);
+function openTask(task) {
+  const ref = task.property_ref;
+  if (ref && task.tab === 'replies' && [...$('queue').options].some(option => option.value === ref)) {
+    $('queue').value = ref; renderState();
+  }
+  // A menu not drawn yet has no options: the value is kept by an option of its own, which the redraw keeps.
+  const choose = select => {
+    if (![...select.options].some(option => option.value === ref)) select.append(el('option', {value: ref}, ref));
+    select.value = ref;
+  };
+  if (ref && task.tab === 'agenda') choose($('agenda-property'));
+  if (ref && task.tab === 'contacts') { $('fichas-property').dataset.touched = '1'; choose($('fichas-property')); }
+  if (ref && task.tab === 'properties') selectProperty(ref);
+  showTab(task.tab);
+}
+function renderTodo(data) {
+  const tasks = data.tasks || [];
+  const many = new Set(tasks.map(task => task.property_ref).filter(Boolean)).size > 1;
+  $('dashboard-todo').hidden = false;
+  $('dashboard-todo').replaceChildren(
+    el('div', {class: 'section-heading'}, el('div', {}, el('p', {class: 'eyebrow'}, 'A FAZER'),
+      el('h2', {}, tasks.length ? 'O que tens de fazer agora' : 'Tudo em dia')),
+      el('span', {class: 'tag'}, String(tasks.reduce((sum, task) => sum + task.count, 0)))),
+    tasks.length ? el('ul', {class: 'todo-list'}, tasks.map(task => el('li', {},
+      el('button', {type: 'button', class: 'todo-item' + (TODO_URGENT.has(task.kind) ? ' urgent' : ''), onclick: () => openTask(task)},
+        el('span', {class: 'todo-count'}, String(task.count)),
+        el('span', {class: 'todo-text'}, task.text,
+          task.names.length ? el('span', {class: 'muted small'}, ' · ' + task.names.join(', ') + (task.count > task.names.length ? '…' : '')) : null),
+        many && task.property_ref ? el('span', {class: 'tag'}, task.property_ref) : null,
+        el('span', {'aria-hidden': 'true'}, '→')))))
+      : el('p', {class: 'muted small'}, 'Sem emails por tratar, visitas por registar nem clientes à espera. Faz uma nova leitura quando quiseres.'));
+}
 try { $('chart-period').value = localStorage.getItem('bot-mail-period') || '14'; } catch { /* Storage may be unavailable. */ }
 $('chart-period').addEventListener('change', event => {
   try { localStorage.setItem('bot-mail-period', event.target.value); } catch { /* Storage may be unavailable. */ }
@@ -2224,6 +2265,7 @@ function renderVoice() {
   const digestRecipient = el('input', {type: 'email', value: settings.voice.digest_recipient || '', placeholder: 'vazio: sem ponto de situação diário'});
   const afterVisit = el('textarea', {rows: 5}, settings.voice.after_visit || '');
   const afterVisitTemplate = el('textarea', {rows: 14}, settings.voice.after_visit_template || '');
+  const visitReminder = el('textarea', {rows: 5}, settings.voice.visit_reminder || '');
   $('voice-form').replaceChildren(el('p', {class: 'eyebrow'}, 'VOZ ', kind('voice')),
     choice('greeting', 'Saudação'), choice('languages', 'Idiomas'), choice('closing', 'Fecho'),
     el('label', {class: 'field'}, 'Assinatura (sempre igual, sem tradução)', signature),
@@ -2250,6 +2292,11 @@ function renderVoice() {
       + 'O cliente responde ao próprio email; a leitura seguinte guarda as notas na visita dele, na Agenda.'),
     el('label', {class: 'field'}, 'Instruções do agradecimento', afterVisit),
     el('label', {class: 'field'}, 'Conteúdo base: inquérito (1 a 5) e ficha de visita — os <…> são preenchidos pelo assistente', afterVisitTemplate),
+    el('p', {class: 'eyebrow voice-section'}, 'LEMBRETES DE VISITA ', kind('prompt')),
+    el('p', {class: 'step voice-section'},
+      'Na véspera e no próprio dia de cada visita marcada, a primeira leitura desse dia põe um rascunho nas Comunicações: '
+      + 'o assistente escreve-o com estas instruções, no idioma do cliente, e lembra o que ainda falta na ficha.'),
+    el('label', {class: 'field'}, 'Instruções do lembrete de visita', visitReminder),
     el('p', {class: 'eyebrow voice-section'}, 'PONTO DE SITUAÇÃO DIÁRIO ', kind('voice')),
     el('p', {class: 'step voice-section'},
       'Um rascunho é preparado a cada leitura de emails, para este endereço; só sai depois de reveres e '
@@ -2262,7 +2309,7 @@ function renderVoice() {
         visits: {slot_minutes: Number(slot.value), rental: rental.value, sale: sale.value},
         reminders: {day2: reminderDay2.value, day4: reminderDay4.value},
         visits_closed: visitsClosed.value, consent_request: consentRequest.value, digest_recipient: digestRecipient.value,
-        after_visit: afterVisit.value, after_visit_template: afterVisitTemplate.value});
+        after_visit: afterVisit.value, after_visit_template: afterVisitTemplate.value, visit_reminder: visitReminder.value});
       renderSettings(); await refreshState(); toast('Voz guardada.');
     }, event.currentTarget)}, 'Guardar voz')));
 }

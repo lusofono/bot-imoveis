@@ -14,7 +14,7 @@ import secrets
 import smtplib
 import time
 import os
-from .ai import (AFTER_VISIT_RULE, AFTER_VISIT_TEMPLATE, KNOWLEDGE_RULE, agenda_prompt, describe, instructions,
+from .ai import (AFTER_VISIT_RULE, AFTER_VISIT_TEMPLATE, KNOWLEDGE_RULE, VISIT_REMINDER_RULE, agenda_prompt, describe, instructions,
                  parse_agenda, parse_survey, visit_analysis_prompt)
 from .configure import STARTER, example_profile
 from .mail import build_digest, build_reply, read_messages
@@ -31,7 +31,7 @@ from .store import (CONTACT_FIELDS, add_contacts, add_note, find_photo, knowledg
 CONTACT_SOURCE = "Idealista"  # today's only portal; see README for the family of emails it accepts.
 # Sent automatically or by a one-click button, in the customer's conversation, but never counted as one
 # of the four interactions and never resetting the clock the 2/4-day reminders are measured from.
-AUX_KINDS = {"reminder", "consent_request", "visits_closed", "addition", "visit_thanks"}  # "addition": «Escrever mais»; "visit_thanks": after the visit
+AUX_KINDS = {"reminder", "consent_request", "visits_closed", "addition", "visit_thanks", "visit_reminder"}  # "addition": «Escrever mais»; "visit_thanks": after the visit
 PROGRAM_KINDS = AUX_KINDS | {"visit_proposal"}  # drafts the program creates; not an email a customer sent
 REMINDER_HOURS = {"2d": 48, "4d": 96}
 HISTORY_LIMIT = 20  # turns kept per conversation, oldest dropped first; also what the prompt gets
@@ -41,7 +41,7 @@ CHART_PERIODS = {3: 1, 7: 1, 14: 1, 30: 1, 90: 7}
 VIEW_FIELDS = ("id", "kind", "date", "subject", "customer", "recipient", "blocked", "body_text", "body_truncated",
                "reply_text", "reply_status", "reply_error", "reply_message_id", "visit_window", "visit_slot",
                "visit_status", "reminder", "closing", "consent_suggested", "consent_confirmed", "history", "merged",
-               "merged_ids", "visit_done")
+               "merged_ids", "visit_done", "visit_reminder")
 # Page field → (profile prompt, key), the same prompts the terminal setup asks for.
 PROMPT_FIELDS = {"general": ("general", "text"), "first": ("first_interaction", "text"),
                  "first_template": ("first_interaction", "reply_template"), "second": ("second_interaction", "text"),
@@ -302,7 +302,7 @@ class MailService:
             limit = qualifying and conversation.get("stage", 0) >= 4  # the 1st reply and three questions already
             ficha = conversation.get("ficha") or item.get("ficha")
             missing = ficha_summary(ficha)["falta"] if ref and email else []
-            if missing and not qualifying and (item.get("kind") == "visit_proposal" or interaction == 4):
+            if missing and not qualifying and (item.get("kind") in ("visit_proposal", "visit_reminder") or interaction == 4):
                 # 26/09: an incomplete file never holds back the proposal or the booking; the customer is
                 # reminded, and the owner decides whether to confirm.
                 warnings.append("Ficha incompleta (falta: " + ", ".join(FICHA_FIELDS[key] for key in missing).lower()
@@ -476,6 +476,7 @@ class MailService:
                                  "direct_replies": direct[ref]}
                 if ref and voice_ok:
                     self.schedule_reminders(ref, data, voice_ok)
+                    self.schedule_visit_reminders(ref, data)
                 self.save(data, ref)
             if profiles:
                 self.prepare_digest(profiles, queues)
@@ -786,6 +787,10 @@ class MailService:
             conversation["last_sent_at"] = now()
         if item.get("kind") == "visit_thanks":
             conversation.setdefault("visit_check", {})["thanks_sent_at"] = now()
+        if item.get("kind") == "visit_reminder" and item.get("visit_reminder"):
+            sent = conversation.setdefault("visit_reminders_sent", [])
+            sent.append(f"{item['visit_reminder']['at']}|{item['visit_reminder']['when']}")
+            del sent[:-20]
 
     @staticmethod
     def aux_item(key, kind, email, conversation, text, **extra):
@@ -837,6 +842,37 @@ class MailService:
             body = f"{phrase}\n\n{conversation['last_text']}" if conversation.get("last_text") else phrase
             key = f"lembrete-{threshold}-{hashlib.sha256(email.encode()).hexdigest()[:8]}"
             data["emails"].append(self.aux_item(key, "reminder", email, conversation, body, reminder=threshold))
+            created += 1
+        return created
+
+    def schedule_visit_reminders(self, ref, data, moment=None):
+        """Visit reminders (26/09): one the day before the visit and one on the day, drafted at the first read of
+        each of those days. The assistant writes them, in the customer's language; the owner reviews and sends.
+
+        None for a visit already checked, a customer on a list or who asked for another date, one already sent, or
+        one the owner dismissed. On the day, the day before's still unsent is replaced by the day's.
+        """
+        moment = moment or datetime.now()  # the agenda's times are local
+        today, stamp = moment.date().isoformat(), moment.strftime("%Y-%m-%d %H:%M")
+        tomorrow = (moment.date() + timedelta(days=1)).isoformat()
+        dismissed = set(data.get("dismissed_message_ids") or [])
+        created = 0
+        for slot in load_visits(self.folder, ref)["slots"]:
+            day = slot["at"][:10]
+            when = "vespera" if day == tomorrow else "dia" if day == today and slot["at"] > stamp else None
+            conversation = data.get("conversations", {}).get(slot["customer"])
+            if (not when or not conversation or conversation.get("ignored") or slot.get("check")
+                    or conversation.get("visit") in ("nao_quer", "outra_data")
+                    or f"{slot['at']}|{when}" in (conversation.get("visit_reminders_sent") or [])):
+                continue
+            digest = hashlib.sha256(f"{slot['customer']}|{slot['at']}".encode()).hexdigest()[:8]
+            key = f"lembrete-visita-{when}-{digest}"
+            if key in dismissed or any(item["id"] == key for item in data["emails"]):
+                continue
+            if when == "dia":
+                data["emails"] = [item for item in data["emails"] if item["id"] != f"lembrete-visita-vespera-{digest}"]
+            data["emails"].append(self.aux_item(key, "visit_reminder", slot["customer"], conversation, "",
+                                                reply_status="pending", visit_reminder={"at": slot["at"], "when": when}))
             created += 1
         return created
 
@@ -1865,6 +1901,84 @@ class MailService:
         except ValueError:
             return False
 
+    # «A fazer», most urgent first: what goes out to customers today, then the queue, the agenda, the rounds, setup.
+    TODO_ORDER = ("visit_reminder", "uncertain", "blocked", "reply", "draft", "accepted", "check", "thanks", "ready",
+                  "brake", "setup")
+
+    def todo(self):
+        """«A fazer» (26/09), right under the dashboard's telemetry: what needs doing now, worked out from the data.
+        Nothing is typed by hand, and a task goes away once it is done. Of the customers, only first names leave
+        this call (as in metrics): never an address or a phone."""
+        def first_names(names):
+            return [(str(name or "").split() or ["sem nome"])[0] for name in names]
+
+        def name_of(item):
+            return (item.get("recipient") or {}).get("name") or (item.get("customer") or {}).get("name") or ""
+
+        tasks = []
+
+        def add(kind, tab, ref, names, text):
+            if names:
+                tasks.append({"kind": kind, "tab": tab, "property_ref": ref, "count": len(names),
+                              "names": first_names(names)[:8], "text": text})
+
+        with locked(self.folder):
+            profiles = load_profiles(self.folder, self.config()["account"])
+            style = load_json(self.folder / "voice.json", {}).get("style") or {}
+            moment = datetime.now()  # the agenda's times are local
+            today, stamp = moment.date().isoformat(), moment.strftime("%Y-%m-%d %H:%M")
+            for ref, profile in profiles.items():
+                data = self.load(ref)
+                emails, conversations = data["emails"], data.get("conversations", {})
+                reminders = [item for item in emails if item.get("kind") == "visit_reminder"]
+                uncertain = [item for item in emails if item.get("reply_status") in ("sending", "uncertain")]
+                blocked = [item for item in emails if item.get("blocked")]
+                rest = [item for item in emails if item not in reminders and item not in uncertain and item not in blocked]
+                add("visit_reminder", "replies", ref, [name_of(item) for item in reminders], "Lembretes de visita por enviar")
+                add("uncertain", "replies", ref, [name_of(item) for item in uncertain],
+                    "Envios com resultado incerto: confirmar no Gmail")
+                add("blocked", "replies", ref, [name_of(item) for item in blocked], "Emails bloqueados: tratar à mão")
+                add("reply", "replies", ref, [name_of(item) for item in rest if item.get("reply_status") in (None, "pending")],
+                    "Emails por responder")
+                add("draft", "replies", ref, [name_of(item) for item in rest if item.get("reply_status") == "draft"],
+                    "Rascunhos por rever e enviar")
+                if not property_active(profile):
+                    continue  # an INATIVO property keeps only what is already in its queue
+                name = lambda email: (conversations.get(email) or {}).get("name") or ""
+                add("accepted", "agenda", ref, [visit["name"] for visit in self.pending_visits(ref, today, "visit_accepted")],
+                    "Horas aceites pelo cliente, por confirmar")
+                slots = self.agenda_slots(ref, today)
+                add("check", "agenda", ref, [name(slot["customer"]) for slot in slots
+                                              if slot["at"] < stamp and not (slot.get("check") or {}).get("checked_at")],
+                    "Visitas por registar: veio ou não veio")
+                thanking = {(item.get("recipient") or {}).get("email") for item in emails if item.get("kind") == "visit_thanks"}
+                add("thanks", "agenda", ref, [name(slot["customer"]) for slot in slots
+                                               if (slot.get("check") or {}).get("attended") is True
+                                               and not slot.get("thanks_sent_at") and slot["customer"] not in thanking],
+                    "Agradecimentos pós-visita por criar")
+                proposed = self.proposed_to(load_visits(self.folder, ref))
+                ready, brake = [], []
+                for customer in self.candidates(ref, data):
+                    conversation = conversations[customer["email"]]
+                    if customer["state"] != "ok" or was_proposed(conversation, customer["email"], proposed):
+                        continue
+                    if ficha_summary(conversation.get("ficha"))["complete"]:
+                        ready.append(customer["name"])
+                    elif conversation.get("stage", 0) >= 4:
+                        brake.append(customer["name"])
+                add("ready", "properties", ref, ready, "Ficha completa, sem proposta de visita: incluir na próxima ronda")
+                add("brake", "contacts", ref, brake, "Três pedidos de informação sem ficha completa: decidir se propões visita")
+            reminders = style.get("reminders") or {}
+            gaps = [label for label, done in (
+                ("lembretes de 2 e 4 dias", any((reminders.get(key) or {}).get("text") for key in ("day2", "day4"))),
+                ("visitas fechadas", (style.get("visits_closed") or {}).get("text")),
+                ("pedido de consentimento", (style.get("consent_request") or {}).get("text"))) if not done]
+            if gaps and profiles:
+                tasks.append({"kind": "setup", "tab": "voice", "property_ref": None, "count": len(gaps), "names": [],
+                              "text": "Textos por escrever em Voz e estilo: " + ", ".join(gaps)})
+            tasks.sort(key=lambda task: self.TODO_ORDER.index(task["kind"]))
+            return {"tasks": tasks}
+
     def metrics(self, days=14):
         """Numbers for the dashboard. Of the customers, only first names leave this call: no address or phone.
 
@@ -2036,6 +2150,7 @@ class MailService:
             voice["consent_request"] = (style.get("consent_request") or {}).get("text") or ""
             voice["after_visit"] = (style.get("after_visit") or {}).get("text") or AFTER_VISIT_RULE
             voice["after_visit_template"] = (style.get("after_visit_template") or {}).get("text") or AFTER_VISIT_TEMPLATE
+            voice["visit_reminder"] = (style.get("visit_reminder") or {}).get("text") or VISIT_REMINDER_RULE
             voice["digest_recipient"] = (style.get("digest_recipient") or {}).get("text") or ""
             today = date.today().isoformat()
             properties = []
@@ -2128,7 +2243,8 @@ class MailService:
                 for key, text in texts.items():
                     style.setdefault("reminders", {}).setdefault(key, {}).update(
                         text=text, status="configured" if text else "not_configured")
-            for key, default in (("after_visit", AFTER_VISIT_RULE), ("after_visit_template", AFTER_VISIT_TEMPLATE)):
+            for key, default in (("after_visit", AFTER_VISIT_RULE), ("after_visit_template", AFTER_VISIT_TEMPLATE),
+                                 ("visit_reminder", VISIT_REMINDER_RULE)):
                 if key in choices:
                     text = str(choices.get(key) or "").strip()
                     if len(text) > 5000:
