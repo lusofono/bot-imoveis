@@ -15,6 +15,11 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.39.6 — 26/09/2026
+
+- **90's RacingCar: na rua do fundo passa só o mesmo carro vermelho**, no regresso depois de passar no topo; a
+  lambreta saiu.
+
 ## α.39.5 — 26/09/2026
 
 - **O carro e o barco fazem a volta completa.** No 90's RacingCar, depois de passar no topo para a esquerda, o
