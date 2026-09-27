@@ -7,14 +7,15 @@ const $ = id => document.getElementById(id);
 let state = {properties: []}, settings = null, preview = null;
 
 // Only the visual preference is stored locally; never account or email content.
-const THEMES = ['night', 'day', 'indigo', 'amber', 'racing', 'boat', 'scooter', 'kw'];
+// APalace is first, and the one a browser with no choice saved starts in (27/09).
+const THEMES = ['apalace', 'night', 'day', 'indigo', 'amber', 'racing', 'boat', 'scooter', 'kw'];
 function applyTheme(theme) {
-  const chosen = THEMES.includes(theme) ? theme : 'night';
+  const chosen = THEMES.includes(theme) ? theme : 'apalace';
   document.documentElement.dataset.theme = chosen;
   $('theme-select').value = chosen;
 }
 try { applyTheme(localStorage.getItem('bot-mail-theme')); }
-catch { applyTheme('night'); }
+catch { applyTheme('apalace'); }
 $('theme-select').addEventListener('change', event => {
   applyTheme(event.target.value);
   try { localStorage.setItem('bot-mail-theme', event.target.value); } catch { /* Storage may be unavailable. */ }

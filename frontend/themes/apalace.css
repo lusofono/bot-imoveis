@@ -1,0 +1,89 @@
+/* APalace (theme id "apalace") — the look of the A|Palace site (bgl.pt/apalace): white pages over a faint gold hexagon
+   pattern, black for the menu bar and the footer (here, the sidebar), gold (#c1964f) for what matters, Montserrat
+   capitals with wide spacing for the section labels, cards with 10 px corners and gold pill buttons with black type.
+   The mark is the logo's silver chevron, drawn as SVG. Montserrat and Open Sans are used when the computer has them,
+   else Avenir Next and the system font (the page loads no fonts from outside). Colours only: no instruments, selector
+   or sounds of its own (no entry in SKINS). Everything is under :root[data-theme="apalace"]. */
+
+/* Colours: gold and black from the site; the gold that carries text on white is a darker bronze, to read well */
+:root[data-theme="apalace"]{color-scheme:light;--bg:#fff;--card:#fff;--text:#222;--muted:#555;--line:#e1e1e1;
+  --accent:#86682c;--accent-text:#fff;--accent-soft:#f5ecdc;--ok:#1f6e3c;--ok-bg:#e4f1e8;--warn:#865300;--warn-bg:#fff2d6;
+  --bad:#a3262a;--bad-bg:#fbe6e6;--shadow:0 2px 4px #0000000d;--halo:#0000;--sidebar:#000;--topbar:#fffffff2;
+  --surface-start:#fff;--surface-end:#fff;--input:#fff;--input1:#fff;--quote:#f5f5f5;--control:#fff;--control1:#f5f5f5;
+  --control-border:#ccc;--control-border1:#ccc;--control-border2:#e1e1e1;--hover:#f9f4ea;--hover-border:#c1964f;
+  --placeholder:#8a8a8a;--nav-muted:#ffffff8c;--breadcrumb:#aaa;--selected-start:#f7f0e3;--selected-end:#fbf7ef;
+  --selected-border:#e0caa7;--highlight-start:#fbf6ec;--highlight-end:#fff;--highlight-border:#e0caa7;--brand-start:#000;
+  --brand-end:#000;--brand-border:#c1964f80;--avatar:#c1964f;--avatar-text:#000;--tag-text:#555;--quote-text:#333;
+  --quote-border:#c1964f;--cover-start:#f5f5f5;--cover-mid:#efe6d6;--cover-end:#e0caa7;--cover-text:#86682c;
+  --chart-secondary:#999;--metric-line:#c1964f;--empty-border:#e0caa7;--success-border:#a8d2b5;--success-border1:#a8d2b5;
+  --error-border:#e2a5a5;--warning-border:#e2c07a;--accent-hover:#d0a765;--glow-soft:#0000;--glow-soft1:#0000;
+  --accent-tint:#c1964f1f;--glow:#c1964f33;
+  --ap-gold:#c1964f;--ap-gold-light:#d9b877;--ap-gold-hover:#d0a765;--ap-bronze:#86682c;--ap-silver:#c8d0dc;--ap-black:#000;
+  --ap-display:"Montserrat","Avenir Next","Futura","Helvetica Neue",Arial,sans-serif;
+  --ap-text:"Open Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  scrollbar-color:#c1964f #f5f5f5}
+:root[data-theme="apalace"] ::selection{background:var(--ap-gold);color:#000}
+/* The site's background: a faint hexagon pattern in a light gold, over white */
+:root[data-theme="apalace"] body{font-family:var(--ap-text);background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='34.64' viewBox='0 0 40 34.64'%3E%3Cpath d='M10 0 L30 0 L40 17.32 L30 34.64 L10 34.64 L0 17.32 Z' fill='none' stroke='%23e0caa7' stroke-width='0.7'/%3E%3C/svg%3E") 0 0/40px 34.64px repeat,#fff}
+
+/* Type: Montserrat for the titles; the section labels are the site's gold kicker, in capitals with wide spacing */
+:root[data-theme="apalace"] :is(h1,h2,h3){font-family:var(--ap-display);color:#111}
+:root[data-theme="apalace"] h1{font-weight:600;letter-spacing:-.2px}
+:root[data-theme="apalace"] h2{font-weight:600;letter-spacing:0}
+:root[data-theme="apalace"] .eyebrow{width:fit-content;padding-bottom:5px;border-bottom:1px solid var(--ap-gold);color:var(--ap-bronze);
+  font:600 10px/1.6 var(--ap-display);letter-spacing:.2em;text-transform:uppercase}
+:root[data-theme="apalace"] .ignore-list.black .eyebrow{color:#000;border-bottom-color:#000}
+:root[data-theme="apalace"] .ignore-list.grey .eyebrow{color:#666;border-bottom-color:#999}
+
+/* The sidebar is the site's black menu bar: white capitals, gold for the chosen tab, the silver chevron on top */
+:root[data-theme="apalace"] .sidebar{background:#000;border-right:1px solid #c1964f59;color:#fff}
+:root[data-theme="apalace"] .brand-mark{width:46px;height:40px;border:0;border-radius:0;box-shadow:none;font-size:0;margin-top:0;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 34'%3E%3Cpath d='M6 31 L17.4 6.2 Q20 1.4 22.6 6.2 L34 31' fill='none' stroke='%23c8d0dc' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat}
+:root[data-theme="apalace"] .brand .brand-name{color:#fff;font-family:var(--ap-display);font-weight:600;letter-spacing:.02em}
+:root[data-theme="apalace"] .brand .brand-name span{margin-top:4px;color:var(--ap-gold-light);font:500 10px/1.5 var(--ap-display);
+  letter-spacing:.24em;text-transform:uppercase}
+:root[data-theme="apalace"] :is(.brand-by,.app-build){color:#ffffffa6}
+:root[data-theme="apalace"] .app-version{border-color:#c1964f80;background:#c1964f1a;color:var(--ap-gold-light)}
+:root[data-theme="apalace"] .nav-label{color:#ffffff8c;font-family:var(--ap-display);letter-spacing:.22em}
+:root[data-theme="apalace"] .sidebar .tab{color:#ffffffd9;border-radius:8px;font:500 12px/1.5 var(--ap-display);letter-spacing:.12em;
+  text-transform:uppercase}
+:root[data-theme="apalace"] .sidebar .tab:hover{background:#ffffff12;border-color:#0000;color:#fff}
+:root[data-theme="apalace"] .sidebar .tab.active{background:linear-gradient(90deg,#c1964f33,#c1964f0d);border-color:#c1964f80;
+  color:var(--ap-gold-light);font-weight:600}
+:root[data-theme="apalace"] .sidebar .nav-count{background:var(--ap-gold);color:#000;font-weight:700;letter-spacing:0}
+:root[data-theme="apalace"] .sidebar :focus-visible{outline-color:var(--ap-gold-light)}
+:root[data-theme="apalace"] .sidebar-note{color:#fff}
+:root[data-theme="apalace"] .sidebar-note p{color:#ffffffb3}
+:root[data-theme="apalace"] .sidebar .status-dot{background:var(--ap-gold);box-shadow:0 0 8px #c1964f99}
+:root[data-theme="apalace"] .account-card{border-top-color:#ffffff29}
+:root[data-theme="apalace"] .account-card .muted{color:#ffffffa6}
+:root[data-theme="apalace"] .account-card .avatar{border-radius:50%;font-weight:700}
+@media(max-width:760px){
+  :root[data-theme="apalace"] .sidebar{border-right:0;border-bottom:1px solid #c1964f59}
+  :root[data-theme="apalace"] .sidebar .tab{font-size:10px;letter-spacing:.04em}
+}
+
+/* The header bar: white, a gold hairline below, the page name in Montserrat capitals */
+:root[data-theme="apalace"] .topbar{background:#fffffff2;border-bottom-color:#e0caa7}
+:root[data-theme="apalace"] .topbar strong{color:#000;font:600 12px/1.5 var(--ap-display);letter-spacing:.16em;text-transform:uppercase}
+
+/* Cards: the site's boxes — white, 10 px corners, a light gray rule, a soft shadow; a short gold line on the numbers */
+:root[data-theme="apalace"] :is(.card,.metric){background:#fff;border-color:#e1e1e1;border-radius:10px}
+:root[data-theme="apalace"] .metric:first-child{background:linear-gradient(120deg,var(--highlight-start),var(--highlight-end));
+  border-color:var(--highlight-border)}
+:root[data-theme="apalace"] .metric:first-child::after{box-shadow:none}
+:root[data-theme="apalace"] .metric .value{font-family:var(--ap-display);font-weight:600;color:#111}
+:root[data-theme="apalace"] .metric.ok .value{color:var(--ok)}
+:root[data-theme="apalace"] .metric.warn .value{color:var(--warn)}
+:root[data-theme="apalace"] .metric.bad .value{color:var(--bad)}
+:root[data-theme="apalace"] :is(.workflow,.retro-widget,.ficha-card){border-radius:10px;background:#fff}
+:root[data-theme="apalace"] .retro-clock #clock-time{text-shadow:none;font-weight:600}
+:root[data-theme="apalace"] .tag{border-radius:999px}
+
+/* Buttons: the site's pills — the main ones gold with black capitals, the others white with a gray rule */
+:root[data-theme="apalace"] :is(button,.button):not(.tab,.todo-item,.link){border-radius:999px}
+:root[data-theme="apalace"] :is(button.primary,.button.primary){background:var(--ap-gold);border-color:var(--ap-gold);color:#000;
+  box-shadow:none;font:600 12px/1.5 var(--ap-display);letter-spacing:.1em;text-transform:uppercase}
+:root[data-theme="apalace"] :is(button.primary,.button.primary):hover{background:var(--ap-gold-hover);border-color:var(--ap-gold-hover)}
+:root[data-theme="apalace"] :is(input,select,textarea){border-radius:6px}
+:root[data-theme="apalace"] :is(input,select,textarea):focus{border-color:var(--ap-gold)}

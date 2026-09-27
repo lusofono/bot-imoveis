@@ -3,6 +3,19 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 27/09/2026: o tema APalace, primeiro e de partida (α.52.0)
+
+**Decisão.**
+- **Tema com o aspeto do site da A|Palace** (bgl.pt/apalace), a agência do utilizador: as cores, o padrão de
+  hexágonos, o preto do menu, a Montserrat e as pílulas douradas. O chevron do logótipo é desenhado em SVG na
+  folha de estilo; não entra nenhum ficheiro de imagem.
+- **Passa a ser o primeiro no seletor e o tema de partida** (pedido do utilizador), em vez do Noite: só muda para
+  quem ainda não tem um tema guardado no browser.
+- **O dourado do site (#c1964f) só serve para fundos, filetes e botões;** o texto dourado sobre branco usa um bronze
+  mais escuro (#86682c), porque o dourado original não chega ao contraste mínimo (2,7:1) para texto pequeno.
+- **As letras vêm do computador:** a página não carrega nada de fora (a política de segurança só deixa `'self'`), por
+  isso usa a Montserrat e a Open Sans se estiverem instaladas, e a Avenir Next e a letra do sistema se não.
+
 ## 27/09/2026: o tema KW-Area, com a marca Keller Williams (α.51.0)
 
 **Decisão.**

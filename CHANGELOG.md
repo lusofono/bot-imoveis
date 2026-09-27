@@ -15,6 +15,20 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.52.1 — 27/09/2026
+
+- **KW-Area:** a etiqueta da versão («version: vα…») passa a ter fundo preto, com a letra branca, sobre o vermelho da
+  barra lateral.
+
+## α.52.0 — 27/09/2026
+
+- **Tema novo, «APalace»** (id `apalace`), com o aspeto do site da A|Palace: fundo branco com o padrão de hexágonos
+  dourados, barra lateral preta como o menu do site, com o chevron prateado do logótipo e o separador escolhido a
+  dourado; títulos em Montserrat, etiquetas das secções em maiúsculas espaçadas com um filete dourado, cartões
+  brancos de cantos arredondados e botões principais em pílula dourada com letra preta.
+- **É o primeiro da lista de temas e o tema de partida:** quem ainda não escolheu nenhum neste browser começa no
+  APalace; quem já escolheu um fica com o seu.
+
 ## α.51.0 — 27/09/2026
 
 - **Tema novo, «KW-Area»** (id `kw`), com a identidade da Keller Williams: o vermelho KW (#B40101), os cinzentos e o

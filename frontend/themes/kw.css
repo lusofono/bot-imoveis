@@ -43,7 +43,7 @@
 :root[data-theme="kw"] .brand .brand-name span{color:#ffffffc7;text-transform:uppercase;font-size:11px;letter-spacing:1.6px;
   margin-top:3px}
 :root[data-theme="kw"] :is(.brand-by,.app-build){color:#ffffffb8}
-:root[data-theme="kw"] .app-version{border-color:#ffffff8c;background:#ffffff1f;color:#fff}
+:root[data-theme="kw"] .app-version{border-color:#000;background:#000;color:#fff}
 :root[data-theme="kw"] .nav-label{color:#ffffffb8}
 :root[data-theme="kw"] .sidebar .tab{color:#fffffff0;border-radius:4px}
 :root[data-theme="kw"] .sidebar .tab:hover{background:#ffffff1f;border-color:#0000}
