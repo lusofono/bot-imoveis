@@ -47,6 +47,10 @@ CONTACT_RETENTION_DAYS = 183  # 6 months without consent (decided 21/09); erased
 INACTIVE_AFTER_EMAILS, INACTIVE_AFTER_HOURS = 2, 96  # 26/09: two of ours unanswered, the last four days ago
 HISTORY_LIMIT = 20  # turns kept per conversation, oldest dropped first; also what the prompt gets
 REPORT_SIGNATURE = f"{APP_NAME} Assistente"  # how the ponto de situação signs (27/09), not the agency's voice
+INTERACTION_MARGIN = 0.20  # 27/09: the safety margin on the average cost of an interaction, for quoting a client
+# The client price per 100 interactions is quoted in euros, at this rate (tradingeconomics.com, 27/09/2026). The rest of
+# the page keeps 1 € = 1 US$ (the owner's choice, 24/09). Update it by hand when the dollar moves a lot.
+USD_PER_EUR, USD_PER_EUR_DATE = 1.1382, "2026-09-27"
 # Dashboard chart: period in days → days per bar (90 days per day would be 90 unreadable bars).
 CHART_PERIODS = {3: 1, 7: 1, 14: 1, 30: 1, 90: 7}
 
@@ -259,9 +263,30 @@ class MailService:
             self.log("model_set", model=model)
             return self.ai_settings()
 
-    def ai_settings(self):
-        return {"mode": self.ai_mode(), "model": self.model(),
-                "models": [{"id": model, "input_usd_per_1m": round(rates[0] * 1000, 4), "output_usd_per_1m": round(rates[1] * 1000, 4)}
+    def interaction_cost(self, events=None):
+        """27/09: what an interaction costs here, on average, for quoting a client: every token the API used (replies,
+        files, agenda, analysis, listings), over the emails this folder sent since the API's first call — not the
+        replies the owner wrote in Gmail —, plus INTERACTION_MARGIN. Tokens in and out apart: their prices differ."""
+        events = load_events(self.folder, limit=100000) if events is None else events
+        calls = [event for event in events if event.get("event") == "openai_usage"]
+        first = min((str(event.get("at") or "") for event in calls), default="")
+        sent = sum(1 for event in events if first and event.get("event") == "send" and event.get("status") == "sent"
+                   and event.get("kind") != "direct" and str(event.get("at") or "") >= first)
+        tokens = {key: sum(event.get(key) or 0 for event in calls) for key in ("prompt_tokens", "completion_tokens")}
+        per_100 = {}
+        if sent:
+            average = {key: value / sent * (1 + INTERACTION_MARGIN) for key, value in tokens.items()}
+            per_100 = {model: round(100 * (average["prompt_tokens"] * rates[0] + average["completion_tokens"] * rates[1]) / 1000, 4)
+                       for model, rates in PRICE_PER_1K_USD.items()}
+        return {"interactions": sent, "since": first[:10] or None, **tokens, "margin": INTERACTION_MARGIN, "per_100_usd": per_100,
+                "per_100_eur": {model: round(value / USD_PER_EUR, 4) for model, value in per_100.items()},
+                "usd_per_eur": USD_PER_EUR, "rate_date": USD_PER_EUR_DATE}
+
+    def ai_settings(self, events=None):
+        basis = self.interaction_cost(events)
+        return {"mode": self.ai_mode(), "model": self.model(), "cost_basis": basis,
+                "models": [{"id": model, "input_usd_per_1m": round(rates[0] * 1000, 4), "output_usd_per_1m": round(rates[1] * 1000, 4),
+                            "per_100_usd": basis["per_100_usd"].get(model), "per_100_eur": basis["per_100_eur"].get(model)}
                            for model, rates in PRICE_PER_1K_USD.items() if model in MODELS]}
 
     def extract_listing(self, text, url=None):
@@ -2542,11 +2567,16 @@ class MailService:
     def metrics(self, days=14):
         """Numbers for the dashboard. Of the customers, only first names leave this call: no address or phone.
 
-        days: the chart's period, one of CHART_PERIODS; 3 months are drawn one bar per week, not per day.
+        days: the chart's period, one of CHART_PERIODS; 3 months are drawn one bar per week, not per day. "all"
+        (27/09, «Desde sempre»): from the first day with data, one bar per day up to a month, per week up to half a
+        year, per 30 days after that.
         """
-        if days not in CHART_PERIODS:
-            raise ValueError("Período inválido: escolhe 3, 7, 14, 30 ou 90 dias.")
-        step = CHART_PERIODS[days]
+        if days != "all" and days not in CHART_PERIODS:
+            raise ValueError("Período inválido: escolhe 7, 14, 30 ou 90 dias, ou desde sempre.")
+        everything = days == "all"
+        if everything:
+            days = 1  # set once the log is read, below
+        step = CHART_PERIODS.get(days, 1)
         today = datetime.now(timezone.utc).date()
         first = today - timedelta(days=days - 1)
 
@@ -2565,6 +2595,15 @@ class MailService:
             refs = list(profiles) or [None]
             contacts = load_contacts(self.folder)
             events = load_events(self.folder, limit=100000)  # read once: the chart, the costs and every tank
+            if everything:
+                # The first day anything happened: a customer's email as logged at READ, or something sent.
+                seen = [str(day)[:10] for event in events if event.get("event") == "read"
+                        for day in (event.get("received") or {}).values()]
+                seen += [str(event.get("at") or "")[:10] for event in events if event.get("event") == "send"]
+                start = min((day for day in seen if DAY.fullmatch(day) and day <= today.isoformat()), default=today.isoformat())
+                days = (today - date.fromisoformat(start)).days + 1
+                step = 1 if days <= 31 else 7 if days <= 186 else 30
+                first = date.fromisoformat(start)
             # A customer email, by message ID → the day it arrived. Three sources, most exact first:
             # the day logged at READ; the email still in the queue; a sent reply's time minus the hours the
             # customer waited (older emails that left the queue before READ logged the day).
@@ -2626,6 +2665,8 @@ class MailService:
                                    "photo": bool(ref) and find_photo(self.folder, ref) is not None})
             sent, waited = Counter(), []
             openai_period, openai_all_time, unattributed = Counter(), Counter(), Counter()
+            # 27/09: the wallet's own period, the last 30 days, whatever the chart shows
+            openai_month, month_start = Counter(), (today - timedelta(days=29)).isoformat()
             per = {ref: {"requests": Counter(), "sent": Counter(), "waited": [], "period": Counter(),
                          "all_time": Counter()} for ref in refs}
             for event in events:
@@ -2653,6 +2694,8 @@ class MailService:
                                     completion_tokens=event.get("completion_tokens", 0),
                                     cost_usd=event.get("cost_usd", 0))
                     openai_all_time.update(usage)
+                    if str(event.get("at") or "")[:10] >= month_start:
+                        openai_month.update(usage)
                     in_period = bucket(event.get("at")) is not None
                     if in_period:
                         openai_period.update(usage)
@@ -2692,6 +2735,7 @@ class MailService:
                                for day in starts],
                     "reply_hours": round(sum(waited) / len(waited), 1) if waited else None,
                     "openai_usage": {"period": usage_of(openai_period), "all_time": usage_of(openai_all_time),
+                                     "month": usage_of(openai_month),
                                      "unattributed": usage_of(unattributed)},
                     "api_fuel": self.api_fuel(None, events),
                     "setup": {"account": bool(account), "app_password": has_app_password(self.folder, account),
@@ -2748,7 +2792,7 @@ class MailService:
                                    **{key: profile["property"].get(key) for key in (
                                        "reference", "listing_id", "listing_url", "advertiser", "description",
                                        "advertised_rent_eur", "owner_email")}})
-            return {"account": account, "voice": voice, "properties": properties, "ai": self.ai_settings(),
+            return {"account": account, "voice": voice, "properties": properties, "ai": self.ai_settings(events),
                     "lookback_days": int(self.config().get("lookback_days", 7)),
                     "openai_configured": has_openai_api_key(self.folder, account), "api_fuel": self.api_fuel(None, events)}
 

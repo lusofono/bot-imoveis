@@ -10,10 +10,15 @@ import urllib.request
 
 API_URL = "https://api.openai.com/v1/chat/completions"
 MODELS_URL = "https://api.openai.com/v1/models"
-MODEL_DEFAULT = "gpt-4o-mini"  # 26/09: the default; gpt-4o is the alternative
-# USD per 1K tokens, OpenAI's own published rates when this was written. They change over time and the
+MODEL_DEFAULT = "gpt-4o-mini"  # 26/09: the default; the others are alternatives the owner picks in Voz e estilo
+# USD per 1K tokens (input, output), OpenAI's own published rates when this was written. They change over time and the
 # page always labels a cost built from this table "estimado": treat it as a rough guide, not an invoice.
-PRICE_PER_1K_USD = {"gpt-4o": (0.0025, 0.01), "gpt-4o-mini": (0.00015, 0.0006)}
+# 27/09: six more, from developers.openai.com/api/docs/pricing that day, each tried once with a JSON call like the
+# app's (all answered); gpt-6-astra the same way right after. gpt-5.6-terra's price may be promotional: check it again.
+PRICE_PER_1K_USD = {"gpt-4o": (0.0025, 0.01), "gpt-4o-mini": (0.00015, 0.0006),
+                    "gpt-4.1": (0.002, 0.008), "gpt-4.1-mini": (0.0004, 0.0016), "gpt-4.1-nano": (0.0001, 0.0004),
+                    "gpt-5.6-terra": (0.002, 0.012), "gpt-6-sol": (0.002, 0.01), "gpt-6-luna": (0.0001, 0.0005),
+                    "gpt-6-astra": (0.01, 0.05)}
 PRICE_FALLBACK = PRICE_PER_1K_USD["gpt-4o"]
 # The models the page offers: only those whose price is confirmed in the table above (the owner's rule, 26/09).
 MODELS = tuple(PRICE_PER_1K_USD)

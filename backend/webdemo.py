@@ -763,6 +763,7 @@ def write_site(destination, data, csv, build_day):
     shutil.copy2(FRONTEND / "style.css", destination / "style.css")
     shutil.copytree(FRONTEND / "themes", destination / "themes")
     shutil.copytree(FRONTEND / "sounds", destination / "sounds")
+    shutil.copytree(FRONTEND / "brand", destination / "brand")
     shutil.copy2(SHIM / "demo-api.js", destination / "demo-api.js")
     shutil.copy2(SHIM / "demo.css", destination / "demo.css")
     page = (FRONTEND / "index.html").read_text(encoding="utf-8")

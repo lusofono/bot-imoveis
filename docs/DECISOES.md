@@ -3,10 +3,49 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 27/09/2026, à noite: mais seis modelos, com o preço confirmado (α.58.0)
+
+**Decisão (pedido do utilizador).**
+- **Entram gpt-4.1-nano, gpt-4.1-mini, gpt-4.1, gpt-5.6-terra, gpt-6-luna e gpt-6-sol**, com os preços da página oficial
+  da OpenAI lida a 27/09. A regra de 26/09 (só modelos com preço confirmado) mantém-se: não há gpt-6-terra na página, por
+  isso o «Terra» é o gpt-5.6-terra; o preço dele pode ser promocional e deve ser revisto.
+- **Antes de entrarem, cada um respondeu a uma chamada de teste** em JSON, como as da app (a lista de modelos da conta,
+  sem custo, e uma frase curta, a uma fração de cêntimo). Estas chamadas não contam no depósito nem nas médias.
+- **O preço por 100 interações usa a média de tokens dos modelos já usados;** com um modelo novo, só fica exato depois de
+  algum uso (os modelos que «pensam» gastam mais tokens de saída).
+- **O modelo de partida continua o gpt-4o-mini:** mudar é escolha do dono, na consola.
+- **Na consola, cada modelo com o seu nome abreviado** (4o MINI, 6 SOL…), a pedido do utilizador; os modos tipo
+  «Turbo» ficam para os temas. Entra também o gpt-6-astra: ficam todos os modelos com preço confirmado.
+
+## 27/09/2026, à noite: o preço de 100 interações, por modelo, para propor ao cliente (α.56.0–α.57.0)
+
+**Decisão (pedidos do utilizador).**
+- **A base é a média real deste escritório:** todos os tokens da API (respostas, fichas, agenda, análise, anúncios) a
+  dividir pelos emails enviados desde a primeira chamada. Não contam as respostas escritas pelo dono no Gmail nem os
+  envios falhados. Os tokens de entrada e de saída ficam separados, porque têm preços diferentes.
+- **Mais 20% de margem**, em euros **ao câmbio do dia em que foi posto** (1 € = 1,1382 US$ a 27/09, tradingeconomics;
+  `USD_PER_EUR` em `backend/service.py`, a mudar à mão quando o dólar mexer muito). É uma exceção à regra de 24/09
+  (1 € = 1 US$ no resto da página), porque é o preço que se diz ao cliente.
+- **Arredondado para se propor:** ao cêntimo e, a partir de 0,50 €, aos 5 cêntimos mais próximos (1,77 € fica 1,75 €,
+  pedido do utilizador). O valor exato fica nos dados.
+- **A escolha do modelo passa a uma consola com um botão por modo** (ECO para o gpt-4o-mini, TURBO para o gpt-4o), para
+  mais tarde se juntarem outros modos; com as cores de uma consola escura em todos os temas.
+
+## 27/09/2026, à noite: o depósito da API num mostrador real de duas agulhas (α.55.0)
+
+**Decisão (pedido do utilizador, com uma imagem de referência).**
+- **Um só mostrador por imóvel para as duas coisas que interessam:** o que a API já gastou, a sério (metade esquerda,
+  agulha azul), e o que resta no depósito de tokens (metade direita, agulha vermelha, de E a F). Como os mostradores
+  combinados dos automóveis: as duas escalas sobem do fundo para o topo.
+- **Com as cores de um objeto real, iguais em todos os temas:** aro cromado, fundo branco, escala azul, agulha
+  vermelha. A escala do gasto vai até ao tamanho do depósito, ou mais, quando já se gastou mais do que isso.
+- **Encher faz-se só pelo ícone da bomba, que pergunta o valor:** menos um campo e um botão na página.
+
 ## 27/09/2026, à noite: ARIA, o email do proprietário e o Âmbar de partida (α.54.0)
 
 **Decisão (respostas do utilizador).**
-- **O nome da app passa a ARIA**; o ponto de situação assina «ARIA Assistente». O pacote Python continua `bot_mail`,
+- **O nome da app passa a ARIA** (AI Real Estate Interactions Assistant, by BigLearn.PT; o «©» ao lado do nome
+  explica-o ao passar o rato); o ponto de situação assina «ARIA Assistente». O pacote Python continua `bot_mail`,
   como já acontecia com o nome anterior (22/09).
 - **O email do proprietário fica no imóvel** (`property.owner_email` no `profile.json`, que não entra no Git). Só o
   formulário do imóvel o muda: uma extração do anúncio não o traz e não o apaga.
@@ -14,9 +53,10 @@ e porquê. O código em pausa fica no histórico do Git, na tag `referencia-pyth
   utilizador, que reencaminha com algo seu. Uma vez por dia e por imóvel, seja qual for, para nunca sair em duplicado.
 - **Mantém-se a opção de antes, o resumo de todos para o utilizador**, que decide o que fazer a cada imóvel: junta as
   páginas como estão no bloco de notas, com uma só assinatura, e não as dá por enviadas.
-- **O Âmbar passa a primeiro e a tema de partida:** a interface está a ser simplificada nele (o trabalho de aspeto
-  faz-se e verifica-se só no Âmbar; os outros temas acompanham quando o desenho fechar, para não gastar tokens a
-  adaptar cada passo intermédio).
+- **O Âmbar passa a primeiro e a tema de partida, com o nome «Default»** (α.54.7; o id continua `amber`, para não
+  apagar a escolha guardada nos browsers): a interface está a ser simplificada nele (o trabalho de aspeto faz-se e
+  verifica-se só neste tema; os outros acompanham quando o desenho fechar, para não gastar tokens a adaptar cada passo
+  intermédio).
 
 ## 27/09/2026: o ponto de situação é para o proprietário, um por imóvel (α.53.0)
 

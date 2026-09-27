@@ -425,3 +425,21 @@ def test_a_notice_blocked_before_the_fix_is_repaired_on_the_next_read(service):
     read(service, [])
     [item] = service.pending()["properties"][0]["emails"]
     assert item["blocked"] is None and item["recipient"]["email"] == CUSTOMER
+
+
+def test_desde_sempre_starts_the_chart_at_the_first_day_with_data(service):
+    from datetime import datetime, timedelta, timezone
+    read(service, [lead("1")])
+    with patch("backend.service.has_app_password", return_value=False):
+        today_only = service.metrics("all")
+    assert (today_only["period_days"], today_only["bucket_days"], len(today_only["by_day"])) == (1, 1, 1)
+    old = (datetime.now(timezone.utc).date() - timedelta(days=45)).isoformat()
+    with open(service.folder / "logs" / "events.jsonl", "a", encoding="utf-8") as stream:
+        stream.write(json.dumps({"at": old + "T10:00:00+00:00", "event": "read", "received": {"velho": old}}) + "\n")
+    with patch("backend.service.has_app_password", return_value=False):
+        longer = service.metrics("all")
+    # 46 days: one bar per week, from that first day
+    assert (longer["period_days"], longer["bucket_days"], len(longer["by_day"])) == (46, 7, 7)
+    assert longer["by_day"][0]["day"] == old and longer["by_day"][0]["requests"] == 1
+    with pytest.raises(ValueError, match="Período"):
+        service.metrics(3000)

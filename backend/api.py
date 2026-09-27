@@ -35,7 +35,9 @@ GENERATE_BATCH = 5  # emails per API call in «Gerar respostas»
 ASSETS = {"app.js": "text/javascript", "style.css": "text/css",
           **{f"themes/{sheet.name}": "text/css" for sheet in sorted((FRONTEND / "themes").glob("*.css"))},
           # A skin's recorded sounds (26/09: the 70's Scooter's engine, CC0 — see frontend/sounds/CREDITS.md).
-          **{f"sounds/{clip.name}": "audio/mp4" for clip in sorted((FRONTEND / "sounds").glob("*.m4a"))}}
+          **{f"sounds/{clip.name}": "audio/mp4" for clip in sorted((FRONTEND / "sounds").glob("*.m4a"))},
+          # The company's logo (27/09), big in the corner of Voz e estilo.
+          **{f"brand/{image.name}": "image/png" for image in sorted((FRONTEND / "brand").glob("*.png"))}}
 HEADERS = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
 # pyproject.toml is the one place the version is written; CHANGELOG.md logs what changed at each one.
 VERSION = tomllib.loads((Path(__file__).resolve().parents[1] / "pyproject.toml").read_text())["project"]["version"]
@@ -59,7 +61,7 @@ def web_app(folder, token):
     """The page and its API for one data folder; every API call must carry this start's token."""
     service = MailService(folder)
     # When this process started running this code — not a compiled build, but the closest thing to one here.
-    build_at = datetime.now().astimezone().strftime("%d/%m/%Y, %H:%M")
+    build_at = datetime.now().astimezone().strftime("%d/%m %H:%M")  # 27/09: no year, beside the version
 
     def state():
         try:
@@ -380,7 +382,8 @@ def web_app(folder, token):
                 "prompt/generate": ("POST", generate),
                 "paste": ("POST", paste), "drafts": ("POST", drafts), "preview": ("POST", preview),
                 "send": ("POST", send), "dismiss": ("POST", dismiss),
-                "metrics": ("POST", lambda body: service.metrics(int(body.get("days") or 14))),
+                "metrics": ("POST", lambda body: service.metrics(
+                    "all" if body.get("days") == "all" else int(body.get("days") or 14))),
                 "settings": ("GET", lambda body: service.settings()), "voice": ("POST", voice),
                 "property/prompt": ("POST", property_prompt),
                 "property/parse": ("POST", lambda body: {"fields": parse_listing(str(body.get("text") or ""))}),

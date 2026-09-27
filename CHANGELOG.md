@@ -15,6 +15,142 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.58.2 — 27/09/2026
+
+- **A consola da IA usa os nomes dos próprios modelos, abreviados** (4.1 NANO, 4o MINI, 6 LUNA, 4.1 MINI, 4.1, 4o,
+  5.6 TERRA, 6 SOL, 6 ASTRA), com uma cor por família; os modos tipo «Turbo» ficam para os temas. **Entra também o
+  gpt-6-astra** ($10.00 / $50.00 por 1M tokens, experimentado com uma chamada como os outros): ficam todos os modelos com
+  preço confirmado, e os valores afinam-se com o uso.
+
+## α.58.1 — 27/09/2026
+
+- **A consola da IA mostra o preço oficial de cada modelo como a OpenAI o escreve:** «Input $2.50 · Output $10.00 /
+  1M tokens».
+
+## α.58.0 — 27/09/2026
+
+- **Mais seis modelos na consola da IA, todos com o preço confirmado na página da OpenAI (27/09):** NANO (gpt-4.1-nano,
+  $0.10 / $0.40), ECO+ (gpt-4.1-mini, $0.40 / $1.60), LUNA (gpt-6-luna, $0.10 / $0.50), SPORT (gpt-4.1, $2 / $8), TERRA
+  (gpt-5.6-terra, $2 / $12, talvez promocional) e SOL (gpt-6-sol, $2 / $10), ao lado de ECO (gpt-4o-mini) e TURBO
+  (gpt-4o). Cada um foi experimentado com uma chamada em JSON, como as da app, antes de entrar. Ficam ordenados do mais
+  leve ao mais forte, cada um com a sua cor e o seu preço por 100 interações. O modelo de partida continua o gpt-4o-mini.
+
+## α.57.6 — 27/09/2026
+
+- **Resumo da atividade: nova opção «Desde sempre», a primeira e a de partida.** O gráfico começa no primeiro dia com
+  dados e ajusta as barras: por dia até um mês, por semana até meio ano, por 30 dias depois disso.
+
+## α.57.5 — 27/09/2026
+
+- **O período do gráfico fica com quatro opções: Semana, Quinzena, Mês e Trimestre** (sai «Últimos 3 dias»; um período
+  guardado que já não exista volta à Quinzena).
+
+## α.57.4 — 27/09/2026
+
+- **Carteira do Painel: a linha de baixo é sempre o último mês**, já não o período escolhido no gráfico, em duas
+  linhas: «Último mês: X €» e, por baixo, «N pedidos · T tokens».
+
+## α.57.3 — 27/09/2026
+
+- **A metade do depósito diz «Clicar para mudar os limites de gastos»** ao passar o rato e, ao clicar, pergunta o
+  novo limite (como a bomba, que diz o mesmo). No Painel, a bomba já não leva ao painel do imóvel: muda o limite ali.
+
+## α.57.2 — 27/09/2026
+
+- **Painel: sai «Gasto neste período e desde sempre: … · N pedido(s)»** de ao lado do mostrador; aparece ao passar o
+  rato na metade esquerda (a do gasto).
+
+## α.57.1 — 27/09/2026
+
+- **Painel: sai «Restam X de Y»**, que aparece ao passar o rato na metade direita do mostrador (a do depósito); só um
+  depósito vazio continua a dizê-lo por extenso. **O mostrador diz só «TOKEN$»** (saiu «GASTO €»).
+
+## α.57.0 — 27/09/2026
+
+- **Voz e estilo, «Inteligência artificial»: a escolha do modelo passa a ser uma consola** escura, tipo painel de
+  instrumentos, com **um botão por modelo, como modos: ECO (gpt-4o-mini) e TURBO (gpt-4o)**, cada um com a luz de
+  ativo, um medidor de potência, os preços por milhão de tokens e o **preço por 100 interações**. Por baixo, os
+  mostradores do cálculo: a amostra, a média de tokens, a **margem (+20%)** e o **câmbio (1 € = 1,1382 US$, 27/09)**.
+
+## α.56.1 — 27/09/2026
+
+- **A versão e a hora de arranque passam para o fundo da barra lateral**, por baixo de «Ambiente local», em texto
+  simples (sem selo), com a versão a negrito.
+
+## α.56.0 — 27/09/2026
+
+- **Preço por 100 interações, por modelo**, para propor a um cliente: a média deste escritório (todos os tokens da API
+  sobre os emails enviados desde a primeira chamada, sem os que escreveste no Gmail), mais 20% de margem, em euros ao
+  câmbio do dia (1 € = 1,1382 US$ a 27/09) e arredondado (ao cêntimo, e aos 5 cêntimos a partir de 0,50 €). Hoje:
+  gpt-4o-mini ≈ 0,11 € e gpt-4o ≈ 1,75 € por 100 interações.
+
+## α.55.9 — 27/09/2026
+
+- **O selo da versão fica numa só linha, sem «version:» e sem o ano:** «vα.55.9» e, ao lado, o dia e a hora do
+  arranque («27/09 18:29»).
+
+## α.55.8 — 27/09/2026
+
+- **Voz e estilo: o painel ETIQUETAS passa a ocupar 2/5 da largura** ao lado de «O teu espaço» (era 1/4).
+
+## α.55.7 — 27/09/2026
+
+- **O cérebro da ARIA fica numa peça branca em relevo** (efeito 3D: luz por cima, sombra por baixo).
+
+## α.55.6 — 27/09/2026
+
+- **A versão e a hora de arranque ficam num só selo branco em relevo**, na barra lateral, uma por baixo da outra
+  (eram duas etiquetas).
+
+## α.55.5 — 27/09/2026
+
+- **O símbolo da ARIA passa a ser o cérebro da BigLearn** (`frontend/brand/brain.png`, com fundo transparente), em
+  vez da casinha «⌂».
+
+## α.55.4 — 27/09/2026
+
+- **O «©» ao lado de «ARIA» diz o que o nome quer dizer**, ao passar o rato: «ARIA — AI Real Estate Interactions
+  Assistant by BigLearn.PT».
+
+## α.55.3 — 27/09/2026
+
+- **Barra lateral: «ARIA» mantém o tamanho e ganha um «©» em expoente**; ao passar o rato, diz «© 2026 BigLearn PT —
+  todos os direitos reservados».
+
+## α.55.2 — 27/09/2026
+
+- **Barra lateral: por baixo de «ARIA», «AI for Real Estate»** (era «Assistente»), com a letra 10% mais pequena.
+
+## α.55.1 — 27/09/2026
+
+- **Voz e estilo: o logótipo fica 20% mais pequeno e alinhado com o título** «As tuas palavras. O teu estilo.», à
+  direita. **A legenda das etiquetas (RAG, Prompt, Voz) passa para um painel de 1/4 ao lado de «O teu espaço»**.
+
+## α.55.0 — 27/09/2026
+
+- **O depósito da API passa a ser um mostrador real, com duas agulhas** (como um relógio de automóvel: aro cromado,
+  fundo branco, escala azul): a metade esquerda, com a agulha azul, é o que a API deste imóvel já gastou (€); a
+  metade direita, com a agulha vermelha, é o que resta no depósito de tokens, de E a F, com a reserva a vermelho. No
+  Painel (um por imóvel) e no painel de cada imóvel do tema Default; os temas ricos ficam para a adaptação final.
+- **Encher o depósito é só o ícone da bomba**, ao lado do mostrador: sai o campo «€» com «Encher»; o clique pergunta
+  o valor.
+
+## α.54.9 — 27/09/2026
+
+- **O mostrador do depósito da API diz «TOKEN$»** em vez de «COMBUSTÍVEL», em todos os temas, e o do painel de cada
+  imóvel deixa de ter por baixo «Depósito da API deste imóvel · gastou …».
+
+## α.54.8 — 27/09/2026
+
+- **O logótipo da BigLearn.pt aparece em grande no canto superior direito de «Voz e estilo»**, com a legenda das
+  etiquetas por baixo (`frontend/brand/biglearn.png`, recortado e com o fundo transparente). **Sai o «by BigLearn
+  PT»** da barra lateral.
+
+## α.54.7 — 27/09/2026
+
+- **O tema «Âmbar» passa a chamar-se «Default»** no menu de temas (continua a ser o primeiro e o de partida). Por
+  dentro mantém o id `amber`, para quem já o tinha escolhido não o perder.
+
 ## α.54.6 — 27/09/2026
 
 - **Qualidade (Painel e painel do imóvel): por baixo do ponteiro fica só «N resp.»** (sai o valor, que o ponteiro já

@@ -50,6 +50,10 @@ def test_the_page_is_served_as_its_own_files(page):
     script, style = client.get("/app.js"), client.get("/style.css")
     assert script.headers["content-type"].startswith("text/javascript") and "X-Bot-Mail-Token" in script.text
     assert style.headers["content-type"].startswith("text/css") and "--accent" in style.text
+    # The company's logo (27/09), in the corner of Voz e estilo; no longer «by BigLearn PT» in the sidebar.
+    logo = client.get("/brand/biglearn.png")
+    assert logo.headers["content-type"] == "image/png" and logo.content.startswith(b"\x89PNG")
+    assert 'src="brand/biglearn.png"' in html.text and "by BigLearn PT" not in html.text
     # A rich theme keeps its own stylesheet in frontend/themes/, linked from the page and served as CSS.
     assert '<link rel="stylesheet" href="themes/racing.css">' in html.text
     racing = client.get("/themes/racing.css")
@@ -74,9 +78,10 @@ def test_the_page_is_served_as_its_own_files(page):
     assert '<option value="kw">KW-Area</option>' in html.text and "'kw'" in script.text
     kw = client.get("/themes/kw.css")
     assert kw.headers["content-type"].startswith("text/css") and "--kw-red:#b40101" in kw.text
-    # Âmbar (27/09, evening; APalace before) is the first option and the theme a browser with no saved choice starts in.
+    # «Default» (id amber, once «Âmbar»; 27/09, evening; APalace before) is the first option and the theme a browser
+    # with no saved choice starts in.
     assert '<link rel="stylesheet" href="themes/apalace.css">' in html.text
-    assert '<select id="theme-select" aria-label="Tema visual"><option value="amber">Âmbar</option>' in html.text
+    assert '<select id="theme-select" aria-label="Tema visual"><option value="amber">Default</option>' in html.text
     assert "const THEMES = ['amber'," in script.text and "THEMES.includes(theme) ? theme : 'amber'" in script.text
     assert ':root[data-theme="apalace"]' in client.get("/themes/apalace.css").text
     # A skin's Sons switch starts hidden and off: nothing plays until the owner turns it on.
@@ -439,7 +444,10 @@ def test_only_api_mode_the_model_choice_and_batches_of_five(service, page):
     _, call = page
     status, settings = call("/api/settings")
     assert settings["ai"]["mode"] == "api" and settings["ai"]["model"] == "gpt-4o-mini"
-    assert [model["id"] for model in settings["ai"]["models"]] == ["gpt-4o", "gpt-4o-mini"]  # only with a known price
+    # only models with a known price: the two of 26/09 and the six confirmed on 27/09
+    assert [model["id"] for model in settings["ai"]["models"]] == ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini",
+                                                                   "gpt-4.1-nano", "gpt-5.6-terra", "gpt-6-sol", "gpt-6-luna",
+                                                                   "gpt-6-astra"]
     status, error = call("/api/ai/model", {"model": "gpt-9"})
     assert status == 400 and "Modelo desconhecido" in error["error"]
     status, ai = call("/api/ai/model", {"model": "gpt-4o"})

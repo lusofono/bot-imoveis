@@ -1,6 +1,6 @@
 # ARIA (bot_mail)
 
-ARIA é o nome da app desde 27/09/2026; o pacote Python e os comandos continuam `bot_mail` e `bot-mail`.
+ARIA (AI Real Estate Interactions Assistant, by BigLearn.PT) é o nome da app desde 27/09/2026; o pacote Python e os comandos continuam `bot_mail` e `bot-mail`.
 
 > **Estado a 22/09/2026.** A versão local corre no Mac: backend em Python (Starlette), página em HTML,
 > CSS e JS com um painel de métricas, e MCP local por stdio. Já leu o Gmail real (35 pedidos, todos
@@ -13,7 +13,8 @@ Ferramenta pessoal para responder em lote, com o teu assistente, aos pedidos de 
 por email dos portais.
 
 **Desde α.43.0 (26/09/2026), «Modo: só API»:** a página trabalha só com a API da OpenAI e a tua própria chave.
-O modelo escolhe-se em «Voz e estilo» (`gpt-4o-mini` por defeito, `gpt-4o` como alternativa), um só para tudo, com
+O modelo escolhe-se em «Voz e estilo», numa consola com um botão por modelo, com o nome dele abreviado: 4.1 NANO, 4o MINI (por
+defeito), 6 LUNA, 4.1 MINI, 4.1, 4o, 5.6 TERRA, 6 SOL e 6 ASTRA, cada um com o preço oficial e o preço por 100 interações (a média deste escritório, +20%, em euros). Um só modelo para tudo, com
 o custo contado no depósito de cada imóvel. As Comunicações passam a 3 passos: Selecionar, Gerar e Rever e enviar.
 O copiar/colar do ChatGPT e o MCP ficam **escondidos, não apagados**: o que se descreve abaixo sobre eles volta com
 `"ai_mode": "copy_paste"` no `config.json` (ver `docs/PLANO-VERSAO-LOCAL.md`, «Evolução futura»).
@@ -53,13 +54,13 @@ Abre `http://127.0.0.1:8765` no browser, já com o link certo. É o mesmo que `.
   arrancou, e nenhum outro site aberto no browser consegue ler a fila ou enviar emails por trás.
 - **Arrancar outra vez fecha a página anterior** da mesma pasta de dados; nunca mexe noutros programas.
 - Tem quatro separadores: **Painel** (métricas dos últimos 14 dias, imóveis e estado da configuração),
-  **Respostas**, **Imóveis** e **Voz e estilo**, com quatro temas visuais simples (Noite, Dia, Índigo e Âmbar)
+  **Respostas**, **Imóveis** e **Voz e estilo**, com quatro temas visuais simples (Default, Noite, Dia e Índigo)
   e três temas ricos: o **80's RacingCar** (um cockpit de GT italiano dos anos 80: carbono, nogueira, pele, caixa
   de velocidades como navegação e um quadro de instrumentos por imóvel) e o **90's Boat** (o posto de comando de
   um iate de luxo dos anos 90: casco creme, cromados, teca envernizada nos detalhes, ecrãs azuis e bandeiras de
   sinais nos separadores) e o **70's Scooter** (uma scooter italiana dos anos 70: creme, cromados, verde-menta, as
   riscas dos anos 70 e um punho de mudanças como navegação), e ainda o **KW-Area** (as cores e a sinalética da
-  Keller Williams, só cores e formas) e o **APalace** (o aspeto do site da A|Palace). O **Âmbar** é o primeiro da lista e o tema de partida (desde 27/09: a
+  Keller Williams, só cores e formas) e o **APalace** (o aspeto do site da A|Palace). O **Default** (antes «Âmbar») é o primeiro da lista e o tema de partida (desde 27/09: a
   interface está a ser simplificada nele, e os outros acompanham no fim). Os temas ricos vivem em `frontend/themes/`, cada um com a sua folha de estilo e, quando
   traz palavras, instrumentos, seletor, relógio ou sons próprios, o seu registo em `SKINS` no `app.js`.
 

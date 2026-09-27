@@ -9,7 +9,8 @@ let state = {properties: []}, settings = null, preview = null;
 
 // Only the visual preference is stored locally; never account or email content.
 // APalace is first, and the one a browser with no choice saved starts in (27/09).
-// Âmbar first and the one to start with (27/09): the interface is being simplified in it, the others follow later.
+// «Default» (id amber, once «Âmbar») first and the one to start with (27/09): the interface is being simplified in it,
+// the others follow later.
 const THEMES = ['amber', 'apalace', 'night', 'day', 'indigo', 'racing', 'boat', 'scooter', 'kw'];
 function applyTheme(theme) {
   const chosen = THEMES.includes(theme) ? theme : 'amber';
@@ -1184,10 +1185,10 @@ function chart(days, bucketDays) {
   const column = (value, x, cls, day, what) => value
     ? svg('rect', {x, y: base - Math.max(3, (base - top) * value / most), width: bar,
                    height: Math.max(3, (base - top) * value / most), rx: 2, class: cls},
-          svg('title', {}, `${bucketDays > 1 ? 'Semana de ' : ''}${day.day.slice(8)}/${day.day.slice(5, 7)}: ${value} ${what}`))
+          svg('title', {}, `${bucketDays >= 30 ? '30 dias desde ' : bucketDays > 1 ? 'Semana de ' : ''}${day.day.slice(8)}/${day.day.slice(5, 7)}: ${value} ${what}`))
     : null;
   return svg('svg', {viewBox: `0 0 ${width} ${height}`, class: 'chart', role: 'img',
-                     'aria-label': 'Pedidos recebidos e respostas enviadas por ' + (bucketDays > 1 ? 'semana' : 'dia')},
+                     'aria-label': 'Pedidos recebidos e respostas enviadas por ' + (bucketDays >= 30 ? '30 dias' : bucketDays > 1 ? 'semana' : 'dia')},
     svg('line', {x1: 0, y1: base, x2: width, y2: base, class: 'grid-line'}),
     days.map((day, i) => [
       column(day.requests, i * slot + 2, 'bar-requests', day, 'pedido(s) recebido(s)'),
@@ -1325,7 +1326,7 @@ function renderDashboard(data) {
   $('dashboard-read').textContent = `Última leitura ${ago(data.last_read_at)}`
     + (data.last_read_at ? ` (${when(data.last_read_at)})` : '') + ` · conta ${data.account}`;
   $('dashboard-chart').replaceChildren(chart(data.by_day, data.bucket_days || 1));
-  $('chart-note').textContent = data.bucket_days > 1 ? 'Cada barra soma uma semana.' : '';
+  $('chart-note').textContent = data.bucket_days >= 30 ? 'Cada barra soma 30 dias.' : data.bucket_days > 1 ? 'Cada barra soma uma semana.' : '';
   $('dashboard-properties').replaceChildren(...(data.properties.length ? data.properties.map(item =>
     el('article', {class: 'card property-tile'},
       propertyCover(item.property_ref, item.photo),
@@ -1357,7 +1358,7 @@ function renderDashboard(data) {
 }
 
 async function loadMetrics() {
-  renderDashboard(await call('api/metrics', {days: Number($('chart-period').value) || 14}));
+  renderDashboard(await call('api/metrics', {days: chartDays()}));
   renderTodo(await call('api/todo'));
 }
 
@@ -1395,9 +1396,13 @@ function renderTodo(data) {
         el('span', {'aria-hidden': 'true'}, '→')))))
       : el('p', {class: 'muted small'}, 'Sem emails por tratar, visitas por registar nem clientes à espera. Faz uma nova leitura quando quiseres.'));
 }
-try { $('chart-period').value = localStorage.getItem('bot-mail-period') || '14'; } catch { /* Storage may be unavailable. */ }
+// «Desde sempre» first and by default (27/09): a new key, so a period saved before starts over there too; one that
+// left the menu (3 days) as well.
+try { $('chart-period').value = localStorage.getItem('bot-mail-period-2') || 'all'; } catch { /* Storage may be unavailable. */ }
+if (!$('chart-period').value) $('chart-period').value = 'all';
+const chartDays = () => $('chart-period').value === 'all' ? 'all' : Number($('chart-period').value) || 14;
 $('chart-period').addEventListener('change', event => {
-  try { localStorage.setItem('bot-mail-period', event.target.value); } catch { /* Storage may be unavailable. */ }
+  try { localStorage.setItem('bot-mail-period-2', event.target.value); } catch { /* Storage may be unavailable. */ }
   run(loadMetrics);
 });
 
@@ -1877,6 +1882,71 @@ async function loadSettings() { settings = await call('api/settings'); renderSet
 
 // «Modo: só API» (26/09): on unless config.json says otherwise; the ChatGPT copy/paste stays in the page, hidden.
 function apiOnly() { return (settings?.ai?.mode ?? 'api') === 'api'; }
+// The engines on offer (27/09): each one's own name, short (the car-like modes, TURBO and the like, come later with
+// the themes), its family's colour and how strong it writes (1 to 5, indicative). A model not listed here still gets a
+// button, plain. Every model with a confirmed price is here; the values get tuned as they are used.
+const ENGINE_MODES = {
+  'gpt-4.1-nano': {mode: '4.1 NANO', tone: 'g41', power: 1, note: 'O mais barato: para textos curtos e simples.'},
+  'gpt-4o-mini': {mode: '4o MINI', tone: 'g4o', power: 2, note: 'Rápido e barato: o de partida.'},
+  'gpt-6-luna': {mode: '6 LUNA', tone: 'luna', power: 3, note: 'Geração 6, a mais leve: mais barato que o 4o mini.'},
+  'gpt-4.1-mini': {mode: '4.1 MINI', tone: 'g41', power: 3, note: 'Geração 4.1, gama pequena.'},
+  'gpt-4.1': {mode: '4.1', tone: 'g41', power: 4, note: 'Geração 4.1, completo.'},
+  'gpt-4o': {mode: '4o', tone: 'g4o', power: 4, note: 'Escreve e percebe melhor que o 4o mini; custa bastante mais.'},
+  'gpt-5.6-terra': {mode: '5.6 TERRA', tone: 'terra', power: 4, note: 'Geração 5.6, gama média (preço talvez promocional).'},
+  'gpt-6-sol': {mode: '6 SOL', tone: 'sol', power: 5, note: 'Geração 6, o do dia a dia mais forte, ao preço do 4o.'},
+  'gpt-6-astra': {mode: '6 ASTRA', tone: 'astra', power: 5, note: 'Geração 6, o topo: cinco vezes o preço do 6 sol.'}};
+// The client price: to the cent, and from 0,50 € to the nearest 5 cents, a round number to quote (27/09: 1,77 → 1,75).
+const clientPrice = value => value >= 0.5 ? Math.round(value * 20) / 20 : Math.round(value * 100) / 100;
+function engineConsole() {
+  const ai = settings.ai || {models: []}, basis = ai.cost_basis || {};
+  // Prices as OpenAI writes them (27/09): dollars with a point, two decimals, per 1M tokens
+  const official = value => '$' + value.toFixed(2);
+  const box = el('div', {class: 'engine-console voice-section'});
+  const readout = (label, value) => el('span', {class: 'engine-readout'}, el('b', {}, label), ' ', value);
+  const draw = () => {
+    const current = settings.ai || ai;
+    const button = model => {
+      const info = ENGINE_MODES[model.id] || {mode: 'MODELO', tone: 'plain', power: 0, note: ''};
+      const active = model.id === current.model;
+      return el('button', {type: 'button', class: 'engine-button' + (active ? ' active' : '') + ' mode-' + info.tone,
+        'aria-pressed': String(active), title: info.note, onclick: event => run(async () => {
+          if (active) return;
+          settings.ai = await call('api/ai/model', {model: model.id});
+          applyAiMode(); draw();
+          toast(`Motor ${info.mode}: ${settings.ai.model}. Vale para as respostas, a agenda, a análise e os anúncios.`);
+        }, event.currentTarget)},
+        el('span', {class: 'engine-top'}, el('span', {class: 'engine-mode'}, info.mode),
+          el('span', {class: 'engine-led'}, active ? 'ATIVO' : 'EM ESPERA')),
+        el('span', {class: 'engine-model'}, model.id),
+        el('span', {class: 'engine-meter', 'aria-hidden': 'true'},
+          [1, 2, 3, 4, 5].map(step => el('i', {class: step <= info.power ? 'on' : ''}))),
+        el('span', {class: 'engine-prices'}, `Input ${official(model.input_usd_per_1m)} · Output ${official(model.output_usd_per_1m)} / 1M tokens`),
+        el('span', {class: 'engine-quote'}, model.per_100_eur != null
+          ? `≈ ${eurFormat.format(clientPrice(model.per_100_eur))} / 100 interações` : 'sem uso ainda para calcular'),
+        info.note && el('span', {class: 'engine-note'}, info.note));
+    };
+    box.replaceChildren(
+      el('div', {class: 'engine-head'},
+        el('span', {class: 'engine-title'}, 'AI ENGINE'),
+        el('span', {class: 'engine-status'}, el('i', {}), apiOnly() ? 'MODO: SÓ API' : 'MODO: COPIAR/COLAR + API')),
+      el('div', {class: 'engine-grid'}, (current.models || []).slice()
+        .sort((a, b) => (ENGINE_MODES[a.id]?.power ?? 9) - (ENGINE_MODES[b.id]?.power ?? 9)
+          || a.input_usd_per_1m - b.input_usd_per_1m).map(button)),  // weakest and cheapest first
+      // 27/09: what the «/ 100 interações» stands on, as readouts: the sample, the margin and the exchange rate
+      basis.usd_per_eur ? el('div', {class: 'engine-readouts'},
+        readout('AMOSTRA', basis.interactions ? `${basis.interactions} emails desde ${fullDay(basis.since).slice(0, 5)}` : 'sem uso ainda'),
+        basis.interactions ? readout('MÉDIA', `${Math.round(basis.prompt_tokens / basis.interactions).toLocaleString('pt-PT')} in · `
+          + `${Math.round(basis.completion_tokens / basis.interactions).toLocaleString('pt-PT')} out tokens`) : null,
+        readout('MARGEM', `+${Math.round(basis.margin * 100)}%`),
+        readout('CÂMBIO', `1 € = ${String(basis.usd_per_eur).replace('.', ',')} US$ · ${fullDay(basis.rate_date).slice(0, 5)}`)) : null,
+      el('p', {class: 'engine-basis'}, '«/ 100 interações» é o que 100 emails custam aqui, em média, com a margem e em euros, '
+        + 'arredondado para propor ao cliente (os emails escritos por ti no Gmail não contam). O custo de cada chamada conta '
+        + 'no depósito do imóvel.'));
+  };
+  draw();
+  return box;
+}
+
 function applyAiMode() {
   document.body.classList.toggle('api-only', apiOnly());
   // The workflow's steps are numbered as shown: Selecionar, Gerar, Rever e enviar with the API.
@@ -2639,7 +2709,7 @@ function gauge({key, value, max, red = null, green = null, unit, caption, readou
   needles[key] = target;
   requestAnimationFrame(() => requestAnimationFrame(() => { needle.style.transform = `rotate(${target}deg)`; }));
   return el('figure', {class: `gauge gauge-${size} gauge-${face}` + (role ? ' gauge-' + role : '') + (alert ? ' gauge-alert' : '')},
-    svg('svg', {viewBox: '0 0 200 200', role: 'img', 'aria-label': `${caption}: ${readout}`},
+    svg('svg', {viewBox: '0 0 200 200', role: 'img', 'aria-label': `${caption || unit}: ${readout}`},
       svg('defs', {}, svg('linearGradient', {id: id + '-bezel', x1: 0, y1: 0, x2: 0, y2: 1},
         svg('stop', {offset: '0%', 'stop-color': '#f6f6f6'}), svg('stop', {offset: '50%', 'stop-color': '#7d8186'}),
         svg('stop', {offset: '100%', 'stop-color': '#dcdde0'}))),
@@ -2655,7 +2725,7 @@ function gauge({key, value, max, red = null, green = null, unit, caption, readou
       svg('text', {x: c, y: c + 63.5, class: 'gauge-readout'}, readout),
       needle,
       svg('circle', {cx: c, cy: c, r: 9, class: 'gauge-cap'})),
-    el('figcaption', {}, caption));
+    caption ? el('figcaption', {}, caption) : null);  // a dial may say all on its face (27/09: the API tank)
 }
 
 function odometer(value, label, digits = 4) {
@@ -2683,9 +2753,91 @@ const litresText = litres => litres == null ? '— L' : litres.toLocaleString('p
 // A property's API tank as a fuel gauge: E to F, the red at the empty end (the reserve), needle on what is left.
 function fuelGauge(fuel, key, caption, size = 'small') {
   const capacity = fuel.capacity_eur, left = fuel.configured ? Math.max(0, fuel.remaining_eur) : capacity;
-  return gauge({key, value: left, max: capacity, red: [0, capacity * 0.15], unit: 'combustível', labels: ['E', '½', 'F'],
+  return gauge({key, value: left, max: capacity, red: [0, capacity * 0.15], unit: 'Token$', labels: ['E', '½', 'F'],
     divisions: 2, minor: 4, icon: 'fuel', role: 'fuel', alert: fuel.empty, size,
     readout: fuel.configured ? eurFormat.format(left) : 'sem limite', caption});
+}
+
+// The API tank as a real two-needle gauge (27/09, after the user's reference: a white automotive dial with a chrome
+// bezel, a blue scale and a red needle). The left half is what this property's API has cost so far, in euros (blue
+// needle); the right half is what is left in its token tank, E to F (red needle), with the reserve in red. Both
+// scales rise from the bottom towards the top, like a car's combination gauge; one dial instead of a gauge and a
+// line of text.
+function tankGauge(fuel, usage, key, caption, sizeClass = 'small', onFill = null) {
+  const spent = usage?.all_time?.cost_usd || 0;
+  const id = 'gauge' + (++gaugeCount), c = 100, r = 80, low = 135, high = 12;
+  const capacity = fuel.capacity_eur || 0, left = fuel.configured ? Math.max(0, fuel.remaining_eur ?? 0) : capacity;
+  const spentMax = niceMax(Math.max(capacity, spent || 0, 1));
+  const share = (value, max) => max ? Math.max(0, Math.min(1, value / max)) : 1;
+  const spentAngle = value => -low + (low - high) * share(value, spentMax);
+  const tankAngle = value => low - (low - high) * share(value, capacity);
+  const point = (a, radius) => [c + radius * Math.sin(a * Math.PI / 180), c - radius * Math.cos(a * Math.PI / 180)];
+  const arc = (a1, a2, radius) => {
+    const [x1, y1] = point(a1, radius), [x2, y2] = point(a2, radius);
+    return `M ${x1} ${y1} A ${radius} ${radius} 0 0 1 ${x2} ${y2}`;
+  };
+  const scale = (angleOf, max, labels) => {
+    const marks = [];
+    for (let i = 0; i <= 20; i++) {
+      const a = angleOf(max * i / 20), major = i % 5 === 0;
+      const [x1, y1] = point(a, r - (major ? 13 : 7)), [x2, y2] = point(a, r - 1);
+      marks.push(svg('line', {x1, y1, x2, y2, class: 'real-tick' + (major ? ' major' : '')}));
+      if (i % 10 === 0) {
+        const [x, y] = point(a, r - 25);
+        marks.push(svg('text', {x, y, class: 'real-number'}, labels[i / 10]));
+      }
+    }
+    return marks;
+  };
+  const euros = value => value.toLocaleString('pt-PT', {maximumFractionDigits: 1});
+  const needle = (name, target) => {
+    const node = svg('g', {class: 'gauge-needle real-needle ' + name},
+      svg('path', {d: `M ${c - 2.6} ${c + 16} L ${c - 0.9} ${c - r + 10} L ${c + 0.9} ${c - r + 10} L ${c + 2.6} ${c + 16} Z`}));
+    const memory = key + ':' + name;
+    node.style.transform = `rotate(${needles[memory] ?? (name === 'needle-spent' ? -low : low)}deg)`;
+    needles[memory] = target;
+    requestAnimationFrame(() => requestAnimationFrame(() => { node.style.transform = `rotate(${target}deg)`; }));
+    return node;
+  };
+  const spentText = eurFormat.format(spent || 0), leftText = fuel.configured ? eurFormat.format(left) : 'sem limite';
+  const size = eurFormat.format(capacity);
+  // What each needle says, in words, on hover over its half (27/09: they were lines of text beside the gauge)
+  const spentHover = usage ? spendingText(usage) : `Gasto até hoje: ${spentText}.`;
+  const tankHover = (!fuel.configured ? 'Sem depósito: a via API não tem limite neste imóvel.'
+    : fuel.empty ? 'Vazio: a API está desligada neste imóvel.'
+    : fuel.reserve ? `Na reserva: restam ${leftText} de ${size}.` : `Restam ${leftText} de ${size}.`)
+    + (onFill ? ' Clicar para mudar os limites de gastos.' : '');
+  const half = (sweep, text, click) => {
+    const node = svg('path', {d: `M ${c} 1 A 99 99 0 0 ${sweep} ${c} 199 Z`, class: 'real-hit' + (click ? ' clickable' : '')},
+      svg('title', {}, text));
+    if (click) node.addEventListener('click', click);
+    return node;
+  };
+  const reserve = capacity * 0.15;
+  return el('figure', {class: `gauge gauge-${sizeClass} gauge-fuel gauge-real` + (fuel.empty ? ' gauge-alert' : '')},
+    svg('svg', {viewBox: '0 0 200 200', role: 'img',
+      'aria-label': `${spentHover} ${tankHover}`},
+      svg('defs', {},
+        svg('linearGradient', {id: id + '-bezel', x1: 0, y1: 0, x2: 0, y2: 1},
+          svg('stop', {offset: '0%', 'stop-color': '#fbfbfb'}), svg('stop', {offset: '45%', 'stop-color': '#a9adb3'}),
+          svg('stop', {offset: '100%', 'stop-color': '#eceef0'})),
+        svg('radialGradient', {id: id + '-face', cx: '50%', cy: '42%', r: '62%'},
+          svg('stop', {offset: '0%', 'stop-color': '#ffffff'}), svg('stop', {offset: '80%', 'stop-color': '#f3f5f8'}),
+          svg('stop', {offset: '100%', 'stop-color': '#dfe3e9'}))),
+      svg('circle', {cx: c, cy: c, r: 99, fill: `url(#${id}-bezel)`, class: 'real-bezel'}),
+      svg('circle', {cx: c, cy: c, r: 92, fill: `url(#${id}-face)`, class: 'real-face'}),
+      fuel.configured && reserve > 0 ? svg('path', {d: arc(tankAngle(reserve), tankAngle(0), r - 4), class: 'real-reserve'}) : null,
+      scale(spentAngle, spentMax, ['0', euros(spentMax / 2), euros(spentMax)]),
+      scale(tankAngle, capacity || 1, ['E', '½', 'F']),
+      // under the needles' pivot, the dial's name (27/09: only «TOKEN$»); at the bottom, each needle's value
+      svg('text', {x: c, y: c + 27, class: 'real-label'}, 'TOKEN$'),
+      svg('text', {x: c - 27, y: c + 60, class: 'real-readout spent'}, spentText),
+      svg('text', {x: c + 27, y: c + 60, class: 'real-readout tank'}, leftText),
+      needle('needle-spent', spentAngle(spent || 0)),
+      needle('needle-tank', tankAngle(left)),
+      svg('circle', {cx: c, cy: c, r: 9, class: 'real-cap'}),
+      half(0, spentHover), half(1, tankHover, onFill)),  // on top of everything: the left half spent, the right the tank
+    caption ? el('figcaption', {}, caption) : null);
 }
 
 // Each property has its own tank (settings.properties[].api_fuel); settings.api_fuel is only for a folder
@@ -2722,48 +2874,58 @@ function applyFuel(fuel, ref) {
 
 // The Painel's view of the tanks: one per property, each filled on its own property's panel (Imóveis).
 // What this property spent on the API (26/09): its own numbers under its own tank; the folder's total is below, apart.
-function propertyUsage(usage) {
-  if (!usage) return null;
+function spendingText(usage) {
   const text = item => item.calls ? `${costFormat.format(item.cost_usd)} · ${item.calls} pedido(s)` : 'nada';
   const same = usage.period.calls === usage.all_time.calls && usage.period.cost_usd === usage.all_time.cost_usd;
-  return el('p', {class: 'muted small fuel-usage'}, same ? `Gasto neste período e desde sempre: ${text(usage.all_time)}.`
-    : `Gasto neste período: ${text(usage.period)} · desde sempre: ${text(usage.all_time)}.`);
+  return same ? `Gasto neste período e desde sempre: ${text(usage.all_time)}.`
+    : `Gasto neste período: ${text(usage.period)} · desde sempre: ${text(usage.all_time)}.`;
+}
+
+// Changing a property's spending limit (27/09): from the pump, or a click on its gauge's tank side. Asks how much; from
+// then on the API may spend up to that here, counted from zero. after: what to redraw once it is filled.
+function fillTank(ref, capacity, after, button) {
+  return run(async () => {
+    const answer = prompt(`Limite de gastos de ${ref}: quantos euros? A partir daí, a via API pode gastar até esse `
+      + 'valor neste imóvel (estimativa a partir dos tokens), e o depósito volta a contar do zero.', String(capacity ?? 5));
+    if (answer === null) return;
+    const amount = Number(String(answer).replace(',', '.'));
+    if (!(amount >= 0.5 && amount <= 1000)) throw new Error('Indica um valor entre 0,5 e 1000 €.');
+    const result = await call('api/fuel/fill', {property_ref: ref, capacity_eur: amount});
+    applyFuel(result.fuel, ref);
+    toast(`Depósito de ${ref} cheio: ${eurFormat.format(result.fuel.capacity_eur)}.`);
+    await after();
+  }, button);
 }
 
 // Depósitos (27/09): what the API cost, every property together, in a wallet at the right of the tanks (the totals
-// used to sit under the tanks, one per column, and read as theirs). The chosen period's line says «o mesmo» when
-// everything was spent in it, instead of repeating the numbers.
+// used to sit under the tanks, one per column, and read as theirs), and what it cost in the last month.
 function renderWallet(usage) {
-  const select = $('chart-period');
-  const period = [...select.options].find(option => option.value === select.value)?.textContent || 'No período escolhido';
   const detail = item => `${item.calls} pedido${item.calls === 1 ? '' : 's'} · `
     + `${(item.prompt_tokens + item.completion_tokens).toLocaleString('pt-PT')} tokens`;
-  const total = usage.all_time, recent = usage.period;
-  const same = recent.calls === total.calls && recent.cost_usd === total.cost_usd;
+  const total = usage.all_time, month = usage.month || usage.period;
+  // 27/09: the last month always (not the chart's period), in two lines — what it cost, then requests and tokens
   $('usage-wallet').replaceChildren(...[
     el('div', {class: 'wallet-flap'}, el('p', {class: 'eyebrow'}, 'GASTO TOTAL', el('br'), 'TODOS OS IMÓVEIS')),
     el('strong', {class: 'wallet-total'}, costFormat.format(total.cost_usd || 0)),
     el('p', {class: 'wallet-detail'}, total.calls ? detail(total) + ' · desde sempre' : 'Sem pedidos ainda'),
-    total.calls ? el('p', {class: 'wallet-period'}, `${period}: `
-      + (same ? 'o mesmo.' : recent.calls ? `${costFormat.format(recent.cost_usd)} · ${detail(recent)}.` : 'nada.')) : null]
+    total.calls ? el('p', {class: 'wallet-period'}, el('span', {}, `Último mês: ${costFormat.format(month.cost_usd || 0)}`),
+      el('span', {class: 'wallet-period-detail'}, detail(month))) : null]
     .filter(Boolean));
 }
 
 function renderFuelOverview(metrics) {
   const rows = metrics.properties.filter(item => item.property_ref && item.api_fuel).map(item => {
-    const fuel = item.api_fuel, left = eurFormat.format(Math.max(0, fuel.remaining_eur ?? 0));
-    const size = eurFormat.format(fuel.capacity_eur);
-    const status = !fuel.configured ? 'Sem depósito: a via API não tem limite neste imóvel.'
-      : fuel.empty ? 'Vazio: a API está desligada neste imóvel.' + (apiOnly() ? '' : ' O copiar/colar continua.')
-      : fuel.reserve ? `Na reserva: restam ${left} de ${size}.` : `Restam ${left} de ${size}.`;
+    // 27/09: what was spent and what is left are the gauge's hovers now, one per half; only an empty tank (the API off
+    // here) still says so in words. The pump, or a click on the tank's half, changes the limit right here.
+    const fuel = item.api_fuel, ref = item.property_ref;
+    const fill = button => fillTank(ref, fuel.capacity_eur, loadMetrics, button);
     return el('div', {class: 'fuel-row'},
-      fuelGauge(fuel, 'painel:fuel:' + item.property_ref, item.property_ref, 'mini'),
+      tankGauge(fuel, item.openai_usage, 'painel:fuel:' + ref, ref, 'small', () => fill()),
       el('div', {class: 'fuel-side'},
-        el('p', {class: 'fuel-status' + (fuel.empty ? ' bad' : fuel.reserve ? ' warn' : '')}, status),
-        propertyUsage(item.openai_usage),
-        el('button', {class: 'link', onclick: () => {
-          selectProperty(item.property_ref, 0, false); showPropertiesView('list'); showTab('properties');
-        }}, 'Encher no painel do imóvel →')));
+        fuel.empty && el('p', {class: 'fuel-status bad'},
+          'Vazio: a API está desligada neste imóvel.' + (apiOnly() ? '' : ' O copiar/colar continua.')),
+        el('button', {class: 'link', title: 'Clicar para mudar os limites de gastos', 'aria-label': `Mudar o limite de gastos de ${ref}`,
+          onclick: event => fill(event.currentTarget)}, 'Encher')));
   });
   $('fuel-panel').replaceChildren(...(rows.length ? rows : [fuelGauge(metrics.api_fuel, 'painel:fuel', 'Depósito da API')]));
 }
@@ -2776,7 +2938,7 @@ function panelSignals(data, metrics) {
   return {pending: data.pending, pendingMax: data.pending <= 20 ? 20 : niceMax(data.pending),
     hours: data.reply_hours, hoursMax, hot: data.reply_hours != null && data.reply_hours >= hoursMax,
     perDay: data.by_day.reduce((sum, day) => sum + day.requests, 0) / (metrics.period_days || 14),
-    fuel: data.api_fuel || metrics.api_fuel, spent: data.openai_usage.all_time.cost_usd,
+    fuel: data.api_fuel || metrics.api_fuel, usage: data.openai_usage,
     petrol: data.petrol || {distance_km: null, l_per_100km: 7, trips: 0, planned_trips: 0, km: null, litres: null}};
 }
 // Hours in at most three digits (26/09): 214 h from a hundred up, 45,3 h below; the «h» never wraps away from the number.
@@ -2798,7 +2960,7 @@ function plainInstruments(ref, s) {
       unit: 'horas', divisions: 4, minor: 3, readout: hoursText(s.hours), caption: 'Tempo médio de resposta', alert: s.hot}),
     gauge({key: ref + ':pending', role: 'tach', value: s.pending, max: s.pendingMax, red: [s.pendingMax / 2, s.pendingMax],
       unit: 'emails', size: 'big', face: 'yellow', divisions: 10, minor: 2, readout: String(s.pending), caption: 'Por responder'}),
-    fuelGauge(s.fuel, 'cluster:fuel', `Depósito da API deste imóvel · gastou ${costFormat.format(s.spent)}`),
+    tankGauge(s.fuel, s.usage, 'cluster:fuel', null, 'small', s.onFill),
     petrolGauge(ref, s.petrol, 'Gasolina das visitas')];
 }
 
@@ -2817,7 +2979,7 @@ function carInstruments(ref, s) {
     gauge({key: ref + ':speed', role: 'speedo', value: s.perDay, max: speedMax, unit: 'pedidos / dia', size: 'big',
       divisions: 5, minor: 4, readout: s.perDay.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + ' /dia',
       caption: 'Pedidos por dia'}),
-    fuelGauge(s.fuel, 'cluster:fuel', `Combustível · tokens · gastou ${costFormat.format(s.spent)}`),
+    fuelGauge(s.fuel, 'cluster:fuel'),
     petrolGauge(ref, s.petrol, 'Gasolina · visitas')];
 }
 
@@ -2836,7 +2998,7 @@ function boatInstruments(ref, s) {
     gauge({key: ref + ':speed', role: 'speedo', value: s.perDay, max: speedMax, unit: 'pedidos / dia', size: 'big',
       face: 'white', divisions: 5, minor: 4, readout: s.perDay.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + ' /dia',
       caption: 'Pedidos por dia'}),
-    fuelGauge(s.fuel, 'cluster:fuel', `Depósito · tokens · gastou ${costFormat.format(s.spent)}`),
+    fuelGauge(s.fuel, 'cluster:fuel'),
     petrolGauge(ref, s.petrol, 'Gasolina · visitas')];
 }
 
@@ -2855,7 +3017,7 @@ function scooterInstruments(ref, s) {
     gauge({key: ref + ':pending', role: 'tach', value: s.pending, max: s.pendingMax, red: [s.pendingMax / 2, s.pendingMax],
       unit: 'emails', size: 'big', face: 'cream', divisions: 10, minor: 2, readout: String(s.pending),
       caption: 'Por responder'}),
-    fuelGauge(s.fuel, 'cluster:fuel', `Depósito · tokens · gastou ${costFormat.format(s.spent)}`),
+    fuelGauge(s.fuel, 'cluster:fuel'),
     petrolGauge(ref, s.petrol, 'Gasolina · visitas')];
 }
 
@@ -2874,22 +3036,13 @@ function heatLimit(property, hoursMax) {
     el('button', {class: 'link', onclick: event => save(event.currentTarget)}, 'Guardar'));
 }
 
-// Filling this property's tank, under its fuel gauge: from now on the API may spend up to that here.
+// Filling this property's tank, beside its fuel gauge: only the pump (27/09); a click asks how much. From then on
+// the API may spend up to that here.
 function fuelFill(property, fuel) {
   const ref = property.reference;
-  const input = el('input', {type: 'number', min: 0.5, max: 1000, step: 0.5, value: fuel.capacity_eur,
-    'aria-label': `Valor do depósito de ${ref}, em euros`});
-  const fill = button => run(async () => {
-    const amount = eurFormat.format(Number(input.value) || 0);
-    if (!confirm(`Encher o depósito de ${ref} com ${amount}? A partir de agora, a via API pode gastar até ${amount} `
-        + 'neste imóvel (estimativa a partir dos tokens), e o gasto volta a contar do zero.')) return;
-    const result = await call('api/fuel/fill', {property_ref: ref, capacity_eur: input.value});
-    applyFuel(result.fuel, ref);
-    toast(`Depósito de ${ref} cheio: ${eurFormat.format(result.fuel.capacity_eur)}.`);
-    renderPropertyDashboard(property);
-  }, button);
-  return el('div', {class: 'gauge-setting'}, el('label', {}, input, '€'),
-    el('button', {class: 'link', onclick: event => fill(event.currentTarget)}, 'Encher'));
+  return el('div', {class: 'gauge-setting'}, el('button', {type: 'button', class: 'link pump-button',
+    title: 'Clicar para mudar os limites de gastos', 'aria-label': `Mudar o limite de gastos de ${ref}`,
+    onclick: event => fillTank(ref, fuel.capacity_eur, () => renderPropertyDashboard(property), event.currentTarget)}, 'Encher'));
 }
 
 // The trip computer: the distance from the agency to this property and the car's consumption (saved per
@@ -2920,6 +3073,7 @@ function tripComputer(property, petrol) {
 
 function propertyCluster(property, data, metrics) {
   const ref = property.reference, signals = panelSignals(data, metrics);
+  signals.onFill = () => fillTank(ref, signals.fuel.capacity_eur, () => renderPropertyDashboard(property));
   const unattributed = metrics.openai_usage.unattributed;
   const dials = (skin()?.instruments || plainInstruments)(ref, signals);
   dials.find(dial => dial.classList.contains('gauge-heat'))?.append(heatLimit(property, signals.hoursMax));
@@ -2956,7 +3110,7 @@ function propertyChartCard(property, data, metrics) {
   period.value = $('chart-period').value;
   period.addEventListener('change', () => {  // the same period as the Painel's chart, in both places
     $('chart-period').value = period.value;
-    try { localStorage.setItem('bot-mail-period', period.value); } catch { /* Storage may be unavailable. */ }
+    try { localStorage.setItem('bot-mail-period-2', period.value); } catch { /* Storage may be unavailable. */ }
     renderPropertyDashboard(property);
   });
   return el('article', {class: 'card cluster-chart-card'},
@@ -3069,7 +3223,7 @@ async function renderPropertyDashboard(property, slide = '') {
   const token = renderPropertyDashboard.token = (renderPropertyDashboard.token || 0) + 1;
   await run(async () => {
     const ref = property.reference;
-    const metrics = await call('api/metrics', {days: Number($('chart-period').value) || 14});
+    const metrics = await call('api/metrics', {days: chartDays()});
     const ignored = await call('api/contacts/ignored', {property_ref: ref});
     const round = property.visits?.closed_at ? null : await call('api/visits/round-summary', {property_ref: ref});
     const data = metrics.properties.find(item => item.property_ref === ref);
@@ -3119,19 +3273,10 @@ function renderVoice() {
   const afterVisit = el('textarea', {rows: 5}, settings.voice.after_visit || '');
   const afterVisitTemplate = el('textarea', {rows: 14}, settings.voice.after_visit_template || '');
   const visitReminder = el('textarea', {rows: 5}, settings.voice.visit_reminder || '');
-  const ai = settings.ai || {models: []};
-  const perM = value => '$' + value.toLocaleString('pt-PT', {maximumFractionDigits: 2});
-  const modelSelect = el('select', {'aria-label': 'Modelo da IA', onchange: event => run(async () => {
-    settings.ai = await call('api/ai/model', {model: event.target.value});
-    applyAiMode(); toast(`Modelo: ${settings.ai.model}. Vale para as respostas, a agenda, a análise e os anúncios.`);
-  })}, ai.models.map(model => el('option', {value: model.id, selected: model.id === ai.model},
-    `${model.id} · ${perM(model.input_usd_per_1m)} / ${perM(model.output_usd_per_1m)} por milhão de tokens (entrada / saída)`)));
-  const aiSection = [el('p', {class: 'eyebrow voice-section'}, 'INTELIGÊNCIA ARTIFICIAL · API OPENAI'),
-    el('p', {class: 'step voice-section'}, apiOnly()
-      ? 'Modo: só API (ligado). Um modelo para tudo; o custo de cada chamada conta no depósito do imóvel. O copiar/colar do ChatGPT e o MCP estão desligados.'
-      : 'Modo: copiar/colar ligado no config.json (ai_mode). A API continua disponível ao lado.'),
-    el('label', {class: 'field voice-section'}, 'Modelo', modelSelect)];
-  $('voice-form').replaceChildren(...aiSection, el('p', {class: 'eyebrow'}, 'VOZ ', kind('voice')),
+  // The AI engine (27/09): a console of its own, one button per model, as modes (ECO, TURBO…), each with its prices
+  // and what 100 interactions cost here — the price to quote a client. A click switches the model for everything.
+  const aiSection = [el('p', {class: 'eyebrow voice-section'}, 'INTELIGÊNCIA ARTIFICIAL · API OPENAI'), engineConsole()];
+  $('voice-form').replaceChildren(...aiSection.filter(Boolean), el('p', {class: 'eyebrow'}, 'VOZ ', kind('voice')),
     choice('greeting', 'Saudação'), choice('languages', 'Idiomas'), choice('closing', 'Fecho'),
     el('label', {class: 'field'}, 'Assinatura (sempre igual, sem tradução)', signature),
     el('label', {class: 'field'}, 'Nome do remetente, ao lado do endereço', senderName),
