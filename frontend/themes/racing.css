@@ -370,3 +370,25 @@
 :root[data-theme="racing"] .sound-toggle:not([hidden])+.theme-control{margin-left:0}
 @media(max-width:760px){:root[data-theme="racing"] .sound-toggle{padding:4px 8px;font-size:0;gap:0}}
 :root[data-theme="racing"] :is(button,.button).shortlist-toggle.on{background:linear-gradient(180deg,#ff3b2f,#a30d06);color:#fff;border-color:#5a0400}
+/* The chrome strip between «R» (Voz e estilo) and the gears (27/09) */
+:root[data-theme="racing"] nav .tab[data-tab="voice"]::after{height:3px;border-radius:2px;background:linear-gradient(90deg,#0000,#8d969d 18%,#fff 50%,#8d969d 82%,#0000);box-shadow:0 1px 1px #0004}
+/* The page ends 40 px above the street (96 px) (27/09) */
+:root[data-theme="racing"] main{padding-bottom:136px}
+@media(max-width:760px){:root[data-theme="racing"] main{padding-bottom:136px}}
+
+/* Warning lights under the gearbox (27/09): a black binnacle strip; each telltale dark until it has a reason, then lit
+   in its own colour with a glow (the turn signals blink) */
+:root[data-theme="racing"] .telltales{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:14px 4px 0;padding:10px;border-radius:12px;
+  background:#050506;box-shadow:inset 0 2px 8px #000,0 0 0 1px #2a2a2e,0 1px 0 #ffffff12}
+:root[data-theme="racing"] .telltales button.telltale.telltale{display:grid;place-items:center;width:auto;height:30px;min-height:0;padding:0;border:0;border-radius:6px;
+  background:#0d0d10;box-shadow:inset 0 1px 3px #000;cursor:pointer;transform:none;animation:none}
+:root[data-theme="racing"] .telltale-icon{width:21px;height:21px;fill:none;stroke:#2a2a30;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+:root[data-theme="racing"] .telltale-icon .fill{fill:#2a2a30;stroke:none}
+:root[data-theme="racing"] .telltale-text{font:900 8px/1 system-ui,sans-serif;text-anchor:middle}
+:root[data-theme="racing"] .telltale.lit.green .telltale-icon{stroke:#3ddc84;filter:drop-shadow(0 0 3px #3ddc84)}:root[data-theme="racing"] .telltale.lit.green .fill{fill:#3ddc84}
+:root[data-theme="racing"] .telltale.lit.amber .telltale-icon{stroke:#ffb000;filter:drop-shadow(0 0 3px #ffb000)}:root[data-theme="racing"] .telltale.lit.amber .fill{fill:#ffb000}
+:root[data-theme="racing"] .telltale.lit.red .telltale-icon{stroke:#ff3b30;filter:drop-shadow(0 0 3px #ff3b30)}:root[data-theme="racing"] .telltale.lit.red .fill{fill:#ff3b30}
+:root[data-theme="racing"] .telltale.lit.blue .telltale-icon{stroke:#3b8bff;filter:drop-shadow(0 0 3px #3b8bff)}:root[data-theme="racing"] .telltale.lit.blue .fill{fill:#3b8bff}
+:root[data-theme="racing"] .telltale.blink .telltale-icon{animation:racing-telltale-blink 1s steps(2,start) infinite}
+@keyframes racing-telltale-blink{to{visibility:hidden}}
+@media(prefers-reduced-motion:reduce){:root[data-theme="racing"] .telltale.blink .telltale-icon{animation:none}}

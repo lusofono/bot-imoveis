@@ -69,6 +69,11 @@ def test_the_page_is_served_as_its_own_files(page):
     assert scooter.headers["content-type"].startswith("text/css") and ':root[data-theme="scooter"]' in scooter.text
     assert not any(brand in served.text for served in (html, script, style, racing, boat, scooter)
                    for brand in ("Vespa", "Piaggio", "Lambretta"))
+    # KW-Area is the one theme with a real brand (asked for, 27/09): colours and shapes only, its own stylesheet.
+    assert '<link rel="stylesheet" href="themes/kw.css">' in html.text
+    assert '<option value="kw">KW-Area</option>' in html.text and "'kw'" in script.text
+    kw = client.get("/themes/kw.css")
+    assert kw.headers["content-type"].startswith("text/css") and "--kw-red:#b40101" in kw.text
     # A skin's Sons switch starts hidden and off: nothing plays until the owner turns it on.
     assert re.search(r'<button id="sound-toggle"[^>]*aria-pressed="false"[^>]*\bhidden\b', html.text)
     # The template itself, with its placeholders, is never served; nor is a theme that does not exist.

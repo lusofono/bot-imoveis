@@ -389,3 +389,26 @@
 :root[data-theme="scooter"] :is(button,.button).shortlist-toggle.on{color:#fff;border-color:#7a120c;background:var(--lacquer-rosso)}
 /* The tricolore logo (26/09): «Real Estate» red, «AI ASSISTANT» green, «by BigLearn PT» white and bold */
 :root[data-theme="scooter"] .brand-by{color:#fff;font-weight:800;letter-spacing:.3px;text-shadow:0 1px 2px #13352e99}
+/* The chrome strip between «R» (Voz e estilo) and the gears (27/09) */
+:root[data-theme="scooter"] nav .tab[data-tab="voice"]::after{height:3px;border-radius:2px;background:linear-gradient(90deg,#0000,#8d969d 18%,#fff 50%,#8d969d 82%,#0000);box-shadow:0 1px 1px #0004}
+/* The page ends 40 px above the town and the road (158 px) (27/09) */
+:root[data-theme="scooter"] main{padding-bottom:198px}
+@media(max-width:760px){:root[data-theme="scooter"] main{padding-bottom:198px}}
+
+/* The headset's jewels under the twist grip (27/09): a brushed-metal arc in a chrome rim, and round glass lights — nearly
+   black when off, lit in their colour with a glow: green (headlamp), oil, the black one (neutral), fuel */
+:root[data-theme="scooter"] .telltales{display:flex;justify-content:center;gap:9px;margin:14px 8px 0;padding:10px 12px 12px;border-radius:40px 40px 14px 14px;
+  background:linear-gradient(180deg,#eef1f3,#b9c1c6 55%,#e3e8eb);box-shadow:0 0 0 2px #fff,0 0 0 3.5px #8d969d,inset 0 2px 4px #0003}
+:root[data-theme="scooter"] .telltales button.telltale.telltale{display:grid;place-items:center;width:34px;height:34px;min-height:0;padding:0;border-radius:50%;
+  border:2px solid #8d969d;cursor:pointer;animation:none;transform:none;
+  background:radial-gradient(circle at 36% 28%,#ffffff80 0 10%,#0000 12%),radial-gradient(circle at 50% 55%,#3a3a3a,#0b0b0b 85%);
+  box-shadow:inset 0 -2px 3px #0008,0 1px 2px #0005,0 0 0 1.5px #fff}
+:root[data-theme="scooter"] .telltale-icon{width:19px;height:19px;fill:none;stroke:#1d1d1d;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;opacity:.55}
+:root[data-theme="scooter"] .telltale-icon .fill{fill:#1d1d1d;stroke:none}
+:root[data-theme="scooter"] .telltale-text{font:900 11px/1 var(--display);text-anchor:middle}
+:root[data-theme="scooter"] .telltales button.telltale.lit{box-shadow:inset 0 -2px 3px #0005,0 0 0 1.5px #fff,0 0 12px 2px var(--jewel)}
+:root[data-theme="scooter"] .telltale.lit .telltale-icon{opacity:.85}
+:root[data-theme="scooter"] .telltales button.telltale.lit.green{--jewel:#5dffa0;background:radial-gradient(circle at 36% 28%,#fff 0 10%,#0000 12%),radial-gradient(circle at 50% 55%,#b9ffd6,#29c46a 70%,#127a3e)}
+:root[data-theme="scooter"] .telltales button.telltale.lit.red{--jewel:#ff8a55;background:radial-gradient(circle at 36% 28%,#fff 0 10%,#0000 12%),radial-gradient(circle at 50% 55%,#ffd2b8,#ff6a2a 65%,#b8320f)}
+:root[data-theme="scooter"] .telltales button.telltale.lit.white{--jewel:#fff4c2;background:radial-gradient(circle at 36% 28%,#fff 0 10%,#0000 12%),radial-gradient(circle at 50% 55%,#ffffff,#f1e7c2 65%,#b9ab80)}
+:root[data-theme="scooter"] .telltales button.telltale.lit.yellow{--jewel:#ffd23a;background:radial-gradient(circle at 36% 28%,#fff 0 10%,#0000 12%),radial-gradient(circle at 50% 55%,#fff1a6,#f6c21a 65%,#b88600)}

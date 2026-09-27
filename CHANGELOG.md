@@ -15,6 +15,52 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.51.0 — 27/09/2026
+
+- **Tema novo, «KW-Area»** (id `kw`), com a identidade da Keller Williams: o vermelho KW (#B40101), os cinzentos e o
+  preto do guia de estilo; a barra lateral é a parede vermelha da receção, com «kw» e todo o texto em branco; a barra
+  de cima branca, como no kw.com; os cartões brancos com a faixa vermelha à esquerda da assinatura de email; as
+  etiquetas das secções na faixa vermelha da capa do guia; os botões principais em pílula escura, que ficam vermelhos
+  ao passar o rato. Só cores e formas: os mostradores são os simples, nas cores da KW, e não tem sons.
+
+## α.50.9 — 27/09/2026
+
+- **Barra lateral 15 px mais larga:** 247 px (215 px em janelas até 1150 px); o conteúdo fica onde estava, e os 15 px
+  a mais ocupam a margem interior dele.
+
+## α.50.8 — 27/09/2026
+
+- **O fim da página, em cada tema rico, fica 40 px acima da decoração do fundo:** as ondas do 90's Boat (onde o último
+  cartão ficava por cima do mar), a rua do 80's RacingCar e a vila do 70's Scooter, em qualquer largura de janela.
+
+## α.50.7 — 27/09/2026
+
+- **O separador «Agenda» passa a chamar-se «Visitas», em todos os temas** (menu, título, e os avisos que diziam «vê na
+  Agenda»); o botão «Atualizar agenda» passa a «Atualizar visitas».
+- **Comunicações:** sai a barra de passos do topo (Selecionar · Preparar · Rever e enviar); cada cartão já diz o seu
+  passo.
+
+## α.50.6 — 27/09/2026
+
+- **Comunicações: o texto dos clientes em papel claro e tinta preta, em todos os temas** — também nos escuros (Noite,
+  Índigo, 80's RacingCar): a mensagem do cartão e cada troca do «Email completo» / «Conversa».
+
+## α.50.5 — 27/09/2026
+
+- **Voz e estilo:** a legenda das etiquetas (RAG, Prompt, Voz) passa para o canto superior direito do cabeçalho, em
+  coluna, e deixa de ocupar uma linha por baixo do título; «Copiar/colar» só aparece no modo copiar/colar.
+
+## α.50.4 — 27/09/2026
+
+- **O «R» (Voz e estilo) fica à parte:** 20 px entre ele e o Painel, com um friso a meio — cromado no 80's
+  RacingCar, no 90's Boat e no 70's Scooter; uma linha discreta nos temas simples. No telemóvel não muda.
+
+## α.50.3 — 27/09/2026
+
+- **«Voz e estilo» passa a ser o primeiro separador, antes do Painel, em todos os temas**, e é o **R** (marcha-atrás)
+  onde há números: no 80's RacingCar (separador e caixa de velocidades), no 70's Scooter (o tambor e os botões do
+  punho: R, 1, 2, 3, 4, 5) e no 90's Boat (a bandeira V primeiro no leme). Em todos, o R soa como o Painel.
+
 ## α.50.2 — 27/09/2026
 
 - **80's RacingCar, mudanças:** «Voz e estilo» passa a ser a marcha-atrás (R), na caixa de velocidades e no número do

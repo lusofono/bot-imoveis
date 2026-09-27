@@ -1,0 +1,86 @@
+/* KW-Area (theme id "kw") — the Keller Williams identity for an agent's own workspace: the palette of the style guide
+   (KW Red #B40101, the main, light and medium grays and black), the reception-area signage «matte white on a red wall»
+   for the sidebar, a white header bar as on kw.com, cards with the red strip on the left of the email signature, the
+   section labels as the red band of the guide's cover, and the site's dark pill buttons. Helvetica Neue, as in the
+   guide. The mark is the two letters set in type, not the logo artwork. Colours only: no instruments, selector or
+   sounds of its own (no entry in SKINS), so the dials are the flat ones of the plain themes, in these colours.
+   Everything is under :root[data-theme="kw"]. */
+
+/* Colours: the style guide's palette, with functional greens and ambers only where the page needs them */
+:root[data-theme="kw"]{color-scheme:light;--bg:#f2f2f2;--card:#fff;--text:#111;--muted:#666;--line:#ccc;
+  --accent:#b40101;--accent-text:#fff;--accent-soft:#f6dede;--ok:#1f6e3c;--ok-bg:#e4f1e8;--warn:#865300;--warn-bg:#fff2d6;
+  --bad:#8f0101;--bad-bg:#fbe4e4;--shadow:0 1px 2px #0000000d,0 8px 22px #0000000a;--halo:#0000;--sidebar:#b40101;
+  --topbar:#fffffff5;--surface-start:#fff;--surface-end:#fff;--input:#fff;--input1:#fff;--quote:#f5f5f5;--control:#fff;
+  --control1:#f2f2f2;--control-border:#ccc;--control-border1:#bdbdbd;--control-border2:#ccc;--hover:#f2f2f2;
+  --hover-border:#666;--placeholder:#999;--nav-muted:#ffffffb8;--breadcrumb:#999;--selected-start:#fff;--selected-end:#fff;
+  --selected-border:#fff;--highlight-start:#fff;--highlight-end:#fff;--highlight-border:#ccc;--brand-start:#fff;
+  --brand-end:#fff;--brand-border:#ffffff8c;--avatar:#fff;--avatar-text:#b40101;--tag-text:#4d4d4d;--quote-text:#333;
+  --quote-border:#b40101;--cover-start:#e6e6e6;--cover-mid:#f2f2f2;--cover-end:#ccc;--cover-text:#b40101;
+  --chart-secondary:#999;--metric-line:#ccc;--empty-border:#ccc;--success-border:#a8d2b5;--success-border1:#a8d2b5;
+  --error-border:#e2a5a5;--warning-border:#e2c07a;--accent-hover:#8f0101;--glow-soft:#0000;--glow-soft1:#0000;
+  --accent-tint:#b4010112;--glow:#b4010126;
+  --kw-red:#b40101;--kw-red-deep:#8f0101;--kw-gray:#999;--kw-light:#ccc;--kw-medium:#666;--kw-black:#000;--kw-slate:#2d3040;
+  --kw-font:"Helvetica Neue",Helvetica,Arial,sans-serif;
+  scrollbar-color:#999 #f2f2f2}
+:root[data-theme="kw"] ::selection{background:var(--kw-red);color:#fff}
+:root[data-theme="kw"] body{background:var(--bg);font-family:var(--kw-font)}
+
+/* Type: black and bold, tight, as the headings of kw.com */
+:root[data-theme="kw"] h1{font-family:var(--kw-font);font-weight:700;letter-spacing:-.8px;color:var(--kw-black)}
+:root[data-theme="kw"] h2{font-family:var(--kw-font);font-weight:700;letter-spacing:-.2px;color:var(--kw-black)}
+/* The section labels are the red band of the guide's cover: white capitals on KW Red, square */
+:root[data-theme="kw"] .eyebrow{display:inline-block;width:fit-content;padding:4px 12px;border-radius:0;color:#fff;
+  background:var(--kw-red);font:700 10px/1.6 var(--kw-font);letter-spacing:2px;text-transform:uppercase}
+:root[data-theme="kw"] .ignore-list.black .eyebrow{background:var(--kw-black)}
+:root[data-theme="kw"] .ignore-list.grey .eyebrow{background:var(--kw-medium)}
+
+/* The sidebar is the reception wall: KW Red, the two letters and every word in matte white */
+:root[data-theme="kw"] .sidebar{background:var(--kw-red);border-right:0;color:#fff}
+:root[data-theme="kw"] .brand-mark{width:auto;height:auto;border:0;border-radius:0;background:none;box-shadow:none;font-size:0;
+  margin-top:-4px}
+:root[data-theme="kw"] .brand-mark::after{content:"kw";color:#fff;font:700 34px/1 var(--kw-font);letter-spacing:-2.5px}
+:root[data-theme="kw"] .brand .brand-name{color:#fff;font-family:var(--kw-font)}
+:root[data-theme="kw"] .brand .brand-name span{color:#ffffffc7;text-transform:uppercase;font-size:11px;letter-spacing:1.6px;
+  margin-top:3px}
+:root[data-theme="kw"] :is(.brand-by,.app-build){color:#ffffffb8}
+:root[data-theme="kw"] .app-version{border-color:#ffffff8c;background:#ffffff1f;color:#fff}
+:root[data-theme="kw"] .nav-label{color:#ffffffb8}
+:root[data-theme="kw"] .sidebar .tab{color:#fffffff0;border-radius:4px}
+:root[data-theme="kw"] .sidebar .tab:hover{background:#ffffff1f;border-color:#0000}
+:root[data-theme="kw"] .sidebar .tab.active{background:#fff;color:var(--kw-red);border-color:#fff;font-weight:700;
+  box-shadow:0 2px 8px #0000002e}
+:root[data-theme="kw"] .sidebar .nav-count{background:#ffffff2e;color:#fff;font-weight:700}
+:root[data-theme="kw"] .sidebar .tab.active .nav-count{background:var(--kw-red);color:#fff}
+:root[data-theme="kw"] .sidebar :focus-visible{outline-color:#fff}
+:root[data-theme="kw"] .sidebar-note{color:#fff}
+:root[data-theme="kw"] .sidebar-note p{color:#ffffffc7}
+:root[data-theme="kw"] .sidebar .status-dot{background:#fff;box-shadow:none}
+:root[data-theme="kw"] .account-card{border-top-color:#ffffff47}
+:root[data-theme="kw"] .account-card .muted{color:#ffffffbf}
+:root[data-theme="kw"] .account-card .avatar{border-radius:50%;background:#fff;color:var(--kw-red);font-weight:700}
+
+/* The header bar is kw.com's: white, a hairline below, the page name in black */
+:root[data-theme="kw"] .topbar{background:#fff;border-bottom-color:#e3e3e3}
+:root[data-theme="kw"] .topbar strong{color:var(--kw-black);font-weight:700}
+
+/* Cards: white, nearly square, and the email signature's red strip down the left of the numbers */
+:root[data-theme="kw"] :is(.card,.metric){background:#fff;border-color:#dcdcdc;border-radius:6px}
+:root[data-theme="kw"] .metric{box-shadow:inset 4px 0 0 var(--kw-red),var(--shadow)}
+:root[data-theme="kw"] .metric:first-child{background:#fff;border-color:#dcdcdc}
+:root[data-theme="kw"] .metric::after{display:none}
+:root[data-theme="kw"] .metric .value{font-weight:700;letter-spacing:-1.2px;color:var(--kw-black)}
+:root[data-theme="kw"] .metric.ok .value{color:var(--ok)}
+:root[data-theme="kw"] .metric.warn .value{color:var(--warn)}
+:root[data-theme="kw"] .metric.bad .value{color:var(--bad)}
+:root[data-theme="kw"] :is(.workflow,.retro-widget,.ficha-card){border-radius:6px;background:#fff}
+:root[data-theme="kw"] .retro-clock #clock-time{text-shadow:none;font-weight:700}
+:root[data-theme="kw"] .tag{border-radius:3px}
+
+/* Buttons: kw.com's pills — the main ones dark slate that turn KW Red, the others white with a gray rule */
+:root[data-theme="kw"] :is(button,.button){border-radius:999px;font-family:var(--kw-font)}
+:root[data-theme="kw"] :is(button.primary,.button.primary){background:var(--kw-slate);border-color:var(--kw-slate);color:#fff;
+  box-shadow:none}
+:root[data-theme="kw"] :is(button.primary,.button.primary):hover{background:var(--kw-red);border-color:var(--kw-red)}
+:root[data-theme="kw"] button.link{border-radius:0}
+:root[data-theme="kw"] :is(input,select,textarea){border-radius:4px}
+:root[data-theme="kw"] .theme-control select{border-radius:999px}

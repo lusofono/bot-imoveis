@@ -7,7 +7,7 @@ const $ = id => document.getElementById(id);
 let state = {properties: []}, settings = null, preview = null;
 
 // Only the visual preference is stored locally; never account or email content.
-const THEMES = ['night', 'day', 'indigo', 'amber', 'racing', 'boat', 'scooter'];
+const THEMES = ['night', 'day', 'indigo', 'amber', 'racing', 'boat', 'scooter', 'kw'];
 function applyTheme(theme) {
   const chosen = THEMES.includes(theme) ? theme : 'night';
   document.documentElement.dataset.theme = chosen;
@@ -23,8 +23,9 @@ $('theme-select').addEventListener('change', event => {
   if (settings && !$('tab-properties').hidden) renderPropertySlider();
 });
 let activeTab = 'dashboard', skinSelector = null;
-const TAB_NAMES = {dashboard: 'Painel', replies: 'Centro de Comunicações', properties: 'Imóveis', contacts: 'Contactos', agenda: 'Agenda',
-  voice: 'Voz e estilo'};
+// Voz e estilo first (27/09): the settings are «R», reverse, before the Painel's 1st gear, in every theme.
+const TAB_NAMES = {voice: 'Voz e estilo', dashboard: 'Painel', replies: 'Centro de Comunicações', properties: 'Imóveis',
+  contacts: 'Contactos', agenda: 'Visitas'};  // the tab is «Visitas» since 27/09 (id stays agenda)
 
 // Skins: a rich theme goes beyond colours. It may bring the words on the page headings, the instruments on
 // each property's panel (from the same signals: see panelSignals), a tab selector of its own and an analog
@@ -386,10 +387,10 @@ function twistGrip(box) {
   const gradient = (id, attrs, colours) => svg(attrs.r ? 'radialGradient' : 'linearGradient', {id, ...attrs},
     colours.map(([offset, colour]) => svg('stop', {offset, 'stop-color': colour})));
   const drum = svg('g', {class: 'grip-drum'}, tabs.map((tab, i) =>
-    svg('text', {x: windowX + i * pitch, y: 59, class: 'grip-number'}, String(i + 1))));
+    svg('text', {x: windowX + i * pitch, y: 59, class: 'grip-number'}, tab === 'voice' ? 'R' : String(i))));
   const notches = tabs.map((tab, i) => {
     const notch = svg('g', {class: 'grip-notch', 'data-tab': tab, transform: `translate(${20 + i * 27} 98)`},
-      svg('circle', {r: 9, class: 'grip-notch-ring'}), svg('text', {y: 0.5, class: 'grip-notch-label'}, String(i + 1)),
+      svg('circle', {r: 9, class: 'grip-notch-ring'}), svg('text', {y: 0.5, class: 'grip-notch-label'}, tab === 'voice' ? 'R' : String(i)),
       svg('title', {}, TAB_NAMES[tab]));
     notch.addEventListener('click', () => showTab(tab));
     return notch;
@@ -411,6 +412,7 @@ function twistGrip(box) {
     svg('g', {'clip-path': 'url(#grip-window)'}, drum),
     svg('path', {d: 'M62 38.5l-3.2-4h6.4Z', class: 'grip-pointer'}),
     notches));
+  telltales(box, 'scooter');
   // The drum moves in the SVG's own units (its transform attribute), tweened here: a CSS transform in px went by
   // screen pixels in Safari once the drawing was scaled, and stopped between two numbers (26/09).
   let current = null, drumX = 0, frame = null;
@@ -479,6 +481,7 @@ function gearbox(box) {
         svg('path', {d: 'M-2.6 0h5.2', stroke: '#3a3d42', 'stroke-width': 1.2}))),
     channel('#ffffffa6', 14, {transform: 'translate(0 1.3)'}), channel('#0b0b0c', 12.5), channel('#1d1d20', 6),
     labels, hits, knob));
+  telltales(box, 'car');
   let at = null, timers = [];
   const place = ([x, y]) => { knob.style.transform = `translate(${x}px, ${y}px)`; };
   return {update(tab) {
@@ -500,7 +503,8 @@ function gearbox(box) {
 // Each spoke points at its tab's signal flag (the same flags as the nav); the wheel turns the short way until the
 // open tab's spoke is at the top, under the lubber mark, and the flags stay upright while it turns. A click on a
 // flag changes tab. Like the gearbox, it repeats the nav for the mouse only (aria-hidden).
-const HELM_FLAGS = {  // International Code of Signals, on a 30 × 20 cloth: P, R, I, C, A, V
+const HELM_FLAGS = {  // International Code of Signals, on a 30 × 20 cloth: V (the settings, first), P, R, I, C, A
+  voice: [['rect', {width: 30, height: 20, fill: '#fff'}], ['path', {d: 'M0 0L30 20M30 0L0 20', stroke: '#c8102e', 'stroke-width': 4}]],
   dashboard: [['rect', {width: 30, height: 20, fill: '#1f4fa0'}], ['rect', {x: 10, y: 6.67, width: 10, height: 6.66, fill: '#fff'}]],
   replies: [['rect', {width: 30, height: 20, fill: '#c8102e'}], ['rect', {x: 12.5, width: 5, height: 20, fill: '#ffcc00'}],
     ['rect', {y: 7.5, width: 30, height: 5, fill: '#ffcc00'}]],
@@ -508,7 +512,6 @@ const HELM_FLAGS = {  // International Code of Signals, on a 30 × 20 cloth: P, 
   contacts: [['rect', {width: 30, height: 20, fill: '#1f4fa0'}], ['rect', {y: 4, width: 30, height: 12, fill: '#fff'}],
     ['rect', {y: 8, width: 30, height: 4, fill: '#c8102e'}]],
   agenda: [['path', {d: 'M0 0H15V20H0Z', fill: '#fff'}], ['path', {d: 'M15 0H30L22 10L30 20H15Z', fill: '#1f4fa0'}]],
-  voice: [['rect', {width: 30, height: 20, fill: '#fff'}], ['path', {d: 'M0 0L30 20M30 0L0 20', stroke: '#c8102e', 'stroke-width': 4}]],
 };
 function helm(box) {
   const c = 90, rim = 50, tabs = Object.keys(HELM_FLAGS), step = 360 / tabs.length;
@@ -543,6 +546,7 @@ function helm(box) {
       gradient('helm-dome', {cx: 0.4, cy: 0.35, r: 0.7}, [[0, '#fff'], [0.5, '#c9ced4'], [1, '#7d848c']])),
     svg('path', {d: `M${c - 5} 0H${c + 5}L${c} 7Z`, class: 'helm-lubber'}),
     wheel));
+  boatSensors(box);
   let angle = null;
   return {update(tab) {
     const index = tabs.indexOf(tab);
@@ -555,6 +559,139 @@ function helm(box) {
     for (const flag of flags) flag.cloth.style.transform = `rotate(${-angle}deg)`;
     if (first) { wheel.getBoundingClientRect(); turning.forEach(node => { node.style.transition = ''; }); }
   }};
+}
+
+// 90's Boat, under the helm (27/09): «Sensores a bordo», a 40-foot 1980 motorsailer (ketch, pilothouse) at night, with a
+// sensor on each part of the boat that reads a part of the app — a green, amber or red light that pulses; a click goes to
+// the tab. Radio (masthead): the last Gmail read. Bilge (keel): emails waiting, the water in the bilge. Wheelhouse
+// (windows): drafts ready to send. Engine (hull): the API tanks. Bow (anchor): today's visits. The drawing is fixed,
+// trusted markup; nothing from an email ever goes into it.
+const SAILER = '<defs> <radialGradient id="bs-night" cx="0.5" cy="0.2" r="0.9"><stop offset="0" stop-color="#1c3f6e"/><stop offset="1" stop-color="#0a1a33"/></radialGradient> <linearGradient id="bs-hull" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="0.7" stop-color="#dfe6ee"/><stop offset="1" stop-color="#b9c6d4"/></linearGradient> <linearGradient id="bs-sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a5a8f" stop-opacity="0.9"/><stop offset="1" stop-color="#0a1a33"/></linearGradient> </defs> <rect width="200" height="116" rx="10" fill="url(#bs-night)"/> <g stroke="#dfe6ee" stroke-width="0.5" fill="none" opacity="0.85"> <path d="M66 7 L16 66"/><path d="M66 7 L100 64"/><path d="M66 7 L148 26"/><path d="M148 26 L184 66"/><path d="M148 26 L136 64"/> </g> <path d="M66 7 V66" stroke="#eef2f6" stroke-width="1.6"/> <path d="M148 24 V66" stroke="#eef2f6" stroke-width="1.3"/> <path d="M66 58 H112" stroke="#c9d3de" stroke-width="1.2"/><rect x="67" y="54.5" width="44" height="4" rx="2" fill="#1f4f8a"/> <path d="M148 60 H176" stroke="#c9d3de" stroke-width="1"/><rect x="149" y="57" width="26" height="3.4" rx="1.7" fill="#1f4f8a"/> <path d="M10 64 L184 64 L190 68 C186 78 170 84 150 86 L60 87 C40 86 24 78 10 64 Z" fill="url(#bs-hull)"/> <path d="M22 74 C40 83 60 84.5 90 85 L150 84.5 C168 83 180 78 186 72" fill="none" stroke="#0e3a66" stroke-width="2"/> <path d="M26 77 C44 84.5 62 86 90 86.4 L150 86 C166 85 176 81 183 76" fill="none" stroke="#c8102e" stroke-width="1.1"/> <path d="M84 64 L88 50 L126 50 L132 58 L132 64 Z" fill="#f4f7fa" stroke="#b9c6d4" stroke-width="0.6"/> <path d="M90 52.5 L93.5 52.5 L92.5 58 L88.8 58 Z M96 52.5 L104 52.5 L104 58 L95 58 Z M106.5 52.5 L114.5 52.5 L114.5 58 L106.5 58 Z M117 52.5 L124.8 52.5 L128.5 57.2 L128.5 58 L117 58 Z" fill="#12375f"/> <g stroke="#dfe6ee" stroke-width="0.5"><path d="M14 60 H30 M14 60 V64 M22 60 V64 M30 60 V64"/><path d="M160 60 H186 M186 60 V66 M172 60 V64"/></g> <path d="M0 90 C20 86 40 94 60 90 S100 86 120 90 S160 94 200 89 V116 H0 Z" fill="url(#bs-sea)"/> <path d="M0 92 C24 89 44 96 70 92 S118 88 140 92 S178 95 200 91" fill="none" stroke="#7fb3e0" stroke-width="0.6" opacity="0.7"/>';
+const BOAT_SENSORS = [
+  {key: 'radio', label: 'Rádio', x: 66, y: 7, tab: 'replies'},
+  {key: 'wheelhouse', label: 'Casa do leme', x: 108, y: 55, tab: 'replies'},
+  {key: 'bilge', label: 'Porão', x: 88, y: 83, tab: 'replies'},
+  {key: 'engine', label: 'Motor', x: 118, y: 76, tab: 'properties'},
+  {key: 'bow', label: 'Proa', x: 20, y: 68, tab: 'agenda'},
+];
+function boatSensors(box) {
+  const drawing = svg('svg', {viewBox: '0 0 200 116', class: 'boat-sensors-drawing', role: 'img', 'aria-label': 'Sensores a bordo'});
+  drawing.innerHTML = SAILER;
+  for (const sensor of BOAT_SENSORS) {
+    const dot = svg('g', {class: 'boat-sensor off', 'data-sensor': sensor.key, transform: `translate(${sensor.x} ${sensor.y})`},
+      svg('circle', {r: 7, class: 'boat-sensor-ring'}), svg('circle', {r: 3.2, class: 'boat-sensor-dot'}), svg('title', {}, sensor.label));
+    dot.addEventListener('click', () => showTab(sensor.tab));
+    drawing.append(dot);
+  }
+  box.append(el('div', {class: 'boat-sensors'}, el('p', {class: 'boat-sensors-title'}, 'SENSORES A BORDO'), drawing,
+    el('ul', {class: 'boat-sensors-legend'})));
+  updateSkinPanels();
+}
+// What the skins' panels read (27/09): the boat's sensors, the car's warning lights, the scooter's jewels.
+function appStatus() {
+  const queues = state?.properties || [], emails = queues.flatMap(queue => queue.emails || []);
+  const lastRead = queues.map(queue => queue.last_read_at).filter(Boolean).sort().pop();
+  const tanks = (settings?.properties || []).map(property => property.api_fuel).filter(Boolean);
+  const today = new Date().toLocaleDateString('sv-SE');  // AAAA-MM-DD, local day
+  return {
+    waiting: emails.filter(email => (email.reply_status ?? 'pending') === 'pending' && !email.blocked).length,
+    drafts: emails.filter(email => email.reply_status === 'draft').length,
+    blocked: emails.filter(email => email.blocked).length,
+    uncertain: emails.filter(email => ['sending', 'uncertain'].includes(email.reply_status)).length,
+    lastRead, hours: lastRead ? (Date.now() - new Date(lastRead).getTime()) / 3600000 : null,
+    empty: tanks.some(tank => tank.empty), reserve: tanks.some(tank => tank.reserve && !tank.empty),
+    visits: (settings?.properties || []).flatMap(property => property.visits?.slots || [])
+      .filter(slot => String(slot.at).startsWith(today)).length,
+    model: settings?.ai?.model || '',
+  };
+}
+function updateSkinPanels() { updateBoatSensors(); updateTelltales(); }
+
+// Warning lights (27/09). 80's RacingCar: ten telltales under the gearbox, dark until they have a reason, in their own
+// colour (the turn signals blink). 70's Scooter: the headset's row of round jewels — green, oil, black, fuel. Each
+// says on hover what it reads; a click goes to the tab.
+const TELLTALE_ICONS = {
+  turn: [['path', {d: 'M2 12l6-5.5v11z M22 12l-6-5.5v11z', class: 'fill'}]],
+  low: [['path', {d: 'M11 5.5C7 5.5 4.5 8.4 4.5 12S7 18.5 11 18.5z', class: 'fill'}], ['path', {d: 'M14 8.5l7 2.2M14 12.5l7 2.2M14 16.5l7 2.2'}]],
+  high: [['path', {d: 'M11 5.5C7 5.5 4.5 8.4 4.5 12S7 18.5 11 18.5z', class: 'fill'}], ['path', {d: 'M14 7.5h7M14 10.5h7M14 13.5h7M14 16.5h7'}]],
+  eco: [['text', {x: 12, y: 15.5, class: 'fill telltale-text'}, 'ECO']],
+  engine: [['path', {d: 'M3.5 10h3V8h6v2h3l2.2-2H20v8.5h-2.3l-2.2-2H14v3H8l-2-2H3.5z', class: 'fill'}]],
+  oil: [['path', {d: 'M2.5 11h5.5l2.5-2h4.5l6.5-2.5-5.5 8H5z', class: 'fill'}], ['path', {d: 'M20.6 14.2c0 1.4-.8 2.3-1.4 2.3s-1.4-.9-1.4-2.3l1.4-2z', class: 'fill'}]],
+  fuel: [['path', {d: 'M5 20V5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v15M3.5 20h12M14 9h1.5l2.5 2.5V17a1.4 1.4 0 0 0 2.8 0V8.5L18 6'}], ['rect', {x: 7, y: 6.5, width: 5, height: 4, class: 'fill'}]],
+  battery: [['path', {d: 'M3 8h18v11H3zM6.5 8V6h3v2M14.5 8V6h3v2M6.5 13.5h3M15 13.5h3M16.5 12v3'}]],
+  belt: [['circle', {cx: 12, cy: 5, r: 2.2, class: 'fill'}], ['path', {d: 'M8 21v-7.5L12 9l4 4.5V21M7.5 10.5l9 8'}]],
+  door: [['path', {d: 'M3.5 16.5v-4l2.5-4h11l2.5 4v4zM6.5 16.5v2M17.5 16.5v2M12 12.5l6.5-4.5'}]],
+  headlamp: [['path', {d: 'M11 5.5C7 5.5 4.5 8.4 4.5 12S7 18.5 11 18.5z', class: 'fill'}], ['path', {d: 'M14 8.5l7 2.2M14 12.5l7 2.2M14 16.5l7 2.2'}]],
+  neutral: [['text', {x: 12, y: 16, class: 'fill telltale-text'}, 'N']],
+};
+const TELLTALES = {
+  car: [
+    {key: 'turn', icon: 'turn', tone: 'green', blink: true, tab: 'replies', on: s => s.waiting > 0, text: s => `${s.waiting} por responder`},
+    {key: 'low', icon: 'low', tone: 'green', tab: 'replies', on: s => s.hours != null && s.hours < 1, text: s => 'Gmail: ' + ago(s.lastRead)},
+    {key: 'high', icon: 'high', tone: 'blue', tab: 'agenda', on: s => s.visits > 0, text: s => `${s.visits} visita(s) hoje`},
+    {key: 'eco', icon: 'eco', tone: 'green', tab: 'voice', on: s => s.model === 'gpt-4o-mini', text: s => 'modelo ' + (s.model || '—')},
+    {key: 'engine', icon: 'engine', tone: 'amber', tab: 'replies', on: s => s.blocked > 0, text: s => `${s.blocked} email(s) bloqueado(s)`},
+    {key: 'oil', icon: 'oil', tone: 'red', tab: 'properties', on: s => s.empty, text: s => s.empty ? 'um depósito da API vazio' : 'depósitos com tokens'},
+    {key: 'fuel', icon: 'fuel', tone: 'amber', tab: 'properties', on: s => s.reserve, text: s => s.reserve ? 'depósito da API na reserva' : 'depósitos sem reserva'},
+    {key: 'battery', icon: 'battery', tone: 'red', tab: 'replies', on: s => s.hours == null || s.hours >= 24, text: s => 'Gmail: ' + ago(s.lastRead)},
+    {key: 'belt', icon: 'belt', tone: 'red', tab: 'replies', on: s => s.drafts > 0, text: s => `${s.drafts} rascunho(s) por enviar`},
+    {key: 'door', icon: 'door', tone: 'red', tab: 'replies', on: s => s.uncertain > 0, text: s => `${s.uncertain} envio(s) incerto(s)`},
+  ],
+  scooter: [
+    {key: 'headlamp', icon: 'headlamp', tone: 'green', tab: 'replies', on: s => s.hours != null && s.hours < 24, text: s => 'Gmail: ' + ago(s.lastRead)},
+    {key: 'oil', icon: 'oil', tone: 'red', tab: 'replies', on: s => s.waiting > 0, text: s => `${s.waiting} por responder`},
+    {key: 'neutral', icon: 'neutral', tone: 'white', tab: 'replies', on: s => s.drafts > 0, text: s => `${s.drafts} rascunho(s) por enviar`},
+    {key: 'fuel', icon: 'fuel', tone: 'yellow', tab: 'properties', on: s => s.empty || s.reserve,
+      text: s => s.empty ? 'um depósito da API vazio' : s.reserve ? 'depósito da API na reserva' : 'depósitos com tokens'},
+  ],
+};
+const TELLTALE_NAMES = {turn: 'Setas', low: 'Médios', high: 'Máximos', eco: 'ECO', engine: 'Motor', oil: 'Óleo', fuel: 'Gasolina',
+  battery: 'Bateria', belt: 'Cinto', door: 'Porta', headlamp: 'Farol', neutral: 'Ponto morto'};
+function telltales(box, kind) {
+  const panel = el('div', {class: `telltales telltales-${kind}`, 'data-kind': kind});
+  for (const lamp of TELLTALES[kind]) {
+    const icon = svg('svg', {viewBox: '0 0 24 24', class: 'telltale-icon', 'aria-hidden': 'true'},
+      TELLTALE_ICONS[lamp.icon].map(([tag, attrs, text]) => svg(tag, attrs, text)));
+    panel.append(el('button', {type: 'button', class: `telltale ${lamp.tone}`, 'data-lamp': lamp.key, onclick: () => showTab(lamp.tab)}, icon));
+  }
+  box.append(panel);
+  updateTelltales();
+}
+function updateTelltales() {
+  const panels = document.querySelectorAll('.telltales');
+  if (!panels.length) return;
+  const status = appStatus();
+  for (const panel of panels) {
+    for (const button of panel.querySelectorAll('.telltale')) {
+      const lamp = TELLTALES[panel.dataset.kind].find(item => item.key === button.dataset.lamp);
+      const lit = !!lamp.on(status);
+      button.classList.toggle('lit', lit);
+      button.classList.toggle('blink', lit && !!lamp.blink);
+      button.title = `${TELLTALE_NAMES[lamp.key]}: ${lamp.text(status)}`;
+      button.setAttribute('aria-label', button.title + (lit ? ' (aceso)' : ''));
+    }
+  }
+}
+
+function updateBoatSensors() {
+  const panel = document.querySelector('.boat-sensors');
+  if (!panel) return;
+  const {waiting, drafts, lastRead, hours, empty, reserve, visits} = appStatus();
+  const fuel = empty ? 'red' : reserve ? 'amber' : 'green';
+  const reading = {
+    radio: [hours == null ? 'red' : hours < 1 ? 'green' : hours < 24 ? 'amber' : 'red', 'Gmail: ' + ago(lastRead)],
+    wheelhouse: [drafts ? 'amber' : 'green', drafts ? `${drafts} rascunho(s) por enviar` : 'nada por enviar'],
+    bilge: [waiting === 0 ? 'green' : waiting <= 5 ? 'amber' : 'red', `${waiting} por responder`],
+    engine: [fuel, fuel === 'red' ? 'um depósito da API vazio' : fuel === 'amber' ? 'depósito na reserva' : 'depósitos da API bem'],
+    bow: [visits ? 'blue' : 'off', visits ? `${visits} visita(s) hoje` : 'sem visitas hoje']};
+  for (const dot of panel.querySelectorAll('.boat-sensor')) {
+    const [tone, text] = reading[dot.dataset.sensor], sensor = BOAT_SENSORS.find(item => item.key === dot.dataset.sensor);
+    dot.setAttribute('class', 'boat-sensor ' + tone);
+    dot.querySelector('title').textContent = `${sensor.label}: ${text}`;
+  }
+  panel.querySelector('.boat-sensors-legend').replaceChildren(...BOAT_SENSORS.map(sensor =>
+    el('li', {class: reading[sensor.key][0], onclick: () => showTab(sensor.tab)},
+      el('span', {class: 'boat-sensor-lamp', 'aria-hidden': 'true'}), el('strong', {}, sensor.label), ' ' + reading[sensor.key][1])));
 }
 
 // Emails are untrusted: every value goes in as text, never as HTML.
@@ -694,6 +831,7 @@ function renderState() {
   $('import-status').hidden = true; markStep('import-step', false); markStep('send-step', false);
   updateSelection();
   holdFuelButtons();  // the email cards were just rebuilt (or the queue changed), their API buttons with them
+  updateSkinPanels();
 }
 
 // A sent card: an active customer already answered, until a visit is booked or the owner takes it out.
@@ -1701,6 +1839,7 @@ for (const id of ['queue', 'agenda-property', 'fichas-property']) propertySwitch
 
 function renderSettings() {
   SWITCHERS.forEach(render => render());  // the descriptions come with the settings
+  updateSkinPanels();
   applyAiMode();
   renderVoice();
   $('agency-knowledge').replaceChildren(el('p', {class: 'eyebrow'}, 'KNOW-HOW DA AGÊNCIA ', kind('rag')),
@@ -2248,7 +2387,7 @@ async function syncAgenda() {
   const done = result.properties.map(item => item.skipped ? `${item.property_ref}: ${item.skipped}`
     : `${item.property_ref}: ${item.confirmed} nova(s), ${item.moved} mudada(s) de hora, ${item.accepted} aceite(s) `
       + `por confirmar, ${item.offered} proposta(s) nossa(s)`);
-  toast('Agenda atualizada. ' + done.join(' · '));
+  toast('Visitas atualizadas. ' + done.join(' · '));
 }
 $('agenda-sync').addEventListener('click', event => run(syncAgenda, event.currentTarget));
 $('agenda-sync-here').addEventListener('click', event => run(syncAgenda, event.currentTarget));
@@ -2777,7 +2916,7 @@ function visitorsCard(property) {
       el('div', {}, el('p', {class: 'eyebrow'}, 'QUEM JÁ VISITOU · FINALISTAS'), el('h2', {}, 'Os que vieram à visita')),
       el('span', {class: 'tag'}, `${came.length} visitaram`)),
     came.length ? el('div', {class: 'client-list'}, came.map(row))
-      : el('p', {class: 'muted small'}, 'Ainda ninguém registado como tendo vindo: marca-o na Agenda, depois de cada visita.'),
+      : el('p', {class: 'muted small'}, 'Ainda ninguém registado como tendo vindo: marca-o em Visitas, depois de cada visita.'),
     missed.length ? el('p', {class: 'muted small'}, `Não apareceram: ${missed.map(slot => slot.name || slot.customer).join(', ')}.`) : null);
 }
 
@@ -2899,9 +3038,9 @@ function renderVoice() {
     el('label', {class: 'field'}, 'Pedido de consentimento RGPD, para quem já respondeu', consentRequest),
     el('p', {class: 'eyebrow voice-section'}, 'PÓS-VISITA ', kind('prompt')),
     el('p', {class: 'step voice-section'},
-      'Depois de marcares na Agenda que o cliente apareceu, «Criar agradecimento» põe um rascunho nas Comunicações: o assistente '
+      'Depois de marcares em Visitas que o cliente apareceu, «Criar agradecimento» põe um rascunho nas Comunicações: o assistente '
       + 'escreve-o com estas instruções, no idioma do cliente, com a tua nota pública, o inquérito e a ficha de visita. '
-      + 'O cliente responde ao próprio email; a leitura seguinte guarda as notas na visita dele, na Agenda.'),
+      + 'O cliente responde ao próprio email; a leitura seguinte guarda as notas na visita dele, em Visitas.'),
     el('label', {class: 'field'}, 'Instruções do agradecimento', afterVisit),
     el('label', {class: 'field'}, 'Conteúdo base: inquérito (1 a 5) e ficha de visita — os <…> são preenchidos pelo assistente', afterVisitTemplate),
     el('p', {class: 'eyebrow voice-section'}, 'LEMBRETES DE VISITA ', kind('prompt')),

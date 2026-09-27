@@ -520,7 +520,7 @@ class MailService:
                             # 26/09: the assistant thanks them (see ai.SURVEY_REPLY_RULE), and a bad mark is flagged.
                             item["survey_reply"] = {"alerts": survey_alerts(survey)}
                             item.setdefault("warnings", []).append(
-                                "Resposta ao inquérito pós-visita registada (vê-a na Agenda e no relatório do imóvel).")
+                                "Resposta ao inquérito pós-visita registada (vê-a em Visitas e no relatório do imóvel).")
                             if item["survey_reply"]["alerts"]:
                                 item["warnings"].append("Atenção ao inquérito: " + "; ".join(item["survey_reply"]["alerts"])
                                                         + ". Lê o comentário antes de responder.")
@@ -1668,7 +1668,7 @@ class MailService:
             conversation = data.get("conversations", {}).get(email)
             check = (conversation or {}).get("visit_check") or {}
             if not conversation or check.get("attended") is not True:
-                raise ValueError("Marca primeiro na Agenda que o cliente apareceu na visita.")
+                raise ValueError("Marca primeiro em Visitas que o cliente apareceu na visita.")
             if any(recipient_email(item) == email and item.get("kind") == "visit_thanks" for item in data["emails"]):
                 raise ValueError("O agradecimento a este cliente já está na fila.")
             key = f"pos-visita-{hashlib.sha256((email + check.get('at', '')).encode()).hexdigest()[:12]}"

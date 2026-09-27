@@ -3,6 +3,17 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 27/09/2026: o tema KW-Area, com a marca Keller Williams (α.51.0)
+
+**Decisão.**
+- **Primeiro tema com uma marca real**, a pedido do utilizador, a partir do guia de identidade da KW e do kw.com: as
+  cores do guia, a sinalética «branco mate em parede vermelha» na barra lateral, a faixa vermelha e as pílulas escuras.
+  É uma exceção à regra de 24/09 (sem marcas nos temas, porque a app é vendida): serve para mostrar a app a agentes KW.
+- **As letras «kw» são texto em Helvetica, não o ficheiro do logótipo**, e o tema é só uma folha de estilo
+  (`frontend/themes/kw.css`), sem entrada em `SKINS`: sem palavras, instrumentos nem sons próprios.
+- **Em aberto:** antes de vender a app com este tema visível a quem não é da KW, confirmar com a KW (ou com o
+  market center do cliente) o uso da marca; se for preciso, basta tirar a opção do seletor.
+
 ## 27/09/2026: versão de demonstração em HTML estático, para vender
 
 **Decisão.**
