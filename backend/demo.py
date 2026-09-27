@@ -57,7 +57,7 @@ def create_demo(folder):
         raise ValueError("O destino já existe; escolhe uma pasta nova para a demonstração.")
     now = datetime.now(timezone.utc)
     save_json(folder / "config.json", {**load_json(TEMPLATES / "config.example.json", {}),
-                                        "account": ACCOUNT, "lookback_days": 3})
+                                        "account": ACCOUNT})
     save_json(folder / "voice.json", load_json(TEMPLATES / "voice.example.json", {}))
     events = []
     for number, (ref, description, rent, listing, color) in enumerate(PROPERTIES):

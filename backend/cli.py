@@ -29,7 +29,7 @@ def main(argv=None):
     commands = parser.add_subparsers(dest="action", required=True)
     commands.add_parser("setup")
     commands.add_parser("read").add_argument("--days", type=int,
-                                             help="dias para trás nesta leitura (por omissão, lookback_days)")
+                                             help="recuar pelo menos estes dias nesta leitura (por omissão, desde a última)")
     commands.add_parser("stdio", help="MCP local por stdio, para um assistente neste computador")
     commands.add_parser("password", help="guarda só a App Password do Gmail, sem repetir o resto do setup")
     commands.add_parser("openai-key", help="guarda a chave OpenAI, opcional, para «Gerar respostas via API»")
@@ -76,14 +76,11 @@ def main(argv=None):
             mailbox = ask("Pasta: all ou inbox", cfg.get("mailbox", "all"))
             if mailbox not in ("all", "inbox"):
                 raise ValueError("Pasta inválida.")
-            lookback = int(ask("Dias da primeira leitura", str(cfg.get("lookback_days", 2))))
-            if lookback < 0:
-                raise ValueError("Dias inválidos.")
             password = getpass.getpass("Google App Password (Enter mantém a existente): ")
             if password:
                 save_password(folder, account, password)
-            cfg.update(account=account, subject_contains=subject, mailbox=mailbox,
-                       lookback_days=lookback, incoming_only=True)
+            cfg.update(account=account, subject_contains=subject, mailbox=mailbox, incoming_only=True)
+            cfg.pop("lookback_days", None)  # 27/09: the first read goes back FIRST_READ_DAYS (or as the property says)
             save_json(folder / "config.json", cfg)
             from .configure import configure_properties, configure_voice, yes
             if (folder / "voice.json").exists() or yes("Esta pasta trabalha por imóveis (avisos de portais como o Idealista)?"):

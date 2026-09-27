@@ -821,15 +821,18 @@ function renderState() {
     (queue.property_ref ?? 'Todos') + (queue.inactive ? ' (inativo)' : ''))));
   if ([...select.options].some(option => option.value === chosen)) select.value = chosen;
   const queue = currentQueue();
-  $('last-read').textContent = queue?.last_read_at ? 'Última leitura: ' + when(queue.last_read_at) : '';
+  // 27/09: no «Dias para trás» — each read goes on from the last one; a new property's first one from the day it chose.
+  $('last-read').textContent = queue?.last_read_at ? `Última leitura: ${when(queue.last_read_at)}. A próxima traz o que chegou desde então.`
+    : queue?.read_from ? `Ainda por ler: a primeira leitura traz os emails desde ${dayLabel(queue.read_from)}.` : '';
   const emails = queue?.emails || [];
   $('emails').replaceChildren(...(emails.length ? emails.map(card)
-    : [el('div', {class: 'empty-state'}, el('strong', {}, state.error ? 'Configuração pendente' : 'Tudo em dia.'), state.error ? 'Verifica o aviso acima para continuar.' : 'Não há emails pendentes. Faz uma nova leitura quando quiseres.')]));
+    : [el('div', {class: 'empty-state'}, el('strong', {}, state.error ? 'Configuração pendente' : 'Tudo em dia.'), state.error ? 'Verifica o aviso acima para continuar.' : 'Não há emails em tratamento. Faz uma nova leitura quando quiseres.')]));
   const active = queue?.active || [];
   $('active-cards').replaceChildren(...(active.length ? [
     el('div', {class: 'section-heading active-heading'}, el('h2', {}, 'Enviados · clientes ativos'), el('span', {class: 'tag'}, String(active.length))),
     el('p', {class: 'step'}, 'Já respondidos, pela página ou no teu Gmail. Ficam aqui até haver visita marcada ou até os retirares; «Escrever mais» abre um rascunho na conversa do cliente.'),
     ...active.map(activeCard)] : []));
+  renderPipeline(queue);  // after the cards: its names go to them
   $('instructions').textContent = queue?.instructions || '';
   preview = null; $('preview-box').replaceChildren();
   // A fresh batch of emails makes any earlier "done" (import, send) stale: back to work, not finished.
@@ -839,12 +842,79 @@ function renderState() {
   updateSkinPanels();
 }
 
+// 27/09: where each customer of the property stands, one column each (the furthest they got), a name per line;
+// «Desistiu» (declined the visit) greyed at the end. Under the table, only counted, the many that would make it long:
+// «Sem resposta», the greylist and the blacklist, whose names open there in a line that wraps. The dots say what
+// needs doing, as set in Voz e estilo, each on its own hover; a name with a card below scrolls to it.
+const PIPELINE = [
+  ['contacto', '1.º contacto', 'Pediram informação e ainda não lhes respondemos.'],
+  ['i1', '1.ª', '1.ª interação: já lhes respondemos uma vez.'],
+  ['i2', '2.ª', '2.ª interação.'],
+  ['i3', '3.ª', '3.ª interação.'],
+  ['i4', 'Mais de 3', 'Mais de três interações.'],
+  ['marcada', 'Visita marcada', 'Têm visita na agenda.'],
+  ['visitou', 'Visitou', 'Já visitaram o imóvel.'],
+  ['shortlist', 'Short list', 'Na short list de Visitas (com os escolhidos e os suplentes).'],
+  ['desistiu', 'Desistiu', 'Recusaram a visita.']];
+const PIPELINE_ASIDE = new Set(['desistiu']);
+const PIPELINE_BELOW = [
+  ['sem_resposta', 'Sem resposta', 'o nosso último email está sem resposta há 3 dias ou mais, seja qual for a interação'],
+  ['greylist', 'Greylist', 'ignorados por agora: disseram que não têm interesse; se voltarem a escrever, entram com um aviso'],
+  ['blacklist', 'Blacklist', 'ignorados sempre: nada do que escrevem volta a entrar']];
+const belowOpen = {};  // which of those lines show their names, kept while the page redraws
+function dotMeaning(color) {
+  const hours = settings?.voice?.alerts || {our_turn_hours: 48, no_visit_hours: 96};
+  return {orange: `à espera de resposta nossa há mais de ${hours.our_turn_hours} h`,
+    red: 'nunca nos respondeu, ou respondeu sem nada do que pedimos',
+    blue: `ficha completa há mais de ${hours.no_visit_hours} h e ainda sem data de visita`,
+    green: 'ficha completa: já sabemos tudo dele'}[color];
+}
+function shortName(name) {  // first name and surname: «Ana Maria Exemplo» → «Ana Exemplo»
+  const words = String(name || '').trim().split(/\s+/).filter(Boolean);
+  return words.length > 2 ? `${words[0]} ${words[words.length - 1]}` : words.join(' ');
+}
+function renderPipeline(queue) {
+  const customers = queue?.pipeline || [], box = $('pipeline');
+  box.hidden = !customers.length;
+  if (!customers.length) { box.replaceChildren(); return; }
+  const columns = PIPELINE.map(([key]) => customers.filter(customer => customer.column === key));
+  const rows = Math.max(0, ...columns.map(list => list.length));
+  const name = customer => {
+    const target = document.querySelector(`[data-customer="${CSS.escape(customer.email)}"]`);
+    const title = [customer.name || customer.email, customer.last_at && 'último contacto ' + when(customer.last_at),
+      customer.selection && SELECTION_LABEL[customer.selection]].filter(Boolean).join(' · ');
+    // 27/09: no legend under the table — each dot says what it means on its own hover
+    const parts = [...(customer.dots || []).map(color => el('span', {class: 'pipeline-dot ' + color, title: dotMeaning(color),
+      role: 'img', 'aria-label': dotMeaning(color)})), shortName(customer.name) || customer.email];
+    return target ? el('button', {type: 'button', class: 'pipeline-name', title, onclick: () => {
+      target.scrollIntoView({behavior: 'smooth', block: 'center'});
+      target.classList.add('flash'); setTimeout(() => target.classList.remove('flash'), 1600);
+    }}, ...parts) : el('span', {class: 'pipeline-name', title}, ...parts);
+  };
+  const below = PIPELINE_BELOW.map(([key, label, hint]) => {
+    const list = customers.filter(customer => customer.column === key);
+    return list.length && el('details', {class: 'pipeline-below', open: !!belowOpen[key],
+      ontoggle: event => { belowOpen[key] = event.currentTarget.open; }},
+      el('summary', {}, label + ' ', el('strong', {}, String(list.length)), el('span', {class: 'muted small'}, ' · ' + hint)),
+      // 27/09: on the greylist and the blacklist, the reason after the name, when there is one
+      el('div', {class: 'pipeline-below-names'}, list.map(customer => customer.reason
+        ? el('span', {class: 'pipeline-entry'}, name(customer), el('span', {class: 'muted small'}, ' — ' + customer.reason))
+        : name(customer))));
+  });
+  box.replaceChildren(el('div', {class: 'pipeline-scroll'}, el('table', {class: 'pipeline', 'aria-label': 'Clientes por fase'},
+    el('thead', {}, el('tr', {}, PIPELINE.map(([key, label, hint], index) => el('th', {scope: 'col', title: hint,
+      class: PIPELINE_ASIDE.has(key) ? 'aside' : ''}, label, el('span', {class: 'pipeline-count'}, String(columns[index].length)))))),
+    el('tbody', {}, Array.from({length: rows}, (_, row) => el('tr', {}, columns.map((list, index) =>
+      el('td', {class: PIPELINE_ASIDE.has(PIPELINE[index][0]) ? 'aside' : ''}, list[row] && name(list[row])))))))),
+    ...below.filter(Boolean));
+}
+
 // A sent card: an active customer already answered, until a visit is booked or the owner takes it out.
 function activeCard(active) {
   const act = (path, message) => run(async () => {
     state = (await call(path, {property_ref: queueRef(), email: active.email})).state; renderState(); toast(message);
   });
-  return el('article', {class: 'card email-card sent-card'},
+  return el('article', {class: 'card email-card sent-card', 'data-customer': active.email},
     el('div', {class: 'card-head'},
       el('span', {class: 'who'}, el('strong', {}, active.name || active.email)),
       el('span', {class: 'tag sent'}, 'enviado'),
@@ -853,10 +923,9 @@ function activeCard(active) {
       active.visit && el('span', {class: 'tag warn'}, VISIT_STATES[active.visit] || active.visit),
       el('span', {class: 'muted small'}, when(active.last_sent_at))),
     el('div', {class: 'muted small'}, active.email),
-    active.last_text && el('details', {}, el('summary', {}, 'O que enviámos por último'), el('blockquote', {}, active.last_text)),
-    (active.history || []).length > 1 && el('details', {},
-      el('summary', {}, `Conversa (${active.history.length} trocas, mais recente primeiro)`),
-      conversationTurns(active.history, null)),
+    // 27/09: the whole conversation always in view, newest first, in a box of its own height (our last email on top)
+    (active.history || []).length ? el('div', {class: 'conversation-box'}, conversationTurns(active.history, null))
+      : active.last_text && el('blockquote', {}, active.last_text),
     el('div', {class: 'actions'},
       el('button', {type: 'button', onclick: () => act('api/active/write', 'Rascunho de acrescento criado na fila, acima.')}, 'Escrever mais'),
       el('button', {type: 'button', class: 'link', onclick: () => act('api/active/remove', 'Retirado da fila até a conversa voltar a mexer.')}, 'Retirar da fila')));
@@ -891,9 +960,19 @@ function conversationTurns(turns, current, dates) {
   const newest = [...turns].reverse();
   return newest.map((turn, index) => el('div', {class: 'history-turn' + (current?.has(turn) ? ' current' : '')},
     el('p', {class: 'muted small'}, turn.who === 'cliente' ? 'Cliente' : 'Nós', ' · ' + turnWhen(turn, dates),
-      current?.has(turn) ? ' · neste cartão' : '',
+      current?.has(turn) ? ' · por responder' : '',
       index === 0 && turn.who !== 'cliente' ? ' · a nossa última resposta, ainda sem resposta do cliente' : ''),
     el('pre', {}, turn.text)));
+}
+
+function programNote(email) {
+  return email.visit_window
+    ? `Proposta de visita: ${dayLabel(email.visit_window.day)}, das ${email.visit_window.start} às ${email.visit_window.end}.`
+    : email.kind === 'visit_thanks' ? `(agradecimento pela visita de ${slotLabel(email.visit_done?.at || '')}, com o inquérito e a ficha de visita`
+      + (email.visit_done?.public ? `; nota pública: «${email.visit_done.public}»)` : ')')
+    : email.kind === 'addition' ? '(acrescento teu a esta conversa: escreve-o abaixo, ou pede-o à IA nas instruções extra)'
+    : AUX_KINDS.includes(email.kind) || email.closing ? '(sem mensagem nova do cliente: email preparado automaticamente, ver o rascunho abaixo)'
+    : '';
 }
 
 function historyBlock(email) {
@@ -905,9 +984,11 @@ function historyBlock(email) {
   if (!turns.length) turns = [...(email.history || [])];
   const current = new Set(turns.filter(turn => turn.who === 'cliente' && texts.has(turn.text.trim())));
   const program = email.visit_window || AUX_KINDS.includes(email.kind) || email.closing;
-  if (!current.size && !program) {
-    // Not in the conversation yet: put each where it belongs in time, not simply last.
+  if (!program) {
+    // Any not in the conversation yet: put each where it belongs in time, not simply last (27/09: each one, now that
+    // the box is the only place the card shows the customer's words).
     for (const part of parts) {
+      if (!(part.message || '').trim() || [...current].some(turn => turn.text.trim() === part.message.trim())) continue;
       const own = {who: 'cliente', text: part.message || '', at: (part.date || '').slice(0, 10), ts: part.date || undefined};
       const stamp = part.date ? new Date(part.date).toISOString() : own.at;
       const later = turns.findIndex(turn => turn.ts ? turn.ts > stamp : (turn.at || '') > own.at);
@@ -915,10 +996,17 @@ function historyBlock(email) {
     }
   }
   if (!turns.length) return false;
-  return el('details', {},
-    el('summary', {class: 'muted small'}, (program ? 'Conversa' : 'Email completo')
-      + (turns.length > 1 ? ` (${turns.length} trocas, mais recente primeiro)` : '')),
+  // 27/09: no «Email completo» to open — the whole conversation always in view, newest first (what this card answers
+  // marked), in a box of a fixed height that scrolls.
+  return el('div', {class: 'conversation-box', 'aria-label': `Conversa: ${turns.length} mensagem(ns), a mais recente primeiro`},
     conversationTurns(turns, current, dates));
+}
+
+// 27/09: what the last «Gerar esta resposta» of each email spent, shown under the button until the page reloads.
+const lastGeneration = {};
+function generationUsage(result) {
+  const tokens = (result.tokens?.prompt_tokens || 0) + (result.tokens?.completion_tokens || 0);
+  return `${tokens.toLocaleString('pt-PT')} tokens · ${costFormat.format(result.cost_usd || 0)}`;
 }
 
 function card(email) {
@@ -929,19 +1017,15 @@ function card(email) {
   const contact = [customer.email || (email.recipient || {}).email, customer.phone].filter(Boolean).join(' · ');
   const ignoreEmail = customer.email || (email.recipient || {}).email;
   const ignoreTarget = ignoreEmail && {email: ignoreEmail, name: customer.name};
-  // Whether the textarea still matches what api/drafts last saved: nothing else marks that on the page,
-  // so after pasting 40 answers or editing one by hand, it is easy to lose track of what still needs a click.
-  const saveButton = el('button', {}, 'Guardar rascunho');
-  const saveStatus = el('span', {class: 'muted small save-status'});
-  const refreshSaveStatus = () => {
-    if (!draft.value.trim()) { saveStatus.textContent = ''; saveButton.classList.remove('primary'); return; }
-    const dirty = draft.value !== saved;
-    saveStatus.textContent = dirty ? 'Por guardar' : 'Guardado';
-    saveButton.classList.toggle('primary', dirty);
-    saveStatus.classList.toggle('warn', dirty);
+  // 27/09: «Guardar rascunho» sits under the draft and shows only while the text differs from what api/drafts last
+  // saved; «Enviar individual» only once there is a text to send (written, pasted or generated).
+  const saveButton = el('button', {class: 'primary'}, 'Guardar rascunho');
+  const saveLine = el('div', {class: 'save-line draft-save'}, saveButton, el('span', {class: 'muted small save-status warn'}, 'Por guardar'));
+  const refreshDraftActions = () => {
+    saveLine.hidden = draft.value === saved;
+    if (sendOne) sendOne.hidden = !draft.value.trim();
   };
-  draft.addEventListener('input', refreshSaveStatus);
-  refreshSaveStatus();
+  draft.addEventListener('input', refreshDraftActions);
   saveButton.addEventListener('click', event => run(async () => {
     state = await call('api/drafts', {property_ref: queueRef(), replies: [{id: email.id, reply_text: draft.value}]});
     renderState(); toast('Rascunho guardado.');
@@ -963,7 +1047,8 @@ function card(email) {
     state = await call('api/state'); renderState();
     toast(sent ? `Enviado para ${reply.to}. Saiu da lista.` : 'Não saiu: vê o aviso no próprio email antes de repetir.',
       sent ? 'ok' : 'warn');
-  }, event.currentTarget)}, 'Enviar só este');
+  }, event.currentTarget)}, 'Enviar individual');
+  refreshDraftActions();
   // WhatsApp (26/09): opens the owner's own WhatsApp on this customer with the draft written in; they press Enter
   // there. Nothing is sent from here and nothing is recorded: the email still goes (or is taken off) as usual.
   const whatsapp = !email.blocked && whatsappNumber(email.whatsapp) && el('button', {type: 'button', class: 'whatsapp-action',
@@ -978,13 +1063,44 @@ function card(email) {
       if (draft.value.trim() && draft.value !== saved
           && !confirm('O rascunho tem alterações por guardar, e a resposta nova substitui-as. Continuar?')) return;
       const result = await call('api/prompt/generate', {property_ref: queueRef(), ids: [email.id], extra: $('extra').value});
+      lastGeneration[email.id] = generationUsage(result);
       state = result.state; renderState(); applyFuel(result.fuel, queueRef());
       const note = (result.notes || []).find(item => item.id === email.id)?.nota;
-      toast(result.saved ? 'Resposta gerada: revê-a antes de enviar.' + (note ? ` Nota: ${note}` : '')
+      toast(result.saved ? `Resposta gerada (${lastGeneration[email.id]}): revê-a antes de enviar.` + (note ? ` Nota: ${note}` : '')
         : 'A API não devolveu um rascunho para este email.', result.saved ? 'ok' : 'warn');
     }, event.currentTarget)}, 'Gerar esta resposta');
   // 27/09: the email and its draft on the left (2/3); on the right (1/3), what can be done with it: save, send, a reply
   // from the API, a fact for the knowledge, and, last, taking it out of the queue.
+  // 27/09: taking it out of the queue sits on the left, under the customer's name and tags, as pills with a hover
+  const exits = el('div', {class: 'exit-actions'},
+    el('button', {class: 'pill-action', title: 'Tira este email da fila sem responder. O Gmail não muda, e se o cliente '
+        + 'voltar a escrever, a mensagem nova entra normalmente.', onclick: event => run(async () => {
+      if (!confirm('Retirar este email da fila sem responder? O Gmail não é alterado e o email não volta a entrar.')) return;
+      state = await call('api/dismiss', {property_ref: queueRef(), ids: [email.id]});
+      renderState(); toast('Email retirado da fila.');
+    }, event.currentTarget)}, 'Retirar da fila'),
+    ignoreTarget && el('button', {class: 'pill-action', title: 'O cliente disse que não quer: sai da fila e deixamos de lhe '
+        + 'escrever primeiro (propostas de visita, lembretes e outros envios automáticos). Se voltar a escrever, a mensagem '
+        + 'entra, com um aviso. Reverte-se em Imóveis.', onclick: event => run(async () => {
+      if (!confirm(`${ignoreTarget.name || ignoreTarget.email} disse que não tem interesse? Sai da fila e deixa de `
+          + 'receber propostas de visita e outros envios automáticos, neste imóvel. Se voltar a escrever, a mensagem '
+          + 'entra, com um aviso. Podes reverter mais tarde em Imóveis.')) return;
+      const result = await call('api/contacts/ignore', {property_ref: queueRef(), email: ignoreTarget.email,
+        ignored: true, kind: 'grey', reason: 'Cliente disse que não tem interesse.'});
+      state = result.state; renderState();
+      toast(`${ignoreTarget.name || ignoreTarget.email} passou a ser ignorado(a) neste imóvel.`);
+    }, event.currentTarget)}, 'Não tem interesse'),
+    ignoreTarget && el('button', {class: 'pill-action danger', title: 'Blacklist, para quem não queres ouvir mais: sai da fila '
+        + 'e nada do que escrever volta a entrar, neste imóvel. Não recebe nenhum envio nosso. Reverte-se em Imóveis.',
+      onclick: event => run(async () => {
+      if (!confirm(`Ignorar ${ignoreTarget.name || ignoreTarget.email} sempre (blacklist), neste imóvel? Este email sai da `
+          + 'fila e nunca mais volta a entrar, mesmo que escreva de novo — e não recebe propostas de visita '
+          + 'nem outros envios automáticos. Podes reverter mais tarde em Imóveis.')) return;
+      const result = await call('api/contacts/ignore', {property_ref: queueRef(), email: ignoreTarget.email,
+        ignored: true, kind: 'black'});
+      state = result.state; renderState();
+      toast(`${ignoreTarget.name || ignoreTarget.email} passou para a blacklist deste imóvel.`);
+    }, event.currentTarget)}, 'Ignorar sempre / Blacklist'));
   const article = el('article', {class: 'card email-card' + (email.blocked ? ' blocked' : '')},
     el('div', {class: 'card-head'},
       el('label', {class: 'who'}, el('input', {type: 'checkbox', class: 'pick', 'data-id': email.id, checked: !email.blocked, disabled: !!email.blocked}),
@@ -1010,6 +1126,7 @@ function card(email) {
       email.visit_status && el('span', {class: 'tag warn'}, VISIT_STATES[email.visit_status] || email.visit_status),
       email.interaction === 2 && fichaTag(email.ficha_summary),
       el('span', {class: 'muted small'}, when(email.date))),
+    exits,
     contact && el('div', {class: 'muted small'}, contact),
     email.recipient_editable && recipientEditor(email),
     email.blocked && el('p', {class: 'alert bad'}, email.blocked),
@@ -1017,51 +1134,23 @@ function card(email) {
     email.reply_error && el('p', {class: 'alert bad'}, email.reply_error),
     (email.draft_checks || []).map(check => el('p', {class: 'alert warn'}, 'Verificação do rascunho: ' + check)),
     email.consent_suggested && el('p', {class: 'alert warn'}, 'O cliente parece ter dito que sim: confirma para gravar em contactos.csv.'),
-    el('blockquote', {}, email.visit_window
-      ? `Proposta de visita: ${dayLabel(email.visit_window.day)}, das ${email.visit_window.start} às ${email.visit_window.end}.`
-      : email.kind === 'visit_thanks' ? `(agradecimento pela visita de ${slotLabel(email.visit_done?.at || '')}, com o inquérito e a ficha de visita`
-        + (email.visit_done?.public ? `; nota pública: «${email.visit_done.public}»)` : ')')
-      : email.kind === 'addition' ? '(acrescento teu a esta conversa: escreve-o abaixo, ou pede-o à IA nas instruções extra)'
-      : AUX_KINDS.includes(email.kind) || email.closing ? '(sem mensagem nova do cliente: email preparado automaticamente, ver o rascunho abaixo)'
-      : customer.message || email.body_text || ''),
-    historyBlock(email),
-    draft);
+    // An email the program prepared has no new message of the customer's: a line says what it is, over the conversation.
+    programNote(email) && el('blockquote', {}, programNote(email)),
+    historyBlock(email) || (!programNote(email) && el('blockquote', {}, customer.message || email.body_text || '')),
+    draft, saveLine);
+  // 27/09: in the order of the work — a fact for the knowledge (open), the reply from the API, then sending it.
   const actions = el('aside', {class: 'card email-actions', 'aria-label': 'O que fazer com este email'},
-    el('div', {class: 'save-line'}, saveButton, saveStatus),
-    sendOne, whatsapp,
     email.consent_suggested && el('button', {class: 'primary', onclick: event => run(async () => {
       state = await call('api/consent/confirm', {property_ref: queueRef(), id: email.id});
       renderState(); toast('Consentimento confirmado e registado em contactos.csv.');
     }, event.currentTarget)}, 'Confirmar consentimento (RGPD)'),
+    noteBox(queueRef(), null, true),
     generateOne && el('div', {class: 'email-generate'},
       el('p', {class: 'muted small'}, 'Gerar resposta ', el('span', {class: 'kind'}, 'API · ' + (settings?.ai?.model || ''))),
-      generateOne),
-    noteBox(queueRef(), null, email.id),
-    el('div', {class: 'exit-actions'},
-      el('button', {class: 'link danger', onclick: event => run(async () => {
-        if (!confirm('Retirar este email da fila sem responder? O Gmail não é alterado e o email não volta a entrar.')) return;
-        state = await call('api/dismiss', {property_ref: queueRef(), ids: [email.id]});
-        renderState(); toast('Email retirado da fila.');
-      }, event.currentTarget)}, 'Retirar da fila'),
-      ignoreTarget && el('button', {class: 'link danger', onclick: event => run(async () => {
-        if (!confirm(`${ignoreTarget.name || ignoreTarget.email} disse que não tem interesse: ignorar sempre, `
-            + 'neste imóvel? Sai da fila e nunca mais volta a entrar, mesmo que escreva de novo — e não recebe '
-            + 'propostas de visita nem outros envios automáticos. Podes reverter mais tarde em Imóveis.')) return;
-        const result = await call('api/contacts/ignore', {property_ref: queueRef(), email: ignoreTarget.email,
-          ignored: true, kind: 'grey', reason: 'Cliente disse que não tem interesse.'});
-        state = result.state; renderState();
-        toast(`${ignoreTarget.name || ignoreTarget.email} passou a ser ignorado(a) neste imóvel.`);
-      }, event.currentTarget)}, 'Não tem interesse'),
-      ignoreTarget && el('button', {class: 'link danger', onclick: event => run(async () => {
-        if (!confirm(`Ignorar ${ignoreTarget.name || ignoreTarget.email} sempre, neste imóvel? Este email sai da `
-            + 'fila e nunca mais volta a entrar, mesmo que escreva de novo — e não recebe propostas de visita '
-            + 'nem outros envios automáticos. Podes reverter mais tarde em Imóveis.')) return;
-        const result = await call('api/contacts/ignore', {property_ref: queueRef(), email: ignoreTarget.email,
-          ignored: true, kind: 'black'});
-        state = result.state; renderState();
-        toast(`${ignoreTarget.name || ignoreTarget.email} passou a ser ignorado(a) neste imóvel.`);
-      }, event.currentTarget)}, 'Ignorar sempre')));
-  return el('div', {class: 'email-row'}, article, actions);
+      generateOne,
+      lastGeneration[email.id] && el('p', {class: 'muted small generation-usage'}, 'Última geração: ' + lastGeneration[email.id])),
+    sendOne, whatsapp);
+  return el('div', {class: 'email-row', 'data-customer': ((email.recipient || {}).email || '').toLowerCase()}, article, actions);
 }
 
 // What the assistant knows about a property, exactly as it gets it: the property's base and the agency's.
@@ -1077,10 +1166,9 @@ function knowledgeView(ref) {
 }
 
 // One more fact while reviewing a reply: it goes to notas.md and the next prompt already carries it.
-// emailId, only from a reply card: offers a second button that also redrafts that one email via the
-// OpenAI API (same call as "Gerar respostas via API"), so the new fact is used right away, not just
-// remembered for next time.
-function noteBox(ref, onSaved, emailId) {
+// inCard (27/09): in an email's card it comes open, just above «Gerar esta resposta», which then uses it; the old
+// «Guardar e refazer esta resposta» button did no more than those two, one after the other.
+function noteBox(ref, onSaved, inCard = false) {
   const text = el('textarea', {rows: 2, 'aria-label': 'Informação a acrescentar ao conhecimento',
     placeholder: 'Ex.: Não tem arrecadação, mas pode guardar algumas coisas no lugar de garagem.'});
   const scope = el('select', {'aria-label': 'Onde guardar'},
@@ -1093,24 +1181,13 @@ function noteBox(ref, onSaved, emailId) {
     else await loadSettings();  // the Imóveis tab lists the knowledge files: keep it current
     return result;
   };
-  const buttons = [el('button', {class: 'primary', onclick: event => run(async () => {
+  const save = el('button', {class: 'primary', onclick: event => run(async () => {
     const result = await saveNote();
     toast((result.scope === 'agency' ? 'Guardado no know-how da agência.' : 'Guardado no conhecimento do imóvel.')
-      + ' O próximo prompt já o leva.');
-  }, event.currentTarget)}, 'Guardar no conhecimento')];
-  if (emailId) {
-    buttons.push(el('button', {class: 'needs-fuel', title: settings?.openai_configured ? '' : 'Sem chave OpenAI configurada: o clique explica como.',
-      onclick: event => run(async () => {
-        if (!text.value.trim()) throw new Error('Escreve a informação antes de refazer a resposta.');
-        await saveNote();
-        const generated = await call('api/prompt/generate', {property_ref: ref, ids: [emailId], extra: ''});
-        state = generated.state; renderState(); applyFuel(generated.fuel, ref);
-        toast(generated.saved ? 'Conhecimento guardado e resposta refeita com a nova informação.'
-          : 'Conhecimento guardado, mas a API não devolveu um rascunho novo para este email.');
-      }, event.currentTarget)}, 'Guardar e refazer esta resposta (API)'));
-  }
-  return el('details', {class: 'note-box'}, el('summary', {class: 'muted small'}, '+ Acrescentar ao conhecimento'),
-    text, el('div', {class: 'actions'}, scope, ...buttons));
+      + (inCard ? ' «Gerar esta resposta» já o usa.' : ' O próximo prompt já o leva.'));
+  }, event.currentTarget)}, 'Guardar no conhecimento');
+  return el('details', {class: 'note-box', open: inCard}, el('summary', {class: 'muted small'}, '+ Acrescentar ao conhecimento'),
+    text, el('div', {class: 'actions'}, scope, save));
 }
 
 function renderPreview() {
@@ -2008,7 +2085,7 @@ function renderSettings() {
   renderVoice();
   $('agency-knowledge').replaceChildren(el('p', {class: 'eyebrow'}, 'KNOW-HOW DA AGÊNCIA ', kind('rag')),
     el('h2', {}, 'Conhecimento comum a todos os imóveis'), knowledgeEditor('agency', null));
-  if (!$('days').value) $('days').value = settings.lookback_days || 7;
+  if (!$('f-first-read').value) $('f-first-read').value = settings.first_read_days || 45;
   renderPropertySlider();
   if (!$('f-sender').value) $('f-sender').value = settings.properties[0]?.sender || 'reply@idealista.pt';
   $('generate-api').title = settings.openai_configured ? '' : 'Sem chave OpenAI configurada: o clique explica como.';
@@ -2553,7 +2630,6 @@ async function syncAgenda() {
       + `por confirmar, ${item.offered} proposta(s) nossa(s)`);
   toast('Visitas atualizadas. ' + done.join(' · '));
 }
-$('agenda-sync').addEventListener('click', event => run(syncAgenda, event.currentTarget));
 $('agenda-sync-here').addEventListener('click', event => run(syncAgenda, event.currentTarget));
 
 $('agenda-week').addEventListener('scroll', () => { agendaScroll.top = $('agenda-week').scrollTop; }, {passive: true});
@@ -2600,6 +2676,9 @@ function openPropertyEditor(fields, ref = null) {
   for (const name of FIELDS) if (name !== 'sender' || fields.sender) $('f-' + name).value = fields[name] ?? keep[name] ?? '';
   $('f-facts').value = (fields.facts || []).join('\n');
   $('editor-title').textContent = ref ? `Editar ${ref}` : 'Novo imóvel';
+  // How far back the first read goes: asked only for a new property (45 days unless changed).
+  $('first-read-field').hidden = Boolean(ref);
+  $('f-first-read').value = settings?.first_read_days || 45;
   showPropertiesView('editor');
 }
 
@@ -3273,6 +3352,10 @@ function renderVoice() {
   const afterVisit = el('textarea', {rows: 5}, settings.voice.after_visit || '');
   const afterVisitTemplate = el('textarea', {rows: 14}, settings.voice.after_visit_template || '');
   const visitReminder = el('textarea', {rows: 5}, settings.voice.visit_reminder || '');
+  // 27/09: the hours behind two of the dots in Comunicações' table of customers
+  const alerts = settings.voice.alerts || {our_turn_hours: 48, no_visit_hours: 96};
+  const ourTurnHours = el('input', {type: 'number', min: 1, max: 720, value: alerts.our_turn_hours});
+  const noVisitHours = el('input', {type: 'number', min: 1, max: 720, value: alerts.no_visit_hours});
   // The AI engine (27/09): a console of its own, one button per model, as modes (ECO, TURBO…), each with its prices
   // and what 100 interactions cost here — the price to quote a client. A click switches the model for everything.
   const aiSection = [el('p', {class: 'eyebrow voice-section'}, 'INTELIGÊNCIA ARTIFICIAL · API OPENAI'), engineConsole()];
@@ -3295,6 +3378,13 @@ function renderVoice() {
     el('label', {class: 'field'}, 'Lembrete aos 4 dias sem resposta (o segundo e último)', reminderDay4),
     el('label', {class: 'field'}, 'Email de «visitas fechadas», para todos os clientes do imóvel', visitsClosed),
     el('label', {class: 'field'}, 'Pedido de consentimento RGPD, para quem já respondeu', consentRequest),
+    el('p', {class: 'eyebrow voice-section'}, 'BOLINHAS DA TABELA DE CLIENTES'),
+    el('p', {class: 'step voice-section'},
+      'Em Comunicações, ao lado de cada nome. Vermelha: nunca nos respondeu, ou respondeu sem nada do que pedimos. '
+      + 'Verde: ficha completa. As outras duas contam horas:'),
+    el('div', {class: 'grid'},
+      el('label', {class: 'field'}, 'Laranja: à espera de resposta nossa há mais de … horas', ourTurnHours),
+      el('label', {class: 'field'}, 'Azul (em vez da verde): ficha completa há mais de … horas sem data de visita', noVisitHours)),
     el('p', {class: 'eyebrow voice-section'}, 'PÓS-VISITA ', kind('prompt')),
     el('p', {class: 'step voice-section'},
       'Depois de marcares em Visitas que o cliente apareceu, «Criar agradecimento» põe um rascunho nas Comunicações: o assistente '
@@ -3319,6 +3409,7 @@ function renderVoice() {
         sender_name: senderName.value, reply_subject: replySubject.value, application_instructions: behaviour.value,
         visits: {slot_minutes: Number(slot.value), rental: rental.value, sale: sale.value},
         reminders: {day2: reminderDay2.value, day4: reminderDay4.value},
+        alerts: {our_turn_hours: Number(ourTurnHours.value), no_visit_hours: Number(noVisitHours.value)},
         visits_closed: visitsClosed.value, consent_request: consentRequest.value, digest_recipient: digestRecipient.value,
         after_visit: afterVisit.value, after_visit_template: afterVisitTemplate.value, visit_reminder: visitReminder.value});
       renderSettings(); await refreshState(); toast('Voz guardada.');
@@ -3329,7 +3420,7 @@ document.querySelectorAll('[data-tab]').forEach(button => button.addEventListene
 $('queue').addEventListener('change', renderState);
 $('emails').addEventListener('change', updateSelection);
 $('read').addEventListener('click', event => run(async () => {
-  state = await call('api/read', {days: Number($('days').value) || undefined}); renderState();
+  state = await call('api/read', {}); renderState();
   if (state.added) playSound('read');
   // Replies written straight in Gmail (found in All Mail or Sent) answer their emails here too.
   const direct = state.direct ? ` ${state.direct} resposta(s) tua(s) enviada(s) diretamente do Gmail registada(s).` : '';
@@ -3351,6 +3442,25 @@ $('copy-prompt').addEventListener('click', event => run(async () => {
   await copyText(text, 'Prompt copiado. Cola-o numa conversa do ChatGPT.', $('prompt-box'));
 }, event.currentTarget));
 $('extra').addEventListener('input', () => { $('copy-prompt').disabled = true; });
+// 27/09: in «Modo: só API», the ChatGPT way stays at hand, folded under «Gerar respostas»: the same prompt (selected
+// emails and extra instructions), copied, and its answer pasted back into the same drafts as the API's.
+$('gpt-prompt').addEventListener('click', event => run(async () => {
+  const ids = selectedIds();
+  if (!ids.length) throw new Error('Seleciona pelo menos um email.');
+  const {prompt} = await call('api/prompt', {property_ref: queueRef(), ids, extra: $('extra').value});
+  $('gpt-prompt-text').textContent = prompt; $('gpt-prompt-text').hidden = false;
+  await copyText(prompt, 'Prompt copiado. Cola-o numa conversa do ChatGPT e traz a resposta para aqui.', $('gpt-box'));
+}, event.currentTarget));
+$('gpt-paste').addEventListener('click', event => run(async () => {
+  const text = $('gpt-answer').value;
+  if (!text.trim()) throw new Error('Cola primeiro a resposta do ChatGPT.');
+  const result = await call('api/paste', {property_ref: queueRef(), text});
+  state = result.state; keepSteps(renderState);
+  $('notes').replaceChildren(...result.notes.map(note => el('p', {class: 'alert warn'}, `Nota do ChatGPT sobre ${nameOf(note.id)}: ${note.nota}`)));
+  $('gpt-answer').value = '';
+  toast(`${result.saved} rascunho(s) guardado(s)` + (result.visits ? ` e ${result.visits} marcação(ões) de visita` : '')
+    + '. Revê-os antes de enviar.');
+}, event.currentTarget));
 $('generate-api').addEventListener('click', event => run(async () => {
   const ids = selectedIds();
   if (!ids.length) throw new Error('Seleciona pelo menos um email.');
@@ -3363,7 +3473,7 @@ $('generate-api').addEventListener('click', event => run(async () => {
   const tokens = (result.tokens?.prompt_tokens || 0) + (result.tokens?.completion_tokens || 0);
   const summary = `${result.saved} rascunho(s) gerado(s) com ${result.model || 'a API'}`
     + (result.visits ? ` e ${result.visits} marcação(ões) de visita` : '')
-    + (tokens ? ` (${tokens} tokens${result.prompts?.length > 1 ? `, ${result.prompts.length} chamadas` : ''})` : '') + '.';
+    + (tokens ? ` (${generationUsage(result)}${result.prompts?.length > 1 ? `, ${result.prompts.length} chamadas` : ''})` : '') + '.';
   toast(summary + ' Revê-os no passo 01 antes de enviar.');
 }, event.currentTarget));
 $('paste').addEventListener('click', event => run(async () => {
@@ -3414,7 +3524,7 @@ $('listing-parse').addEventListener('click', event => run(async () => {
 $('property-save').addEventListener('click', event => run(async () => {
   const fields = Object.fromEntries(FIELDS.map(name => [name, $('f-' + name).value.trim() || null]));
   fields.facts = $('f-facts').value;
-  const result = await call('api/property/save', {fields});
+  const result = await call('api/property/save', {fields, first_read_days: editorRef ? undefined : Number($('f-first-read').value) || undefined});
   settings = result.settings; editorRef = result.reference;
   selectProperty(result.reference, 0, false); renderSettings(); showPropertiesView('list'); await refreshState();
   toast(`Imóvel ${result.reference} ${result.created ? 'criado' : 'atualizado'}. Revê a base de conhecimento na pasta do imóvel.`);

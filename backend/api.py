@@ -125,22 +125,24 @@ def web_app(folder, token):
         model = service.model(cfg)
         totals = {"saved": 0, "notes": [], "visits": 0, "fichas": 0, "prompts": []}
         usage_total = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        cost_total = 0.0
         for start in range(0, len(ids), GENERATE_BATCH):
             service.require_fuel(ref)
             current = queue(ref)  # fresh each time: the previous batch's drafts changed its revision
             prompt_text = reply_prompt(current, ids[start:start + GENERATE_BATCH], extra)
             answer, usage = complete(key, model, prompt_text)  # raises OpenAIError, shown to the owner like any other
             # Tokens only: never the prompt or the answer, same rule as every other log entry.
-            service.log("openai_usage", model=model, **usage, reference=ref,
-                        cost_usd=round(estimate_cost_usd(model, **{
-                            k: usage[k] for k in ("prompt_tokens", "completion_tokens")}), 6))
+            cost = estimate_cost_usd(model, **{k: usage[k] for k in ("prompt_tokens", "completion_tokens")})
+            cost_total += cost
+            service.log("openai_usage", model=model, **usage, reference=ref, cost_usd=round(cost, 6))
             result = save_drafts_from(current, answer)
             for field in ("saved", "visits", "fichas"):
                 totals[field] += result[field]
             totals["notes"] += result["notes"]
             totals["prompts"].append(prompt_text)  # «Ver o que foi enviado à IA», in the page only
             usage_total = {k: usage_total[k] + (usage.get(k) or 0) for k in usage_total}
-        return {**totals, "model": model, "state": state(), "tokens": usage_total, "fuel": service.api_fuel(ref)}
+        return {**totals, "model": model, "state": state(), "tokens": usage_total, "cost_usd": round(cost_total, 6),
+                "fuel": service.api_fuel(ref)}
 
     def drafts(body):
         current = queue(body.get("property_ref"))
@@ -177,7 +179,8 @@ def web_app(folder, token):
         return {"prompt": listing_prompt(url)}
 
     def property_save(body):
-        return {**service.save_property(body.get("fields") or {}), "settings": service.settings()}
+        return {**service.save_property(body.get("fields") or {}, body.get("first_read_days")),
+                "settings": service.settings()}
 
     def visit_candidates(body):
         return service.visit_candidates(body.get("property_ref") or None)

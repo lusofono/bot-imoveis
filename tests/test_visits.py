@@ -21,6 +21,7 @@ def item(service, key):
 def test_each_read_can_look_further_back(service):
     with patch("backend.service.app_password", return_value="fake"), patch(
             "backend.service.read_messages", return_value=([], 0, "INBOX")) as fetch:
+        service.read()  # the first one goes back 45 days (27/09); the next ones from the day before the last
         service.read(days=30)
     assert fetch.call_args.args[3] == (date.today() - timedelta(days=30)).isoformat()
     with pytest.raises(ValueError, match="dias para trás"):

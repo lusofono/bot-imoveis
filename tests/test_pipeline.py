@@ -1,0 +1,100 @@
+"""The customers by step (27/09), in the table above the emails: one column each, the furthest they got."""
+import json
+from datetime import datetime, timedelta, timezone
+from backend.service import ficha_update
+from backend.store import save_json, save_visits
+from test_properties import CUSTOMER, REF, draft_and_send, lead, read, service  # noqa: F401 (service is a fixture)
+
+OTHER = "bruno.exemplo@example.com"
+
+
+def columns(service):
+    return {customer["email"]: (customer["column"], customer["waiting"])
+            for customer in service.pending()["properties"][0]["pipeline"]}
+
+
+def change(service, email, **fields):
+    data = service.load(REF)
+    data["conversations"][email].update(fields)
+    service.save(data, REF)
+
+
+def test_each_customer_sits_in_the_column_of_the_furthest_step_they_got_to(service):
+    read(service, [lead("1")])
+    # Not answered yet: the first contact, waiting for us.
+    assert columns(service) == {CUSTOMER: ("contacto", True)}
+    draft_and_send(service, "1")
+    assert columns(service) == {CUSTOMER: ("i1", False)}
+    # Our email unanswered for 3 days or more, whatever the step: «Sem resposta».
+    change(service, CUSTOMER, last_sent_at=(datetime.now(timezone.utc) - timedelta(days=3, minutes=1)).isoformat())
+    assert columns(service)[CUSTOMER] == ("sem_resposta", False)
+    # They write again: back in their step, waiting for us.
+    read(service, [dict(lead("2"), thread_id="t1")])
+    assert columns(service)[CUSTOMER] == ("i1", True)
+    change(service, CUSTOMER, stage=5)
+    assert columns(service)[CUSTOMER] == ("i4", True)  # «Mais de 3»
+
+    # A visit on the agenda, then attended, then on the short list; declining it puts them aside.
+    save_visits(service.folder, REF, {"windows": [], "slots": [{"at": "2026-10-01 18:00", "customer": CUSTOMER}]})
+    assert columns(service)[CUSTOMER][0] == "marcada"
+    save_visits(service.folder, REF, {"windows": [], "slots": [
+        {"at": "2026-10-01 18:00", "customer": CUSTOMER, "check": {"attended": True}}]})
+    assert columns(service)[CUSTOMER][0] == "visitou"
+    change(service, CUSTOMER, selection={"status": "shortlist"})
+    assert columns(service)[CUSTOMER][0] == "shortlist"
+    change(service, CUSTOMER, visit="nao_quer")
+    assert columns(service)[CUSTOMER][0] == "desistiu"
+    # The greylist and the blacklist go under the table, each on its own line.
+    change(service, CUSTOMER, ignored=True, ignored_kind="grey", ignored_reason="Já arrendou outra casa.")
+    assert columns(service)[CUSTOMER][0] == "greylist"
+    assert service.pending()["properties"][0]["pipeline"][0]["reason"] == "Já arrendou outra casa."  # shown after the name
+    change(service, CUSTOMER, ignored_kind="black")
+    assert columns(service)[CUSTOMER][0] == "blacklist"
+
+
+def dots(service):
+    return {customer["email"]: customer["dots"] for customer in service.pending()["properties"][0]["pipeline"]}
+
+
+COMPLETE = {"trabalho": "Engenheira", "agregado": "Casal", "datas": "Um ano", "disponibilidade": "Fins de tarde"}
+
+
+def test_the_dots_say_what_needs_doing_with_the_hours_set_in_the_voice(service):
+    now = datetime.now(timezone.utc)
+    read(service, [dict(lead("1"), date=(now - timedelta(hours=49)).isoformat())])
+    assert dots(service) == {CUSTOMER: ["orange"]}  # waiting for us more than 48 h
+    draft_and_send(service, "1")
+    assert dots(service) == {CUSTOMER: ["red"]}  # never answered us
+    change(service, CUSTOMER, ficha={**COMPLETE, "at": now.isoformat(), "complete_at": now.isoformat()})
+    assert dots(service) == {CUSTOMER: ["green"]}
+    old = (now - timedelta(hours=97)).isoformat()
+    change(service, CUSTOMER, ficha={**COMPLETE, "at": old, "complete_at": old})
+    assert dots(service) == {CUSTOMER: ["blue"]}  # complete for 4 days and still no visit date
+    # The hours come from Voz e estilo.
+    voice = json.loads((service.folder / "voice.json").read_text(encoding="utf-8"))
+    voice["style"]["alerts"] = {"our_turn_hours": 24, "no_visit_hours": 120}
+    save_json(service.folder / "voice.json", voice)
+    assert dots(service) == {CUSTOMER: ["green"]}
+    assert service.settings()["voice"]["alerts"] == {"our_turn_hours": 24, "no_visit_hours": 120}
+    # A visit proposed: no blue, whatever the time.
+    voice["style"]["alerts"] = {"our_turn_hours": 24, "no_visit_hours": 96}
+    save_json(service.folder / "voice.json", voice)
+    change(service, CUSTOMER, visit_offered={"at": now.isoformat()})
+    assert dots(service) == {CUSTOMER: ["green"]}
+
+
+def test_a_file_remembers_when_it_became_complete():
+    first = ficha_update(None, {"trabalho": "Engenheira"})
+    assert "complete_at" not in first
+    done = ficha_update(first, COMPLETE)
+    assert done["complete_at"] == done["at"]
+    later = ficha_update({**done, "complete_at": "2026-09-01T10:00:00+00:00"}, {"animais": "Um gato"})
+    assert later["complete_at"] == "2026-09-01T10:00:00+00:00" and later["animais"] == "Um gato"
+
+
+def test_the_table_has_names_and_the_newest_first(service):
+    read(service, [dict(lead("1"), date="2026-09-20T10:00:00+00:00"),
+                   dict(lead("2", reply_to=(OTHER,)), date="2026-09-25T10:00:00+00:00")])
+    pipeline = service.pending()["properties"][0]["pipeline"]
+    assert [customer["email"] for customer in pipeline] == [OTHER, CUSTOMER]
+    assert pipeline[1]["name"] == "Ana Exemplo" and pipeline[1]["last_at"].startswith("2026-09-20")

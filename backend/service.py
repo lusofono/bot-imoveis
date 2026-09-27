@@ -44,6 +44,13 @@ REMINDER_HOURS = {"2d": 48, "4d": 96}
 REMINDER_MAX_HOURS = 144  # 6 days of silence: no more reminders (26/09)
 FICHAS_BATCH = 10  # customers per call in «Preencher fichas com a IA»
 CONTACT_RETENTION_DAYS = 183  # 6 months without consent (decided 21/09); erased on the owner's click
+FIRST_READ_DAYS = 45  # 27/09: how far back a property's first read goes, unless chosen when it was created
+FIRST_READ_RANGE = (1, 365)
+NO_REPLY_DAYS = 3  # 27/09: our last email unanswered this long puts the customer in «Sem resposta», at any step
+# 27/09: the dots in the customers table, in hours, set in Voz e estilo: orange, a message of theirs waiting for us
+# longer than this; blue, their file complete this long and still no visit date from us.
+ALERT_HOURS = {"our_turn_hours": 48, "no_visit_hours": 96}
+ALERT_HOURS_RANGE = (1, 720)
 INACTIVE_AFTER_EMAILS, INACTIVE_AFTER_HOURS = 2, 96  # 26/09: two of ours unanswered, the last four days ago
 HISTORY_LIMIT = 20  # turns kept per conversation, oldest dropped first; also what the prompt gets
 REPORT_SIGNATURE = f"{APP_NAME} Assistente"  # how the ponto de situação signs (27/09), not the agency's voice
@@ -133,6 +140,22 @@ def survey_of(conversation):
         if again and any(again.get(part) for part in ("imovel", "consultor", "marcacao")):
             return {**again, "at": survey.get("at")}
     return survey
+
+
+def ficha_update(old, new):
+    """merge_ficha, stamped: "at" is this update; "complete_at", when the file first became complete, kept while it
+    stays complete (a file complete before 27/09 counts from its last update)."""
+    merged, at = merge_ficha(old, new), now()
+    if not ficha_summary(merged)["complete"]:
+        return {**merged, "at": at}
+    since = ((old or {}).get("complete_at") or (old or {}).get("at")) if ficha_summary(old)["complete"] else None
+    return {**merged, "at": at, "complete_at": since or at}
+
+
+def alert_hours(voice):
+    """The hours behind the orange and blue dots, as set in Voz e estilo (ALERT_HOURS by default)."""
+    stored = ((voice or {}).get("style") or {}).get("alerts") or {}
+    return {key: int(stored.get(key) or default) for key, default in ALERT_HOURS.items()}
 
 
 def was_proposed(conversation, email, proposed):
@@ -441,6 +464,8 @@ class MailService:
                                "visit_accepted": (conversation.get("visit_accepted") or {}).get("at"),
                                "history": list(conversation.get("history") or [])})
         result = {"property_ref": ref, "revision": data["revision"], "last_read_at": data.get("last_read_at"),
+                  "read_from": None if data.get("last_read_at") else (
+                      data.get("read_from") or (date.today() - timedelta(days=FIRST_READ_DAYS)).isoformat()),
                   "instructions": instructions(profile, voice, visits), "emails": emails, "active": active,
                   "inactive": not property_active(profile)}
         if added is not None:
@@ -458,11 +483,12 @@ class MailService:
             refs = [self.pick(profiles, property_ref)] if property_ref else list(profiles)
             voice = load_voice(self.folder)
             return {"account": self.config()["account"],
-                    "properties": [self.view(ref, profiles[ref], self.load(ref), voice, visits=self.open_visits(ref, voice))
-                                   for ref in refs]}
+                    "properties": [self.property_view(ref, profiles[ref], self.load(ref), voice) for ref in refs]}
 
     def read(self, days=None):
-        """Brings the new emails. days: how far back this read looks (default: lookback_days of config.json)."""
+        """Brings the new emails, each property from the day before its last read (27/09: no more «Dias para trás»
+        in the page). A property never read goes back to the day chosen when it was created, else FIRST_READ_DAYS.
+        days (terminal, MCP): reach back at least that far this time, in every property."""
         if days is not None and (isinstance(days, bool) or not isinstance(days, int) or not 1 <= days <= 365):
             raise ValueError("Indica os dias para trás: um número de 1 a 365.")
         with locked(self.folder):
@@ -478,19 +504,40 @@ class MailService:
                     pass  # incomplete voice: the read still runs, just without auto-drafts this time
             queues = {ref: self.load(ref) for ref in refs}
             start_at = now()
-            back = days if days is not None else max(0, int(cfg.get("lookback_days", 7)))
-            start = datetime.now(timezone.utc).date() - timedelta(days=back)
-            for data in queues.values():
+            today = datetime.now(timezone.utc).date()
+            starts = {}
+            for ref, data in queues.items():
                 if data.get("last_read_at"):
                     # One-day overlap handles date boundaries; IDs remove duplicates.
-                    start = min(start, datetime.fromisoformat(data["last_read_at"]).date() - timedelta(days=1))
+                    since = datetime.fromisoformat(data["last_read_at"]).date() - timedelta(days=1)
+                else:
+                    since = (date.fromisoformat(data["read_from"]) if data.get("read_from")
+                             else today - timedelta(days=FIRST_READ_DAYS))
+                starts[ref] = min(since, today - timedelta(days=days)) if days is not None else since
+            # One scan for all: a new property's first read widens it, so each email is kept only within the
+            # window of its own property — the others never get back mail older than their last read.
+            start = min(starts.values())
             known = {ref: {message_key(e) for e in data["emails"]} | {merged for e in data["emails"] for merged in e.get("merged_ids", [])}
                      | set(data["replied_message_ids"]) | set(data["dismissed_message_ids"]) for ref, data in queues.items()}
             seen = set().union(*known.values())
 
+            def before(item, since):
+                arrived = aware(item.get("date"))
+                return arrived is not None and arrived.astimezone(timezone.utc).date() < since
+
             def accept(item):
                 # Decided on headers: known IDs and, with profiles, mail outside their families are skipped.
-                return message_key(item) not in seen and (not profiles or route(item, profiles, queues)[1] is not None)
+                if message_key(item) in seen:
+                    return False
+                if not profiles:
+                    return True
+                ref, kind, _ = route(item, profiles, queues)
+                if kind is None or (ref in starts and before(item, starts[ref])):
+                    return False
+                # The owner may have answered them from Gmail later in this same scan (All Mail goes by arrival).
+                people.update(address.casefold() for address in addresses(item.get("reply_to") or []))
+                threads.update({item.get("thread_id")} - {None, ""})
+                return True
 
             # The owner's own replies, written straight from Gmail: to someone we know, or in a thread we know.
             # Never one this page sent: its Message-ID is in the conversation already.
@@ -576,7 +623,7 @@ class MailService:
                 added[ref] += 1
                 received[key] = contact_day(item)
             # After the customers' emails, so a direct reply can answer one that arrived in this same read.
-            direct = self.record_direct_replies(queues, outgoing) if profiles else Counter()
+            direct = self.record_direct_replies(queues, outgoing, starts) if profiles else Counter()
             if profiles:
                 for ref, data in queues.items():
                     contacts += self.repair_missing_reply_to(ref, data, profiles[ref], cfg["account"])
@@ -601,8 +648,7 @@ class MailService:
                 return {"added": added[None], "revision": data["revision"], "emails": data["emails"]}
             voice = load_voice(self.folder)
             return {"scanned": scanned, "ambiguous": ambiguous, "direct": sum(direct.values()),
-                    "properties": [self.view(ref, profiles[ref], queues[ref], voice, added[ref], self.open_visits(ref, voice))
-                                   for ref in refs]}
+                    "properties": [self.property_view(ref, profiles[ref], queues[ref], voice, added[ref]) for ref in refs]}
 
     @staticmethod
     def merge_pending(data):
@@ -668,7 +714,7 @@ class MailService:
             merged += len(gone)
         return merged
 
-    def record_direct_replies(self, queues, outgoing):
+    def record_direct_replies(self, queues, outgoing, starts=None):
         """The replies the owner wrote straight from Gmail, found at READ in All Mail (or in Sent).
 
         Each is tied to one customer of one property: by the pending emails it answers (the same Gmail thread,
@@ -715,6 +761,8 @@ class MailService:
             data = queues[ref]
             if shut_out(data["conversations"].get(email) or {}):
                 continue
+            if starts and ref in starts and sent_at.astimezone(timezone.utc).date() < starts[ref]:
+                continue  # older than this property's window: a new property's first read reached that far
             created = email not in data["conversations"]
             conversation = data["conversations"].setdefault(email, {"stage": 0, "sent_message_ids": [], "thread_ids": []})
             mine = [item for item in data["emails"] if recipient_email(item) == email and item.get("kind") not in PROGRAM_KINDS]
@@ -810,8 +858,7 @@ class MailService:
                     continue
                 email = ((item.get("recipient") or {}).get("email") or "").casefold()
                 conversation = data.get("conversations", {}).get(email)
-                item["ficha"] = {**merge_ficha((conversation or {}).get("ficha") or item.get("ficha"), entry["ficha"]),
-                                 "at": now()}
+                item["ficha"] = ficha_update((conversation or {}).get("ficha") or item.get("ficha"), entry["ficha"])
                 if conversation is not None:
                     conversation["ficha"] = item["ficha"]  # a new customer's is kept on their email until it is sent
             data.pop("send_preview", None)
@@ -1111,6 +1158,80 @@ class MailService:
         history = conversation.get("history") or []
         first = next((index for index, turn in enumerate(history) if turn.get("who") == "nos"), None)
         return first is not None and any(turn.get("who") == "cliente" for turn in history[first + 1:])
+
+    def property_view(self, ref, profile, data, voice, added=None):
+        """A property as the page shows it: its queue (view) and where each of its customers stands (pipeline)."""
+        return {**self.view(ref, profile, data, voice, added, self.open_visits(ref, voice)),
+                "pipeline": self.pipeline(ref, data, voice)}
+
+    def pipeline(self, ref, data, voice=None, moment=None):
+        """27/09: each customer of a property in one column, the furthest they got — for the table above the emails.
+        contacto: not answered yet; i1 to i4: the interaction reached (i4: more than three); marcada, visitou,
+        shortlist and desistiu (declined the visit); and under the table, sem_resposta (our last email left unanswered
+        NO_REPLY_DAYS or more, whatever the step, or inactive), greylist and blacklist. waiting: a message of theirs is
+        in the queue for us to answer. dots, as the owner set them: orange, that message has waited longer than
+        our_turn_hours; red, they never answered us, or answered without any of what we asked; green, their file is
+        complete; blue instead of green, complete for no_visit_hours and still no visit date from us."""
+        moment = moment or datetime.now(timezone.utc)
+        hours = alert_hours(voice)
+        conversations = data.get("conversations", {})
+        waiting, new = {}, {}
+        for item in data["emails"]:
+            email = recipient_email(item)
+            if not email or item.get("kind") in PROGRAM_KINDS or item.get("blocked") or item.get("answered_directly"):
+                continue
+            arrived = aware(item.get("date")) or moment
+            waiting[email] = min(waiting.get(email, arrived), arrived)
+            if email not in conversations:
+                new.setdefault(email, item)
+        agenda = load_visits(self.folder, ref) if ref else {"windows": [], "slots": []}
+        slots, proposed = agenda["slots"], self.proposed_to(agenda) if ref else set()
+        visited = {slot["customer"] for slot in slots if (slot.get("check") or {}).get("attended") is True}
+        booked = {slot["customer"] for slot in slots if (slot.get("check") or {}).get("attended") is not False}
+        customers = []
+        for email in set(conversations) | set(new):
+            conversation = conversations.get(email) or {}
+            history = conversation.get("history") or []
+            stage = conversation.get("stage", 0)
+            selection = (conversation.get("selection") or {}).get("status")
+            sent = aware(conversation.get("last_sent_at"))
+            silent = bool(stage and (not history or history[-1].get("who") == "nos")
+                          and sent and moment - sent >= timedelta(days=NO_REPLY_DAYS))
+            if conversation.get("ignored"):
+                column = "blacklist" if ignore_kind(conversation) == "black" else "greylist"
+            elif conversation.get("visit") == "nao_quer":
+                column = "desistiu"
+            elif selection in SELECTION_STATES:
+                column = "shortlist"
+            elif email in visited:
+                column = "visitou"
+            elif email in booked:
+                column = "marcada"
+            elif email not in waiting and stage and (conversation.get("inactive") or silent):
+                column = "sem_resposta"
+            else:
+                column = f"i{min(stage, 4)}" if stage else "contacto"
+            item = new.get(email) or {}
+            dots = []
+            if column not in ("desistiu", "greylist", "blacklist"):
+                if email in waiting and moment - waiting[email] >= timedelta(hours=hours["our_turn_hours"]):
+                    dots.append("orange")
+                ficha = conversation.get("ficha") or item.get("ficha")
+                summary = ficha_summary(ficha)
+                if summary["complete"]:
+                    done = aware(ficha.get("complete_at") or ficha.get("at"))
+                    late = bool(done and moment - done >= timedelta(hours=hours["no_visit_hours"])
+                                and email not in booked and not was_proposed(conversation, email, proposed))
+                    dots.append("blue" if late else "green")
+                elif stage and (not self.replied_after_us(conversation) or not summary["known"]):
+                    dots.append("red")
+            last = history[-1].get("ts") or history[-1].get("at") if history else item.get("date")
+            customers.append({"email": email, "column": column, "waiting": email in waiting, "selection": selection,
+                              "dots": dots, "reason": (conversation.get("ignored_reason") or "")
+                              if column in ("greylist", "blacklist") else "",
+                              "name": conversation.get("name") or (item.get("customer") or {}).get("name") or "",
+                              "last_at": last or conversation.get("last_sent_at")})
+        return sorted(customers, key=lambda customer: str(customer["last_at"] or ""), reverse=True)
 
     def owner_report(self, ref, profile, data, moment=None):
         """27/09: a property's situation as its owner reads it, not the queue's: how many customers contacted us,
@@ -2346,7 +2467,7 @@ class MailService:
         with locked(self.folder):
             data = self.load(ref)
             conversation = data["conversations"][email]
-            conversation["ficha"] = {**merge_ficha(conversation.get("ficha"), ficha), "at": now()}
+            conversation["ficha"] = ficha_update(conversation.get("ficha"), ficha)
             self.save(data, ref)
             self.log("openai_usage", model=model, **usage, reference=ref, cost_usd=round(estimate_cost_usd(
                 model, **{k: usage[k] for k in ("prompt_tokens", "completion_tokens")}), 6))
@@ -2387,7 +2508,7 @@ class MailService:
                         model, **{k: usage[k] for k in ("prompt_tokens", "completion_tokens")}), 6))
                     for key_id, ficha in parse_fichas_batch(answer, set(ids)).items():
                         conversation = conversations[ids[key_id]]
-                        conversation["ficha"] = {**merge_ficha(conversation.get("ficha"), ficha), "at": now()}
+                        conversation["ficha"] = ficha_update(conversation.get("ficha"), ficha)
                         result["filled"] += 1
                 self.save(data, ref)
                 self.log("fichas_filled", reference=ref, asked=result["asked"], filled=result["filled"])
@@ -2766,6 +2887,7 @@ class MailService:
             voice["after_visit_template"] = (style.get("after_visit_template") or {}).get("text") or AFTER_VISIT_TEMPLATE
             voice["visit_reminder"] = (style.get("visit_reminder") or {}).get("text") or VISIT_REMINDER_RULE
             voice["digest_recipient"] = (style.get("digest_recipient") or {}).get("text") or ""
+            voice["alerts"] = alert_hours({"style": style})
             today = date.today().isoformat()
             properties = []
             events = load_events(self.folder, limit=100000)  # once, for every property's tank
@@ -2793,7 +2915,7 @@ class MailService:
                                        "reference", "listing_id", "listing_url", "advertiser", "description",
                                        "advertised_rent_eur", "owner_email")}})
             return {"account": account, "voice": voice, "properties": properties, "ai": self.ai_settings(events),
-                    "lookback_days": int(self.config().get("lookback_days", 7)),
+                    "first_read_days": FIRST_READ_DAYS,
                     "openai_configured": has_openai_api_key(self.folder, account), "api_fuel": self.api_fuel(None, events)}
 
     def save_photo(self, ref, image):
@@ -2877,6 +2999,17 @@ class MailService:
                     if len(text) > 3000:
                         raise ValueError("Texto demasiado longo (até 3000 caracteres).")
                     style.setdefault(key, {}).update(text=text, status="configured" if text else "not_configured")
+            alerts = choices.get("alerts")
+            if alerts is not None:
+                if not isinstance(alerts, dict):
+                    raise ValueError("Alertas inválidos.")
+                values = {}
+                for key in ALERT_HOURS:
+                    value = alerts.get(key)
+                    if isinstance(value, bool) or not isinstance(value, int) or not ALERT_HOURS_RANGE[0] <= value <= ALERT_HOURS_RANGE[1]:
+                        raise ValueError("Indica as horas das bolinhas: um número de 1 a 720.")
+                    values[key] = value
+                style["alerts"] = {**values, "status": "configured"}
             if "digest_recipient" in choices:
                 recipient = str(choices.get("digest_recipient") or "").strip()
                 if recipient and not EMAIL.fullmatch(recipient):
@@ -2886,9 +3019,13 @@ class MailService:
             save_json(path, voice)
             self.log("voice_saved")
 
-    def save_property(self, fields):
-        """Create or update a property from listing data; the facts go to its knowledge base."""
+    def save_property(self, fields, first_read_days=None):
+        """Create or update a property from listing data; the facts go to its knowledge base. A new property's
+        first read goes back first_read_days (asked when it is created; FIRST_READ_DAYS by default)."""
         fields = clean_property(fields)
+        back = FIRST_READ_DAYS if first_read_days in (None, "") else first_read_days
+        if isinstance(back, bool) or not isinstance(back, int) or not FIRST_READ_RANGE[0] <= back <= FIRST_READ_RANGE[1]:
+            raise ValueError("Indica os dias da primeira leitura: um número de 1 a 365.")
         if not fields["reference"] or not fields["description"]:
             raise ValueError("Indica pelo menos a referência e a descrição do imóvel.")
         with locked(self.folder):
@@ -2909,8 +3046,13 @@ class MailService:
                 write_private(knowledge / "anuncio.md", "# Dados do anúncio\n\n<!-- Extraídos do anúncio pela página "
                               "local; confirma e corrige. Este ficheiro é substituído na próxima extração. -->\n\n"
                               + "\n".join(f"- {fact}" for fact in fields["facts"]) + "\n")
+            created = ref not in profiles
+            queue = self.load(ref)
+            if created and not queue.get("last_read_at"):
+                queue["read_from"] = (date.today() - timedelta(days=back)).isoformat()
+                self.save(queue, ref)
             self.log("property_saved", reference=ref)
-            return {"reference": ref, "created": ref not in profiles}
+            return {"reference": ref, "created": created}
 
     def knowledge(self, property_ref=None):
         """What the assistant knows, exactly as it gets it: the property's base and the agency's know-how."""

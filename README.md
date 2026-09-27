@@ -1,6 +1,6 @@
 # ARIA (bot_mail)
 
-ARIA (AI Real Estate Interactions Assistant, by BigLearn.PT) é o nome da app desde 27/09/2026; o pacote Python e os comandos continuam `bot_mail` e `bot-mail`.
+ARIA (AI Real Estate Inquiry Assistant, by BigLearn.pt) é o nome da app desde 27/09/2026; o pacote Python e os comandos continuam `bot_mail` e `bot-mail`.
 
 > **Estado a 22/09/2026.** A versão local corre no Mac: backend em Python (Starlette), página em HTML,
 > CSS e JS com um painel de métricas, e MCP local por stdio. Já leu o Gmail real (35 pedidos, todos
@@ -35,8 +35,10 @@ Sem API de IA e sem base de dados. Tudo corre no teu computador.
 5. Pede: **«Mostra o lote que vais enviar.»** Confere destinatários e textos.
 6. Confirma o envio. Só os enviados com sucesso saem dos pendentes.
 
-READ pode correr hoje, amanhã ou daqui a uma semana: retoma desde a última leitura concluída.
-Não apaga rascunhos. A primeira leitura usa os dias definidos na configuração.
+READ pode correr hoje, amanhã ou daqui a uma semana: cada imóvel retoma desde a véspera da última leitura.
+Não apaga rascunhos. A primeira leitura de um imóvel recua os dias escolhidos ao criá-lo (45 por omissão), com
+os emails recebidos e as tuas respostas no Gmail; uma leitura assim nunca traz aos outros imóveis emails mais
+antigos do que a última leitura deles.
 Os identificadores já respondidos ficam no JSON para não voltarem a entrar.
 Uma nova mensagem na mesma conversa tem outro ID e entra normalmente.
 
@@ -70,7 +72,8 @@ assistente consulta: o know-how da agência, em «Voz e estilo», e o conhecimen
 **Copiar/colar** (o que levas e trazes do ChatGPT). Por agora usa-se copiar/colar ou, opcionalmente, a API
 da OpenAI (ver «Via alternativa por API» abaixo); o MCP fica para depois.
 
-No separador **Comunicações** (Centro de Comunicações; antes «Respostas»), o fluxo é em lote. Antes de ler, escolhes quantos dias recuar (7 por omissão):
+No separador **Comunicações** (Centro de Comunicações; antes «Respostas»), o fluxo é em lote. «Ler emails do Gmail» não pergunta dias: continua desde a última leitura (desde 27/09). Por cima dos emails, uma tabela mostra os clientes do imóvel por fase (1.º contacto, interações,
+visita marcada, visitou, short list, sem resposta e desistiu); clicar num nome leva ao seu cartão (desde 27/09). Os passos:
 
 1. **Ler emails do Gmail** e escolher os emails a tratar.
 2. **Criar prompt**: um só prompt para todos os selecionados, mostrado na página antes de qualquer cópia.
@@ -136,7 +139,7 @@ Com pelo menos um perfil, o READ só guarda:
 
 O resto do correio é ignorado, sem descarregar o texto.
 
-**«Atualizar agenda»** (Respostas e Agenda): a IA (API) lê as conversas dos clientes ativos e atualiza a
+**«Atualizar visitas»** (só no separador Visitas, desde 27/09): a IA (API) lê as conversas dos clientes ativos e atualiza a
 Agenda sozinha — verde o dia e a hora que confirmámos, laranja os que o cliente aceitou. **Os enviados ficam na
 fila**, em «Enviados · clientes ativos», até haver visita marcada ou até os retirares; «Escrever mais» abre um
 rascunho de acrescento na conversa do cliente.

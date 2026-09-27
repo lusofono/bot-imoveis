@@ -40,8 +40,9 @@ def create_server(folder):
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=True))
     async def read_emails(days: int | None = None) -> dict:
-        """Consulta Gmail e acrescenta emails novos (uma fila por imóvel, se houver perfis). days: quantos dias
-        para trás nesta leitura (por omissão, os da configuração). Devolve os pendentes e as instruções de cada
+        """Consulta Gmail e acrescenta emails novos (uma fila por imóvel, se houver perfis). Cada imóvel desde a
+        véspera da última leitura (um imóvel novo, desde o dia escolhido ao criá-lo); days: recuar pelo menos estes
+        dias nesta leitura. Devolve os pendentes e as instruções de cada
         imóvel. Não envia."""
         return await run(service.read, days)
 

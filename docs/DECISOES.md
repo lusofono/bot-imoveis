@@ -3,6 +3,87 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 27/09/2026, à noite: a conversa sempre à vista, e o ChatGPT à mão em «Gerar respostas» (α.61.1–α.61.2)
+
+**Decisão (pedidos do utilizador).**
+- **A conversa inteira sempre aberta, a mais recente em cima, numa caixa de 300 px com scroll:** o «Email completo»
+  fechado obrigava a um clique em cada cartão, e a mensagem do cliente aparecia duas vezes (no topo e na conversa).
+  A altura fixa impede que uma conversa longa empurre o rascunho para longe.
+- **Em «Modo: só API», o caminho do ChatGPT fica dobrado por baixo de «Gerar respostas»**, em vez de escondido: o
+  mesmo prompt e a mesma validação dos rascunhos, para quando se prefere não gastar a API.
+
+## 27/09/2026, à noite: os clientes por fase, numa tabela em Comunicações (α.60.0)
+
+**Decisão (pedido do utilizador, com as colunas dele).**
+- **Uma tabela por cima dos emails, do imóvel escolhido:** uma coluna por fase e um nome por linha, para ver o funil
+  de relance antes de entrar no detalhe da lista de baixo.
+- **Cada cliente numa só coluna, a da fase mais avançada:** desistiu, short list, visitou, visita marcada, sem
+  resposta e, antes disso, a interação em que vai. Assim os números das colunas somam o total de clientes.
+- **«1.º contacto» é quem ainda não teve resposta nossa** (pedido do utilizador: antes de respondermos é só um primeiro
+  contacto); as interações contam as nossas respostas, como as etiquetas dos emails.
+- **«Sem resposta» à parte de «Desistiu»:** calar-se não é dizer que não. Entra quem deixou o nosso último email sem
+  resposta 3 dias ou mais, em qualquer interação (pedido do utilizador), além dos inativos; quem volta a escrever volta
+  à sua fase. «Desistiu» é quem recusou a visita ou está na greylist ou na blacklist.
+- **A Short list é a de Visitas**, com os escolhidos e os suplentes: não há uma segunda marcação.
+- **«Sem resposta» fica fora da tabela, só com o número** (α.60.1, pedido do utilizador): são muitos, e uma coluna
+  deles tornava a tabela comprida. Os nomes abrem-se por baixo, numa linha seguida, para quem quiser saber quem são.
+  Pelo mesmo motivo, a greylist e a blacklist do imóvel ficam em duas linhas iguais por baixo (α.61.0), e «Desistiu»
+  passa a ser só quem recusou a visita.
+- **As bolinhas, com a legenda do utilizador (α.61.0):** laranja, a nossa vez há mais de 48 h; vermelha, nunca nos
+  respondeu ou respondeu sem nada do que pedimos (nenhum dos quatro pontos da ficha); verde, ficha completa; azul em vez
+  de verde, ficha completa há mais de 96 h sem proposta de visita nossa. As duas horas definem-se em Voz e estilo (são do
+  dono, não do imóvel). As cores são fixas em todos os temas: são sinais. Um cliente num 1.º contacto nunca tem
+  vermelha (ainda não lhe perguntámos nada); os da greylist, da blacklist e de «Desistiu» não têm bolinhas.
+- **Para a azul, a ficha passa a guardar quando ficou completa** (`complete_at`, mantido enquanto se mantiver
+  completa); nas fichas completas de antes, conta a última atualização.
+- **Um ponto marca quem espera resposta nossa**, e clicar num nome leva ao seu cartão (quando tem um na lista).
+
+## 27/09/2026, à noite: as ações de cada email pela ordem do trabalho (α.59.1)
+
+**Decisão (pedidos do utilizador).**
+- **À direita, pela ordem em que se faz:** acrescentar ao conhecimento (aberto), gerar a resposta, enviar. O conhecimento
+  vem antes porque é o que muda a resposta gerada; por isso sai «Guardar e refazer esta resposta», que era só os dois
+  passos seguidos.
+- **Cada botão só aparece quando serve:** «Guardar rascunho» quando há alterações por guardar, e por baixo do texto a
+  que diz respeito; «Enviar individual» quando há texto para enviar.
+- **Os tokens e o custo da última geração ficam por baixo do botão**, sem abrir nada: a pergunta era «quanto gastou
+  esta?». Ficam até recarregar a página; o total continua na carteira do Painel.
+- **Tirar da fila fica à esquerda, junto do nome do cliente, em pills pequenas com hover:** são decisões sobre o
+  cliente, não passos da resposta, e o hover explica a diferença entre as três (retirar este email; deixar de lhe
+  escrever primeiro, com o que ele escrever a entrar; nunca mais).
+
+## 27/09/2026, à noite: ler desde a última leitura; 45 dias só na primeira leitura de um imóvel (α.59.0)
+
+**Decisão (pedido do utilizador).**
+- **Sai «Dias para trás» de Comunicações.** A leitura já retomava sozinha desde a última: o campo só contava na
+  primeira leitura, num imóvel novo ou depois de mudar as regras de um imóvel, e o resto do tempo só tornava a leitura
+  mais lenta (223 cabeçalhos vistos para 1 email novo, a 27/09).
+- **Cada imóvel lê desde a véspera da sua última leitura** (um dia de sobreposição por causa dos fusos e das datas do
+  IMAP; os IDs evitam duplicados). O `lookback_days` do `config.json` deixa de contar.
+- **A primeira leitura de um imóvel recua os dias escolhidos ao criá-lo, 45 por omissão**, com os emails recebidos e as
+  respostas do dono no Gmail. Fica no `queue.json` do imóvel como data (`read_from`), para uma leitura dias depois
+  continuar a apanhar tudo.
+- **Uma só pesquisa no Gmail, mas cada email só entra se couber na janela do seu imóvel:** a primeira leitura de um
+  imóvel novo não pode trazer aos outros pedidos de há semanas que nunca foram lidos (e a que já não faz sentido
+  responder).
+- **Uma resposta do dono no Gmail a um cliente que aparece nessa mesma leitura passa a contar:** os clientes aceites
+  entram logo na lista de quem se conhece, e o Gmail («Todo o correio») entrega as mensagens pela ordem de chegada.
+- **O terminal e o MCP mantêm `--days`**, para recuar mais numa leitura (por exemplo, depois de corrigir a referência
+  de um imóvel).
+
+## 27/09/2026, à noite: ARIA é «AI Real Estate Inquiry Assistant», by BigLearn.pt (α.58.3)
+
+**Decisão (pedido do utilizador, depois de rever o nome).**
+- **«Inquiry» em vez de «Interactions»:** é o termo do setor para o pedido que chega do portal, que é o que a app
+  trata, e as iniciais continuam a dar ARIA. «Interactions Assistant» soava mal em inglês (um nome antes de outro fica
+  no singular) e dizia pouco. «Real Estate» sem hífen, como se escreve num nome.
+- **O significado vai no hover do nome, e o «©» diz só os direitos de autor:** quem passa o rato num «©» espera ler
+  isso, e o símbolo é pequeno de mais para ser o único sítio com o significado.
+- **A empresa escreve-se sempre «BigLearn.pt»**, como no logótipo e no site (havia «BigLearn PT» e «BigLearn.PT»).
+  As entradas antigas do `CHANGELOG.md` e desta página ficam como estavam.
+- **Fica anotado, sem mudar nada agora:** «Aria» é também o assistente de IA do browser Opera, e ARIA a norma de
+  acessibilidade da web; a confirmar o registo da marca antes da venda da app.
+
 ## 27/09/2026, à noite: mais seis modelos, com o preço confirmado (α.58.0)
 
 **Decisão (pedido do utilizador).**

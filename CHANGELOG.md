@@ -1,4 +1,4 @@
-# Changelog — ARIA, by BigLearn PT
+# Changelog — ARIA, by BigLearn.pt
 
 A versão aparece no canto superior esquerdo da página e vem de um só sítio: `version` em `pyproject.toml`.
 Cada pedido que muda a página ou o backend sobe a versão e fica registado aqui, do mais recente para o mais
@@ -14,6 +14,107 @@ o `pyproject.toml` continua com o número normal (`0.X.Y`), que é o que as ferr
 ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparece na página.
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
+
+## α.61.5 — 27/09/2026
+
+- **Greylist e Blacklist, por baixo da tabela dos clientes: o motivo aparece a seguir ao nome**, quando há um (por
+  exemplo «Cliente disse que não tem interesse.»).
+
+## α.61.4 — 27/09/2026
+
+- **Tabela dos clientes: sai a legenda das bolinhas de baixo da tabela;** cada bolinha diz o que quer dizer no seu
+  próprio hover.
+
+## α.61.3 — 27/09/2026
+
+- **Comunicações: sai «Atualizar visitas»** do cartão «Ler emails». Fica só em Visitas, onde já estava: é lá que se
+  tratam as visitas, e as respostas geradas pela API já registam as marcações que levam.
+
+## α.61.2 — 27/09/2026
+
+- **«Gerar respostas» ganha, por baixo e em pequeno, «Ou no ChatGPT (copiar/colar)»**: fechado por omissão; aberto,
+  tem «Criar e copiar o prompt» (o mesmo prompt dos emails selecionados, com as instruções extra), o prompt à vista, e
+  o campo para colar a resposta do ChatGPT com «Guardar rascunhos». Os rascunhos são os mesmos que os da API.
+
+## α.61.1 — 27/09/2026
+
+- **Sai «Email completo»: a conversa está sempre à vista**, a mais recente em cima, numa caixa de 300 px de altura que
+  faz scroll. O que o cartão responde vem marcado «por responder»; a letra passa a ser a da página (era a de máquina
+  de escrever). Um email preparado pelo programa (proposta de visita, lembretes…) tem por cima uma linha a dizer o
+  que é. Os cartões dos enviados usam a mesma caixa (saem «O que enviámos por último» e «Conversa»).
+
+## α.61.0 — 27/09/2026
+
+- **Tabela dos clientes: bolinhas ao lado de cada nome, com a legenda por baixo da tabela.** 🟠 laranja: à espera de
+  resposta nossa há mais de 48 h; 🔴 vermelha: nunca nos respondeu, ou respondeu sem nada do que pedimos; 🟢 verde:
+  ficha completa, já sabemos tudo dele; 🔵 azul, em vez da verde: ficha completa há mais de 96 h e ainda sem data de
+  visita da nossa parte. As horas mudam-se em **Voz e estilo**, na secção nova «Bolinhas da tabela de clientes». O
+  hover de cada nome diz o que cada bolinha quer dizer.
+- **Por baixo de «Sem resposta», mais duas linhas: a Greylist (ignorados por agora) e a Blacklist (ignorados
+  sempre)** deste imóvel, só com o número, que se abrem para mostrar os nomes. Saem da coluna «Desistiu», que fica
+  só com quem recusou a visita. Os nomes das três linhas também têm bolinhas.
+- A ficha de cada cliente guarda quando ficou completa (`complete_at`), para a bolinha azul; as fichas completas de
+  antes contam desde a última atualização.
+
+## α.60.2 — 27/09/2026
+
+- **Comunicações: «Emails pendentes» passa a «Emails em tratamento»** (e «Não há emails em tratamento» quando a lista
+  está vazia): «pendentes» soava a falha do nosso lado, e a lista também tem rascunhos, lembretes e propostas de visita
+  a caminho.
+
+## α.60.1 — 27/09/2026
+
+- **«Sem resposta» sai da tabela das fases** (eram muitos e a tabela ficava comprida): passa a uma linha por baixo dela,
+  «Sem resposta N», que se abre para mostrar os nomes, seguidos, uns ao lado dos outros. Fica aberta ou fechada como a
+  deixaste, enquanto a página não recarrega.
+
+## α.60.0 — 27/09/2026
+
+- **Comunicações: uma tabela com os clientes do imóvel por fase**, logo por baixo de «Emails pendentes». Uma coluna
+  por fase, com quantos são: **1.º contacto** (ainda sem resposta nossa), **1.ª, 2.ª, 3.ª e Mais de 3** interações,
+  **Visita marcada**, **Visitou**, **Short list** e, à parte e em tom mais apagado, **Sem resposta** (o nosso último
+  email sem resposta há 3 dias ou mais, seja qual for a interação) e **Desistiu** (recusou a visita, greylist ou
+  blacklist). Cada cliente aparece uma só vez, na fase mais avançada, com o nome e o apelido; um ponto laranja marca
+  quem está à espera de resposta nossa. O hover diz o nome completo e o último contacto; clicar num nome leva ao
+  cartão desse cliente na lista de baixo.
+
+## α.59.2 — 27/09/2026
+
+- **O botão «Ignorar sempre» passa a dizer «Ignorar sempre / Blacklist»**, com o mesmo nome da lista a que leva (a que
+  aparece em Imóveis); o hover e a confirmação dizem-no também.
+
+## α.59.1 — 27/09/2026
+
+- **Comunicações, as ações de cada email pela ordem do trabalho** (à direita): «+ Acrescentar ao conhecimento», já
+  aberto; «Gerar esta resposta», com os tokens e o custo da última geração por baixo («Última geração: 1 234 tokens ·
+  0,0021 €»); e **«Enviar individual»** (era «Enviar só este»), que só aparece quando há texto no rascunho.
+- **«Guardar rascunho» passa para baixo do rascunho**, à esquerda, e só aparece quando o texto mudou e ainda não foi
+  guardado.
+- **Sai «Guardar e refazer esta resposta (API)»:** fazia o mesmo que «Guardar no conhecimento» seguido de «Gerar esta
+  resposta».
+- **«Retirar da fila», «Não tem interesse» e «Ignorar sempre» passam para a esquerda**, por baixo do nome do cliente e
+  das etiquetas, em botões pill com um hover que explica o que cada um faz. A confirmação de «Não tem interesse» deixa
+  de dizer que o cliente nunca mais entra: se voltar a escrever, a mensagem entra, com um aviso (é assim desde 26/09).
+- «Gerar respostas» (o lote) diz também o custo, ao lado dos tokens.
+
+## α.59.0 — 27/09/2026
+
+- **Sai «Dias para trás» de Comunicações:** «Ler emails do Gmail» continua sempre desde a véspera da última leitura de
+  cada imóvel. Por baixo, a página diz desde quando lê.
+- **Ao criar um imóvel, a página pergunta quantos dias ler para trás na primeira leitura (45 por omissão)**, com os
+  emails recebidos e as tuas respostas no Gmail. Uma leitura assim só traz ao imóvel novo os emails antigos: os outros
+  imóveis não recebem nada mais antigo do que a última leitura deles.
+- **As tuas respostas escritas no Gmail a um cliente que chegou nessa mesma leitura passam a contar** (antes só
+  contavam na leitura seguinte, se o cliente já estivesse na fila).
+- O `bot-mail setup` deixa de perguntar os «Dias da primeira leitura» e o `lookback_days` do `config.json` deixa de
+  contar; `bot-mail read --days N` (e o MCP) ainda pode recuar mais, numa leitura.
+
+## α.58.3 — 27/09/2026
+
+- **ARIA quer dizer «AI Real Estate Inquiry Assistant»** (era «Interactions»): diz-o o hover do próprio nome, «ARIA —
+  AI Real Estate Inquiry Assistant, by BigLearn.pt». **O «©» volta a dizer «© 2026 BigLearn.pt — todos os direitos
+  reservados».** O nome da empresa escreve-se sempre «BigLearn.pt», como no logótipo (também no LEIA-ME da
+  demonstração).
 
 ## α.58.2 — 27/09/2026
 

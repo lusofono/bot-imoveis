@@ -54,6 +54,23 @@ def test_the_page_is_served_as_its_own_files(page):
     logo = client.get("/brand/biglearn.png")
     assert logo.headers["content-type"] == "image/png" and logo.content.startswith(b"\x89PNG")
     assert 'src="brand/biglearn.png"' in html.text and "by BigLearn PT" not in html.text
+    # «ARIA»'s hover says what the name means; the © beside it keeps the copyright (α.58.3).
+    assert '<strong class="brand-name" title="ARIA — AI Real Estate Inquiry Assistant, by BigLearn.pt">' in html.text
+    assert 'title="© 2026 BigLearn.pt — todos os direitos reservados">©</sup>' in html.text
+    # 27/09: no «Dias para trás» in Comunicações; the first read's days are asked when a property is created.
+    assert "Dias para trás" not in html.text and 'id="f-first-read"' in html.text and 'id="days"' not in html.text
+    # Each email's actions: «Enviar individual», and no «Guardar e refazer» (it was save + generate).
+    assert "'Enviar individual'" in script.text and "Enviar só este" not in script.text
+    assert "'Guardar e refazer" not in script.text and "pill-action" in script.text
+    assert "'Ignorar sempre / Blacklist'" in script.text
+    # 27/09: «Atualizar visitas» only in Visitas (it was in Comunicações too).
+    assert 'id="agenda-sync"' not in html.text and 'id="agenda-sync-here"' in html.text
+    # 27/09: the ChatGPT way folded under «Gerar respostas»; the conversation always open, in a box that scrolls.
+    assert 'id="gpt-box"' in html.text and "$('gpt-paste')" in script.text
+    assert "conversation-box" in script.text and "Email completo" not in script.text.replace("no «Email completo» to open", "")
+    # The customers by step, above the emails (27/09), under «Emails em tratamento» (it was «Emails pendentes»).
+    assert "<h2>Emails em tratamento</h2>" in html.text and "Emails pendentes" not in html.text
+    assert 'id="pipeline"' in html.text and "function renderPipeline" in script.text and "pipeline-below" in script.text
     # A rich theme keeps its own stylesheet in frontend/themes/, linked from the page and served as CSS.
     assert '<link rel="stylesheet" href="themes/racing.css">' in html.text
     racing = client.get("/themes/racing.css")
@@ -334,6 +351,9 @@ def test_generate_calls_the_api_and_saves_drafts_exactly_like_pasting(service, p
     assert status == 200 and generated["saved"] == 1 and generated["notes"][0]["nota"] == "Confirma a data."
     assert generated["state"]["properties"][0]["emails"][0]["reply_text"].startswith("Cara Ana")
     assert generated["tokens"] == usage
+    # What it cost, for the line under «Gerar esta resposta» (27/09).
+    from backend.openai_client import estimate_cost_usd
+    assert generated["cost_usd"] == round(estimate_cost_usd(generated["model"], prompt_tokens=100, completion_tokens=20), 6) > 0
     prompt_sent = complete.call_args.args[2]
     assert "Sê breve." in prompt_sent and CUSTOMER not in prompt_sent  # same prompt as copy/paste, no contacts
     # Tokens (never the prompt or the answer) are logged for the dashboard's cost panel.
