@@ -2,20 +2,22 @@
 // TOKEN is written into index.html by the server at each start and goes with every API call.
 const STATUS ={pending: 'por responder', draft: 'rascunho', error: 'erro no envio', sending: 'a enviar', uncertain: 'envio incerto'};
 const AUX_KINDS = ['reminder', 'consent_request', 'visits_closed', 'addition'];
-const FIELDS = ['reference', 'sender', 'listing_id', 'listing_url', 'advertiser', 'advertised_rent_eur', 'description'];
+const FIELDS = ['reference', 'sender', 'listing_id', 'listing_url', 'advertiser', 'advertised_rent_eur', 'description',
+  'owner_email'];
 const $ = id => document.getElementById(id);
 let state = {properties: []}, settings = null, preview = null;
 
 // Only the visual preference is stored locally; never account or email content.
 // APalace is first, and the one a browser with no choice saved starts in (27/09).
-const THEMES = ['apalace', 'night', 'day', 'indigo', 'amber', 'racing', 'boat', 'scooter', 'kw'];
+// Âmbar first and the one to start with (27/09): the interface is being simplified in it, the others follow later.
+const THEMES = ['amber', 'apalace', 'night', 'day', 'indigo', 'racing', 'boat', 'scooter', 'kw'];
 function applyTheme(theme) {
-  const chosen = THEMES.includes(theme) ? theme : 'apalace';
+  const chosen = THEMES.includes(theme) ? theme : 'amber';
   document.documentElement.dataset.theme = chosen;
   $('theme-select').value = chosen;
 }
 try { applyTheme(localStorage.getItem('bot-mail-theme')); }
-catch { applyTheme('apalace'); }
+catch { applyTheme('amber'); }
 $('theme-select').addEventListener('change', event => {
   applyTheme(event.target.value);
   try { localStorage.setItem('bot-mail-theme', event.target.value); } catch { /* Storage may be unavailable. */ }
@@ -38,7 +40,7 @@ const SKINS = {
     words: {
       'dashboard.eyebrow': 'COCKPIT', 'dashboard.title': 'O teu dia, a todo o gás.',
       'dashboard.step': 'Contactos, respostas e imóveis: todos os instrumentos à vista.',
-      'activity.eyebrow': 'TELEMETRIA', 'activity.title': 'Pedidos e respostas, volta a volta',
+      'activity.eyebrow': 'ROAD BOOK', 'activity.title': 'Pedidos e respostas, volta a volta',
       'setup.eyebrow': 'CHECK-LIST DE PARTIDA', 'setup.title': 'Pronto para arrancar',
       'portfolio.eyebrow': 'GARAGEM', 'portfolio.title': 'Os teus imóveis, na garagem',
       'replies.eyebrow': 'BOX', 'replies.title': 'Paragem na box: rápida, mas sem erros.',
@@ -78,7 +80,7 @@ const SKINS = {
     words: {
       'dashboard.eyebrow': 'GUIADOR', 'dashboard.title': 'O teu dia, a passear numa vila costeira.',
       'dashboard.step': 'Contactos, respostas e imóveis: tudo à vista, entre os punhos.',
-      'activity.eyebrow': 'CONTA-QUILÓMETROS', 'activity.title': 'Pedidos e respostas, curva a curva',
+      'activity.eyebrow': 'ROAD BOOK', 'activity.title': 'Pedidos e respostas, curva a curva',
       'setup.eyebrow': 'ANTES DO ARRANQUE', 'setup.title': 'Pronto para dar ao pedal',
       'portfolio.eyebrow': 'GARAGEM DA VILLA', 'portfolio.title': 'Os teus imóveis, estacionados à sombra',
       'replies.eyebrow': 'CORREIO EXPRESSO', 'replies.title': 'Cada resposta, entregue de scooter.',
@@ -757,6 +759,7 @@ function showTab(name) {
   for (const tab of Object.keys(TAB_NAMES)) $('tab-' + tab).hidden = tab !== name;
   window.scrollTo({top: 0, behavior: 'instant'});
   if (name === 'dashboard') { run(loadMetrics); run(loadDigest); }
+  if (name === 'voice') run(loadMetrics);  // «O teu espaço» (27/09) lives at the top of the settings now
   if (name === 'contacts') run(loadContacts);
   if (name === 'agenda') renderAgenda();
   // Sends, refills and reads elsewhere change its numbers: the cluster is never shown out of date.
@@ -966,7 +969,22 @@ function card(email) {
     title: 'Abre o WhatsApp do Mac na conversa deste cliente, com o rascunho escrito. Envias tu, lá.',
     onclick: () => { location.href = `whatsapp://send?phone=${whatsappNumber(email.whatsapp)}&text=${encodeURIComponent(whatsappText(draft.value))}`; }},
     'Abrir no WhatsApp');
-  return el('article', {class: 'card email-card' + (email.blocked ? ' blocked' : '')},
+  // 27/09: a reply from the API for this email alone (the same call as «Gerar respostas», with its extra instructions).
+  const generateOne = !email.blocked && el('button', {class: 'needs-fuel',
+    title: settings?.openai_configured ? 'O prompt leva as instruções e a mensagem, sem o email nem o telefone do cliente.'
+      : 'Sem chave OpenAI configurada: o clique explica como.',
+    onclick: event => run(async () => {
+      if (draft.value.trim() && draft.value !== saved
+          && !confirm('O rascunho tem alterações por guardar, e a resposta nova substitui-as. Continuar?')) return;
+      const result = await call('api/prompt/generate', {property_ref: queueRef(), ids: [email.id], extra: $('extra').value});
+      state = result.state; renderState(); applyFuel(result.fuel, queueRef());
+      const note = (result.notes || []).find(item => item.id === email.id)?.nota;
+      toast(result.saved ? 'Resposta gerada: revê-a antes de enviar.' + (note ? ` Nota: ${note}` : '')
+        : 'A API não devolveu um rascunho para este email.', result.saved ? 'ok' : 'warn');
+    }, event.currentTarget)}, 'Gerar esta resposta');
+  // 27/09: the email and its draft on the left (2/3); on the right (1/3), what can be done with it: save, send, a reply
+  // from the API, a fact for the knowledge, and, last, taking it out of the queue.
+  const article = el('article', {class: 'card email-card' + (email.blocked ? ' blocked' : '')},
     el('div', {class: 'card-head'},
       el('label', {class: 'who'}, el('input', {type: 'checkbox', class: 'pick', 'data-id': email.id, checked: !email.blocked, disabled: !!email.blocked}),
         el('strong', {}, customer.name || sender.name || sender.email || 'Sem nome')),
@@ -1006,13 +1024,19 @@ function card(email) {
       : AUX_KINDS.includes(email.kind) || email.closing ? '(sem mensagem nova do cliente: email preparado automaticamente, ver o rascunho abaixo)'
       : customer.message || email.body_text || ''),
     historyBlock(email),
-    draft,
-    el('div', {class: 'actions'},
-      saveButton, saveStatus, sendOne, whatsapp,
-      email.consent_suggested && el('button', {class: 'primary', onclick: event => run(async () => {
-        state = await call('api/consent/confirm', {property_ref: queueRef(), id: email.id});
-        renderState(); toast('Consentimento confirmado e registado em contactos.csv.');
-      }, event.currentTarget)}, 'Confirmar consentimento (RGPD)'),
+    draft);
+  const actions = el('aside', {class: 'card email-actions', 'aria-label': 'O que fazer com este email'},
+    el('div', {class: 'save-line'}, saveButton, saveStatus),
+    sendOne, whatsapp,
+    email.consent_suggested && el('button', {class: 'primary', onclick: event => run(async () => {
+      state = await call('api/consent/confirm', {property_ref: queueRef(), id: email.id});
+      renderState(); toast('Consentimento confirmado e registado em contactos.csv.');
+    }, event.currentTarget)}, 'Confirmar consentimento (RGPD)'),
+    generateOne && el('div', {class: 'email-generate'},
+      el('p', {class: 'muted small'}, 'Gerar resposta ', el('span', {class: 'kind'}, 'API · ' + (settings?.ai?.model || ''))),
+      generateOne),
+    noteBox(queueRef(), null, email.id),
+    el('div', {class: 'exit-actions'},
       el('button', {class: 'link danger', onclick: event => run(async () => {
         if (!confirm('Retirar este email da fila sem responder? O Gmail não é alterado e o email não volta a entrar.')) return;
         state = await call('api/dismiss', {property_ref: queueRef(), ids: [email.id]});
@@ -1035,8 +1059,8 @@ function card(email) {
           ignored: true, kind: 'black'});
         state = result.state; renderState();
         toast(`${ignoreTarget.name || ignoreTarget.email} passou a ser ignorado(a) neste imóvel.`);
-      }, event.currentTarget)}, 'Ignorar sempre')),
-    noteBox(queueRef(), null, email.id));
+      }, event.currentTarget)}, 'Ignorar sempre')));
+  return el('div', {class: 'email-row'}, article, actions);
 }
 
 // What the assistant knows about a property, exactly as it gets it: the property's base and the agency's.
@@ -1120,12 +1144,35 @@ function ago(value) {
   return `há ${Math.round(hours / 24)} dia(s)`;
 }
 
-// open: what a click does (the number leads to the emails behind it); title: the per-property split on hover.
-function metricCard(value, label, kind, {open, title} = {}) {
-  const go = open && (event => { if (event.type === 'click' || event.key === 'Enter' || event.key === ' ') { event.preventDefault(); open(); } });
-  return el('article', {class: 'metric' + (kind && value ? ' ' + kind : '') + (open ? ' clickable' : ''), title,
-      role: open ? 'button' : null, tabindex: open ? '0' : null, onclick: go || null, onkeydown: go || null},
+// A number that only informs (27/09): no click, no jump to another tab; what to do is in «A fazer».
+// title: what is behind it, on hover.
+function metricCard(value, label, kind, {title} = {}) {
+  return el('article', {class: 'metric' + (kind && value ? ' ' + kind : ''), title},
     el('div', {class: 'value'}, String(value)), el('div', {class: 'label'}, label));
+}
+
+// The hover of the four queue numbers (27/09): the last ten emails behind each, newest first — first name, the
+// property (with several), when it arrived or was written, and what it is when the program wrote it — and «+ N itens»
+// for the rest. header: the split by property, above the list.
+const QUEUE_SHOWS = {pending: () => true, drafts: item => item.status === 'draft', blocked: item => item.blocked,
+  attention: item => ['uncertain', 'error', 'sending'].includes(item.status)};
+const QUEUE_KINDS = {reminder: 'lembrete', visit_proposal: 'proposta de visita', visit_reminder: 'lembrete de visita',
+  visit_thanks: 'agradecimento', visit_missed: 'visita falhada', consent_request: 'pedido de consentimento',
+  visits_closed: 'visitas fechadas', addition: 'acrescento', docs_request: 'pedido de documentos'};
+function queueHover(properties, shows, header) {
+  const items = properties.flatMap(property => (property.queue || []).filter(shows)
+    .map(item => ({...item, ref: property.property_ref || 'Fila única'})))
+    .sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
+  if (!items.length) return header;
+  const stamp = value => {
+    const moment = new Date(value);
+    return isNaN(moment) ? '' : moment.toLocaleString('pt-PT', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
+  };
+  const lines = items.slice(0, 10).map(item =>
+    [item.name, properties.length > 1 && item.ref, stamp(item.date), QUEUE_KINDS[item.kind]].filter(Boolean).join(' · '));
+  const rest = items.length - lines.length;
+  if (rest > 0) lines.push(`+ ${rest} ${rest === 1 ? 'item' : 'itens'}`);
+  return (header ? header + '\n\n' : '') + lines.join('\n');
 }
 
 // Short, readable labels however many bars there are: every bar up to 14, fewer after that.
@@ -1223,7 +1270,7 @@ function qualityGauges(report, key, size = 'small') {
   const box = el('div', {class: 'quality-gauges'}, Object.entries(report.parts).map(([part, item]) => gauge({
     key: `${key}:${part}`, value: item.score ?? 50, max: 100, red: [0, report.red], green: [report.green, 100],
     unit: 'qualidade', divisions: 4, minor: 5, size, alert: item.score != null && item.score < report.red,
-    readout: item.score == null ? 'sem respostas' : `${item.score} · ${item.count} resp.`,
+    readout: item.score == null ? 'sem respostas' : `${item.count} resp.`,  // the needle already says the score (27/09)
     caption: item.label + (item.average != null ? ` · média ${item.average.toLocaleString('pt-PT')}/5` : '')
       + (item.ones ? ` · ${item.ones}× nota 1` : '') + (item.no ? ` · ${item.no}× «não»` : '')})));
   box.style.setProperty('--gauges', Object.keys(report.parts).length);  // the page's CSP allows no style attribute
@@ -1248,15 +1295,7 @@ function renderQuality(report) {
 function renderDashboard(data) {
   renderQuality(data.quality);
   const totals = data.totals;
-  // The dashboard carries no customer data, only counts: a click opens the property's queue, where they are.
-  const openQueue = field => {
-    const target = data.properties.find(item => item[field] > 0);
-    if (!target) return undefined;
-    return () => {
-      $('queue').value = target.property_ref || ''; renderState(); showTab('replies');
-      $('inbox-step').scrollIntoView({behavior: 'smooth', block: 'start'});
-    };
-  };
+  // The dashboard carries no customer data, only counts, and they only inform (27/09): what to do is in «A fazer».
   const split = field => data.properties.length > 1
     ? data.properties.map(item => `${item.property_ref || 'Fila única'}: ${item[field]}`).join('\n') : undefined;
   const dm = day => day ? day.slice(8, 10) + '/' + day.slice(5, 7) : '?';
@@ -1275,10 +1314,12 @@ function renderDashboard(data) {
     return lines.join('\n');
   };
   $('metric-cards').replaceChildren(
-    metricCard(totals.pending, 'Pedidos por responder', null, {open: openQueue('pending'), title: split('pending')}),
-    metricCard(totals.drafts, 'Rascunhos prontos', 'ok', {open: openQueue('drafts'), title: split('drafts')}),
-    metricCard(totals.blocked, 'Bloqueados', 'warn', {open: openQueue('blocked'), title: split('blocked')}),
-    metricCard(totals.attention, 'A precisar de atenção', 'bad', {open: totals.attention ? openQueue('pending') : undefined}),
+    metricCard(totals.pending, 'Pedidos por responder', null,
+      {title: queueHover(data.properties, QUEUE_SHOWS.pending, split('pending'))}),
+    metricCard(totals.drafts, 'Rascunhos prontos', 'ok', {title: queueHover(data.properties, QUEUE_SHOWS.drafts, split('drafts'))}),
+    metricCard(totals.blocked, 'Bloqueados', 'warn', {title: queueHover(data.properties, QUEUE_SHOWS.blocked, split('blocked'))}),
+    metricCard(totals.attention, 'A precisar de atenção', 'bad',
+      {title: queueHover(data.properties, QUEUE_SHOWS.attention, split('attention'))}),
     metricCard(totals.answered, 'Respostas enviadas', null, {title: answeredList()}),
     metricCard(hoursText(data.reply_hours), 'Tempo médio até resposta'));
   $('dashboard-read').textContent = `Última leitura ${ago(data.last_read_at)}`
@@ -1302,7 +1343,7 @@ function renderDashboard(data) {
             }}, 'Painel do imóvel →'),
             el('button', {class: 'link', onclick: () => {
               $('queue').value = item.property_ref || ''; renderState(); showTab('replies');
-            }}, 'Ver respostas →')))))) : [el('div', {class: 'empty-state'}, 'Ainda não há imóveis configurados. Adiciona o primeiro em Imóveis.')]));
+            }}, 'Comunicações do imóvel →')))))) : [el('div', {class: 'empty-state'}, 'Ainda não há imóveis configurados. Adiciona o primeiro em Imóveis.')]));
   const check = (ok, label, hint) => el('li', {},
     el('span', {class: 'dot' + (ok ? '' : ' missing')}), el('span', {}, label,
       !ok && hint ? el('span', {class: 'muted small'}, ' — ' + hint) : ''));
@@ -1311,10 +1352,7 @@ function renderDashboard(data) {
     check(data.setup.app_password, 'App Password guardada no Keychain', 'corre mac/password.command'),
     check(data.setup.voice, 'Voz completa', 'preenche o separador Voz e estilo'),
     check(data.setup.properties > 0, `Imóveis configurados: ${data.setup.properties}`, 'cria um no separador Imóveis'));
-  const usageText = usage => usage.calls ? `${costFormat.format(usage.cost_usd)} · ${usage.calls} pedido(s) · ${usage.prompt_tokens + usage.completion_tokens} tokens`
-    : 'Sem pedidos ainda';
-  $('usage-period').textContent = usageText(data.openai_usage.period);
-  $('usage-all-time').textContent = usageText(data.openai_usage.all_time);
+  renderWallet(data.openai_usage);
   renderFuelOverview(data);
 }
 
@@ -1366,72 +1404,127 @@ $('chart-period').addEventListener('change', event => {
 const DIGEST_STATUS = {draft: 'rascunho', sending: 'a enviar', sent: 'enviado',
   error: 'erro no envio', uncertain: 'envio incerto'};
 
-// The daily status digest: prepared by itself at each READ, for the owner's own inbox. Never sent
-// without this "Enviar" click, however many days it has been sitting there as a draft.
-function renderDigest(digest) {
-  const box = $('digest-panel');
-  if (!digest) {
-    box.replaceChildren(el('article', {class: 'card digest-card'},
-      el('div', {class: 'section-heading'},
-        el('div', {}, el('p', {class: 'eyebrow'}, 'PONTO DE SITUAÇÃO DIÁRIO'), el('h2', {}, 'Ainda sem ponto de situação')),
-        el('span', {class: 'tag'}, 'por criar')),
-      el('p', {class: 'muted small'}, 'Prepara-se sozinho na primeira leitura de emails do dia, se houver um destinatário '
-        + 'definido em Voz e estilo. Só sai quando carregares em «Enviar».')));
-    return;
-  }
-  // 26/09: the numbers as they stand now, in tiles and one block per property; the email's text, which is what goes
-  // out, stays one click away for review or editing.
-  const sent = digest.reply_status === 'sent', summary = digest.summary || {properties: [], totals: {}};
-  const totals = summary.totals;
-  const text = el('textarea', {rows: 12, 'aria-label': 'Texto do ponto de situação', readonly: sent}, digest.reply_text);
-  const tile = (value, label, tone = '') => el('div', {class: 'digest-kpi ' + tone}, el('strong', {}, String(value ?? 0)), el('span', {}, label));
-  const property = row => el('div', {class: 'digest-property' + (row.active ? '' : ' inactive')},
+// «Ponto de situação» (27/09): on the left, each property's numbers as its owner wants them — who contacted us, who
+// answered our first email, who is still active, the visits booked and done; on the right, a notepad with the report
+// for the owner, one page per property (each owner gets only their own). Written from the data until edited here; an
+// edit is kept for the day, and «Atualizar» writes it again. Nothing goes without «Enviar».
+const ACTIVE_HINT = 'Dos que responderam, os que continuam: sem os que deixaram de responder, recusaram a visita '
+  + 'ou pediram para não serem contactados.';
+let notepadProperty = null;
+function renderDigest(view) {
+  const pages = view?.properties || [];
+  const total = key => pages.reduce((sum, page) => sum + (Array.isArray(page[key]) ? page[key].length : page[key] || 0), 0);
+  const tile = (value, label, tone = '', title) => el('div', {class: 'digest-kpi ' + tone, title},
+    el('strong', {}, String(value)), el('span', {}, label));
+  const pill = (value, label, tone = '', title) => el('span', {class: 'digest-pill ' + tone, title}, el('b', {}, String(value)), ' ' + label);
+  const property = page => el('div', {class: 'digest-property' + (page.active ? '' : ' inactive')},
     el('div', {class: 'digest-property-head'},
-      el('span', {class: 'property-ref'}, row.property_ref), el('strong', {}, row.description),
-      !row.active && el('span', {class: 'tag warn'}, 'INATIVO')),
+      el('span', {class: 'property-ref'}, page.property_ref), el('strong', {}, page.description),
+      !page.active && el('span', {class: 'tag warn'}, 'INATIVO')),
     el('div', {class: 'digest-pills'},
-      el('span', {class: 'digest-pill'}, el('b', {}, String(row.conversations)), ' conversas'),
-      el('span', {class: 'digest-pill'}, el('b', {}, String(row.pending)), ' na fila'),
-      el('span', {class: 'digest-pill ok'}, el('b', {}, String(row.drafted)), ' rascunhos prontos'),
-      el('span', {class: 'digest-pill ' + (row.awaiting.length ? 'warn' : 'ok')}, el('b', {}, String(row.awaiting.length)), ' por preparar')),
-    row.awaiting.length ? el('div', {class: 'digest-names'}, el('span', {class: 'muted small'}, 'Por preparar:'),
-      row.awaiting.map(name => el('span', {class: 'digest-chip'}, name)))
-      : el('p', {class: 'muted small digest-clear'}, 'Nada por preparar neste imóvel.'));
-  box.replaceChildren(el('article', {class: 'card digest-card'},
+      pill(page.contacted, 'contactaram'), pill(page.responded, 'responderam'),
+      pill(page.still_active, 'ainda ativos', '', ACTIVE_HINT), pill(page.booked, 'marcaram visita'),
+      pill(page.visited.length, 'visitaram', page.visited.length ? 'ok' : '')),
+    page.visited.length ? el('div', {class: 'digest-names'}, el('span', {class: 'muted small'}, 'Visitaram:'),
+      page.visited.map(person => el('span', {class: 'digest-chip'}, person.name)))
+      : el('p', {class: 'muted small digest-clear'}, 'Ainda sem visitas feitas'
+        + (page.upcoming.length ? `; a próxima é ${slotLabel(page.upcoming[0])}.` : '.')));
+  $('digest-panel').replaceChildren(el('article', {class: 'card digest-card'},
+    el('p', {class: 'eyebrow'}, 'PONTO DE SITUAÇÃO'), el('h2', {}, 'Situação de ' + fullDay(view?.date)),
+    ...(pages.length ? [
+      el('div', {class: 'digest-kpis'},
+        tile(total('contacted'), 'contactaram'), tile(total('responded'), 'responderam à 1.ª mensagem'),
+        tile(total('still_active'), 'ainda ativos', '', ACTIVE_HINT), tile(total('booked'), 'marcaram visita'),
+        tile(total('visited'), 'visitaram', 'ok')),
+      el('p', {class: 'muted small digest-now'}, 'Os números são os de agora. O texto para o proprietário de cada imóvel '
+        + 'está no bloco de notas.'),
+      el('div', {class: 'digest-properties'}, pages.map(property)),
+      pages.length > 1 && view.recipient && sendAll(view)]
+      : [el('p', {class: 'muted small'}, 'Sem imóveis configurados: o ponto de situação é de cada imóvel.')])));
+  renderNotepad(view);
+}
+
+// The summary of every property for the user (27/09, the option kept from before): the pages as they stand, one after
+// the other, to the address in Voz e estilo; the user decides what to do with each. It leaves the pages as they are.
+function sendAll(view) {
+  const all = view.all || {};
+  const done = all.reply_status === 'sent' || all.reply_status === 'sending';
+  return el('div', {class: 'digest-all'},
+    all.reply_error && el('p', {class: 'alert bad'}, all.reply_error),
+    done ? el('p', {class: 'muted small'}, all.reply_status === 'sent'
+      ? `Resumo de todos os imóveis enviado para ${view.recipient}${all.sent_at ? ' em ' + when(all.sent_at) : ''}.`
+      : 'O resumo de todos os imóveis está a ser enviado.')
+    : el('button', {class: 'send-action', onclick: event => run(async () => {
+      if (!confirm(`Enviar para ${view.recipient} o resumo dos ${view.properties.length} imóveis, como está nos blocos de notas?`)) return;
+      const result = await call('api/digest/send-all', {confirmed: true});
+      if (result.status === 'sent') playSound('send');
+      renderDigest(await call('api/digest'));
+      toast(result.status === 'sent' ? 'Resumo de todos os imóveis enviado.'
+        : 'Envio incerto: verifica Enviados no Gmail antes de repetir.', result.status === 'sent' ? 'ok' : 'warn');
+    }, event.currentTarget)}, 'Enviar-me o resumo de todos'));
+}
+
+// The notepad: one page per property, picked in its tabs. The text is kept on leaving it (no button); a page sent,
+// or maybe sent, stays as it went.
+function renderNotepad(view) {
+  const box = $('digest-notepad'), pages = view?.properties || [];
+  if (!pages.length) { box.replaceChildren(); return; }
+  if (!pages.some(page => page.property_ref === notepadProperty)) notepadProperty = pages[0].property_ref;
+  const page = pages.find(item => item.property_ref === notepadProperty);
+  const ref = page.property_ref, recipient = view.recipient, status = page.reply_status;
+  const editable = status === 'draft' || status === 'error';
+  const text = el('textarea', {class: 'notepad-paper', rows: 18, spellcheck: 'true', readonly: !editable,
+    'aria-label': `Ponto de situação para o proprietário de ${ref}`}, page.reply_text);
+  const saved = el('span', {class: 'notepad-saved', 'aria-live': 'polite'});
+  const save = async () => {
+    if (!editable || text.value === page.reply_text) return;
+    await call('api/digest/save', {property_ref: ref, text: text.value});
+    page.reply_text = text.value; page.edited = true;
+    saved.textContent = 'Texto guardado.';
+  };
+  if (editable) text.addEventListener('change', () => run(save));
+  const tag = status === 'draft' && page.edited ? 'editado' : DIGEST_STATUS[status] || status;
+  // Two ways out (27/09): to the owner (the email in Imóveis), with a copy to the user; or only to the user, who
+  // forwards it with something of their own. Once a day per property, whichever way.
+  const owner = page.owner_email, sendable = ['draft', 'error', 'uncertain'].includes(status);
+  const send = (to, label, primary) => el('button', {class: (primary ? 'primary ' : '') + 'send-action',
+    onclick: event => run(async () => {
+      const target = to === 'owner' ? `ao proprietário (${owner})${recipient ? `, com cópia para ${recipient}` : ''}` : `para ${recipient}`;
+      if (!confirm(`Enviar agora o ponto de situação de ${ref} ${target}?`)) return;
+      await save();
+      const result = await call('api/digest/send', {property_ref: ref, to, confirmed: true});
+      if (result.status === 'sent') playSound('send');
+      renderDigest(await call('api/digest'));
+      toast(result.status === 'sent' ? 'Ponto de situação enviado.'
+        : 'Envio incerto: verifica Enviados no Gmail antes de repetir.', result.status === 'sent' ? 'ok' : 'warn');
+    }, event.currentTarget)}, label);
+  box.replaceChildren(el('article', {class: 'card notepad-card'},
     el('div', {class: 'section-heading'},
-      el('div', {}, el('p', {class: 'eyebrow'}, 'PONTO DE SITUAÇÃO DIÁRIO'),
-        el('h2', {}, 'Situação de ' + String(digest.date || '').split('-').reverse().join('/')),
-        el('p', {class: 'muted small digest-to'}, sent ? `Enviado para ${digest.recipient || '—'}${digest.sent_at ? ' em ' + when(digest.sent_at) : ''}.`
-          : `Vai para ${digest.recipient || '— (define o destinatário em Voz e estilo)'}. Só sai quando carregares em «Enviar».`)),
-      el('span', {class: 'tag' + (digest.reply_status === 'draft' ? ' draft' : sent ? ' visit' : '')},
-        DIGEST_STATUS[digest.reply_status] || digest.reply_status)),
-    digest.reply_error && el('p', {class: 'alert bad'}, digest.reply_error),
-    el('div', {class: 'digest-kpis'},
-      tile(totals.conversations, 'conversas'), tile(totals.pending, 'na fila'),
-      tile(totals.drafted, 'rascunhos prontos', 'ok'), tile(totals.awaiting, 'por preparar', totals.awaiting ? 'warn' : 'ok')),
-    el('p', {class: 'muted small digest-now'}, 'Os números são os de agora; o texto do email é o do rascunho, feito na primeira leitura do dia.'),
-    el('div', {class: 'digest-properties'}, summary.properties.map(property)),
-    el('details', {class: 'digest-text'}, el('summary', {class: 'muted small'}, sent ? 'Ver o texto enviado' : 'Ver e editar o texto do email'),
-      text,
-      !sent && el('div', {class: 'actions'},
-        el('button', {onclick: event => run(async () => {
-          renderDigest(await call('api/digest/save', {text: text.value})); toast('Ponto de situação guardado.');
-        }, event.currentTarget)}, 'Guardar o texto'),
-        el('button', {class: 'link', onclick: event => run(async () => {
-          renderDigest(await call('api/digest/refresh', {})); toast('Texto atualizado com a situação de agora.');
-        }, event.currentTarget)}, 'Atualizar com a situação de agora'))),
-    !sent && el('div', {class: 'actions digest-actions'},
-      el('button', {class: 'primary send-action', onclick: event => run(async () => {
-        if (!confirm(`Enviar agora o ponto de situação de hoje para ${digest.recipient}?`)) return;
-        await call('api/digest/save', {text: text.value});
-        const result = await call('api/digest/send', {confirmed: true});
-        if (result.status === 'sent') playSound('send');
-        renderDigest(await call('api/digest'));
-        toast(result.status === 'sent' ? 'Ponto de situação enviado.'
-          : 'Envio incerto: verifica Enviados no Gmail antes de repetir.', result.status === 'sent' ? 'ok' : 'warn');
-      }, event.currentTarget)}, 'Enviar o ponto de situação'),
-      el('button', {class: 'link', onclick: event => run(async () => {
-        renderDigest(await call('api/digest/refresh', {})); toast('Texto atualizado com a situação de agora.');
+      el('div', {}, el('p', {class: 'eyebrow'}, 'PARA O PROPRIETÁRIO'), el('h2', {}, 'Bloco de notas')),
+      el('span', {class: 'tag' + (status === 'draft' ? ' draft' : status === 'sent' ? ' visit' : '')}, tag)),
+    pages.length > 1 && el('div', {class: 'notepad-tabs', role: 'tablist', 'aria-label': 'Imóvel'}, pages.map(item =>
+      el('button', {type: 'button', role: 'tab', class: 'notepad-tab' + (item === page ? ' active' : ''),
+        'aria-selected': String(item === page), title: item.description,
+        onclick: () => { notepadProperty = item.property_ref; renderNotepad(view); }}, item.property_ref))),
+    page.reply_error && el('p', {class: 'alert bad'}, page.reply_error),
+    el('div', {class: 'notepad'}, text),
+    el('p', {class: 'muted small notepad-to'}, status === 'sent'
+      ? `Enviado ${page.sent_to === 'owner' ? `ao proprietário (${owner || '—'})` : `para ${recipient || '—'}`}`
+        + `${page.sent_at ? ' em ' + when(page.sent_at) : ''}.`
+      : (owner ? `Proprietário: ${owner}${recipient ? `, com cópia para ${recipient}` : ''}.`
+        : 'Sem email do proprietário: põe-no em Imóveis, nos dados do imóvel.')
+        + (recipient ? '' : ' Para o receberes tu, põe o teu email em Voz e estilo.'),
+      ' ', saved),
+    el('div', {class: 'actions notepad-actions'},
+      sendable && owner && send('owner', 'Enviar ao proprietário', true),
+      sendable && recipient && send('me', 'Enviar para mim', !owner),
+      el('button', {type: 'button', onclick: async () => {
+        try { await navigator.clipboard.writeText(text.value); toast('Copiado: cola-o no email ou no WhatsApp do proprietário.'); }
+        catch { text.select(); toast('Não consegui copiar sozinho: o texto ficou selecionado, copia-o com ⌘C.', 'warn'); }
+      }}, 'Copiar'),
+      editable && el('button', {class: 'link', onclick: event => run(async () => {
+        if (page.edited && !confirm('O texto volta a ser escrito com os números de agora e perdes o que alteraste. Continuar?')) return;
+        renderDigest(await call('api/digest/refresh', {property_ref: ref})); toast('Texto atualizado com a situação de agora.');
       }, event.currentTarget)}, 'Atualizar com a situação de agora'))));
 }
 
@@ -2432,7 +2525,9 @@ function showPropertiesView(view) {
 // ref: the property being edited (its data fills the form); null for a new one.
 function openPropertyEditor(fields, ref = null) {
   editorRef = ref;
-  for (const name of FIELDS) if (name !== 'sender' || fields.sender) $('f-' + name).value = fields[name] ?? '';
+  // The owner's email is not in the listing: filled from an extraction, the form keeps the one already saved (27/09).
+  const keep = {owner_email: settings?.properties?.find(property => property.reference === ref)?.owner_email};
+  for (const name of FIELDS) if (name !== 'sender' || fields.sender) $('f-' + name).value = fields[name] ?? keep[name] ?? '';
   $('f-facts').value = (fields.facts || []).join('\n');
   $('editor-title').textContent = ref ? `Editar ${ref}` : 'Novo imóvel';
   showPropertiesView('editor');
@@ -2635,6 +2730,25 @@ function propertyUsage(usage) {
     : `Gasto neste período: ${text(usage.period)} · desde sempre: ${text(usage.all_time)}.`);
 }
 
+// Depósitos (27/09): what the API cost, every property together, in a wallet at the right of the tanks (the totals
+// used to sit under the tanks, one per column, and read as theirs). The chosen period's line says «o mesmo» when
+// everything was spent in it, instead of repeating the numbers.
+function renderWallet(usage) {
+  const select = $('chart-period');
+  const period = [...select.options].find(option => option.value === select.value)?.textContent || 'No período escolhido';
+  const detail = item => `${item.calls} pedido${item.calls === 1 ? '' : 's'} · `
+    + `${(item.prompt_tokens + item.completion_tokens).toLocaleString('pt-PT')} tokens`;
+  const total = usage.all_time, recent = usage.period;
+  const same = recent.calls === total.calls && recent.cost_usd === total.cost_usd;
+  $('usage-wallet').replaceChildren(...[
+    el('div', {class: 'wallet-flap'}, el('p', {class: 'eyebrow'}, 'GASTO TOTAL', el('br'), 'TODOS OS IMÓVEIS')),
+    el('strong', {class: 'wallet-total'}, costFormat.format(total.cost_usd || 0)),
+    el('p', {class: 'wallet-detail'}, total.calls ? detail(total) + ' · desde sempre' : 'Sem pedidos ainda'),
+    total.calls ? el('p', {class: 'wallet-period'}, `${period}: `
+      + (same ? 'o mesmo.' : recent.calls ? `${costFormat.format(recent.cost_usd)} · ${detail(recent)}.` : 'nada.')) : null]
+    .filter(Boolean));
+}
+
 function renderFuelOverview(metrics) {
   const rows = metrics.properties.filter(item => item.property_ref && item.api_fuel).map(item => {
     const fuel = item.api_fuel, left = eurFormat.format(Math.max(0, fuel.remaining_eur ?? 0));
@@ -2696,13 +2810,13 @@ function carInstruments(ref, s) {
   return [
     gauge({key: ref + ':hours', role: 'heat', value: s.hours || 0, max: s.hoursMax, red: [s.hoursMax * 0.75, s.hoursMax],
       unit: '', icon: 'heat', labels: ['C', '', 'H'], divisions: 2, minor: 4, readout: hoursText(s.hours),
-      caption: 'Temperatura · tempo médio de resposta', alert: s.hot}),
+      caption: 'Tempo médio de resposta', alert: s.hot}),
     gauge({key: ref + ':pending', role: 'tach', value: s.pending, max: s.pendingMax, red: [s.pendingMax / 2, s.pendingMax],
       unit: 'emails', size: 'big', face: 'yellow', divisions: 10, minor: 2, readout: String(s.pending),
-      caption: 'Conta-rotações · por responder'}),
+      caption: 'Por responder'}),
     gauge({key: ref + ':speed', role: 'speedo', value: s.perDay, max: speedMax, unit: 'pedidos / dia', size: 'big',
       divisions: 5, minor: 4, readout: s.perDay.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + ' /dia',
-      caption: 'Velocímetro · pedidos por dia'}),
+      caption: 'Pedidos por dia'}),
     fuelGauge(s.fuel, 'cluster:fuel', `Combustível · tokens · gastou ${costFormat.format(s.spent)}`),
     petrolGauge(ref, s.petrol, 'Gasolina · visitas')];
 }
@@ -2715,13 +2829,13 @@ function boatInstruments(ref, s) {
   return [
     gauge({key: ref + ':hours', role: 'heat', value: s.hours || 0, max: s.hoursMax, red: [s.hoursMax * 0.75, s.hoursMax],
       unit: 'horas', face: 'white', labels: ['BOM TEMPO', 'VARIÁVEL', 'TEMPESTADE'], divisions: 2, minor: 4,
-      readout: hoursText(s.hours), caption: 'Barómetro · tempo médio de resposta', alert: s.hot}),
+      readout: hoursText(s.hours), caption: 'Tempo médio de resposta', alert: s.hot}),
     gauge({key: ref + ':pending', role: 'tach', value: s.pending, max: s.pendingMax, red: [s.pendingMax / 2, s.pendingMax],
       unit: 'emails', size: 'big', face: 'white', divisions: 10, minor: 2, readout: String(s.pending),
-      caption: 'Anemómetro · por responder'}),
+      caption: 'Por responder'}),
     gauge({key: ref + ':speed', role: 'speedo', value: s.perDay, max: speedMax, unit: 'pedidos / dia', size: 'big',
       face: 'white', divisions: 5, minor: 4, readout: s.perDay.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + ' /dia',
-      caption: 'Velocidade · pedidos por dia'}),
+      caption: 'Pedidos por dia'}),
     fuelGauge(s.fuel, 'cluster:fuel', `Depósito · tokens · gastou ${costFormat.format(s.spent)}`),
     petrolGauge(ref, s.petrol, 'Gasolina · visitas')];
 }
@@ -2734,13 +2848,13 @@ function scooterInstruments(ref, s) {
   return [
     gauge({key: ref + ':hours', role: 'heat', value: s.hours || 0, max: s.hoursMax, red: [s.hoursMax * 0.75, s.hoursMax],
       unit: 'motor', face: 'cream', icon: 'heat', labels: ['C', '', 'H'], divisions: 2, minor: 4, readout: hoursText(s.hours),
-      caption: 'Temperatura · tempo médio de resposta', alert: s.hot}),
+      caption: 'Tempo médio de resposta', alert: s.hot}),
     gauge({key: ref + ':speed', role: 'speedo', value: s.perDay, max: speedMax, unit: 'pedidos / dia', size: 'big',
       face: 'cream', divisions: 5, minor: 4, readout: s.perDay.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + ' /dia',
-      caption: 'Velocímetro · pedidos por dia'}),
+      caption: 'Pedidos por dia'}),
     gauge({key: ref + ':pending', role: 'tach', value: s.pending, max: s.pendingMax, red: [s.pendingMax / 2, s.pendingMax],
       unit: 'emails', size: 'big', face: 'cream', divisions: 10, minor: 2, readout: String(s.pending),
-      caption: 'Conta-rotações · por responder'}),
+      caption: 'Por responder'}),
     fuelGauge(s.fuel, 'cluster:fuel', `Depósito · tokens · gastou ${costFormat.format(s.spent)}`),
     petrolGauge(ref, s.petrol, 'Gasolina · visitas')];
 }
@@ -2851,15 +2965,14 @@ function propertyChartCard(property, data, metrics) {
     el('div', {class: 'legend'}, el('span', {class: 'requests'}, 'Pedidos recebidos'), el('span', {class: 'sent'}, 'Respostas enviadas')));
 }
 
-// The Painel's six numbers, for this property only (26/09), right under its instruments; a click on the queue's numbers
-// opens this property's queue in the Comunicações.
-function propertyMetrics(property, data) {
-  const open = () => { $('queue').value = property.reference; renderState(); showTab('replies'); };
+// The Painel's six numbers, for this property only (26/09), right under its instruments; like the Painel's, they only
+// inform (27/09).
+function propertyMetrics(data) {
   return el('div', {class: 'metrics property-metrics'},
-    metricCard(data.pending, 'Pedidos por responder', null, {open: data.pending ? open : undefined}),
-    metricCard(data.drafts, 'Rascunhos prontos', 'ok', {open: data.drafts ? open : undefined}),
-    metricCard(data.blocked, 'Bloqueados', 'warn', {open: data.blocked ? open : undefined}),
-    metricCard(data.attention, 'A precisar de atenção', 'bad', {open: data.attention ? open : undefined}),
+    metricCard(data.pending, 'Pedidos por responder', null, {title: queueHover([data], QUEUE_SHOWS.pending)}),
+    metricCard(data.drafts, 'Rascunhos prontos', 'ok', {title: queueHover([data], QUEUE_SHOWS.drafts)}),
+    metricCard(data.blocked, 'Bloqueados', 'warn', {title: queueHover([data], QUEUE_SHOWS.blocked)}),
+    metricCard(data.attention, 'A precisar de atenção', 'bad', {title: queueHover([data], QUEUE_SHOWS.attention)}),
     metricCard(data.answered, 'Respostas enviadas'),
     metricCard(hoursText(data.reply_hours), 'Tempo médio até resposta'));
 }
@@ -2962,7 +3075,7 @@ async function renderPropertyDashboard(property, slide = '') {
     const data = metrics.properties.find(item => item.property_ref === ref);
     if (token !== renderPropertyDashboard.token || !data) return;
     const wrap = el('div', {class: slide}, propertyCluster(property, data, metrics),
-      propertyMetrics(property, data),
+      propertyMetrics(data),
       satisfactionCard(property),
       visitorsCard(property),
       el('div', {class: 'dashboard-lists'},
@@ -3002,7 +3115,7 @@ function renderVoice() {
   const reminderDay4 = el('textarea', {rows: 2, placeholder: 'ex.: Ficamos à disposição se ainda tiver interesse em visitar.'}, reminders.day4 || '');
   const visitsClosed = el('textarea', {rows: 4, placeholder: 'ex.: Agradecemos o interesse. As visitas a este imóvel já estão fechadas.'}, settings.voice.visits_closed || '');
   const consentRequest = el('textarea', {rows: 4, placeholder: 'ex.: Podemos guardar o seu contacto para futuras oportunidades semelhantes? Responda "sim" se concordar.'}, settings.voice.consent_request || '');
-  const digestRecipient = el('input', {type: 'email', value: settings.voice.digest_recipient || '', placeholder: 'vazio: sem ponto de situação diário'});
+  const digestRecipient = el('input', {type: 'email', value: settings.voice.digest_recipient || '', placeholder: 'o teu email: recebe as cópias e o resumo de todos'});
   const afterVisit = el('textarea', {rows: 5}, settings.voice.after_visit || '');
   const afterVisitTemplate = el('textarea', {rows: 14}, settings.voice.after_visit_template || '');
   const visitReminder = el('textarea', {rows: 5}, settings.voice.visit_reminder || '');
@@ -3049,11 +3162,12 @@ function renderVoice() {
       'Na véspera e no próprio dia de cada visita marcada, a primeira leitura desse dia põe um rascunho nas Comunicações: '
       + 'o assistente escreve-o com estas instruções, no idioma do cliente, e lembra o que ainda falta na ficha.'),
     el('label', {class: 'field'}, 'Instruções do lembrete de visita', visitReminder),
-    el('p', {class: 'eyebrow voice-section'}, 'PONTO DE SITUAÇÃO DIÁRIO ', kind('voice')),
+    el('p', {class: 'eyebrow voice-section'}, 'PONTO DE SITUAÇÃO ', kind('voice')),
     el('p', {class: 'step voice-section'},
-      'Um rascunho é preparado a cada leitura de emails, para este endereço; só sai depois de reveres e '
-      + 'clicares «Enviar» no Painel, tal como o resto. Vazio: a funcionalidade fica desligada.'),
-    el('label', {class: 'field'}, 'Enviar o ponto de situação diário para', digestRecipient),
+      'O relatório de cada imóvel está no bloco de notas do Painel. Vai ao proprietário (o email dele fica em Imóveis), '
+      + 'com cópia para este endereço, ou só para este endereço, para o reencaminhares; daqui também recebes o resumo de '
+      + 'todos os imóveis. Nada sai sem confirmares.'),
+    el('label', {class: 'field'}, 'O teu email para o ponto de situação', digestRecipient),
     el('div', {class: 'actions'}, el('button', {class: 'primary', onclick: event => run(async () => {
       const choices = Object.fromEntries(Object.entries(selects).map(([key, select]) => [key, select.value]));
       settings = await call('api/voice', {...choices, signature: signature.value,

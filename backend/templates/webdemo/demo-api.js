@@ -244,6 +244,7 @@
     'POST api/digest/save': () => { notSaved(); return snap('api/digest'); },
     'POST api/digest/refresh': () => snap('api/digest'),
     'POST api/digest/send': async () => { await wait(800); notSaved('Demonstração: nada foi enviado.'); return {status: 'sent'}; },
+    'POST api/digest/send-all': async () => { await wait(800); notSaved('Demonstração: nada foi enviado.'); return {status: 'sent'}; },
     'POST api/ai/model': body => { notSaved(); return {...(snap('api/settings').ai || {}), model: body.model}; },
     'POST api/property/panel': body => {
       notSaved();

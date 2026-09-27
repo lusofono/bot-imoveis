@@ -1,4 +1,6 @@
-# bot_mail
+# ARIA (bot_mail)
+
+ARIA é o nome da app desde 27/09/2026; o pacote Python e os comandos continuam `bot_mail` e `bot-mail`.
 
 > **Estado a 22/09/2026.** A versão local corre no Mac: backend em Python (Starlette), página em HTML,
 > CSS e JS com um painel de métricas, e MCP local por stdio. Já leu o Gmail real (35 pedidos, todos
@@ -57,7 +59,8 @@ Abre `http://127.0.0.1:8765` no browser, já com o link certo. É o mesmo que `.
   um iate de luxo dos anos 90: casco creme, cromados, teca envernizada nos detalhes, ecrãs azuis e bandeiras de
   sinais nos separadores) e o **70's Scooter** (uma scooter italiana dos anos 70: creme, cromados, verde-menta, as
   riscas dos anos 70 e um punho de mudanças como navegação), e ainda o **KW-Area** (as cores e a sinalética da
-  Keller Williams, só cores e formas) e o **APalace** (o aspeto do site da A|Palace; é o tema de partida). Os temas ricos vivem em `frontend/themes/`, cada um com a sua folha de estilo e, quando
+  Keller Williams, só cores e formas) e o **APalace** (o aspeto do site da A|Palace). O **Âmbar** é o primeiro da lista e o tema de partida (desde 27/09: a
+  interface está a ser simplificada nele, e os outros acompanham no fim). Os temas ricos vivem em `frontend/themes/`, cada um com a sua folha de estilo e, quando
   traz palavras, instrumentos, seletor, relógio ou sons próprios, o seu registo em `SKINS` no `app.js`.
 
 Tudo o que orienta as respostas edita-se na página, e cada campo diz o que é: **RAG** (factos que o
@@ -215,13 +218,24 @@ o envio, tal como todos os outros.
   cliente começa por «sim», «yes» ou «oui», a página assinala-o no email; um clique em «Confirmar
   consentimento» grava `rgpd: sim`, a data e o email de prova em `contactos.csv`.
 
-## Ponto de situação diário
+## Ponto de situação para o proprietário
 
-A cada leitura, se tiveres um destinatário configurado em **Voz e estilo** («Destinatário do ponto de
-situação diário»), a página prepara um resumo de todos os imóveis (conversas, pendentes e quem ainda não
-tem rascunho) uma vez por dia. Aparece no **Painel**, editável antes de enviar; «Guardar» grava o texto,
-«Enviar» pede confirmação e manda-o pelo Gmail — a mesma regra de aprovação humana de sempre. Uma segunda
-leitura no mesmo dia não repara o resumo já preparado.
+No **Painel**, o cartão «Ponto de situação» mostra, imóvel a imóvel, o que interessa ao proprietário: quantos
+clientes nos contactaram, quantos responderam à nossa primeira mensagem, quantos continuam ativos (dos que
+responderam, sem os que deixaram de responder, recusaram a visita ou pediram para não serem contactados), quantos
+marcaram visita e quantos já visitaram.
+- **Ao lado, um bloco de notas com o texto para o proprietário**, uma página por imóvel: cada proprietário recebe só
+  o seu. Diz o que está feito, o que está em curso (quem continua em conversa e as próximas visitas) e, de quem já
+  visitou, o nome e o que a ficha diz da situação profissional e do agregado familiar. Nada do trabalho interno da
+  fila (rascunhos, emails por preparar).
+- **O texto escreve-se sozinho a partir dos dados.** O que alterares fica guardado nesse dia (ao sair do texto);
+  «Atualizar com a situação de agora» volta a escrevê-lo.
+- **Três maneiras de o fazer sair, sempre com confirmação:** «Enviar ao proprietário» (o email dele fica no imóvel,
+  em Imóveis), com cópia para o teu email de **Voz e estilo**; «Enviar para mim», só para esse email, para o
+  reencaminhares com algo teu; ou «Copiar», para o email ou o WhatsApp. Cada imóvel sai uma vez por dia.
+- **«Enviar-me o resumo de todos»** (com mais do que um imóvel) manda-te as páginas todas num só email, como estão
+  no bloco de notas, e deixa-as por enviar: decides depois o que fazer a cada uma.
+- **Assina «ARIA Assistente»**, não a assinatura da agência.
 
 ## Estrutura
 
@@ -396,7 +410,7 @@ de ferramentas de escrita ativa no assistente e não autorizes envio automático
 
 117 testes: lotes, persistência, falhas SMTP, deduplicação, anexos, leitura IMAP simulada, regras dos
 imóveis, assunto e remetente, links do Idealista, registo de contactos, gestão de contactos, lembretes,
-visitas fechadas, pedido de consentimento, ponto de situação diário, via API da OpenAI, métricas sem dados
+visitas fechadas, pedido de consentimento, ponto de situação para o proprietário, via API da OpenAI, métricas sem dados
 de clientes, fotografias, página local, MCP local por stdio e comandos do terminal, sempre com dados
 fictícios. Nenhum teste lê uma caixa
 real ou envia emails.

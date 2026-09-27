@@ -74,10 +74,10 @@ def test_the_page_is_served_as_its_own_files(page):
     assert '<option value="kw">KW-Area</option>' in html.text and "'kw'" in script.text
     kw = client.get("/themes/kw.css")
     assert kw.headers["content-type"].startswith("text/css") and "--kw-red:#b40101" in kw.text
-    # APalace (27/09) is the first option and the theme a browser with no saved choice starts in.
+    # Âmbar (27/09, evening; APalace before) is the first option and the theme a browser with no saved choice starts in.
     assert '<link rel="stylesheet" href="themes/apalace.css">' in html.text
-    assert '<select id="theme-select" aria-label="Tema visual"><option value="apalace">APalace</option>' in html.text
-    assert "const THEMES = ['apalace'," in script.text and "THEMES.includes(theme) ? theme : 'apalace'" in script.text
+    assert '<select id="theme-select" aria-label="Tema visual"><option value="amber">Âmbar</option>' in html.text
+    assert "const THEMES = ['amber'," in script.text and "THEMES.includes(theme) ? theme : 'amber'" in script.text
     assert ':root[data-theme="apalace"]' in client.get("/themes/apalace.css").text
     # A skin's Sons switch starts hidden and off: nothing plays until the owner turns it on.
     assert re.search(r'<button id="sound-toggle"[^>]*aria-pressed="false"[^>]*\bhidden\b', html.text)

@@ -1,4 +1,4 @@
-# Changelog — Real Estate AI Assistant, by BigLearn PT
+# Changelog — ARIA, by BigLearn PT
 
 A versão aparece no canto superior esquerdo da página e vem de um só sítio: `version` em `pyproject.toml`.
 Cada pedido que muda a página ou o backend sobe a versão e fica registado aqui, do mais recente para o mais
@@ -14,6 +14,118 @@ o `pyproject.toml` continua com o número normal (`0.X.Y`), que é o que as ferr
 ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparece na página.
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
+
+## α.54.6 — 27/09/2026
+
+- **Qualidade (Painel e painel do imóvel): por baixo do ponteiro fica só «N resp.»** (sai o valor, que o ponteiro já
+  mostra), com a letra 20% mais pequena.
+
+## α.54.5 — 27/09/2026
+
+- **Temas ricos: os mostradores dizem só o que medem** («Pedidos por dia», «Por responder», «Tempo médio de
+  resposta»); saem «Velocímetro», «Conta-rotações», «Anemómetro», «Barómetro», «Temperatura» e «Velocidade», que o
+  desenho de cada tema já mostra.
+
+## α.54.4 — 27/09/2026
+
+- **«O teu espaço · Pronto para trabalhar» sai do Painel e passa para o início de «Voz e estilo»**, como resumo das
+  definições (sem o «Ajustar preferências →», que ali não faz falta). O gráfico do Painel fica a toda a largura.
+
+## α.54.3 — 27/09/2026
+
+- **Carteira do Painel: «GASTO TOTAL» numa linha e «TODOS OS IMÓVEIS» na seguinte.**
+
+## α.54.2 — 27/09/2026
+
+- **Comunicações: cada email por responder ocupa 2/3 da largura, com um painel de ações ao lado (1/3)** que o
+  acompanha quando o email é comprido: «Guardar rascunho» (e «Guardado»), «Enviar só este», «Abrir no WhatsApp»,
+  **«Gerar esta resposta» (API) só para esse email**, com as instruções extra do passo 02, «+ Acrescentar ao
+  conhecimento» (com «Guardar e refazer esta resposta») e, no fim, «Retirar da fila», «Não tem interesse» e «Ignorar
+  sempre». O email, o histórico e o rascunho ficam à esquerda.
+
+## α.54.1 — 27/09/2026
+
+- **Comunicações: «Ler emails» passa a ser um cartão (2/3) ao lado de «Gerar respostas» (1/3)**, com o imóvel, os
+  dias para trás, «Ler emails do Gmail», «Atualizar visitas» e a última leitura. As duas colunas seguem pela página
+  abaixo, com cada email e as suas ações.
+
+## α.54.0 — 27/09/2026
+
+- **A app passa a chamar-se ARIA** (antes «Real Estate AI Assistant»): no canto («ARIA · Assistente», by BigLearn PT),
+  no título da página e no terminal. O pacote e os comandos continuam `bot_mail` e `bot-mail`.
+- **Cada imóvel tem o email do proprietário** (Imóveis → dados do imóvel, opcional). Preencher o imóvel a partir do
+  anúncio nunca o apaga.
+- **O ponto de situação de cada imóvel sai de duas maneiras:** «Enviar ao proprietário», com cópia para o teu email
+  de Voz e estilo, ou «Enviar para mim», só para ti, para o reencaminhares. Uma vez por dia e por imóvel.
+- **Volta a opção de receberes o resumo de todos os imóveis:** «Enviar-me o resumo de todos», no cartão do ponto de
+  situação (com mais do que um imóvel), junta as páginas do bloco de notas num só email e deixa-as por enviar.
+- **O ponto de situação assina «ARIA Assistente»**, em vez da assinatura da agência.
+- **O Âmbar passa a ser o primeiro tema da lista e o tema de partida** (antes o APalace), para quem ainda não
+  escolheu nenhum.
+
+## α.53.1 — 27/09/2026
+
+- **Painel: ao passar o rato em «Pedidos por responder», «Rascunhos prontos», «Bloqueados» e «A precisar de
+  atenção»** aparecem os últimos 10 emails de cada um, do mais recente para o mais antigo: o primeiro nome, o imóvel
+  (com mais do que um), o dia e a hora e, quando foi o programa a escrevê-lo, o que é (lembrete, proposta de visita…).
+  Se houver mais, o fim diz «+ x itens». Com vários imóveis, a divisão por imóvel continua por cima. O mesmo nos
+  quatro números do painel de cada imóvel.
+
+## α.53.0 — 27/09/2026
+
+- **O ponto de situação passa a ser para o proprietário, um por imóvel.** Em vez de conversas, emails na fila,
+  rascunhos e «por preparar», conta o que interessa ao dono do imóvel: **contactaram** (clientes, não conversas:
+  inclui os pedidos novos ainda por responder), **responderam** à nossa primeira mensagem, **ainda ativos** (dos que
+  responderam, sem os que deixaram de responder, recusaram a visita ou pediram para não serem contactados),
+  **marcaram visita** e **visitaram**. O cartão do Painel mostra estes cinco números, no total e por imóvel, com os
+  nomes de quem visitou.
+- **O texto para o proprietário diz o que está feito e o que está em curso:** «Até hoje» (contactaram, responderam,
+  visitas marcadas e feitas), «Em curso» (quem continua em conversa e as próximas visitas) e «Quem já visitou», com o
+  nome e o que a ficha diz da situação profissional e do agregado familiar. Fecha com a assinatura da Voz.
+- **Um bloco de notas à direita do cartão, no lugar da «Ronda de visitas»,** com uma página por imóvel (separadores).
+  Substitui o «Ver e editar o texto do email». O texto escreve-se sozinho a partir dos dados; o que alterares fica
+  guardado nesse dia ao sair do texto, e «Atualizar com a situação de agora» volta a escrevê-lo (pergunta antes, se
+  o tinhas alterado). **«Copiar»** para o email ou o WhatsApp do proprietário; **«Enviar»** manda a página desse
+  imóvel para o endereço de Voz e estilo, com o imóvel no assunto, depois de confirmares.
+- **Já não depende da primeira leitura do dia nem de haver destinatário:** o bloco de notas tem sempre o texto de
+  hoje; o destinatário só é preciso para «Enviar».
+- **«Ronda de visitas · Avisa os clientes ativos» passa para o separador Visitas**, no fim da página.
+
+## α.52.8 — 27/09/2026
+
+- **Painel: sai o botão «Tratar respostas ↗»** do topo, ao lado do relógio. As Comunicações abrem-se na barra lateral.
+
+## α.52.7 — 27/09/2026
+
+- **Painel: sai o botão «Gerir imóveis →»** do título «A tua carteira». Os imóveis gerem-se no separador Imóveis, e
+  cada cartão continua a ter «Painel do imóvel →».
+
+## α.52.6 — 27/09/2026
+
+- **Painel, cartões dos imóveis: «Ver respostas →» passa a «Comunicações do imóvel →»** (abre a fila desse imóvel,
+  como antes).
+
+## α.52.5 — 27/09/2026
+
+- **«Depósitos · API OpenAI» passa a ser uma secção inteira, a toda a largura** do Painel, por baixo do gráfico e de
+  «O teu espaço» (antes ocupava só a coluna da esquerda).
+- **Os dois totais que estavam por baixo dos depósitos saem dali** (pareciam de cada imóvel e mostravam o mesmo). Em
+  vez deles, à direita, uma **carteira com o gasto total de todos os imóveis**: o valor desde sempre, os pedidos e os
+  tokens, e uma linha para o período escolhido no gráfico, que diz «o mesmo» quando tudo foi gasto nesse período. A
+  nota de que é uma estimativa aparece ao passar o rato (ⓘ).
+
+## α.52.4 — 27/09/2026
+
+- **O cartão do gráfico no Painel muda de nome:** «Road Book» no 70's Scooter (era «Conta-quilómetros») e no 80's
+  RacingCar (era «Telemetria»); «Resumo da atividade» nos temas sem palavras próprias (era só «Atividade»). O 90's
+  Boat mantém «Diário de bordo».
+
+## α.52.3 — 27/09/2026
+
+- **Os seis números do Painel passam a só informar:** «Pedidos por responder», «Rascunhos prontos», «Bloqueados» e
+  «A precisar de atenção» deixam de abrir as Respostas ao clicar, e o cursor deixa de ser a mão. O mesmo nos seis
+  números do painel de cada imóvel. A divisão por imóvel continua a aparecer ao passar o rato; o que há para fazer
+  está no «A fazer», que leva a cada sítio.
 
 ## α.52.2 — 27/09/2026
 

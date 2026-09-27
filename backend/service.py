@@ -14,6 +14,7 @@ import secrets
 import smtplib
 import time
 import os
+from . import APP_NAME
 from .ai import (AFTER_VISIT_RULE, AFTER_VISIT_TEMPLATE, KNOWLEDGE_RULE, VISIT_REMINDER_RULE, extract_json, ficha_profile_prompt,
                  fichas_prompt, parse_fichas_batch,
                  listing_text_prompt, parse_listing, agenda_prompt, describe, instructions,
@@ -45,6 +46,7 @@ FICHAS_BATCH = 10  # customers per call in «Preencher fichas com a IA»
 CONTACT_RETENTION_DAYS = 183  # 6 months without consent (decided 21/09); erased on the owner's click
 INACTIVE_AFTER_EMAILS, INACTIVE_AFTER_HOURS = 2, 96  # 26/09: two of ours unanswered, the last four days ago
 HISTORY_LIMIT = 20  # turns kept per conversation, oldest dropped first; also what the prompt gets
+REPORT_SIGNATURE = f"{APP_NAME} Assistente"  # how the ponto de situação signs (27/09), not the agency's voice
 # Dashboard chart: period in days → days per bar (90 days per day would be 90 unreadable bars).
 CHART_PERIODS = {3: 1, 7: 1, 14: 1, 30: 1, 90: 7}
 
@@ -565,8 +567,6 @@ class MailService:
                     self.mark_inactive(ref, data)
                     self.schedule_visit_reminders(ref, data)
                 self.save(data, ref)
-            if profiles:
-                self.prepare_digest(profiles, queues)
             # received: message ID → the day the customer's email arrived, so the dashboard still counts it
             # after it is answered or dismissed and leaves the queue. IDs and dates only, never an address.
             self.log("read", added=sum(added.values()), ambiguous=ambiguous, direct=sum(direct.values()),
@@ -1076,131 +1076,223 @@ class MailService:
         return created
 
     def digest_recipient(self):
-        """The address that gets the daily status digest, from voice.json; leniently, not the full voice."""
+        """The address «Enviar» sends an owner's report to, from voice.json; leniently, not the full voice."""
         style = load_json(self.folder / "voice.json", {}).get("style") or {}
         return (style.get("digest_recipient") or {}).get("text") or ""
 
     @staticmethod
-    def digest_text(profiles, queues, today):
-        """One property per block: conversations, pending count, and who still needs a reply prepared."""
-        lines = [f"Ponto de situação, {today}", ""]
-        totals = Counter()
-        for ref, profile in profiles.items():
-            data = queues[ref]
-            emails = data["emails"]
-            conversations = data.get("conversations", {})
-            drafted = sum(1 for item in emails if item.get("reply_status") == "draft")
-            awaiting = [item for item in emails if item.get("reply_status") not in ("draft", "sent")]
-            lines.append(f"{ref} — {profile['property'].get('description') or ref}")
-            lines.append(f"- {len(conversations)} conversas; {len(emails)} pendentes na fila "
-                         f"({drafted} com rascunho pronto, {len(awaiting)} por preparar).")
-            if awaiting:
-                names = ", ".join((item.get("customer") or {}).get("name")
-                                  or (item.get("recipient") or {}).get("name") or "sem nome" for item in awaiting)
-                lines.append(f"- Por preparar: {names}.")
-            lines.append("")
-            totals.update(conversas=len(conversations), pendentes=len(emails), por_preparar=len(awaiting))
-        lines.append(f"No total: {totals['conversas']} conversas, {totals['pendentes']} pendentes, "
-                     f"{totals['por_preparar']} por preparar.")
-        return "\n".join(lines)
+    def replied_after_us(conversation):
+        """The customer wrote again after our first email to them («responderam», in the owner's report)."""
+        history = conversation.get("history") or []
+        first = next((index for index, turn in enumerate(history) if turn.get("who") == "nos"), None)
+        return first is not None and any(turn.get("who") == "cliente" for turn in history[first + 1:])
 
-    def prepare_digest(self, profiles, queues):
-        """Once a day, after a READ: today's status, as a draft only. Never sent without a click."""
-        if not self.digest_recipient():
-            return
-        today = date.today().isoformat()
-        existing = load_digest(self.folder)
-        if existing and existing.get("date") == today:
-            return
-        save_digest(self.folder, {"date": today, "reply_text": self.digest_text(profiles, queues, today),
-                                  "reply_status": "draft", "reply_error": None, "created_at": now(), "sent_at": None})
+    def owner_report(self, ref, profile, data, moment=None):
+        """27/09: a property's situation as its owner reads it, not the queue's: how many customers contacted us,
+        answered our first email, are still active (of those who answered, the ones who have not gone silent, declined
+        the visit or asked us to stop), booked a visit and came to it; the visits still to come; and who visited, with
+        what their file says about their work and household. Only this property's customers: each owner gets their own
+        report."""
+        moment = moment or datetime.now()  # the agenda's times are local
+        stamp = moment.strftime("%Y-%m-%d %H:%M")
+        conversations = data.get("conversations", {})
+        new = {recipient_email(item) for item in data["emails"]
+               if item.get("kind") not in PROGRAM_KINDS and not item.get("blocked")} - set(conversations) - {""}
+        answered = [conversation for conversation in conversations.values() if self.replied_after_us(conversation)]
+        slots = sorted(load_visits(self.folder, ref)["slots"], key=lambda slot: slot["at"])
+        visited = {}
+        for slot in slots:
+            if (slot.get("check") or {}).get("attended") is True:
+                conversation = conversations.get(slot["customer"]) or {}
+                ficha = conversation.get("ficha") or {}
+                visited[slot["customer"]] = {"name": conversation.get("name") or slot.get("name") or "(sem nome)",
+                                             "at": slot["at"], "trabalho": ficha.get("trabalho"),
+                                             "agregado": ficha.get("agregado")}
+        return {"property_ref": ref, "description": profile["property"].get("description") or ref,
+                "owner_email": profile["property"].get("owner_email") or "",
+                "active": property_active(profile), "contacted": len(conversations) + len(new),
+                "responded": len(answered),
+                "still_active": sum(1 for conversation in answered if not (conversation.get("ignored")
+                                    or conversation.get("inactive") or conversation.get("visit") == "nao_quer")),
+                "booked": len({slot["customer"] for slot in slots}), "visited": list(visited.values()),
+                "upcoming": [slot["at"] for slot in slots if slot["at"] > stamp and not slot.get("check")]}
 
     @staticmethod
-    def digest_summary(profiles, queues):
-        """The same numbers as the digest's text, structured for the Painel's card (26/09): per property and in total."""
-        rows, totals = [], Counter()
-        for ref, profile in profiles.items():
-            emails = queues[ref]["emails"]
-            awaiting = [item for item in emails if item.get("reply_status") not in ("draft", "sent")]
-            row = {"property_ref": ref, "description": profile["property"].get("description") or ref,
-                   "active": property_active(profile), "conversations": len(queues[ref].get("conversations", {})),
-                   "pending": len(emails), "drafted": sum(1 for item in emails if item.get("reply_status") == "draft"),
-                   "awaiting": [(item.get("customer") or {}).get("name") or (item.get("recipient") or {}).get("name")
-                                or "sem nome" for item in awaiting]}
-            rows.append(row)
-            totals.update(conversations=row["conversations"], pending=row["pending"], drafted=row["drafted"],
-                          awaiting=len(awaiting))
-        return {"properties": rows, "totals": {key: totals[key] for key in ("conversations", "pending", "drafted", "awaiting")}}
+    def owner_report_text(report, today, signature=""):
+        """The report for the owner (27/09), to send from the page or to copy into an email or a WhatsApp: what is
+        done so far, what is in progress, and who visited. Nothing of the queue's inner work (drafts, emails waiting)."""
+        def count(number, one, many):
+            return f"{number} {one if number == 1 else many}"
+
+        def sentence(text, missing):
+            return (str(text).strip().rstrip(".") + ".") if text else missing
+
+        day = lambda at: f"{at[8:10]}/{at[5:7]}"
+        visited, upcoming = report["visited"], report["upcoming"]
+        lines = [f"Ponto de situação — {report['description']}", "/".join(reversed(today.split("-"))), "",
+                 "Até hoje:",
+                 f"- {count(report['contacted'], 'cliente contactou-nos', 'clientes contactaram-nos')};",
+                 f"- {count(report['responded'], 'respondeu', 'responderam')} à nossa primeira mensagem;",
+                 f"- {count(report['booked'], 'marcou', 'marcaram')} visita e "
+                 f"{count(len(visited), 'já visitou', 'já visitaram')} o imóvel.",
+                 "", "Em curso:",
+                 f"- {count(report['still_active'], 'cliente continua', 'clientes continuam')} em conversa connosco"
+                 + (";" if upcoming else ".")]
+        if upcoming:
+            lines.append(f"- {'Próxima visita' if len(upcoming) == 1 else 'Próximas visitas'}: "
+                         + ", ".join(f"{day(at)} às {at[11:16]}" for at in upcoming) + ".")
+        if visited:
+            lines += ["", "Quem já visitou:"]
+            for person in visited:
+                lines += [f"- {person['name']} (visitou a {day(person['at'])})",
+                          f"  Situação profissional: {sentence(person['trabalho'], 'ainda por saber.')}",
+                          f"  Agregado familiar: {sentence(person['agregado'], 'ainda por saber.')}"]
+        if signature:
+            lines += ["", signature]
+        return "\n".join(lines)
+
+    def today_digest(self):
+        """digest.json as today's pages, one per property (27/09); yesterday's, or the single text of before, start over."""
+        digest = load_digest(self.folder) or {}
+        today = date.today().isoformat()
+        if digest.get("date") != today or not isinstance(digest.get("pages"), dict):
+            return {"date": today, "pages": {}}
+        return digest
+
+    def owner_page(self, ref, profile, digest):
+        """One property's page in the notepad: its numbers of now, and the text kept today (edited, or sent) or else
+        written now from the data."""
+        report = self.owner_report(ref, profile, self.load(ref))
+        page = digest["pages"].get(ref) or {}
+        return {**report, "reply_text": page.get("reply_text") or self.owner_report_text(report, digest["date"], REPORT_SIGNATURE),
+                "reply_status": page.get("reply_status") or "draft", "reply_error": page.get("reply_error"),
+                "sent_at": page.get("sent_at"), "sent_to": page.get("sent_to"), "edited": bool(page)}
 
     def digest_view(self):
-        """Today's digest as saved, with the situation as it stands now and who it goes to, for the Painel's card."""
+        """The Painel's «Ponto de situação» (27/09): per property, the numbers of now and the report for its owner;
+        and how today's summary of every property, for the user, went."""
         with locked(self.folder):
-            digest = load_digest(self.folder)
-            if not digest:
-                return None
             profiles = load_profiles(self.folder, self.config()["account"])
-            return {**digest, "recipient": self.digest_recipient(),
-                    "summary": self.digest_summary(profiles, {ref: self.load(ref) for ref in profiles})}
+            digest = self.today_digest()
+            return {"date": digest["date"], "recipient": self.digest_recipient(), "all": digest.get("all"),
+                    "properties": [self.owner_page(ref, profile, digest) for ref, profile in profiles.items()]}
 
-    def refresh_digest(self):
-        """«Atualizar com a situação de agora»: the draft is made at the day's first read; this rewrites its text
-        from the queues as they are now. A digest already sent is left alone."""
-        with locked(self.folder):
-            digest = load_digest(self.folder)
-            if not digest:
-                raise ValueError("Ainda não há ponto de situação preparado.")
-            if digest.get("reply_status") not in ("draft", "error"):
-                raise ValueError("O ponto de situação de hoje já foi enviado.")
-            profiles = load_profiles(self.folder, self.config()["account"])
-            digest["reply_text"] = self.digest_text(profiles, {ref: self.load(ref) for ref in profiles}, digest["date"])
-            save_digest(self.folder, digest)
-        return self.digest_view()
+    def digest_page(self, profiles, property_ref, digest, changing=True):
+        """The property and its page kept today (None: not edited yet). A page that went, or may have gone, is final."""
+        ref = self.pick(profiles, property_ref)
+        if not ref:
+            raise ValueError("O ponto de situação é de um imóvel: configura um imóvel primeiro.")
+        page = digest["pages"].get(ref)
+        if page and page.get("reply_status") not in (("draft", "error") if changing else ("draft", "error", "uncertain")):
+            raise ValueError("O ponto de situação deste imóvel já foi enviado hoje."
+                             if page.get("reply_status") == "sent" else "Envio incerto: verifica Enviados no Gmail.")
+        return ref, page
 
-    def save_digest_text(self, text):
+    def save_digest_text(self, text, property_ref=None):
+        """The owner's report as edited in the notepad: kept for the day, until «Atualizar» or the next day."""
         text = str(text or "")
         if len(text) > 20000:
             raise ValueError("Texto demasiado longo.")
         with locked(self.folder):
-            digest = load_digest(self.folder)
-            if not digest:
-                raise ValueError("Ainda não há ponto de situação preparado.")
-            digest["reply_text"] = text
+            digest = self.today_digest()
+            ref, page = self.digest_page(self.profiles(), property_ref, digest)
+            digest["pages"][ref] = {**(page or {"reply_status": "draft", "reply_error": None, "sent_at": None}),
+                                    "reply_text": text, "saved_at": now()}
             save_digest(self.folder, digest)
-            return digest
+            return digest["pages"][ref]
 
-    def send_digest(self, confirmed):
+    def refresh_digest(self, property_ref=None):
+        """«Atualizar com a situação de agora»: forgets the text edited today, so the report is written again now."""
+        with locked(self.folder):
+            digest = self.today_digest()
+            ref, page = self.digest_page(self.profiles(), property_ref, digest)
+            if page:
+                digest["pages"].pop(ref)
+                save_digest(self.folder, digest)
+        return self.digest_view()
+
+    def mail_report(self, digest, entry, recipient, subject, text, cc=None):
+        """Sends one report and records on entry (a page, or the summary of all) how it went: «sending» is saved first,
+        so a crash in the middle is never taken for «not sent»."""
+        cfg = self.config()
+        msg = build_digest(cfg["account"], recipient, subject, text, cc)
+        password = app_password(self.folder, cfg["account"])
+        entry.update(reply_status="sending", reply_error=None)
+        save_digest(self.folder, digest)
+        try:
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as smtp:
+                smtp.login(cfg["account"], password)
+                refused = smtp.send_message(msg)
+                if refused:
+                    raise smtplib.SMTPRecipientsRefused(refused)
+        except smtplib.SMTPResponseException as exc:
+            entry.update(reply_status="error", reply_error=f"SMTP {exc.smtp_code}")
+        except smtplib.SMTPRecipientsRefused:
+            entry.update(reply_status="error", reply_error="Destinatário recusado pelo SMTP.")
+        except Exception:
+            entry.update(reply_status="uncertain", reply_error="Ligação interrompida; verifica Enviados no Gmail antes de repetir.")
+        else:
+            entry.update(reply_status="sent", sent_at=now())
+        save_digest(self.folder, digest)
+
+    def send_digest(self, confirmed, property_ref=None, to="me"):
+        """One property's report, as it stands in the notepad, never without a click (27/09): to="owner" sends it to the
+        property's owner (the email in Imóveis), with a copy to the address in Voz e estilo; to="me", only to that
+        address, for the user to forward. Once a day per property, whichever way it went."""
+        if confirmed is not True:
+            raise ValueError("É necessária confirmação explícita do utilizador após rever o texto.")
+        if to not in ("owner", "me"):
+            raise ValueError("Destino inválido.")
+        with locked(self.folder):
+            profiles, digest = self.profiles(), self.today_digest()
+            ref, page = self.digest_page(profiles, property_ref, digest, changing=False)
+            mine = self.digest_recipient()
+            owner = profiles[ref]["property"].get("owner_email") or ""
+            recipient = owner if to == "owner" else mine
+            if to == "owner" and not EMAIL.fullmatch(recipient):
+                raise ValueError("Este imóvel não tem o email do proprietário: põe-no em Imóveis, nos dados do imóvel.")
+            if to == "me" and not EMAIL.fullmatch(recipient):
+                raise ValueError("Configura um destinatário válido em Voz e estilo.")
+            if not page:
+                report = self.owner_report(ref, profiles[ref], self.load(ref))
+                page = {"reply_text": self.owner_report_text(report, digest["date"], REPORT_SIGNATURE),
+                        "reply_status": "draft", "reply_error": None, "sent_at": None}
+            digest["pages"][ref] = page
+            page["sent_to"] = to
+            description = profiles[ref]["property"].get("description") or ref
+            subject = f"Ponto de situação — {description} — {'/'.join(reversed(digest['date'].split('-')))}"
+            cc = mine if to == "owner" and EMAIL.fullmatch(mine) else None
+            self.mail_report(digest, page, recipient, subject, page["reply_text"], cc)
+            self.log("digest_send", status=page["reply_status"], reference=ref, to=to)
+            return {"status": page["reply_status"], "property_ref": ref}
+
+    def send_digest_all(self, confirmed):
+        """The summary of every property, one after the other as they stand in the notepad, to the address in Voz e
+        estilo (27/09, the option kept from before): the user decides what to do with each. It leaves the pages as
+        they are, so each can still go to its owner; once a day."""
         if confirmed is not True:
             raise ValueError("É necessária confirmação explícita do utilizador após rever o texto.")
         with locked(self.folder):
-            digest = load_digest(self.folder)
-            if not digest or digest.get("reply_status") not in ("draft", "error", "uncertain"):
-                raise ValueError("Não há ponto de situação por enviar.")
             recipient = self.digest_recipient()
             if not EMAIL.fullmatch(recipient):
                 raise ValueError("Configura um destinatário válido em Voz e estilo.")
-            cfg = self.config()
-            msg = build_digest(cfg["account"], recipient, f"Ponto de situação — {digest['date']}", digest["reply_text"])
-            password = app_password(self.folder, cfg["account"])
-            digest.update(reply_status="sending", reply_error=None)
-            save_digest(self.folder, digest)
-            try:
-                with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as smtp:
-                    smtp.login(cfg["account"], password)
-                    refused = smtp.send_message(msg)
-                    if refused:
-                        raise smtplib.SMTPRecipientsRefused(refused)
-            except smtplib.SMTPResponseException as exc:
-                digest.update(reply_status="error", reply_error=f"SMTP {exc.smtp_code}")
-            except smtplib.SMTPRecipientsRefused:
-                digest.update(reply_status="error", reply_error="Destinatário recusado pelo SMTP.")
-            except Exception:
-                digest.update(reply_status="uncertain",
-                              reply_error="Ligação interrompida; verifica Enviados no Gmail antes de repetir.")
-            else:
-                digest.update(reply_status="sent", sent_at=now())
-            save_digest(self.folder, digest)
-            self.log("digest_send", status=digest["reply_status"])
-            return {"status": digest["reply_status"]}
+            profiles, digest = self.profiles(), self.today_digest()
+            if not profiles:
+                raise ValueError("O ponto de situação é de um imóvel: configura um imóvel primeiro.")
+            entry = digest.get("all") or {}
+            if entry.get("reply_status") in ("sent", "sending"):
+                raise ValueError("O resumo de todos os imóveis já foi enviado hoje."
+                                 if entry["reply_status"] == "sent" else "O resumo de todos os imóveis está a ser enviado.")
+            parts = []
+            for ref, profile in profiles.items():
+                text = self.owner_page(ref, profile, digest)["reply_text"].rstrip()
+                parts.append(text[:-len(REPORT_SIGNATURE)].rstrip() if text.endswith(REPORT_SIGNATURE) else text)
+            day = "/".join(reversed(digest["date"].split("-")))
+            digest["all"] = entry
+            self.mail_report(digest, entry, recipient, f"Ponto de situação — todos os imóveis — {day}",
+                             ("\n\n" + "—" * 24 + "\n\n").join(parts) + "\n\n" + REPORT_SIGNATURE)
+            self.log("digest_send_all", status=entry["reply_status"], properties=len(parts))
+            return {"status": entry["reply_status"]}
 
     @staticmethod
     def snapshot(data, ids):
@@ -2505,6 +2597,13 @@ class MailService:
                                      "interactions": conversation.get("stage", 0)}
                                     for email, conversation in conversations.items() if conversation.get("stage")),
                                    key=lambda customer: customer["last_reply"] or "", reverse=True)
+                # 27/09: what is behind the Painel's four queue numbers, for their hover (the last ten of each): first
+                # name, day, what it is and how it stands. The same exception as above: never an address or a phone.
+                queue = [{"name": ((((item.get("customer") or {}).get("name") or (item.get("recipient") or {}).get("name")
+                                     or "").split()) or ["(sem nome)"])[0],
+                          "date": str(item.get("date") or ""), "kind": item.get("kind"),
+                          "status": item.get("reply_status") or "pending", "blocked": bool(item.get("blocked"))}
+                         for item in emails]
                 totals.update(pending=len(emails), drafts=status["draft"], blocked=blocked, answered=answered,
                               customers=len(conversations),
                               attention=status["uncertain"] + status["error"] + status["sending"])
@@ -2520,7 +2619,7 @@ class MailService:
                                    "clients": {state: clients[state] for state in
                                                ("ok", "pending", "booked", "outra_data", "nao_quer")},
                                    "ignored": {kind: ignored[kind] for kind in IGNORE_KINDS},
-                                   "answered_customers": customers,
+                                   "answered_customers": customers, "queue": queue,
                                    "last_read_at": data.get("last_read_at"), "description": listing.get("description"),
                                    "listing_url": listing.get("listing_url"),
                                    "advertised_rent_eur": listing.get("advertised_rent_eur"),
@@ -2648,7 +2747,7 @@ class MailService:
                                               "offered": self.pending_visits(ref, today, "visit_offered")},
                                    **{key: profile["property"].get(key) for key in (
                                        "reference", "listing_id", "listing_url", "advertiser", "description",
-                                       "advertised_rent_eur")}})
+                                       "advertised_rent_eur", "owner_email")}})
             return {"account": account, "voice": voice, "properties": properties, "ai": self.ai_settings(),
                     "lookback_days": int(self.config().get("lookback_days", 7)),
                     "openai_configured": has_openai_api_key(self.folder, account), "api_fuel": self.api_fuel(None, events)}

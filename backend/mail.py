@@ -472,8 +472,9 @@ def build_reply(item, account, sender_name="", subject=None):
     return msg, recipient
 
 
-def build_digest(account, recipient, subject, text):
-    """The daily status digest: a plain new message from the account to the owner's own address.
+def build_digest(account, recipient, subject, text, cc=None):
+    """The ponto de situação: a plain new message from the account, to the property's owner (with a copy to the user)
+    or to the user's own address.
 
     Never a reply (no In-Reply-To/References): it is not part of any customer's conversation.
     """
@@ -485,6 +486,8 @@ def build_digest(account, recipient, subject, text):
     msg["Date"] = formatdate(localtime=True)
     msg["From"] = account
     msg["To"] = recipient
+    if cc and cc.casefold() not in (recipient.casefold(), account.casefold()):
+        msg["Cc"] = cc
     msg["Subject"] = subject
     msg["Message-ID"] = make_msgid(domain="gmail.com")
     msg.set_content(text)

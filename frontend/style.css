@@ -140,9 +140,6 @@
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 /* API cost card: two lines of number, then the honest fine print about the estimate. */
-.usage-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
-.usage-row:last-of-type{border-bottom:0}
-.usage-row strong{font-variant-numeric:tabular-nums;font-size:15px}
 #openai-usage-card .muted.small{margin:12px 0 0}
 
 /* Chart period: a small select where the fixed "Últimos 14 dias" tag used to be. */
@@ -150,11 +147,8 @@
 .legend #chart-note{margin-left:auto}
 .legend #chart-note:before{display:none}
 
-/* Dashboard numbers that lead somewhere: the pointer and the border say so before the click. */
-.metric.clickable{cursor:pointer;transition:border-color .18s,transform .18s}
-.metric.clickable:hover,.metric.clickable:focus-visible{border-color:var(--hover-border);transform:translateY(-1px)}
+/* Dashboard numbers only inform (27/09): no click; the ones with a split by property show it on hover. */
 .metric[title]{cursor:help}
-.metric.clickable[title]{cursor:pointer}
 
 /* Workflow steps 01-04: a checkmark and a tinted background replace the number once that step is done,
    so "done" never looks like the same blank state the step started in. */
@@ -387,10 +381,6 @@
 #fuel-panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px 28px;align-items:center;margin:6px 0 4px}
 #fuel-panel .fuel-row{margin:0;flex-wrap:nowrap}
 #fuel-panel .fuel-status{margin-bottom:4px}
-/* …and its two usage lines side by side; the estimate's caveat is a hover now (title on .usage-rows, marked ⓘ) */
-#openai-usage-card .usage-rows{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:0 28px;cursor:help}
-#openai-usage-card .usage-rows .usage-row{border-bottom:0;border-top:1px solid var(--line)}
-#openai-usage-card .usage-row span::after{content:" ⓘ";color:var(--muted);font-size:11px}
 /* …where «Encher no painel do imóvel →» is a fuel-pump icon beside the tank's status (the text stays for screen
    readers; the icon takes the theme's link colour) */
 #fuel-panel .fuel-side{display:flex;align-items:center;gap:10px}
@@ -399,6 +389,25 @@
 #fuel-panel .fuel-side button.link::before{content:"";width:26px;height:26px;background:currentColor;
   -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 3h9a1 1 0 0 1 1 1v16h1a1 1 0 0 1 0 2H2a1 1 0 0 1 0-2h1V4a1 1 0 0 1 1-1zm1.5 2v5h6V5h-6z' fill='black'/%3E%3Cpath d='M14.5 6.5l3 3V17a1.6 1.6 0 0 0 3.2 0V8.4L18.2 6' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 3h9a1 1 0 0 1 1 1v16h1a1 1 0 0 1 0 2H2a1 1 0 0 1 0-2h1V4a1 1 0 0 1 1-1zm1.5 2v5h6V5h-6z' fill='black'/%3E%3Cpath d='M14.5 6.5l3 3V17a1.6 1.6 0 0 0 3.2 0V8.4L18.2 6' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat}
 #fuel-panel .fuel-side button.link:hover{background:var(--accent-tint);text-decoration:none}
+/* «Depósitos · API OpenAI» (27/09): a section of its own, full width, with the tanks on the left and, on the right,
+   a wallet with what the API cost for every property together: a flap with the stitching and the clasp, the total
+   below; the estimate's caveat is the wallet's hover (marked ⓘ) */
+#openai-usage-card{margin:18px 0 0}
+.fuel-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(250px,320px);gap:18px 32px;align-items:center}
+.wallet{position:relative;padding:0 20px 16px;border:1px solid var(--line);border-radius:12px 12px 18px 18px;
+  background:var(--card);box-shadow:var(--shadow);cursor:help}
+.wallet-flap{position:relative;display:flex;align-items:center;gap:10px;margin:0 -20px 16px;padding:14px 50px 12px 20px;
+  border-bottom:1px dashed var(--control-border);border-radius:12px 12px 0 0;background:var(--accent-tint);color:var(--accent)}
+.wallet-flap::before{content:"";flex:none;width:22px;height:22px;background:currentColor;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 7.5 15.2 4.1a1.5 1.5 0 0 1 2 1.4v2' fill='none' stroke='black' stroke-width='1.8' stroke-linejoin='round'/%3E%3Cpath d='M5.5 7.5h13A2.5 2.5 0 0 1 21 10v8a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 18v-8a2.5 2.5 0 0 1 2.5-2.5z' fill='none' stroke='black' stroke-width='1.8'/%3E%3Cpath d='M21 12h-4a2 2 0 0 0 0 4h4z' fill='black'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 7.5 15.2 4.1a1.5 1.5 0 0 1 2 1.4v2' fill='none' stroke='black' stroke-width='1.8' stroke-linejoin='round'/%3E%3Cpath d='M5.5 7.5h13A2.5 2.5 0 0 1 21 10v8a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 18v-8a2.5 2.5 0 0 1 2.5-2.5z' fill='none' stroke='black' stroke-width='1.8'/%3E%3Cpath d='M21 12h-4a2 2 0 0 0 0 4h4z' fill='black'/%3E%3C/svg%3E") center/contain no-repeat}
+.wallet-flap::after{content:"";position:absolute;right:18px;bottom:-9px;width:16px;height:16px;border-radius:50%;
+  background:var(--accent);box-shadow:0 0 0 3px var(--card)}
+.wallet-flap .eyebrow{margin:0}
+.wallet-total{display:block;font-size:30px;font-weight:500;line-height:1.2;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+.wallet-detail{margin:4px 0 0;color:var(--muted);font-size:12px}
+.wallet-detail::after{content:" ⓘ";font-size:11px}
+.wallet-period{margin:12px 0 0;padding-top:10px;border-top:1px solid var(--line);font-size:12px}
+@media(max-width:900px){.fuel-layout{grid-template-columns:minmax(0,1fr)}}
 /* Agenda, «Depois das visitas»: past visits still to check, as buttons above the week (the after-visit step) */
 .agenda-todo{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:0 0 16px;padding:10px 14px;
   border:1px dashed var(--accent);border-radius:12px;background:var(--accent-tint)}
@@ -445,9 +454,8 @@ body:not(.api-only) .api-only-show{display:none!important}
 .whatsapp-action{white-space:nowrap}
 .recipient-edit{margin:8px 0}
 .recipient-edit input{flex:1 1 220px;width:auto}
-/* Ponto de situação diário (26/09): tiles, one block per property with the names still to prepare, the email's text folded */
-.digest-card .digest-to{margin:2px 0 0}
-.digest-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:16px 0 6px}
+/* Ponto de situação (26/09; 27/09 for the owner): tiles, one block per property with who visited */
+.digest-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:16px 0 6px}
 .digest-kpi{display:flex;flex-direction:column;gap:2px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--input1)}
 .digest-kpi strong{font-size:28px;line-height:1.1;font-weight:600;font-variant-numeric:tabular-nums;color:var(--text)}
 .digest-kpi span{font-size:11px;color:var(--muted)}
@@ -468,10 +476,29 @@ body:not(.api-only) .api-only-show{display:none!important}
 .digest-names{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 .digest-chip{padding:2px 10px;border-radius:999px;font-size:12px;color:var(--text);background:var(--accent-tint);border:1px solid var(--line)}
 .digest-clear{margin:0}
-.digest-text{margin:14px 0 0}
-.digest-text textarea{margin-top:8px}
-.digest-actions{align-items:center}
 @media(max-width:760px){.digest-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.digest-all{margin-top:14px}
+/* …and, beside it, the notepad with the report for each property's owner (27/09): one page per property (the tabs),
+   ruled lines that scroll with the text, a margin rule and the binding's holes, in the theme's colours */
+.notepad-card{display:flex;flex-direction:column}
+.notepad-tabs{display:flex;flex-wrap:wrap;gap:4px;margin:14px 0 -1px;position:relative;z-index:1}
+.notepad-tab{min-height:0;padding:5px 12px;border-radius:9px 9px 0 0;border:1px solid var(--line);border-bottom-color:transparent;
+  background:var(--input1);color:var(--muted);font:600 11px/1.4 ui-monospace,SFMono-Regular,monospace;letter-spacing:.5px}
+.notepad-tab.active{background:var(--input);color:var(--accent);border-color:var(--control-border);border-bottom-color:var(--input)}
+.notepad{position:relative;flex:1;display:flex;margin:14px 0 8px;padding-top:20px;border:1px solid var(--control-border);
+  border-radius:12px;background:var(--input);overflow:hidden}
+.notepad-tabs+.notepad{margin-top:0;border-top-left-radius:0}
+.notepad::before{content:"";position:absolute;top:7px;left:16px;right:16px;height:8px;pointer-events:none;
+  background:radial-gradient(circle,var(--control-border) 0 3px,transparent 3.5px) 0 0/22px 8px repeat-x}
+#digest-notepad .notepad textarea.notepad-paper{flex:1;min-height:360px;margin:0;padding:0 16px 12px 54px;border:0;border-radius:0;
+  resize:vertical;font-size:14px;line-height:26px;background-color:var(--input);background-attachment:local;
+  background-image:linear-gradient(90deg,transparent 40px,color-mix(in srgb,var(--bad) 45%,transparent) 40px 41px,transparent 41px),
+    repeating-linear-gradient(transparent 0 25px,var(--line) 25px 26px)}
+#digest-notepad .notepad textarea.notepad-paper:focus{outline:none}
+.notepad:focus-within{border-color:var(--accent)}
+.notepad-to{margin:0}
+.notepad-saved{color:var(--ok)}
+.notepad-actions{align-items:center;margin-top:12px}
 .visitors-card{margin:18px 0}
 .visitor-row{flex-wrap:wrap;gap:6px 12px}
 .cluster-chart-card{margin:18px 0}
@@ -479,10 +506,33 @@ body:not(.api-only) .api-only-show{display:none!important}
 /* The short-list switch: outlined when off, lit (accent) when the customer is on the list */
 .shortlist-toggle{min-height:32px;padding:5px 12px;border-radius:999px;font-size:12px;font-weight:700}
 .shortlist-toggle.on{color:var(--accent-text);background:var(--accent);border-color:var(--accent)}
-/* Comunicações (26/09): «Gerar respostas» and «Rever e enviar» side by side at the top, the emails below at full width */
+/* Comunicações (27/09): two columns all the way down — on top, «Ler emails» (2/3) beside «Gerar respostas» (1/3); below,
+   each email with its draft (2/3) beside what can be done with it (1/3), which follows the scroll of a long email */
 .reply-layout{grid-template-columns:minmax(0,1fr)}
-.reply-layout>.batch-column{order:-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px;align-items:start}
+.reply-layout>.batch-column{display:grid;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:18px;align-items:stretch}
 .reply-layout>.batch-column>.card{margin:0}
+.read-controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px 22px;margin:14px 0 0}
+.read-controls select,.read-controls input{width:auto}
+.read-card #last-read{margin:12px 0 0}
+.email-row{display:grid;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:18px;align-items:start;margin:14px 0}
+.email-row>.card{margin:0}
+.email-actions{position:sticky;top:84px;display:flex;flex-direction:column;align-items:stretch;gap:10px;padding:18px}
+.email-actions button{width:100%}
+.email-actions .save-line{display:flex;align-items:center;gap:10px}
+.email-actions .save-line button{width:auto;flex:1}
+.email-generate{padding-top:10px;border-top:1px solid var(--line)}
+.email-generate p{margin:0 0 8px}
+.email-actions .note-box{margin:0;padding-top:4px;border-top:1px solid var(--line)}
+.email-actions .note-box .actions{flex-direction:column;align-items:stretch}
+.email-actions .note-box select{width:100%}
+.exit-actions{display:flex;flex-direction:column;align-items:flex-start;padding-top:8px;border-top:1px solid var(--line)}
+.exit-actions button.link{width:auto;min-height:0;padding:5px 0}
+@media(max-width:900px){.reply-layout>.batch-column,.email-row{grid-template-columns:minmax(0,1fr)}.email-actions{position:static}}
+/* «O teu espaço» (27/09): the summary at the top of Voz e estilo, as wide as the form below it */
+#tab-voice .setup-card{max-width:900px}
+#tab-voice .setup-card .checks{margin:14px 0 0}
+/* Qualidade (27/09): only «N resp.» under the needle, 20% smaller than the other dials' readouts */
+.quality-gauges .gauge-readout{font-size:12.8px}
 /* «Escolher» (26/09): an emergency button in a yellow-and-black striped guard; armed, it turns red and pulses. The
    :root prefix and the doubled class outrank the rich themes' button rules. */
 .eject-guard{display:inline-flex;align-items:center;gap:10px;padding:5px;border-radius:14px;
@@ -500,8 +550,7 @@ body:not(.api-only) .api-only-show{display:none!important}
 :root .eject-guard .eject-cancel.eject-cancel{padding:0 8px 0 2px;color:#fff;background:none;border:0;box-shadow:none;text-shadow:0 1px 2px #000;
   font-weight:700;min-height:0}
 @media(prefers-reduced-motion:reduce){:root .eject-guard button.eject.armed.armed{animation:none}}
-/* Depósitos (26/09): each property's own spend under its tank; the folder's total in rows of its own, full width */
-.usage-rows{grid-template-columns:minmax(0,1fr);margin-top:6px}
+/* Depósitos (26/09): each property's own spend under its tank */
 .fuel-usage{margin:2px 0 4px}
 /* «Rever e enviar» at the top of the drafts' column (26/09) */
 .send-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;margin:0 0 14px;padding:14px 16px;border:1px solid var(--line);

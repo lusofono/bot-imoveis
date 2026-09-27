@@ -3,6 +3,56 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 27/09/2026, à noite: ARIA, o email do proprietário e o Âmbar de partida (α.54.0)
+
+**Decisão (respostas do utilizador).**
+- **O nome da app passa a ARIA**; o ponto de situação assina «ARIA Assistente». O pacote Python continua `bot_mail`,
+  como já acontecia com o nome anterior (22/09).
+- **O email do proprietário fica no imóvel** (`property.owner_email` no `profile.json`, que não entra no Git). Só o
+  formulário do imóvel o muda: uma extração do anúncio não o traz e não o apaga.
+- **Duas saídas por imóvel, à escolha no momento:** ao proprietário com cópia para o utilizador, ou só para o
+  utilizador, que reencaminha com algo seu. Uma vez por dia e por imóvel, seja qual for, para nunca sair em duplicado.
+- **Mantém-se a opção de antes, o resumo de todos para o utilizador**, que decide o que fazer a cada imóvel: junta as
+  páginas como estão no bloco de notas, com uma só assinatura, e não as dá por enviadas.
+- **O Âmbar passa a primeiro e a tema de partida:** a interface está a ser simplificada nele (o trabalho de aspeto
+  faz-se e verifica-se só no Âmbar; os outros temas acompanham quando o desenho fechar, para não gastar tokens a
+  adaptar cada passo intermédio).
+
+## 27/09/2026: o ponto de situação é para o proprietário, um por imóvel (α.53.0)
+
+**Decisão.**
+- **O leitor é o proprietário do imóvel, não quem gere a fila** (pedido do utilizador: «deverá ser para eu enviar ao
+  proprietário»). Sai o trabalho interno (conversas, emails na fila, rascunhos, «por preparar»); entram os números que
+  o utilizador pediu, por esta ordem: quantos clientes nos contactaram, quantos responderam, quantos continuam ativos,
+  quantos marcaram visita e quantos visitaram, e de quem visitou o nome e um resumo da situação profissional e
+  familiar (os campos «trabalho» e «agregado» da ficha).
+- **Um relatório por imóvel, não um para todos:** cada imóvel tem o seu proprietário, e o texto leva nomes e dados
+  pessoais dos clientes. Um texto único com todos os imóveis obrigava a cortar à mão antes de enviar, e um descuido
+  mostrava a um proprietário os clientes de outro.
+- **As definições:** «contactaram» conta clientes (emails distintos: as conversas mais os pedidos novos ainda sem
+  resposta), não conversas; «responderam» é quem voltou a escrever depois da nossa primeira mensagem (o histórico da
+  conversa); «ainda ativos» é, desses, quem não ficou inativo, não recusou a visita e não está numa lista de
+  ignorados. Não é o «Clientes ativos» do painel do imóvel, que conta também quem nunca respondeu e ainda não passou a
+  inativo: num relatório para o proprietário, «34 ativos» com «12 responderam» não fazia sentido.
+- **Escreve-se na hora, a partir dos dados; só se guarda o que o utilizador altera** (por imóvel e por dia). Deixa de
+  ser preparado na primeira leitura do dia e deixa de precisar de destinatário: sem ele, copia-se. «Enviar» continua
+  a ir só para o endereço de Voz e estilo e só com confirmação; ainda não há email do proprietário em cada imóvel.
+- **O texto num bloco de notas ao lado dos números, em vez de escondido num «Ver e editar»** (pedido do utilizador),
+  no lugar da «Ronda de visitas», que foi para o separador Visitas: é lá que se trata das visitas.
+
+## 27/09/2026: simplificar a interface e os passos do dia a dia (α.52.3)
+
+**Decisão.**
+- **O rumo a partir daqui, a pedido do utilizador:** simplificar a interface e os passos do dia a dia. Cada coisa
+  tem um sítio e um caminho; o que é só informação não leva a lado nenhum.
+- **Os números do Painel só informam.** Um clique em «Pedidos por responder», «Rascunhos prontos», «Bloqueados» ou
+  «A precisar de atenção» abria a fila nas Respostas: era um segundo caminho para o que o «A fazer» já faz, linha a
+  linha e com os nomes. Passam a ser só leitura, no Painel e no painel de cada imóvel; a divisão por imóvel continua
+  ao passar o rato.
+- **…e dizem o que está por trás deles ao passar o rato (α.53.1, pedido do utilizador):** os últimos 10 emails de cada
+  número, com «+ x itens» para o resto. Alarga a exceção de 22/09 aos dados do Painel: **só o primeiro nome**, o dia,
+  o tipo e o estado; nunca um endereço, um telefone ou o nome completo (um teste confirma).
+
 ## 27/09/2026: o tema APalace, primeiro e de partida (α.52.0)
 
 **Decisão.**

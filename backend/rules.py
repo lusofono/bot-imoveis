@@ -256,6 +256,13 @@ def clean_property(fields):
         raise ValueError("A referência só pode ter letras, algarismos, _ e - (ex.: AP_T3_LISBOA).")
     if clean["sender"] and not EMAIL.fullmatch(clean["sender"]):
         raise ValueError("O remetente dos avisos tem de ser um endereço de email.")
+    if "owner_email" in fields:
+        # 27/09: who gets the property's report (the ponto de situação). Only when the form sends it: other callers
+        # (the listing's extraction) never wipe the one already saved.
+        owner = " ".join(str(fields.get("owner_email") or "").split())
+        if owner and (len(owner) > 200 or not EMAIL.fullmatch(owner)):
+            raise ValueError("O email do proprietário tem de ser um endereço de email.")
+        clean["owner_email"] = owner or None
     if clean["listing_id"] and not clean["listing_id"].isdigit():
         raise ValueError("O código do anúncio tem de ter só algarismos.")
     if clean["listing_url"] and urlsplit(clean["listing_url"]).scheme != "https":
@@ -304,7 +311,7 @@ def build_profile(fields, account, template, existing, today):
     kept = reply.get("never_reply_to") or [] if existing else []
     reply["never_reply_to"] = list(dict.fromkeys([*kept, sender, account]))
     prop.update({key: fields[key] for key in ("reference", "listing_id", "listing_url", "advertiser",
-                                              "description", "advertised_rent_eur")})
+                                              "description", "advertised_rent_eur", "owner_email") if key in fields})
     prop["information_source"] = f"Página local, {today.isoformat()}"
     return profile
 

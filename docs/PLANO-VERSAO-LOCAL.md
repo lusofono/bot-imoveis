@@ -239,9 +239,9 @@ Regra comum: o programa prepara, e nada sai sem a pré-visualização do lote e 
    que já têm conversa e ainda não foram convidados. Nas respostas que começam por «sim», «yes» ou «oui», a
    página sugere confirmar; um clique grava `rgpd: sim`, a data e o Message-ID como prova em
    `contactos.csv`.
-5. **Ponto de situação diário (feito a 22/09, à noite):** ver `docs/DECISOES.md`. Ainda por fazer:
-   histórico dos pontos de situação já enviados (hoje só existe o de hoje) e um destinatário por omissão
-   escolhido no `mac/setup.command`, em vez de só na página.
+5. **Ponto de situação (feito a 22/09, à noite; desde 27/09, um relatório por imóvel para o proprietário, num bloco
+   de notas no Painel):** ver `docs/DECISOES.md`. Ainda por fazer: histórico dos pontos de situação já enviados (hoje
+   só existe o de hoje) e, se o utilizador quiser, o email do proprietário em cada imóvel, para o «Enviar» ir direto.
 6. **Um JSON por run, para o Codex ou o Claude trabalharem sem copiar/colar:** cada run numa pasta
    `data/runs/<data-e-hora>/` com `pedidos.json` (o que o agente lê) e `respostas.json` (o que escreve), e
    um comando `bot-mail drafts` que aplica as respostas com as mesmas verificações.

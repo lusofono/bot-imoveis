@@ -301,6 +301,11 @@ def test_dashboard_carries_first_names_only_never_contacts(service):
     assert metrics["setup"] == {"account": True, "app_password": False, "voice": True, "properties": 1,
                                 "openai_key": False}
     assert [item["pending"] for item in metrics["properties"]] == [2]
+    # 27/09: what is behind the queue numbers, for their hover: first name, date, kind, status, blocked; nothing else.
+    queue = metrics["properties"][0]["queue"]
+    assert [(item["name"], item["kind"], item["status"], item["blocked"]) for item in queue] == [
+        ("Ana", "lead", "pending", False), ("Ana", "lead", "pending", True)]
+    assert all(set(item) == {"name", "date", "kind", "status", "blocked"} for item in queue)
     text = json.dumps(metrics, ensure_ascii=False)
     for private in (CUSTOMER, "900 000 001", "Ana Exemplo"):
         assert private not in text

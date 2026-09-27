@@ -21,6 +21,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from starlette.routing import Route
+from . import APP_NAME
 from .ai import listing_prompt, parse_fichas, parse_listing, parse_replies, parse_visits, reply_prompt, short_id
 from .openai_client import complete, estimate_cost_usd
 from .secrets import openai_api_key
@@ -273,13 +274,18 @@ def web_app(folder, token):
         return service.ignored_contacts(body.get("property_ref") or None)
 
     def digest_save(body):
-        service.save_digest_text(body.get("text"))
+        service.save_digest_text(body.get("text"), body.get("property_ref") or None)
         return service.digest_view()
 
     def digest_send(body):
         if body.get("confirmed") is not True:
             raise ValueError("Confirma o envio na página.")
-        return service.send_digest(True)
+        return service.send_digest(True, body.get("property_ref") or None, body.get("to") or "me")
+
+    def digest_send_all(body):
+        if body.get("confirmed") is not True:
+            raise ValueError("Confirma o envio na página.")
+        return service.send_digest_all(True)
 
     # One operation at a time from this page: a second click waits instead of failing on the
     # file lock. Other processes (MCP, terminal) still meet the file lock.
@@ -405,7 +411,8 @@ def web_app(folder, token):
                 "fuel/fill": ("POST", fuel_fill),
                 "digest": ("GET", lambda body: service.digest_view()), "todo": ("GET", lambda body: service.todo()),
                 "digest/save": ("POST", digest_save), "digest/send": ("POST", digest_send),
-                "digest/refresh": ("POST", lambda body: service.refresh_digest()),
+                "digest/send-all": ("POST", digest_send_all),
+                "digest/refresh": ("POST", lambda body: service.refresh_digest(body.get("property_ref") or None)),
                 "knowledge": ("POST", lambda body: service.knowledge(body.get("property_ref") or None)),
                 "knowledge/note": ("POST", note), "knowledge/save": ("POST", knowledge_save)}
     routes = ([Route("/", page), Route("/photo/{ref}", photo), Route("/contactos.csv", contacts_csv)]
@@ -447,7 +454,7 @@ def serve(folder, port=8765, open_browser=True):
     (Path(folder) / ".page.pid").write_text(str(os.getpid()))
     token = secrets.token_urlsafe(24)
     url = f"http://127.0.0.1:{port}/?t={token}"
-    print(f"Real Estate AI Assistant v{DISPLAY_VERSION}: {url}\nO link muda a cada arranque. Ctrl+C para parar.", flush=True)
+    print(f"{APP_NAME} v{DISPLAY_VERSION}: {url}\nO link muda a cada arranque. Ctrl+C para parar.", flush=True)
     if open_browser:
         threading.Timer(1.0, webbrowser.open, [url]).start()
     uvicorn.run(web_app(folder, token), host="127.0.0.1", port=port, access_log=False, log_level="warning")

@@ -779,7 +779,7 @@ def write_site(destination, data, csv, build_day):
     (destination / "demo-data.js").write_text("window.DEMO_DATA = " + payload + ";\n", encoding="utf-8")
     (destination / "contactos.csv").write_bytes(csv if isinstance(csv, bytes) else csv.encode("utf-8"))
     (destination / "LEIA-ME.txt").write_text(
-        "Real Estate AI Assistant, by BigLearn PT — versão de demonstração\n\n"
+        "ARIA, by BigLearn PT — versão de demonstração\n\n"
         "Pasta estática: envia todo o conteúdo para qualquer servidor HTTP (ou abre index.html no browser).\n"
         "Dados fictícios e respostas gravadas: não lê nem envia emails e não chama nenhuma IA.\n"
         "As datas acompanham o dia de quem vê a demonstração.\n", encoding="utf-8")
