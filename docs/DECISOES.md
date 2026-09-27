@@ -3,6 +3,29 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 27/09/2026: versão de demonstração em HTML estático, para vender
+
+**Decisão.**
+- **`bot-mail webdemo <pasta>` gera uma demo estática** (HTML, CSS, JS e os dados), para enviar para um servidor HTTP
+  qualquer. Pedido do utilizador: «sem API, com resultados já pré-programados para cada passo, com o mesmo look & feel».
+- **A página é a mesma (`app.js`, `style.css`, os temas), sem uma linha alterada.** Um ficheiro a mais,
+  `demo-api.js`, substitui o `fetch` da página e responde às chamadas `api/...` a partir de `demo-data.js`. Assim a demo
+  acompanha a página sozinha: basta voltar a gerá-la. A alternativa (uma cópia da página com dados escritos à mão)
+  ficaria diferente da real ao fim de poucos dias.
+- **Os dados vêm do backend verdadeiro, não escritos à mão:** o gerador corre duas semanas de uma agência fictícia
+  pelo `MailService` real, com o relógio, o Gmail, a OpenAI e o SMTP simulados (os mesmos `patch` dos testes), e grava
+  as respostas da API em quatro momentos: ao abrir, depois de ler, depois de gerar e depois de enviar. Só os
+  rascunhos que a «IA» escreve na demo foram escritos à mão, por serem o que um comprador lê primeiro.
+- **A fila é seguida email a email no browser** (rascunhos gerados ou editados, enviados, retirados, propostas de
+  visita novas); o resto (métricas, agenda, contactos) passa para a gravação do momento seguinte.
+- **As datas deslocam-se para o dia de quem vê** (as datas ISO, as «dd/mm/aaaa» e as datas nos textos, escritas como
+  marcadores): sem isso, a demo ficava velha uma semana depois de gerada.
+- **Nada é gravado nem enviado, e a página di-lo:** uma pílula fixa em baixo, e um aviso em cada alteração que na
+  versão completa ficaria guardada. O que só faz sentido com o Gmail ou a IA ligados responde com uma mensagem clara.
+- **Dados fictícios só com domínios reservados** (`example.com`, `.example`) e um teste confirma que nada da pasta
+  `data/` nem nomes reais entram. O `demo-api.js` é testado passo a passo no motor JavaScript do macOS (`jsc`), sem browser,
+  como pede o `CLAUDE.md`.
+
 ## 26/09/2026, noite (4): o tema 70's Scooter, e 80's RacingCar (α.45.0)
 
 **Decisão.**

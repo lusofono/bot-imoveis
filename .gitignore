@@ -22,3 +22,6 @@ __pycache__/
 
 # Real per-property profiles (account, listing, address) stay local.
 **/properties/*/
+
+# The static demo (bot-mail webdemo dist/<pasta>): built files, never in Git.
+/dist/

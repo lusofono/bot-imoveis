@@ -50,7 +50,7 @@ const SKINS = {
     },
     instruments: carInstruments,
     selector: gearbox,
-    sounds: {send: engineBlip, read: pitRadio, click: switchClack, shift: gearShift},
+    sounds: {send: racingSend, read: racingStart, click: switchClack, shift: racingGear},
   },
   boat: {
     words: {
@@ -70,7 +70,7 @@ const SKINS = {
     },
     instruments: boatInstruments,
     selector: helm,
-    sounds: {send: shipHorn, read: shipBell, click: brassTick},
+    sounds: {send: boatHorn, read: boatBell, click: brassTick, shift: boatEngine},
   },
   scooter: {
     words: {
@@ -298,6 +298,19 @@ function scooterStart(context) { playSample(context, 'scooter-start', () => kick
 function scooterGear(context, gear, from = 0) {
   playSample(context, 'scooter-gear', () => scooterShift(context, gear, from), 0.86 + Math.max(1, gear) * 0.07, 0.6);
 }
+
+// 80's RacingCar's and 90's Boat's recorded sounds (27/09, CC0, credits in frontend/sounds/CREDITS.md), each falling back
+// on its synthesised sound. The car: a racing engine starting (new emails); an Italian GT pulling hard, closing with a
+// turbo's blow-off (emails out); short revs, higher in each gear (tabs). The boat: the ship's bell struck twice (new
+// emails); a boat's horn (emails out); a diesel engine running, a little higher at each tab (tabs).
+function racingStart(context) { playSample(context, 'car-start', () => pitRadio(context), 1, 0.75); }
+function racingSend(context) { playSample(context, 'car-send', () => engineBlip(context), 1, 0.85); }
+function racingGear(context, gear, from = 0) {
+  playSample(context, 'car-gear', () => gearShift(context, gear, from), 0.88 + Math.max(1, gear) * 0.05, 0.6);
+}
+function boatBell(context) { playSample(context, 'boat-bell', () => shipBell(context), 1, 0.7); }
+function boatHorn(context) { playSample(context, 'boat-horn', () => shipHorn(context), 1, 0.7); }
+function boatEngine(context, gear) { playSample(context, 'boat-engine', () => brassTick(context), 0.9 + Math.max(1, gear) * 0.04, 0.5); }
 
 // 70's Scooter, emails out: the horn — two short, bright honks from a twin-tone buzzer.
 function scooterHorn(context) {

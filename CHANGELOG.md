@@ -15,6 +15,25 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.50.0 — 27/09/2026
+
+- **Versão de demonstração em HTML estático, para vender:** `bot-mail webdemo <pasta>` gera uma pasta (e um .zip) com
+  a página tal como está e uma agência fictícia (3 imóveis, 16 clientes), pronta a enviar para qualquer servidor HTTP.
+  Sem Gmail, sem IA e sem servidor: as respostas de cada passo foram gravadas pelo backend verdadeiro com o relógio, o
+  Gmail, a OpenAI e o SMTP simulados. Ler, gerar, editar, pré-visualizar e enviar funcionam; as datas acompanham o dia
+  de quem vê; uma pílula no fundo diz que é uma demonstração e tem «Recomeçar».
+
+## α.49.0 — 27/09/2026
+
+- **Sons reais também no 80's RacingCar e no 90's Boat** (gravações CC0 do Freesound, créditos em
+  `frontend/sounds/CREDITS.md`):
+  - **80's RacingCar:** o arranque e a acelerada de um carro de corrida clássico quando chegam emails; ao enviar, um GT
+    italiano a puxar a fundo, rematado pelo «pssh» de um turbo; a cada separador, aceleradas curtas, mais agudas a cada
+    mudança.
+  - **90's Boat:** o sino do navio, duas badaladas, quando chegam emails; a buzina ao enviar; e, novo, o motor diesel a
+    trabalhar a cada separador.
+  - Os sons sintetizados ficam como reserva.
+
 ## α.48.12 — 26/09/2026
 
 - **Contactos:** «Descarregar CSV» sai do cabeçalho da página e passa para o canto direito da linha dos filtros, logo

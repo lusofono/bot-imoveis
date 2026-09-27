@@ -22,7 +22,7 @@ def ask(label, default=""):
 
 def main(argv=None):
     """bot-mail [--instance PASTA] setup | password | openai-key | read | pending | send | resolve |
-    replicate | demo | web | stdio. Errors are printed as ERRO: … and return 1, never a traceback."""
+    replicate | demo | webdemo | web | stdio. Errors are printed as ERRO: … and return 1, never a traceback."""
     parser = argparse.ArgumentParser(description="bot_mail — uma conta, uma pasta, um JSON")
     parser.add_argument("--instance", type=Path, default=Path(os.environ.get("BOT_MAIL_INSTANCE", ROOT / "data")),
                         help="pasta de dados (por omissão, data/)")
@@ -43,6 +43,9 @@ def main(argv=None):
     replicate.add_argument("destination", type=Path)
     demo = commands.add_parser("demo", help="pasta de dados com imóveis e clientes fictícios, para trabalhar na página")
     demo.add_argument("destination", type=Path)
+    webdemo = commands.add_parser("webdemo", help="versão de demonstração estática (HTML), com dados fictícios, "
+                                                  "para enviar para um servidor HTTP")
+    webdemo.add_argument("destination", type=Path)
     web = commands.add_parser("web", help="página local, sem MCP: copiar e colar no ChatGPT")
     web.add_argument("--port", type=int, default=8765)
     web.add_argument("--no-browser", action="store_true")
@@ -136,6 +139,11 @@ def main(argv=None):
             from .demo import create_demo
             destination = create_demo(args.destination)
             print(f"Demonstração criada: {destination}. Apenas dados fictícios.")
+        elif args.action == "webdemo":
+            from .webdemo import build
+            destination, archive = build(args.destination)
+            print(f"Demonstração estática criada: {destination} (e {archive.name}). Envia o conteúdo da pasta para o "
+                  "servidor HTTP, ou abre index.html no browser. Apenas dados fictícios.")
         elif args.action == "web":
             from .api import serve
             service.config()  # needs the account; the page itself shows what else is missing

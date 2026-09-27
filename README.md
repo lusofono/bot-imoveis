@@ -330,6 +330,28 @@ está na tag `referencia-python` e volta, adaptado, com a AWS. Ver [docs/DECISOE
 Cria uma pasta de dados **vazia** para outra conta Gmail, sem copiar emails, credenciais ou confirmações.
 Não copies uma pasta já configurada com os seus segredos.
 
+## Versão de demonstração (HTML estático, para vender)
+
+```bash
+.venv/bin/bot-mail webdemo dist/demo-imoveis
+```
+
+Cria `dist/demo-imoveis/` (e `dist/demo-imoveis.zip`): a página tal como está, com uma agência fictícia («Casa
+Exemplo Imobiliária», três imóveis e 16 clientes inventados), pronta a enviar para **qualquer servidor HTTP** — basta
+copiar o conteúdo da pasta, sem Python nem base de dados — ou a abrir diretamente no browser.
+- **Não lê nem envia emails e não chama nenhuma IA.** As respostas de cada passo foram gravadas antes, pelo backend
+  verdadeiro, numa pasta temporária com o relógio, o Gmail, a OpenAI e o SMTP simulados (duas semanas de trabalho da
+  agência). Uma pílula no fundo da página diz «Demonstração · dados fictícios» e tem **Recomeçar**.
+- **O percurso completo funciona:** Ler emails (entram 4 pedidos novos e uma resposta), selecionar, Gerar respostas
+  (em português, inglês, espanhol e alemão com tradução), editar, pré-visualizar e enviar; o Painel, a Agenda, os
+  Imóveis e os Contactos acompanham. Mudanças de configuração respondem, mas avisam que não ficam gravadas; o que só
+  existe ligado ao Gmail ou à IA (novo imóvel a partir do anúncio, consentimento, fechar visitas) diz que precisa da
+  versão completa.
+- **As datas acompanham o dia de quem vê:** o dia em que a demo foi gerada passa a ser «hoje», por isso a Agenda e os
+  últimos 14 dias estão sempre certos. Voltar a gerar só é preciso quando a página mudar.
+- O código está em `backend/webdemo.py` (simulação e gravação) e `backend/templates/webdemo/` (`demo-api.js`, que
+  responde às chamadas da página no browser, e `demo.css`). A pasta `dist/` não entra no Git.
+
 ## MCP
 
 | Operação | Efeito |
