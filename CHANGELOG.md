@@ -15,6 +15,20 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.52.2 — 27/09/2026
+
+Registo do que já seguiu no código dos commits de α.51.0 e α.52.1 e ainda não estava aqui:
+
+- **90's Boat: «Sensores a bordo», por baixo do leme** — um veleiro motorsailer de 40 pés de 1980 (ketch, casa do
+  leme) à noite, com sensores que pulsam em verde, âmbar ou vermelho: rádio (a última leitura do Gmail), casa do leme
+  (rascunhos por enviar), porão (emails por responder), motor (depósitos da API) e proa (visitas de hoje, a azul).
+- **80's RacingCar: dez luzes de aviso por baixo da caixa de velocidades** — setas, médios, máximos, ECO, motor, óleo,
+  gasolina, bateria, cinto e porta, apagadas até terem motivo (as setas piscam).
+- **70's Scooter: a fila de vidros redondos por baixo do punho de mudanças** — farol verde, óleo, o preto (N) e a
+  gasolina, como no tablier de uma scooter dos anos 70.
+- Nos três, cada luz diz ao passar o rato o que mede, e um clique leva ao separador.
+- **A barra lateral deixa de ter a frase «O envio fica sempre sob o teu controlo.»**, em todos os temas.
+
 ## α.52.1 — 27/09/2026
 
 - **KW-Area:** a etiqueta da versão («version: vα…») passa a ter fundo preto, com a letra branca, sobre o vermelho da
