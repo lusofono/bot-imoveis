@@ -305,8 +305,11 @@ function scooterGear(context, gear, from = 0) {
 // emails); a boat's horn (emails out); a diesel engine running, a little higher at each tab (tabs).
 function racingStart(context) { playSample(context, 'car-start', () => pitRadio(context), 1, 0.75); }
 function racingSend(context) { playSample(context, 'car-send', () => engineBlip(context), 1, 0.85); }
+// The Painel (1st) and Voz e estilo (R, reverse) keep the short rev; the tabs in between pull away harder, a clip of a
+// racing engine winding right up, a little higher in each gear (27/09).
 function racingGear(context, gear, from = 0) {
-  playSample(context, 'car-gear', () => gearShift(context, gear, from), 0.88 + Math.max(1, gear) * 0.05, 0.6);
+  if (gear <= 1) return playSample(context, 'car-gear', () => gearShift(context, 1, from), 0.93, 0.6);
+  playSample(context, 'car-accel', () => gearShift(context, gear, from), 0.92 + (gear - 2) * 0.05, 0.6);
 }
 function boatBell(context) { playSample(context, 'boat-bell', () => shipBell(context), 1, 0.7); }
 function boatHorn(context) { playSample(context, 'boat-horn', () => shipHorn(context), 1, 0.7); }
@@ -441,7 +444,7 @@ function twistGrip(box) {
 // only there for the look); the lever goes through neutral like a real one, and a click on a gear changes
 // tab. It repeats the nav for the mouse: the nav itself stays the accessible way (aria-hidden here).
 const GEARS = {dashboard: [71, 29], replies: [71, 103], properties: [106, 29], contacts: [106, 103], agenda: [141, 29],
-  voice: [141, 103]};
+  voice: [36, 29]};  // Voz e estilo is reverse (27/09); the 6th slot stays in the gate, for the look
 function gearbox(box) {
   const neutral = 66, gate = 'M36 66H141M36 66V29M71 29V103M106 29V103M141 29V103';
   const gradient = (id, attrs, colours) => svg(attrs.r ? 'radialGradient' : 'linearGradient', {id, ...attrs},
@@ -449,8 +452,8 @@ function gearbox(box) {
   const channel = (colour, width, extra = {}) => svg('path', {d: gate, fill: 'none', stroke: colour, 'stroke-width': width,
     'stroke-linecap': 'round', ...extra});
   const tabs = Object.keys(GEARS);
-  const labels = [svg('text', {x: 36, y: 14, class: 'gate-label'}, 'R'), ...tabs.map((tab, i) => svg('text', {x: GEARS[tab][0],
-    y: GEARS[tab][1] < neutral ? 14 : 120, class: 'gate-label', 'data-tab': tab}, String(i + 1)))];
+  const labels = [...tabs.map((tab, i) => svg('text', {x: GEARS[tab][0], y: GEARS[tab][1] < neutral ? 14 : 120, class: 'gate-label',
+    'data-tab': tab}, tab === 'voice' ? 'R' : String(i + 1))), svg('text', {x: 141, y: 120, class: 'gate-label'}, '6')];
   const hits = tabs.map(tab => svg('circle', {cx: GEARS[tab][0], cy: GEARS[tab][1], r: 13, fill: 'transparent', class: 'gate-hit',
     'data-tab': tab}, svg('title', {}, TAB_NAMES[tab])));
   for (const node of [...labels, ...hits]) if (node.dataset.tab) node.addEventListener('click', () => showTab(node.dataset.tab));
@@ -1652,7 +1655,52 @@ function applyAiMode() {
   $('generate-api').classList.toggle('primary', apiOnly());
 }
 
+// The property switcher of Imóveis (27/09), the same in Comunicações, Agenda and Contactos: big arrows, the reference,
+// the description, the dots and «1 / 3». It drives the page's own <select> (kept, hidden), so every tab's logic stays
+// as it was: a change here sets the select and fires its «change»; a select refilled or changed elsewhere redraws it.
+const SWITCHERS = [];
+function propertySwitcher(select) {
+  const label = select.closest('label');
+  const row = label?.parentElement;
+  const box = el('div', {class: 'property-slider property-switcher', tabindex: '0', 'aria-label': 'Escolher o imóvel'});
+  row.before(box);
+  label.hidden = true;
+  const go = index => {
+    const options = [...select.options];
+    if (!options.length) return;
+    select.selectedIndex = (index + options.length) % options.length;
+    select.dispatchEvent(new Event('change'));
+  };
+  const render = () => {
+    const options = [...select.options], index = Math.max(0, select.selectedIndex), many = options.length > 1;
+    const option = options[index];
+    if (!option) return box.replaceChildren(el('span', {class: 'muted small'}, 'Sem imóveis.'));
+    const ref = option.value, property = (settings?.properties || []).find(item => item.reference === ref);
+    const inactive = property?.active === false || /inativo/i.test(option.textContent);
+    box.replaceChildren(...el('div', {},
+      many && el('button', {type: 'button', class: 'slider-arrow prev', 'aria-label': 'Imóvel anterior', onclick: () => go(index - 1)}, '‹'),
+      el('div', {class: 'slider-title'},
+        el('span', {class: 'property-ref'}, ref ? ref + (inactive ? ' · INATIVO' : '') : 'TODOS OS IMÓVEIS'),
+        el('strong', {}, ref ? property?.description || option.textContent : 'Todos os imóveis, em conjunto'),
+        many && el('div', {class: 'slider-dots'}, options.map((other, i) => el('button', {type: 'button',
+          class: 'slider-dot' + (i === index ? ' active' : ''), 'aria-label': other.value || 'Todos', title: other.value || 'Todos',
+          'aria-current': i === index ? 'true' : false, onclick: () => go(i)})),
+          el('span', {class: 'muted small'}, `${index + 1} / ${options.length}`))),
+      many && el('button', {type: 'button', class: 'slider-arrow next', 'aria-label': 'Imóvel seguinte', onclick: () => go(index + 1)}, '›')).childNodes);
+  };
+  box.addEventListener('keydown', event => {
+    if (event.key === 'ArrowLeft') go(select.selectedIndex - 1);
+    if (event.key === 'ArrowRight') go(select.selectedIndex + 1);
+  });
+  select.addEventListener('change', render);
+  new MutationObserver(render).observe(select, {childList: true});
+  SWITCHERS.push(render);
+  render();
+}
+for (const id of ['queue', 'agenda-property', 'fichas-property']) propertySwitcher($(id));
+
 function renderSettings() {
+  SWITCHERS.forEach(render => render());  // the descriptions come with the settings
   applyAiMode();
   renderVoice();
   $('agency-knowledge').replaceChildren(el('p', {class: 'eyebrow'}, 'KNOW-HOW DA AGÊNCIA ', kind('rag')),

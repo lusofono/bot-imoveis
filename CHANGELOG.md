@@ -15,6 +15,19 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.50.2 — 27/09/2026
+
+- **80's RacingCar, mudanças:** «Voz e estilo» passa a ser a marcha-atrás (R), na caixa de velocidades e no número do
+  separador, e soa como o Painel. Os separadores do meio (Comunicações, Imóveis, Contactos, Agenda) ganham um som de
+  aceleração a fundo, tirado da gravação do carro de corrida (CC0), mais agudo a cada mudança.
+
+## α.50.1 — 27/09/2026
+
+- **O mesmo seletor de imóvel em todo o lado:** as Comunicações, a Agenda e Contactos passam a escolher o imóvel como em
+  Imóveis — setas grandes, a referência, a descrição, os pontos e «1 / 3» (na Agenda e em Contactos, «Todos os imóveis»
+  é a primeira posição). Setas do teclado também mudam. O filtro de imóvel da tabela de contactos continua um menu, ao
+  lado do RGPD e da pesquisa.
+
 ## α.50.0 — 27/09/2026
 
 - **Versão de demonstração em HTML estático, para vender:** `bot-mail webdemo <pasta>` gera uma pasta (e um .zip) com

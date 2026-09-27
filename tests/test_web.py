@@ -477,7 +477,7 @@ def test_a_listing_is_extracted_from_its_pasted_text(service, page):
 def test_the_scooter_sounds_are_served_as_audio(page):
     client, _ = page
     client.get(f"/?t={TOKEN}")
-    for name in ("scooter-start", "scooter-rev", "scooter-gear", "car-start", "car-send", "car-gear",
+    for name in ("scooter-start", "scooter-rev", "scooter-gear", "car-start", "car-send", "car-gear", "car-accel",
                  "boat-bell", "boat-horn", "boat-engine"):
         response = client.get(f"/sounds/{name}.m4a")
         assert response.status_code == 200 and response.headers["content-type"] == "audio/mp4" and len(response.content) > 5000

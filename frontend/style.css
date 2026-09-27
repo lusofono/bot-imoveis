@@ -517,3 +517,6 @@ body:not(.api-only) .api-only-show{display:none!important}
 .cluster .trip-computer button.link{min-height:26px;padding:2px 0}
 .cluster .trip-reading{flex-basis:auto;flex:1 1 220px;text-align:right}
 .contacts-filters .contacts-csv{margin-left:auto}
+/* The property switcher in Comunicações, Agenda and Contactos: the same as Imóveis (27/09) */
+.property-switcher{margin:0 0 16px}
+.property-switcher:focus-visible{outline:2px solid var(--accent);outline-offset:3px}

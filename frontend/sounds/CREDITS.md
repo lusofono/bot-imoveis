@@ -24,7 +24,8 @@ normalizados, com saída suave:
 | `car-start.m4a` | chegam emails (0 a 9 s) | «Ignition Starting and Engine Rev on a Vintage Race Car», *timothyd4y*, n.º 472610 |
 | `car-send.m4a` | enviar (195,5 a 203,5 s) | desfile de desportivos italianos em Lymington, *richwise*, n.º 476310 |
 | (dentro do anterior) | o «pssh» do turbo, aos 5,2 s | «Turbo Spooling and Blow Off», *EwanPenman11*, n.º 659544 (2,4 a 4,9 s) |
-| `car-gear.m4a` | mudar de separador (33,6 a 36,6 s) | «Car Engine Start, Idle, and Revving», *NHumphrey*, n.º 200973 |
+| `car-gear.m4a` | Painel e Voz e estilo (R) (33,6 a 36,6 s) | «Car Engine Start, Idle, and Revving», *NHumphrey*, n.º 200973 |
+| `car-accel.m4a` | os outros separadores: acelerar a fundo (28 a 32,2 s) | a mesma gravação do `car-start.m4a` (*timothyd4y*, n.º 472610) |
 | `boat-bell.m4a` | chegam emails (inteira) | «Ship Bell Two Chimes», *Sojan*, n.º 353232 |
 | `boat-horn.m4a` | enviar (inteira) | «Boat Horn», *PearceWilsonKing*, n.º 346108 |
 | `boat-engine.m4a` | mudar de separador (3 a 6 s) | «Lobster Boat Starting and Stopping», *bone666138*, n.º 398416 |
