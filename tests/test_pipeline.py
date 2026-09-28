@@ -98,3 +98,31 @@ def test_the_table_has_names_and_the_newest_first(service):
     pipeline = service.pending()["properties"][0]["pipeline"]
     assert [customer["email"] for customer in pipeline] == [OTHER, CUSTOMER]
     assert pipeline[1]["name"] == "Ana Exemplo" and pipeline[1]["last_at"].startswith("2026-09-20")
+
+
+def test_a_customer_writing_with_a_visit_booked_or_after_it_gets_its_own_prompt(service):
+    # 27/09: they went as a plain «5.ª» or later, which has no prompt.
+    from datetime import date
+    from backend.ai import reply_prompt
+    read(service, [lead("1")])
+    draft_and_send(service, "1")
+    follow = {"gmail_message_id": "f1", "thread_id": "t1", "message_id": "<f1@mail.example>", "date": NOW_ISO(),
+              "from": [{"name": "Ana Exemplo", "email": CUSTOMER}], "subject": "Re: Nova mensagem",
+              "body_text": "A garagem dá para dois carros?"}
+    day = (date.today() + timedelta(days=2)).isoformat()
+    save_visits(service.folder, REF, {"windows": [], "slots": [{"at": day + " 18:00", "customer": CUSTOMER}]})
+    read(service, [follow])
+    queue = service.pending()["properties"][0]
+    [email] = [item for item in queue["emails"] if item["id"] == "f1"]
+    assert (email["phase"], email["booked_at"]) == ("booked", day + " 18:00")
+    prompt = reply_prompt(queue, ["f1"])
+    assert "interação: visita marcada" in prompt and "Visita marcada para" in prompt and "Cliente com visita marcada" in prompt
+    # After the visit: «já visitou».
+    change(service, CUSTOMER, visit_check={"at": day + " 18:00", "attended": True})
+    queue = service.pending()["properties"][0]
+    [email] = [item for item in queue["emails"] if item["id"] == "f1"]
+    assert email["phase"] == "visited" and "interação: já visitou" in reply_prompt(queue, ["f1"])
+
+
+def NOW_ISO():
+    return datetime.now(timezone.utc).isoformat()

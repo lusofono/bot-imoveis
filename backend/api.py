@@ -24,6 +24,7 @@ from starlette.routing import Route
 from . import APP_NAME
 from .ai import listing_prompt, parse_fichas, parse_listing, parse_replies, parse_visits, reply_prompt, short_id
 from .openai_client import complete, estimate_cost_usd
+from .rules import phone_in
 from .secrets import openai_api_key
 from .service import MailService
 
@@ -72,12 +73,19 @@ def web_app(folder, token):
         queues = data.get("properties") or [{"property_ref": None, "revision": data["revision"], "instructions": "",
                                              "last_read_at": data.get("last_read_at"), "emails": data["emails"]}]
         phones = service.phones() if queues and queues[0].get("property_ref") else {}
+        profiles = service.profile_links() if queues and queues[0].get("property_ref") else {}
         for queue in queues:
             for email in queue["emails"]:
                 email["short_id"] = short_id(email["id"])
                 # The WhatsApp button's number (26/09): the page only, never in a prompt.
                 address = ((email.get("recipient") or {}).get("email") or (email.get("customer") or {}).get("email") or "").casefold()
-                email["whatsapp"] = (email.get("customer") or {}).get("phone") or phones.get((address, queue.get("property_ref")), "")
+                # 27/09: else one the customer wrote in this message or an earlier one of theirs (never our quoted text)
+                email["whatsapp"] = ((email.get("customer") or {}).get("phone") or phones.get((address, queue.get("property_ref")), "")
+                                     or phone_in((email.get("customer") or {}).get("message"))
+                                     or next((found for turn in reversed(email.get("conversation") or [])
+                                              if turn.get("who") == "cliente" for found in [phone_in(turn.get("text"))] if found), ""))
+                # 27/09: the customer's profile on the portal («Ver perfil»), from this notice or an earlier one
+                email["profile_url"] = email.get("profile_url") or profiles.get((address, queue.get("property_ref")), "")
         return {"account": data["account"], "error": None, "properties": queues}
 
     def queue(ref):
@@ -120,6 +128,7 @@ def web_app(folder, token):
         # emails: past that, answers get worse and a long JSON risks being cut.
         ref = queue(body.get("property_ref"))["property_ref"]
         ids, extra = ids_of(body), str(body.get("extra") or "")
+        only_extra = body.get("only_extra") is True and len(ids) == 1  # 27/09: one email, its points only
         cfg = service.config()
         key = openai_api_key(service.folder, cfg["account"])
         model = service.model(cfg)
@@ -129,7 +138,7 @@ def web_app(folder, token):
         for start in range(0, len(ids), GENERATE_BATCH):
             service.require_fuel(ref)
             current = queue(ref)  # fresh each time: the previous batch's drafts changed its revision
-            prompt_text = reply_prompt(current, ids[start:start + GENERATE_BATCH], extra)
+            prompt_text = reply_prompt(current, ids[start:start + GENERATE_BATCH], extra, only_extra)
             answer, usage = complete(key, model, prompt_text)  # raises OpenAIError, shown to the owner like any other
             # Tokens only: never the prompt or the answer, same rule as every other log entry.
             cost = estimate_cost_usd(model, **{k: usage[k] for k in ("prompt_tokens", "completion_tokens")})

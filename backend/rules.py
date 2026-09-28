@@ -12,6 +12,10 @@ from urllib.parse import urlsplit
 REFERENCE = re.compile(r"[A-Za-z0-9_-]{1,64}")
 EMAIL = re.compile(r"[^@\s<>(),;:\"\[\]]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+")
 PHONE = re.compile(r"\+?\d[\d .()-]{7,}\d")
+# 27/09: a phone a customer wrote in a message, for the page's WhatsApp button only: a Portuguese mobile, with or without
+# +351, or a number written with its country code (+… or 00…). Dates, prices and references do not match.
+MESSAGE_PHONE = re.compile(r"(?<![\d+])(?:(?:\+|00)351[\s.-]?)?9[1236](?:[\s.-]?\d){7}(?!\d)"
+                           r"|(?<![\d+])(?:\+|00)[1-9]\d{0,2}(?:[\s.-]?\d){6,12}(?!\d)")
 LISTING = re.compile(r"Código do anúncio:\s*(\d+)")
 SUBJECT_NAME = re.compile(r"\bde (.+?) sobre o teu imóvel")
 QUOTE = re.compile(r"^(>|(Em|On|No dia) .+(escreveu|wrote):?$|_{10,}$|-{3,} ?(Original Message|Mensagem original))")
@@ -352,6 +356,12 @@ def has_token(text, token):
     return re.search(rf"(?<![\w-]){re.escape(token)}(?![\w-])", text or "") is not None
 
 
+def phone_in(text):
+    """The first phone a customer wrote in a message (see MESSAGE_PHONE), as written; "" when there is none."""
+    match = MESSAGE_PHONE.search(str(text or ""))
+    return match.group(0).strip() if match else ""
+
+
 def route(item, profiles, queues):
     """Return (ref, kind, customer); kind is lead, follow_up, ambiguous or None (not ours)."""
     senders = {a.casefold() for a in addresses(item.get("from"))}
@@ -410,12 +420,13 @@ def prepare(item, kind, customer, profile, account):
     reply_to = item.get("reply_to") or []
     valid = [a for a in reply_to if EMAIL.fullmatch(str(a.get("email", "")).strip())]
     body_email = head[email_at] if email_at is not None else None
-    if not reply_to and body_email and body_email.casefold() not in never:
-        # 26/09: some portal notices come without Reply-To but with the customer's email in the body, in the
-        # contact lines. The notice came from the portal sender (route checked it), so that email is used, with
-        # a warning to confirm. Without one in the body, it stays blocked as before.
+    portal_only = bool(valid) and all(str(a["email"]).strip().casefold() in never for a in valid)
+    if (not reply_to or portal_only) and body_email and body_email.casefold() not in never:
+        # 26/09: some portal notices come without Reply-To (or, 27/09, with the portal's own address in it) but with the
+        # customer's email in the body, in the contact lines. The notice came from the portal sender (route checked it),
+        # so that email is the recipient — common on Idealista, so no warning since 27/09. Without one in the body, it
+        # stays blocked as before.
         recipient = {"name": name or "", "email": body_email}
-        warnings.append(f"Sem Reply-To: o destinatário é o email do corpo do aviso ({body_email}). Confirma antes de enviar.")
     elif not reply_to:
         blocked = reply.get("missing_reply_to_notice") or "Sem Reply-To: confirma o destinatário."
     elif len(reply_to) != 1 or len(valid) != 1 or valid[0]["email"].strip().casefold() in never:

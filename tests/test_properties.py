@@ -177,9 +177,7 @@ def test_language_option_adds_an_english_translation_below_portuguese_english_sp
 @pytest.mark.parametrize("reply_to, notice", [
     ((), "não tem Reply-To"),
     (("a@example.com", "b@example.com"), "não identifica um único"),
-    (("reply@idealista.pt",), "não identifica um único"),
-    (("owner@example.com",), "não identifica um único"),
-])
+])  # a Reply-To that is the portal's or our own address gives way to the notice's email since 27/09 (test below)
 def test_missing_or_invalid_reply_to_blocks_sending_until_dismissed(service, reply_to, notice):
     queue = read(service, [lead("1", reply_to=reply_to, body_email="" if not reply_to else CUSTOMER)])["properties"][0]
     [email] = queue["emails"]
@@ -395,7 +393,8 @@ def test_a_new_property_starts_active_even_from_an_inactive_template(service):
 def test_without_reply_to_the_email_in_the_body_is_the_recipient_and_the_owner_can_change_it(service):
     [email] = read(service, [lead("1", reply_to=())])["properties"][0]["emails"]
     assert email["blocked"] is None and email["recipient"]["email"] == CUSTOMER and email["recipient_editable"]
-    assert any(w.startswith("Sem Reply-To: o destinatário é o email do corpo") for w in email["warnings"])
+    # 27/09: common on Idealista — the email in the notice is used, with no warning.
+    assert not any(w.startswith("Sem Reply-To") for w in email["warnings"])
     assert load_contacts(service.folder)[(CUSTOMER, REF)]["nome"] == "Ana Exemplo"
 
     # Neither a Reply-To nor an email in the body: blocked, until the owner types who it goes to.
@@ -443,3 +442,34 @@ def test_desde_sempre_starts_the_chart_at_the_first_day_with_data(service):
     assert longer["by_day"][0]["day"] == old and longer["by_day"][0]["requests"] == 1
     with pytest.raises(ValueError, match="Período"):
         service.metrics(3000)
+
+
+def test_a_phone_the_customer_wrote_is_found_for_whatsapp_and_dates_or_prices_are_not():
+    # 27/09: the WhatsApp button's number, when the portal notice had none.
+    from backend.rules import phone_in
+    assert phone_in("Cumprimentos,\nRui Exemplo\n912 345 678") == "912 345 678"
+    assert phone_in("liga-me para o +351 931234567, obrigado") == "+351 931234567"
+    assert phone_in("o meu número inglês é +44 7700 900123") == "+44 7700 900123"
+    assert phone_in("visita a 25/09/2026 às 18:17, renda de 1.000 € e 3500€ de rendimentos, ref. 123456789") == ""
+
+
+def test_a_reply_to_that_is_the_portals_own_address_gives_way_to_the_email_in_the_notice(service):
+    # 27/09: Idealista sometimes puts its own address in Reply-To; the customer's email in the notice's body is used.
+    for key, own, body in (("1", "reply@idealista.pt", CUSTOMER), ("2", "owner@example.com", "rui.exemplo@example.com")):
+        read(service, [lead(key, reply_to=(own,), body_email=body)])
+        [email] = [item for item in service.pending()["properties"][0]["emails"] if item["id"] == key]
+        assert email["blocked"] is None and email["recipient"]["email"] == body
+        assert not any("Reply-To" in warning for warning in email["warnings"])
+
+
+def test_a_notice_with_no_email_but_a_phone_gets_a_reply_for_whatsapp_or_sms_never_an_email(service):
+    # 27/09: blocked for the email, but written all the same, to go by WhatsApp or SMS.
+    from backend.ai import reply_prompt
+    queue = read(service, [lead("1", reply_to=(), body_email="")])["properties"][0]
+    [email] = service.pending()["properties"][0]["emails"]
+    assert email["blocked"] and email["phone_only"] is True
+    prompt = reply_prompt(service.pending()["properties"][0], ["1"])
+    assert "vai por WhatsApp ou SMS" in prompt
+    service.drafts([{"id": "1", "reply_text": "Olá Ana"}], queue["revision"])
+    with pytest.raises(ValueError, match="bloqueado"):
+        service.preview(["1"])  # never by email

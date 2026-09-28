@@ -59,10 +59,39 @@ def test_the_page_is_served_as_its_own_files(page):
     assert 'title="© 2026 BigLearn.pt — todos os direitos reservados">©</sup>' in html.text
     # 27/09: no «Dias para trás» in Comunicações; the first read's days are asked when a property is created.
     assert "Dias para trás" not in html.text and 'id="f-first-read"' in html.text and 'id="days"' not in html.text
-    # Each email's actions: «Enviar individual», and no «Guardar e refazer» (it was save + generate).
-    assert "'Enviar individual'" in script.text and "Enviar só este" not in script.text
+    # Each email's actions: «Enviar já este por email», «Enviar por WhatsApp» and «Atualizar resposta» (27/09), and no
+    # «Guardar e refazer» (it was save + generate).
+    assert "'Enviar já este por email'" in script.text and "'Enviar por WhatsApp'" in script.text
+    assert "'Atualizar resposta'" in script.text and "Enviar só este" not in script.text and "Enviar individual" not in script.text
+    assert "'Atualizar resposta'), lastGeneration[email.id] && el('small', {class: 'button-sub'}" in script.text.replace("\n      ", " ")
+    assert "el('span', {class: 'kind button-badge'}, 'API · '" in script.text and "'Resposta ', el('span'" not in script.text
+    # 27/09: the steps in turn — PASSO 02 after a read, PASSO 03 after «2» (or with drafts waiting); «1» and «2» rest 10 minutes.
+    assert "'Ignorar os emails anteriores'" in script.text and "only_extra: fact.only" in script.text
+    assert "const STEP_REST_MS = 10 * 60 * 1000;" in script.text and "$('send-step').hidden = !(stepsDone.generated || generating || drafts);" in script.text
+    assert "copyButton(turn.text, 'Copiar esta mensagem')" in script.text and "'Copiar o email')" in script.text
+    assert "Porquê, nas palavras dela" in script.text  # with no draft, the AI's note is shown (27/09)
+    assert "button.replaceChildren(...original)" in script.text  # a clicked button gets its number and icon back
+    assert "const QUICK_REPLIES" in script.text and "'Pedir que aguarde uns dias'" in script.text  # quick replies (27/09)
+    assert "'Copiar o telefone'" in script.text and "'Perfil no Idealista ↗'" in script.text  # phone and profile under the name
+    assert "buttonIcon('phone'), 'Enviar por SMS / iMessage'" in script.text and "`sms:+${phone}&body=" in script.text and "buttonIcon('chat'), 'Enviar por WhatsApp'" in script.text
     assert "'Guardar e refazer" not in script.text and "pill-action" in script.text
     assert "'Ignorar sempre / Blacklist'" in script.text
+    # 27/09: the Painel — the API tanks before the activity summary, which has its three numbers over the chart.
+    assert html.text.index('id="openai-usage-card"') < html.text.index('id="activity-summary"')
+    assert "function activitySummary" in script.text and "chart-tooltip" in script.text
+    # The total spent is a car dial like the tanks (it was a wallet), in euros to the cent (no more 4 decimals).
+    assert "Um depósito de tokens por imóvel" not in html.text and "A tua carteira" not in html.text
+    assert html.text.index('id="dashboard-properties"') < html.text.index('id="dashboard-todo"')
+    assert html.text.index('id="dashboard-read"') < html.text.index('id="metric-cards"')
+    assert "notepad-tabs" not in script.text and "digest-property' + (page.active" in script.text
+    assert "function realDial" in script.text and "sizeClass: 'wallet'" in script.text and "maximumFractionDigits: 4" not in script.text
+    # 27/09: in each email, what is written in «Acrescentar ao conhecimento» goes with «Atualizar resposta» (saved
+    # first, or only for this reply); no «Guardar no conhecimento» of its own there.
+    assert "'Só para esta resposta'" in script.text and "noteField.beforeGenerate()" in script.text
+    # 27/09: the buttons numbered in the order they are pressed; PASSO 02 beside «Rever e enviar», under the emails' heading.
+    assert 'step-num" aria-hidden="true">1</span>Ler emails do Gmail' in html.text
+    assert 'step-num" aria-hidden="true">3</span>Preparar envios dos selecionados' in html.text
+    assert html.text.index("Emails em tratamento") < html.text.index('id="prepare-step"') < html.text.index('id="send-step"')
     # 27/09: «Atualizar visitas» only in Visitas (it was in Comunicações too).
     assert 'id="agenda-sync"' not in html.text and 'id="agenda-sync-here"' in html.text
     # 27/09: the ChatGPT way folded under «Gerar respostas»; the conversation always open, in a box that scrolls.
@@ -351,7 +380,7 @@ def test_generate_calls_the_api_and_saves_drafts_exactly_like_pasting(service, p
     assert status == 200 and generated["saved"] == 1 and generated["notes"][0]["nota"] == "Confirma a data."
     assert generated["state"]["properties"][0]["emails"][0]["reply_text"].startswith("Cara Ana")
     assert generated["tokens"] == usage
-    # What it cost, for the line under «Gerar esta resposta» (27/09).
+    # What it cost, for the line under «Atualizar resposta» (27/09).
     from backend.openai_client import estimate_cost_usd
     assert generated["cost_usd"] == round(estimate_cost_usd(generated["model"], prompt_tokens=100, completion_tokens=20), 6) > 0
     prompt_sent = complete.call_args.args[2]
@@ -527,3 +556,24 @@ def test_every_id_on_the_page_is_unique():
     html = (Path(__file__).resolve().parents[1] / "frontend" / "index.html").read_text(encoding="utf-8")
     ids = re.findall(r'\bid="([\w-]+)"', html)
     assert len(ids) == len(set(ids)), sorted({i for i in ids if ids.count(i) > 1})
+
+
+def test_extra_instructions_add_to_the_interaction_and_the_reply_keeps_its_paragraphs(service):
+    # 27/09: a reply came back as the extra lines only, run together; the prompt now says they add, never replace.
+    from backend.ai import reply_prompt
+    read(service, [lead("1")])
+    queue = service.pending()["properties"][0]
+    prompt = reply_prompt(queue, ["1"], "Só para esta resposta, junta também estes pontos ao que a interação pede:\n- Agradece.")
+    assert "somam-se às de cima, não as substituem" in prompt and "- Agradece." in prompt
+    assert "parágrafos curtos separados por uma linha em branco" in prompt
+
+
+
+def test_ignoring_what_came_before_writes_the_chosen_points_only(service):
+    # 27/09: «Ignorar os emails anteriores» — the owner's points are the whole reply, not an addition to the interaction.
+    from backend.ai import reply_prompt
+    read(service, [lead("1")])
+    queue = service.pending()["properties"][0]
+    only = reply_prompt(queue, ["1"], "Escreve só estes pontos:\n- Agradece.", only_extra=True)
+    assert "substituem as da interação: escreve só uma resposta curta com estes pontos" in only
+    assert "somam-se às de cima" not in only

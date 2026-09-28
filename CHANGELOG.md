@@ -15,6 +15,227 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.70.0 — 28/09/2026
+
+- **Respostas rápidas: nova opção «Ignorar os emails anteriores»**, a última, um pouco afastada e só clicável com uma ou
+  mais das outras ligadas. Ligada, «Atualizar resposta» escreve só com os pontos marcados (uma resposta curta, com a
+  saudação, o fecho e a assinatura da voz), sem seguir o prompt da interação nem responder ao que veio antes; desligar
+  todas as outras desliga-a também. Sem ela, os pontos continuam a somar-se à resposta.
+- **«Não precisa de resposta» passa a letra branca** no fundo amarelo torrado.
+
+## α.69.3 — 27/09/2026
+
+- **A pill «Retirar da fila» passa a dizer «Não precisa de resposta»**, com fundo amarelo torrado (letra escura, para se
+  ler); a confirmação e o aviso dizem o mesmo. Faz o mesmo de antes: tira só este email da fila, sem resposta.
+
+## α.69.2 — 27/09/2026
+
+- **«Enviar por WhatsApp» e «Enviar por SMS / iMessage» ficam com metade da altura** dos outros botões, com o ícone
+  mais pequeno.
+
+## α.69.1 — 27/09/2026
+
+- **Avisos do Idealista sem Reply-To, ou com o endereço do próprio Idealista no Reply-To: usa-se o email do cliente que
+  vem no aviso, sem aviso nenhum** (é comum no Idealista). Sai a nota «Sem Reply-To: o destinatário é o email do corpo
+  do aviso», também dos emails já na fila, e os que estavam bloqueados por um Reply-To do portal ficam resolvidos na
+  leitura seguinte.
+- **Um aviso sem email do cliente, mas com telefone, continua a poder ter resposta:** «Atualizar resposta» escreve-a
+  (curta, para WhatsApp ou SMS) e o cartão mostra «Enviar por WhatsApp» e «Enviar por SMS / iMessage»; por email
+  continua a não poder sair, e o aviso do cartão di-lo.
+
+## α.69.0 — 27/09/2026
+
+- **Um prompt próprio para quem escreve com a visita marcada, e outro para quem já visitou.** Estes emails iam à IA
+  como «5.ª interação» ou seguintes, para as quais não há prompt, e a resposta saía do histórico. Passam a ir marcados
+  «visita marcada» (com o dia e a hora da visita) ou «já visitou», cada um com as suas instruções, e o cartão mostra essa
+  etiqueta em vez de «5.ª interação». Os dois textos editam-se em **Voz e estilo**, na secção nova «Visita marcada e
+  depois da visita».
+- **O pedido de documentos diz o que o dono diz:** que gostaríamos de passar à próxima fase de análise da candidatura
+  e que, para isso, pedimos a documentação — nunca «short list» nem «escolhido». Também passa a editar-se em Voz e
+  estilo. (O email já existia: em Visitas, «Pedir documentos» no cartão de cada candidato da short list.)
+- **Mais uma resposta rápida: «Perguntar se recebeu o email anterior»** (não tivemos resposta e pode ter ido para o
+  spam ou o lixo).
+- **As pills de cada email ganham cor:** «Retirar da fila» a verde e «Não tem interesse» a vermelho, com letra branca.
+
+## α.68.1 — 27/09/2026
+
+- **A pill «Ignorar sempre / Blacklist» passa a ter fundo cinzento-escuro**, com letra branca (mais escuro ao passar o
+  rato).
+
+## α.68.0 — 27/09/2026
+
+- **Comunicações: os passos por ordem.** O PASSO 02 («Gerar respostas») só aparece depois de «1 Ler emails do Gmail»,
+  e o PASSO 03 («Rever e enviar») depois de «2 Gerar respostas». **Os botões 1 e 2 descansam 10 minutos depois de
+  carregados** (desligados, com o hover a dizer a que horas voltam), para não se ler nem gerar o mesmo lote duas vezes.
+- **«Guardar rascunho · Por guardar» só aparece depois de mudares o texto do rascunho:** a comparação ignora agora as
+  diferenças de mudança de linha e os espaços no fim, que a própria caixa de texto pode introduzir.
+- Para não ficar preso: ao recarregar a página nesses 10 minutos, os passos continuam à vista (a hora da leitura vem
+  do servidor; a do lote gerado fica neste browser); e o PASSO 03 aparece também quando já há rascunhos prontos na fila
+  (feitos por «Atualizar resposta», colados do ChatGPT ou de antes), sem obrigar a gerar outra vez.
+
+## α.67.1 — 27/09/2026
+
+- **As respostas rápidas e as instruções extra somam-se à resposta, não a substituem:** o prompt diz agora que cada
+  resposta continua a fazer o que a sua interação pede, com a saudação e o fecho da voz, e integra os pontos extra no
+  parágrafo a que pertencem, em poucas palavras, sem a tornar mais longa do que precisa (uma resposta real veio só com
+  as frases das respostas rápidas, seguidas). No email, «Só para esta resposta» manda os pontos um por linha.
+- **«Resposta API · modelo» deixa de ser uma linha por cima do botão:** fica só «API · GPT-4O-MINI», 30% mais pequeno,
+  no canto direito do botão «Atualizar resposta».
+- **O gasto da última geração passa para dentro do botão «Atualizar resposta»**, em letra pequena por baixo do nome
+  («Última: 6 764 tokens · < 0,01 €»), sem o botão crescer.
+- **As respostas vêm em parágrafos:** o formato pede saudação, parágrafos curtos separados por uma linha em branco, fecho
+  e assinatura, nunca um bloco de frases seguidas.
+
+## α.67.0 — 27/09/2026
+
+- **Por baixo do nome de cada cliente: o email, o telefone e o perfil no Idealista.** O telefone é o do aviso do portal,
+  o do `contactos.csv` ou um que o cliente escreveu; o email e o telefone têm cada um o ícone de copiar.
+- **A leitura passa a guardar o link «Ver perfil» dos avisos do Idealista** (perdia-se ao passar o email a texto): fica
+  no email e numa coluna nova do `contactos.csv`, «perfil», e aparece como «Perfil no Idealista ↗» também nas respostas
+  seguintes desse cliente. Só para os avisos lidos daqui em diante; só ligações https.
+- **«Enviar por SMS / iMessage»**, a seguir a «Enviar por WhatsApp», também só com texto no rascunho: abre as
+  Mensagens do Mac para o número do cliente com o rascunho escrito, e envias tu, lá. Sem telemóvel, fica desligado.
+- **Mais quatro respostas rápidas:** «Perguntar se mantém o interesse», «Confirmar que recebemos os documentos», «Propor
+  falar por telefone ou WhatsApp» (e a melhor hora) e «Enviar a morada e o link do Google Maps» (os da base de
+  conhecimento; se lá não estiverem, a IA não os inventa e diz em nota que faltam).
+
+## α.66.1 — 27/09/2026
+
+- **«Enviar por WhatsApp» vai também buscar o número que o cliente escreveu numa mensagem sua** (esta ou uma anterior,
+  nunca o texto nosso citado), quando o aviso do portal e o `contactos.csv` não o têm: um telemóvel português, com ou
+  sem +351, ou um número com o indicativo do país (+… ou 00…). Datas, preços e referências não contam. Só para o botão:
+  não vai para a IA nem fica gravado.
+
+## α.66.0 — 27/09/2026
+
+- **Respostas rápidas em cada email**, por cima de «+ Acrescentar ao conhecimento»: **«Agradecer o email e as
+  informações»** e **«Pedir que aguarde uns dias»** (para passarmos à próxima fase). São interruptores, e podem ligar-se
+  vários: cada um ligado escreve a sua frase na caixa do conhecimento (que parte como «Só para esta resposta»), e
+  desligá-lo tira-a; «Atualizar resposta» usa-as. O hover de cada um mostra a frase que escreve.
+
+## α.65.1 — 27/09/2026
+
+- **Em cada email, o painel de ações alinha pelo fundo do cartão** (acaba com ele, ao lado do rascunho), em vez de
+  ficar alinhado pelo topo.
+- **Quando «Atualizar resposta» não traz rascunho, o aviso mostra a nota em que a IA explica porquê** (antes dizia só
+  «A API não devolveu um rascunho para este email.» e a nota perdia-se).
+- **Os botões com número ou ícone voltam a tê-lo depois de carregados** (ficava «1Ler emails do Gmail», sem a
+  bolinha: o botão guardava só o texto enquanto dizia «A trabalhar…»).
+- **A etiqueta «Resposta · API · modelo» de cada email já traz o nome do modelo desde a abertura da página** (os
+  cartões desenhavam-se antes de chegarem as definições, e ficava «API ·» sem modelo).
+
+## α.65.0 — 27/09/2026
+
+- **Em cada email, «+ Acrescentar ao conhecimento» passa a ter «Só para esta resposta» como opção de partida** (a
+  primeira da lista): o que se escreve ali só vai para essa resposta e nada fica gravado no conhecimento, a não ser que
+  se escolha «Só este imóvel» ou «Todos os imóveis (agência)».
+- **As respostas ao inquérito pós-visita lidas antes de 26/09 ficam marcadas como tal na leitura seguinte**, e passam a
+  ter o seu prompt («Resposta ao inquérito»). Até aqui iam à IA como uma interação normal (por exemplo, a 8.ª), para a
+  qual não há prompt.
+
+## α.64.9 — 27/09/2026
+
+- **Em cada email, um pequeno ícone de copiar:** ao lado do email do cliente (copia o endereço) e em cada mensagem da
+  conversa, ao lado da data (copia o texto dessa mensagem).
+
+## α.64.8 — 27/09/2026
+
+- **Comunicações: o PASSO 03 «Rever e enviar» passa a ser um cartão igual ao PASSO 02**, com as mesmas letras (título,
+  texto e etiqueta), e **os botões 2 e 3 ficam à mesma altura**: os dois cartões partilham a grelha da linha.
+- **O fundo dos textos das conversas em cada email fica um pouco mais claro** (#fbf8f2, era #f7f3ea).
+
+## α.64.7 — 27/09/2026
+
+- **Os ícones dos botões de cada email ficam duas vezes maiores** (32 px), e **os números 1, 2 e 3** de «Ler emails do
+  Gmail», «Gerar respostas» e «Preparar envios dos selecionados» também crescem (30 px).
+
+## α.64.6 — 27/09/2026
+
+- **Comunicações: a escolha do imóvel sai do cartão «Ler emails» e fica antes, à parte**, como nos outros separadores.
+  **No cartão ficam o título, a última leitura e, por baixo, o botão «1 Ler emails do Gmail»**, como nos passos 2 e 3.
+
+## α.64.5 — 27/09/2026
+
+- **Os botões de cada email ganham um ícone:** setas em círculo em «Atualizar resposta», um envelope em «Enviar já este
+  por email» e um balão de conversa em «Enviar por WhatsApp».
+
+## α.64.4 — 27/09/2026
+
+- **Em cada email, sai a linha «Vai com «Atualizar resposta».»** por baixo de «+ Acrescentar ao conhecimento»: é
+  sempre assim.
+
+## α.64.3 — 27/09/2026
+
+- **Voz e estilo, a consola da IA: o fundo passa a ser o do tema** (era uma grelha azul-escura); o título, o estado e a
+  nota por baixo usam as cores do tema. **As caixas de dentro (um botão por modelo e os mostradores do cálculo) mantêm
+  o fundo escuro, 10% mais claro.**
+
+## α.64.2 — 27/09/2026
+
+- **Em cada email, os botões mudam de nome:** «Gerar esta resposta» passa a **«Atualizar resposta»** e «Enviar
+  individual» a **«Enviar já este por email»**.
+- **«Enviar por WhatsApp»** (era «Abrir no WhatsApp») aparece ao lado, também só quando há texto no rascunho: abre o
+  WhatsApp do Mac na conversa do cliente com o rascunho escrito, e envias tu, lá. Sem telemóvel do cliente, fica à vista
+  mas desligado, e o hover diz porquê (antes nem aparecia).
+
+## α.64.1 — 27/09/2026
+
+- **Em cada email, «+ Acrescentar ao conhecimento» ganha a opção «Só para esta resposta»**, ao lado de «Só este imóvel»
+  (a de partida) e «Todos os imóveis (agência)».
+- **Sai «Guardar no conhecimento» dos emails: vai com «Gerar esta resposta».** Com texto escrito, o botão guarda-o
+  primeiro no conhecimento (do imóvel ou da agência) e depois gera; com «Só para esta resposta», não guarda nada e
+  junta-o às instruções só desta resposta. O aviso diz onde ficou. Num email bloqueado, sem «Gerar esta resposta», o
+  botão de guardar continua lá; em Imóveis também.
+
+## α.64.0 — 27/09/2026
+
+- **Comunicações: o PASSO 02 («Gerar respostas») passa para baixo de «Emails em tratamento», lado a lado com «Rever e
+  enviar».** «Ler emails» fica sozinho em cima, a toda a largura.
+- **Os três botões que se carregam por ordem têm o número:** 1 «Ler emails do Gmail», 2 «Gerar respostas» e 3
+  **«Preparar envios dos selecionados»** (era «Pré-visualizar envio dos selecionados»).
+- **Sai a linha tracejada por cima de «Gerar respostas»**, e o botão sobe.
+
+## α.63.1 — 27/09/2026
+
+- **Painel: o calendário do cabeçalho fica 30% mais largo e 10% mais alto.**
+- **«Resumo da atividade»: «O ritmo dos teus contactos» deixa de ocupar uma linha** e passa para a direita, ao lado do
+  período.
+
+## α.63.0 — 27/09/2026
+
+- **Painel: os imóveis passam para cima, logo antes de «A fazer»**, sem o título «POR IMÓVEL · A tua carteira».
+- **«Última leitura … · conta …» sobe para o cabeçalho**, por baixo de «Contactos, respostas e imóveis. Tudo no mesmo
+  lugar.», numa linha à parte na cor de destaque do tema.
+- **Ponto de situação e bloco de notas num só painel.** Saem os separadores do bloco de notas: clicar num imóvel da
+  lista do ponto de situação (ou Enter, com o teclado) abre a página dele no bloco de notas, ao lado; o imóvel escolhido
+  fica marcado, e a referência aparece por cima do bloco («PARA O PROPRIETÁRIO · REF»).
+- **Depósitos: sai o título «Um depósito de tokens por imóvel»** (fica «DEPÓSITOS · API OPENAI»).
+
+## α.62.1 — 27/09/2026
+
+- **Painel, Depósitos: o gasto total de todos os imóveis passa a ser um mostrador de automóvel**, igual aos dos
+  depósitos (era uma carteira e destoava): à esquerda, com a agulha azul, desde sempre; à direita, com a agulha
+  vermelha, o último mês; os dois na mesma escala, em euros. Os pedidos e os tokens de cada um estão no hover de cada
+  metade.
+- **Os custos da API arredondam ao cêntimo, mais não** (eram até 4 casas): no mostrador, nos depósitos, na «Última
+  geração» de cada email e no lote; um valor abaixo de meio cêntimo diz «< 0,01 €».
+
+## α.62.0 — 27/09/2026
+
+- **Painel: «Depósitos · API OpenAI» passa para antes do «Resumo da atividade».**
+- **«Resumo da atividade» redesenhado.** Por cima do gráfico, três números do período: **pedidos recebidos** (com a
+  média por dia), **respostas enviadas** (com o tempo médio até resposta) e o **dia (ou período) com mais pedidos**; as
+  cores ao lado dos dois primeiros são a legenda. O gráfico ganha um eixo com valores redondos e linhas de grelha finas,
+  colunas aos pares com o topo arredondado, o valor do dia com mais pedidos escrito por cima, e, ao passar o rato (ou
+  com o teclado), uma faixa no dia e uma caixa com os dois valores. No tema Default, as respostas passam a verde-azulado
+  (#00917f; o cinzento-verde de antes lia-se como cinzento), com as duas cores validadas para daltonismo e contraste. O
+  gráfico de cada imóvel, em Imóveis, ganha o mesmo desenho.
+
+## α.61.6 — 27/09/2026
+
+- **Painel, Qualidade: sai a linha «Continua interessado: sim · talvez · não… O detalhe de cada imóvel está em
+  Imóveis.»** por baixo dos mostradores.
+
 ## α.61.5 — 27/09/2026
 
 - **Greylist e Blacklist, por baixo da tabela dos clientes: o motivo aparece a seguir ao nome**, quando há um (por

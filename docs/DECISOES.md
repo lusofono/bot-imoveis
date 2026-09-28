@@ -3,6 +3,54 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 28/09/2026: «Ignorar os emails anteriores», o único modo em que os pontos substituem a resposta (α.70.0)
+
+**Decisão (pedido do utilizador).**
+- **As respostas rápidas somam-se sempre ao que a interação pede** (α.67.1), exceto quando se liga «Ignorar os emails
+  anteriores»: aí a resposta é só esses pontos. É um interruptor à parte, que só se liga com pelo menos um ponto
+  marcado, para nunca pedir à IA uma resposta vazia; só vale para um email de cada vez («Atualizar resposta»), nunca
+  para o lote.
+
+## 27/09/2026, à noite: prompts para a visita marcada, para depois da visita e para os documentos (α.69.0)
+
+**Decisão (pedido do utilizador, depois de uma resposta sem sentido a um cliente que já tinha visitado).**
+- **Cada fase tem o seu prompt:** um cliente que volta a escrever com a visita marcada, ou depois de ter visitado, ia
+  como «5.ª» ou seguinte, e para essas não há prompt: a IA escrevia a partir do histórico. Passam a ter duas fases
+  próprias, «visita marcada» (com o dia e a hora) e «já visitou», decididas pela agenda (visita futura) e pelo registo da
+  visita (compareceu), com textos de partida no código e editáveis em Voz e estilo.
+- **O pedido de documentos nunca fala em short list:** diz que gostaríamos de passar à próxima fase de análise e pede a
+  documentação, como o dono faz; editável também.
+
+## 27/09/2026, à noite: os passos de Comunicações por ordem, com 10 minutos de descanso (α.68.0)
+
+**Decisão (pedido do utilizador).**
+- **O PASSO 02 só aparece depois de ler o Gmail, e o PASSO 03 depois de gerar;** os botões 1 e 2 ficam desligados 10
+  minutos depois de usados, para não haver leituras nem lotes repetidos (o 2 custa dinheiro).
+- **Exceções para não bloquear:** a leitura conta pela hora do servidor (`last_read_at`), por isso sobrevive a um
+  recarregar; o lote gerado conta neste browser (`localStorage`); e o PASSO 03 aparece sempre que já haja rascunhos na
+  fila, porque obrigar a gerar outra vez para poder enviar seria pagar duas vezes. «Atualizar resposta», de cada email,
+  não tem descanso.
+
+## 27/09/2026, à noite: as respostas rápidas somam-se à resposta (α.66.0–α.67.1)
+
+**Decisão (pedidos do utilizador).**
+- **Respostas rápidas como interruptores cumulativos**, que escrevem frases na caixa do conhecimento (por omissão «Só
+  para esta resposta»), em vez de botões que geram sozinhos: o dono vê e pode corrigir o que vai para a IA.
+- **São aditivas:** uma resposta real com quase todas ligadas veio só com essas frases, seguidas e sem a saudação nem o
+  que a interação pedia. O prompt passa a dizer que as instruções extra se somam às da interação e se integram no texto,
+  em poucas palavras, e o formato pede parágrafos separados por uma linha em branco.
+
+## 27/09/2026, à noite: nada vai para o conhecimento sem se pedir; inquéritos antigos com o seu prompt (α.64.1–α.65.0)
+
+**Decisão (pedidos do utilizador).**
+- **Em cada email, o que se escreve em «+ Acrescentar ao conhecimento» vai com «Atualizar resposta»** (sai o botão
+  próprio). **A opção de partida é «Só para esta resposta»:** só entra nas instruções dessa geração; gravar no
+  conhecimento do imóvel ou da agência é uma escolha explícita, porque fica para todas as respostas seguintes.
+- **Uma resposta ao inquérito lida antes de 26/09 não tinha a marca que lhe dá o prompt** e ia à IA como uma interação
+  normal (a 8.ª, num caso real), para a qual não há prompt. A leitura seguinte marca-a, como as outras reparações da
+  leitura: só emails ainda por enviar, de um cliente a quem já foi o agradecimento com o inquérito, e cujo texto se lê
+  como um inquérito.
+
 ## 27/09/2026, à noite: a conversa sempre à vista, e o ChatGPT à mão em «Gerar respostas» (α.61.1–α.61.2)
 
 **Decisão (pedidos do utilizador).**

@@ -1,5 +1,5 @@
 from unittest.mock import patch
-from backend.mail import parse_structure, body_sections, fetch_text_only, parse_addresses, read_messages
+from backend.mail import parse_structure, body_sections, fetch_text_only, html_profile_link, parse_addresses, read_messages
 
 
 def test_selects_text_without_attachments():
@@ -23,7 +23,7 @@ def test_fetch_only_selected_parts():
             return "OK", [(b"", payload)]
     mail = Mail()
     raw = b'''BODYSTRUCTURE (("TEXT" "PLAIN" NIL NIL NIL "7BIT" 10 1 NIL NIL)("APPLICATION" "PDF" NIL NIL NIL "BASE64" 100 NIL NIL) "MIXED")'''
-    assert fetch_text_only(mail, b"1", raw) == ("Hello", False)
+    assert fetch_text_only(mail, b"1", raw) == ("Hello", False, "")  # no HTML, so no «Ver perfil» link
     assert mail.calls == ["(BODY.PEEK[1.MIME]<0.131073>)", "(BODY.PEEK[1]<0.131073>)"]
 
 
@@ -135,3 +135,12 @@ def test_with_the_inbox_only_the_sent_folder_is_read_too_whatever_its_language()
                                             accept=lambda item: True, outgoing=outgoing, accept_outgoing=lambda item: True)
     assert (box, scanned, len(items)) == ("INBOX", 1, 1)
     assert [item["message_id"] for item in outgoing] == ["<direct@example.com>"]
+
+
+def test_the_profile_link_of_a_portal_notice_is_kept_and_only_an_https_one():
+    # 27/09: «Ver perfil» is a link in the notice's HTML, lost in its text; the page shows it by the customer's email.
+    notice = ('<table><tr><td><a href="https://www.idealista.pt/imovel/1/">Anúncio</a></td></tr>'
+              '<tr><td>Ana Exemplo</td></tr><tr><td><a href=" https://www.idealista.pt/utilizador/abc/ ">Ver perfil</a></td></tr></table>')
+    assert html_profile_link(notice) == "https://www.idealista.pt/utilizador/abc/"
+    assert html_profile_link('<a href="javascript:alert(1)">Ver perfil</a>') == ""
+    assert html_profile_link("<p>Sem ligações</p>") == ""

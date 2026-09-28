@@ -15,7 +15,7 @@ import smtplib
 import time
 import os
 from . import APP_NAME
-from .ai import (AFTER_VISIT_RULE, AFTER_VISIT_TEMPLATE, KNOWLEDGE_RULE, VISIT_REMINDER_RULE, extract_json, ficha_profile_prompt,
+from .ai import (AFTER_VISIT_RULE, AFTER_VISIT_TEMPLATE, BOOKED_REPLY_RULE, DOCS_REQUEST_RULE, KNOWLEDGE_RULE, VISIT_REMINDER_RULE, VISITED_REPLY_RULE, extract_json, ficha_profile_prompt,
                  fichas_prompt, parse_fichas_batch,
                  listing_text_prompt, parse_listing, agenda_prompt, describe, instructions,
                  parse_agenda, parse_survey, visit_analysis_prompt)
@@ -51,6 +51,7 @@ NO_REPLY_DAYS = 3  # 27/09: our last email unanswered this long puts the custome
 # longer than this; blue, their file complete this long and still no visit date from us.
 ALERT_HOURS = {"our_turn_hours": 48, "no_visit_hours": 96}
 ALERT_HOURS_RANGE = (1, 720)
+SURVEY_NOTICE = "Resposta ao inquérito pós-visita registada (vê-a em Visitas e no relatório do imóvel)."
 INACTIVE_AFTER_EMAILS, INACTIVE_AFTER_HOURS = 2, 96  # 26/09: two of ours unanswered, the last four days ago
 HISTORY_LIMIT = 20  # turns kept per conversation, oldest dropped first; also what the prompt gets
 REPORT_SIGNATURE = f"{APP_NAME} Assistente"  # how the ponto de situação signs (27/09), not the agency's voice
@@ -64,7 +65,7 @@ CHART_PERIODS = {3: 1, 7: 1, 14: 1, 30: 1, 90: 7}
 VIEW_FIELDS = ("id", "kind", "date", "subject", "customer", "recipient", "blocked", "body_text", "body_truncated",
                "reply_text", "reply_status", "reply_error", "reply_message_id", "visit_window", "visit_slot",
                "visit_status", "reminder", "closing", "consent_suggested", "consent_confirmed", "history", "merged",
-               "merged_ids", "visit_done", "visit_reminder", "survey_reply", "docs_request", "visit_missed")
+               "merged_ids", "visit_done", "visit_reminder", "survey_reply", "docs_request", "visit_missed", "profile_url")
 # Page field → (profile prompt, key), the same prompts the terminal setup asks for.
 PROMPT_FIELDS = {"general": ("general", "text"), "first": ("first_interaction", "text"),
                  "first_template": ("first_interaction", "reply_template"), "second": ("second_interaction", "text"),
@@ -407,7 +408,9 @@ class MailService:
         emails = []
         for item in data["emails"]:
             email = customer(item)
-            warnings = list(item.get("warnings", []))
+            # 27/09: no Reply-To with the customer's email in the notice is common on Idealista: no warning about it
+            warnings = [warning for warning in item.get("warnings", [])
+                        if not warning.startswith("Sem Reply-To: o destinatário é o email do corpo")]
             if email and counts[email] > 1:
                 warnings.append("Há outro email pendente deste cliente neste imóvel; evita respostas repetidas.")
             conversation = conversations.get(email, {})
@@ -436,8 +439,17 @@ class MailService:
             if (interaction > 4 and (everyone or email in invited) and email not in booked
                     and conversation.get("visit") != "nao_quer"):
                 interaction = 4
+            # 27/09: a customer's own email once their visit is booked, or after they visited: its own prompt, not «5.ª»
+            check = conversation.get("visit_check") or {}
+            phase = (None if item.get("kind") != "follow_up" or item.get("survey_reply") else
+                     "visited" if check.get("attended") is True else "booked" if email in booked else None)
+            # 27/09: a portal notice with no email of the customer's (blocked for the email) but a phone: its reply is
+            # still written, to be sent by WhatsApp or SMS
+            phone_only = bool(item.get("blocked") and not item.get("recipient") and item.get("kind") == "lead"
+                              and (item.get("customer") or {}).get("phone"))
             emails.append({key: item.get(key) for key in VIEW_FIELDS} | {
-                "interaction": interaction if email else None, "warnings": warnings,
+                "interaction": interaction if email else None, "warnings": warnings, "phase": phase, "phone_only": phone_only,
+                "booked_at": ((visits or {}).get("booked_at") or {}).get(email) if phase == "booked" else None,
                 "ficha": ficha, "ficha_summary": ficha_summary(ficha) if ref else None, "qualifying_limit": limit,
                 "draft_checks": draft_checks(item.get("reply_text"), signature, house, item.get("visit_slot")),
                 # A portal notice without a (valid) Reply-To: the owner may set or correct the recipient (26/09).
@@ -582,7 +594,7 @@ class MailService:
                         contacts.append({"email": email, "nome": item["customer"].get("name") or "",
                                          "telefone": item["customer"].get("phone") or "",
                                          "primeiro_contacto": contact_day(item), "imovel": ref,
-                                         "fonte": CONTACT_SOURCE})
+                                         "fonte": CONTACT_SOURCE, "perfil": item.get("profile_url") or ""})
                     # Known by their email already, whether this message is a direct reply (follow_up) or
                     # another portal notice (lead) from someone we have written to before either way.
                     conversation = queues[ref]["conversations"].get(email) if email else None
@@ -593,8 +605,7 @@ class MailService:
                             conversation["visit_survey"] = {**survey, "at": item.get("date") or now()}
                             # 26/09: the assistant thanks them (see ai.SURVEY_REPLY_RULE), and a bad mark is flagged.
                             item["survey_reply"] = {"alerts": survey_alerts(survey)}
-                            item.setdefault("warnings", []).append(
-                                "Resposta ao inquérito pós-visita registada (vê-a em Visitas e no relatório do imóvel).")
+                            item.setdefault("warnings", []).append(SURVEY_NOTICE)
                             if item["survey_reply"]["alerts"]:
                                 item["warnings"].append("Atenção ao inquérito: " + "; ".join(item["survey_reply"]["alerts"])
                                                         + ". Lê o comentário antes de responder.")
@@ -1061,8 +1072,21 @@ class MailService:
     @staticmethod
     def repair_surveys(data):
         """Survey answers kept before 26/09 without any mark (written as words, or wrapped over two lines): read again
-        from the customer's own reply in the history, with the reader of today."""
+        from the customer's own reply in the history, with the reader of today. 27/09: and a survey answer still in the
+        queue from before 26/09, read without the mark that gives it its prompt (it went as a plain «8.ª interação»,
+        for which there is none): marked now, with today's notice."""
         fixed = 0
+        for item in data.get("emails", []):
+            if item.get("survey_reply") or item.get("kind") != "follow_up" or item.get("reply_status") not in (None, "pending", "draft"):
+                continue
+            conversation = data.get("conversations", {}).get(recipient_email(item)) or {}
+            survey = ((conversation.get("visit_check") or {}).get("thanks_sent_at")
+                      and parse_survey((item.get("customer") or {}).get("message") or item.get("body_text")))
+            if survey:
+                item["survey_reply"] = {"alerts": survey_alerts(survey)}
+                item["warnings"] = [warning for warning in item.get("warnings") or []
+                                    if not warning.startswith("Resposta ao inquérito pós-visita registada")] + [SURVEY_NOTICE]
+                fixed += 1
         for conversation in data.get("conversations", {}).values():
             survey = conversation.get("visit_survey")
             if not survey or any(survey.get(part) for part in ("imovel", "consultor", "marcacao")):
@@ -1076,12 +1100,14 @@ class MailService:
         return fixed
 
     def repair_missing_reply_to(self, ref, data, profile, account):
-        """Portal notices already in the queue, blocked only for lacking Reply-To before 26/09: prepared again, so
-        the email in their body becomes the recipient (with the warning) when there is one. Returns their contacts."""
-        notice = profile.get("reply", {}).get("missing_reply_to_notice") or "Sem Reply-To: confirma o destinatário."
+        """Portal notices already in the queue, blocked only for lacking Reply-To before 26/09 (or, 27/09, for a Reply-To
+        that is the portal's own address): prepared again, so the email in their body becomes the recipient when there
+        is one. Returns their contacts."""
+        notices = {profile.get("reply", {}).get("missing_reply_to_notice") or "Sem Reply-To: confirma o destinatário.",
+                   profile.get("reply", {}).get("invalid_reply_to_notice") or "Reply-To inválido: confirma o destinatário."}
         found = []
         for item in data["emails"]:
-            if (item.get("kind") != "lead" or item.get("recipient") or item.get("blocked") != notice
+            if (item.get("kind") != "lead" or item.get("recipient") or item.get("blocked") not in notices
                     or item.get("reply_status") not in (None, "pending", "draft")):
                 continue
             fixed = prepare(item, "lead", None, profile, account)
@@ -1624,6 +1650,8 @@ class MailService:
         return {**rules, "windows": [{**window, "free": free_times(window, rules["slot"], booked)}
                                      for window in agenda["windows"] if window["day"] >= today],
                 "booked": sorted({slot["customer"] for slot in agenda["slots"] if slot["at"][:10] >= today}),
+                "booked_at": {slot["customer"]: slot["at"] for slot in sorted(agenda["slots"], key=lambda slot: slot["at"])
+                              if slot["at"][:10] >= today},
                 "proposed": sorted(self.proposed_to(agenda)),
                 "closed": bool(agenda.get("closed_at"))}
 
@@ -2515,6 +2543,10 @@ class MailService:
                 results.append(result)
             return {"fill": results}
 
+    def profile_links(self):
+        """(email, property) → the portal profile's link, from contactos.csv (27/09): for the page only."""
+        return {key: row.get("perfil") or "" for key, row in load_contacts(self.folder).items() if row.get("perfil")}
+
     def phones(self):
         """(email, property) → phone, from contactos.csv: only for the page's WhatsApp button, never for the AI."""
         return {key: row.get("telefone") or "" for key, row in load_contacts(self.folder).items() if row.get("telefone")}
@@ -2886,6 +2918,9 @@ class MailService:
             voice["after_visit"] = (style.get("after_visit") or {}).get("text") or AFTER_VISIT_RULE
             voice["after_visit_template"] = (style.get("after_visit_template") or {}).get("text") or AFTER_VISIT_TEMPLATE
             voice["visit_reminder"] = (style.get("visit_reminder") or {}).get("text") or VISIT_REMINDER_RULE
+            voice["booked_reply"] = (style.get("booked_reply") or {}).get("text") or BOOKED_REPLY_RULE
+            voice["visited_reply"] = (style.get("visited_reply") or {}).get("text") or VISITED_REPLY_RULE
+            voice["docs_request"] = (style.get("docs_request") or {}).get("text") or DOCS_REQUEST_RULE
             voice["digest_recipient"] = (style.get("digest_recipient") or {}).get("text") or ""
             voice["alerts"] = alert_hours({"style": style})
             today = date.today().isoformat()
@@ -2985,7 +3020,8 @@ class MailService:
                     style.setdefault("reminders", {}).setdefault(key, {}).update(
                         text=text, status="configured" if text else "not_configured")
             for key, default in (("after_visit", AFTER_VISIT_RULE), ("after_visit_template", AFTER_VISIT_TEMPLATE),
-                                 ("visit_reminder", VISIT_REMINDER_RULE)):
+                                 ("visit_reminder", VISIT_REMINDER_RULE), ("booked_reply", BOOKED_REPLY_RULE),
+                                 ("visited_reply", VISITED_REPLY_RULE), ("docs_request", DOCS_REQUEST_RULE)):
                 if key in choices:
                     text = str(choices.get(key) or "").strip()
                     if len(text) > 5000:

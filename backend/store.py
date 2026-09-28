@@ -15,7 +15,7 @@ from .rules import KNOWLEDGE_LIMIT, REFERENCE, check_profile, check_voice, knowl
 
 PHOTO_TYPES = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
 CONTACT_FIELDS = ("email", "nome", "telefone", "primeiro_contacto", "imovel", "fonte",
-                  "rgpd", "rgpd_data", "rgpd_prova")
+                  "rgpd", "rgpd_data", "rgpd_prova", "perfil")  # perfil (27/09): the portal profile's link
 # The file where facts added from the page go, one per line; the assistant reads the text under the title.
 NOTES_HEADING = ("# Notas do proprietário\n\n"
                  "Acrescentadas ao rever as respostas. Se contradisserem o resto, valem estas.\n\n")
@@ -228,10 +228,11 @@ def add_contacts(folder, entries):
             contacts[key] = {"email": entry["email"], "nome": entry["nome"] or "",
                              "telefone": entry["telefone"] or "", "primeiro_contacto": entry["primeiro_contacto"],
                              "imovel": entry["imovel"], "fonte": entry["fonte"],
-                             "rgpd": "por_pedir", "rgpd_data": "", "rgpd_prova": ""}
+                             "rgpd": "por_pedir", "rgpd_data": "", "rgpd_prova": "", "perfil": entry.get("perfil") or ""}
         else:
             row["nome"] = row["nome"] or entry["nome"] or ""
             row["telefone"] = row["telefone"] or entry["telefone"] or ""
+            row["perfil"] = row.get("perfil") or entry.get("perfil") or ""
     save_contacts(folder, contacts)
 
 

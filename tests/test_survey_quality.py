@@ -82,3 +82,21 @@ def test_the_fourth_dial_is_the_interest():
     assert report["parts"]["interesse"] == {"label": "Interesse em arrendar", "count": 3, "average": None, "ones": 0, "no": 1,
                                             "score": 50}
     assert survey_report([])["parts"]["interesse"]["score"] is None  # no answer: the needle rests at the middle
+
+
+def test_a_survey_answer_read_before_its_mark_gets_it_at_the_next_read():
+    # 27/09: read before 26/09, it went to the assistant as a plain «8.ª interação», which has no prompt.
+    from backend.service import MailService, SURVEY_NOTICE
+    text = ("1. O imóvel: Excelente\n2. O consultor: Excelente\n3. A marcação: Rápida e clara\n"
+            "4. Continua interessado? sim\n5. Comentário: o ar condicionado não parecia funcionar")
+    item = {"id": "s1", "kind": "follow_up", "reply_status": "pending", "recipient": {"email": "ana@example.com"},
+            "customer": {"message": text}, "warnings": ["Resposta ao inquérito pós-visita registada (vê-a na Agenda)."]}
+    data = {"emails": [item], "conversations": {"ana@example.com": {"visit_check": {"thanks_sent_at": "2026-09-25T10:00:00"}}}}
+    MailService.repair_surveys(data)
+    assert item["survey_reply"] == {"alerts": []} and item["warnings"] == [SURVEY_NOTICE]
+    # Not after the thanks (no survey sent): left alone.
+    other = {**item, "id": "s2", "recipient": {"email": "rui@example.com"}}
+    other.pop("survey_reply")
+    data = {"emails": [other], "conversations": {"rui@example.com": {}}}
+    MailService.repair_surveys(data)
+    assert "survey_reply" not in other

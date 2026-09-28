@@ -43,7 +43,6 @@ const SKINS = {
       'dashboard.step': 'Contactos, respostas e imóveis: todos os instrumentos à vista.',
       'activity.eyebrow': 'ROAD BOOK', 'activity.title': 'Pedidos e respostas, volta a volta',
       'setup.eyebrow': 'CHECK-LIST DE PARTIDA', 'setup.title': 'Pronto para arrancar',
-      'portfolio.eyebrow': 'GARAGEM', 'portfolio.title': 'Os teus imóveis, na garagem',
       'replies.eyebrow': 'BOX', 'replies.title': 'Paragem na box: rápida, mas sem erros.',
       'properties.eyebrow': 'GARAGEM', 'properties.title': 'Cada imóvel, o seu motor.',
       'properties.step': 'Um quadro de instrumentos por imóvel: temperatura, rotação, velocidade e combustível.',
@@ -63,7 +62,6 @@ const SKINS = {
       'dashboard.step': 'Contactos, respostas e imóveis: todos os instrumentos de bordo à vista.',
       'activity.eyebrow': 'DIÁRIO DE BORDO', 'activity.title': 'Pedidos e respostas, milha a milha',
       'setup.eyebrow': 'ANTES DE LARGAR', 'setup.title': 'Pronto para largar amarras',
-      'portfolio.eyebrow': 'MARINA', 'portfolio.title': 'Os teus imóveis, atracados na marina',
       'replies.eyebrow': 'RÁDIO DE BORDO', 'replies.title': 'Cada resposta, a bom porto.',
       'properties.eyebrow': 'FROTA', 'properties.title': 'Cada imóvel, o seu barco.',
       'properties.step': 'Um posto de comando por imóvel: os instrumentos, o rumo e o combustível.',
@@ -83,7 +81,6 @@ const SKINS = {
       'dashboard.step': 'Contactos, respostas e imóveis: tudo à vista, entre os punhos.',
       'activity.eyebrow': 'ROAD BOOK', 'activity.title': 'Pedidos e respostas, curva a curva',
       'setup.eyebrow': 'ANTES DO ARRANQUE', 'setup.title': 'Pronto para dar ao pedal',
-      'portfolio.eyebrow': 'GARAGEM DA VILLA', 'portfolio.title': 'Os teus imóveis, estacionados à sombra',
       'replies.eyebrow': 'CORREIO EXPRESSO', 'replies.title': 'Cada resposta, entregue de scooter.',
       'properties.eyebrow': 'A FROTA', 'properties.title': 'Cada imóvel, a sua scooter.',
       'properties.step': 'Um guiador por imóvel: velocímetro, conta-rotações, temperatura e depósito.',
@@ -731,12 +728,14 @@ function toast(text, kind = 'ok') {
 // button, when given, shows the click was received and is still running: disabled and relabelled
 // until the action settles, whether it succeeds or fails (the error itself goes to the toast).
 async function run(action, button) {
-  const original = button?.textContent;
+  // 27/09: the button's own nodes are put back, not only its text, so its number or icon comes back with it
+  const original = button ? [...button.childNodes] : null;
   if (button) { button.disabled = true; button.textContent = 'A trabalhar…'; }
   try { await action(); }
   catch (error) { toast(error.message, 'bad'); }
-  // data-hold: something else keeps it off (an empty API tank): finishing a click must not switch it back on.
-  finally { if (button) { button.disabled = button.dataset.hold === '1'; button.textContent = original; } }
+  // data-hold: something else keeps it off (an empty API tank), data-lock: a step's 10 minutes (27/09): finishing a
+  // click must not switch it back on.
+  finally { if (button) { button.disabled = button.dataset.hold === '1' || button.dataset.lock === '1'; button.replaceChildren(...original); } }
 }
 
 async function copyText(text, done, fallbackBox) {
@@ -839,8 +838,35 @@ function renderState() {
   $('import-status').hidden = true; markStep('import-step', false); markStep('send-step', false);
   updateSelection();
   holdFuelButtons();  // the email cards were just rebuilt (or the queue changed), their API buttons with them
+  updateSteps();
   updateSkinPanels();
 }
+
+// 27/09: the steps in turn. PASSO 02 shows once the Gmail was read (in this page, or in the last 10 minutes), and «1 Ler
+// emails do Gmail» rests for 10 minutes after each read; PASSO 03 shows once «2 Gerar respostas» was pressed (or in the
+// last 10 minutes), or when drafts are already waiting, and «2» rests for 10 minutes too (no second bill for one batch).
+// The read's time is the server's (last_read_at); the batch's, this browser's.
+const STEP_REST_MS = 10 * 60 * 1000;
+const stepsDone = {read: false, generated: false};
+function generatedAt() { try { return Number(localStorage.getItem('aria-generated-at')) || 0; } catch { return 0; } }
+function restButton(button, since, what) {
+  const until = since + STEP_REST_MS, resting = Date.now() < until;
+  button.dataset.lock = resting ? '1' : '';
+  button.disabled = resting || button.dataset.hold === '1';
+  const hhmm = moment => new Date(moment).toLocaleTimeString('pt-PT', {hour: '2-digit', minute: '2-digit'});
+  if (resting) button.title = `${what} às ${hhmm(since)}: volta a estar disponível às ${hhmm(until)}.`;
+  else if (button.title.includes('volta a estar disponível')) button.title = '';
+  return resting;
+}
+function updateSteps() {
+  const lastRead = Math.max(0, ...(state.properties || []).map(queue => Date.parse(queue.last_read_at || '') || 0));
+  const reading = restButton($('read'), lastRead, 'Leitura feita');
+  const generating = restButton($('generate-api'), generatedAt(), 'Respostas geradas');
+  const drafts = (currentQueue()?.emails || []).some(email => email.reply_status === 'draft');
+  $('prepare-step').hidden = !(stepsDone.read || reading);
+  $('send-step').hidden = !(stepsDone.generated || generating || drafts);
+}
+setInterval(() => { if (state.properties) updateSteps(); }, 30000);
 
 // 27/09: where each customer of the property stands, one column each (the furthest they got), a name per line;
 // «Desistiu» (declined the visit) greyed at the end. Under the table, only counted, the many that would make it long:
@@ -961,7 +987,8 @@ function conversationTurns(turns, current, dates) {
   return newest.map((turn, index) => el('div', {class: 'history-turn' + (current?.has(turn) ? ' current' : '')},
     el('p', {class: 'muted small'}, turn.who === 'cliente' ? 'Cliente' : 'Nós', ' · ' + turnWhen(turn, dates),
       current?.has(turn) ? ' · por responder' : '',
-      index === 0 && turn.who !== 'cliente' ? ' · a nossa última resposta, ainda sem resposta do cliente' : ''),
+      index === 0 && turn.who !== 'cliente' ? ' · a nossa última resposta, ainda sem resposta do cliente' : '',
+      copyButton(turn.text, 'Copiar esta mensagem')),
     el('pre', {}, turn.text)));
 }
 
@@ -1002,28 +1029,59 @@ function historyBlock(email) {
     conversationTurns(turns, current, dates));
 }
 
-// 27/09: what the last «Gerar esta resposta» of each email spent, shown under the button until the page reloads.
+const sameText = (a, b) => [a, b].map(text => String(text || '').replace(/\r\n?/g, '\n').replace(/\s+$/, ''))
+  .reduce((x, y) => x === y);
+
+// 27/09: small line icons for an email's own buttons (update the reply, send it by email, send it by WhatsApp), drawn
+// in the button's own colour.
+const BUTTON_ICONS = {
+  refresh: ['M20 11a8 8 0 1 0-2.34 5.66', 'M20 4v7h-7'],
+  mail: ['M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1z', 'M3.5 7 12 13l8.5-6'],
+  chat: ['M12 4a8 8 0 1 1-3.7 15.1L4 20l1-3.9A8 8 0 0 1 12 4z', 'M9 10.5h6M9 13.5h4'],
+  copy: ['M9 8h9a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z', 'M5 16V5a1 1 0 0 1 1-1h9'],
+  phone: ['M8 3h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z', 'M11 18h2']};
+function buttonIcon(name) {
+  return svg('svg', {viewBox: '0 0 24 24', width: 16, height: 16, class: 'button-icon', 'aria-hidden': 'true', fill: 'none',
+    stroke: 'currentColor', 'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round'},
+    BUTTON_ICONS[name].map(d => svg('path', {d})));
+}
+
+// 27/09: a small icon that copies a text to the clipboard (a customer's email address, one message of a conversation).
+function copyButton(text, label) {
+  return el('button', {type: 'button', class: 'copy-icon', title: label, 'aria-label': label, onclick: async () => {
+    try { await navigator.clipboard.writeText(text); toast('Copiado.'); }
+    catch { toast('Não consegui copiar sozinho: seleciona o texto e copia-o com ⌘C.', 'warn'); }
+  }}, buttonIcon('copy'));
+}
+
+// 27/09: what the last «Atualizar resposta» of each email spent, shown under the button until the page reloads.
 const lastGeneration = {};
 function generationUsage(result) {
   const tokens = (result.tokens?.prompt_tokens || 0) + (result.tokens?.completion_tokens || 0);
-  return `${tokens.toLocaleString('pt-PT')} tokens · ${costFormat.format(result.cost_usd || 0)}`;
+  return `${tokens.toLocaleString('pt-PT')} tokens · ${costText(result.cost_usd)}`;
 }
 
 function card(email) {
   const customer = email.customer || {}, sender = (email.from || [])[0] || {};
   const saved = email.reply_text || '';
+  const writable = !email.blocked || email.phone_only;  // 27/09: no email, but a phone: written for WhatsApp or SMS
   const draft = el('textarea', {'aria-label': 'Rascunho da resposta', rows: 7, placeholder: apiOnly()
     ? 'Rascunho: gera-o com a IA no passo 2 ou escreve aqui.' : 'Rascunho: cola a resposta do ChatGPT no passo 3 ou escreve aqui.'}, saved);
-  const contact = [customer.email || (email.recipient || {}).email, customer.phone].filter(Boolean).join(' · ');
+  // 27/09: under the name, the email, the phone (the notice's, contactos.csv's, or one they wrote) and the portal profile
+  const address = customer.email || (email.recipient || {}).email || '', phoneShown = customer.phone || email.whatsapp || '';
+  const profileUrl = /^https:\/\//.test(email.profile_url || '') ? email.profile_url : '';
   const ignoreEmail = customer.email || (email.recipient || {}).email;
   const ignoreTarget = ignoreEmail && {email: ignoreEmail, name: customer.name};
   // 27/09: «Guardar rascunho» sits under the draft and shows only while the text differs from what api/drafts last
-  // saved; «Enviar individual» only once there is a text to send (written, pasted or generated).
+  // saved; «Enviar já este por email» and «Enviar por WhatsApp» only once there is a text to send (written, pasted or
+  // generated).
   const saveButton = el('button', {class: 'primary'}, 'Guardar rascunho');
   const saveLine = el('div', {class: 'save-line draft-save'}, saveButton, el('span', {class: 'muted small save-status warn'}, 'Por guardar'));
   const refreshDraftActions = () => {
-    saveLine.hidden = draft.value === saved;
-    if (sendOne) sendOne.hidden = !draft.value.trim();
+    // 27/09: only a change of ours shows it — compared without line-ending or trailing-space differences, which the
+    // text box itself may introduce
+    saveLine.hidden = sameText(draft.value, saved);
+    for (const button of [sendOne, whatsapp, sms]) if (button) button.hidden = !draft.value.trim();
   };
   draft.addEventListener('input', refreshDraftActions);
   saveButton.addEventListener('click', event => run(async () => {
@@ -1047,39 +1105,64 @@ function card(email) {
     state = await call('api/state'); renderState();
     toast(sent ? `Enviado para ${reply.to}. Saiu da lista.` : 'Não saiu: vê o aviso no próprio email antes de repetir.',
       sent ? 'ok' : 'warn');
-  }, event.currentTarget)}, 'Enviar individual');
-  refreshDraftActions();
+  }, event.currentTarget)}, buttonIcon('mail'), 'Enviar já este por email');
   // WhatsApp (26/09): opens the owner's own WhatsApp on this customer with the draft written in; they press Enter
   // there. Nothing is sent from here and nothing is recorded: the email still goes (or is taken off) as usual.
-  const whatsapp = !email.blocked && whatsappNumber(email.whatsapp) && el('button', {type: 'button', class: 'whatsapp-action',
-    title: 'Abre o WhatsApp do Mac na conversa deste cliente, com o rascunho escrito. Envias tu, lá.',
-    onclick: () => { location.href = `whatsapp://send?phone=${whatsappNumber(email.whatsapp)}&text=${encodeURIComponent(whatsappText(draft.value))}`; }},
-    'Abrir no WhatsApp');
-  // 27/09: a reply from the API for this email alone (the same call as «Gerar respostas», with its extra instructions).
-  const generateOne = !email.blocked && el('button', {class: 'needs-fuel',
+  // 27/09: «Enviar por WhatsApp» (it was «Abrir no WhatsApp», and hidden without a phone number): without one it stays
+  // in view, switched off, and says why.
+  const phone = whatsappNumber(email.whatsapp);
+  const whatsapp = writable && el('button', {type: 'button', class: 'whatsapp-action', disabled: !phone,
+    title: phone ? 'Abre o WhatsApp do Mac na conversa deste cliente, com o rascunho escrito. Envias tu, lá.'
+      : 'Sem telemóvel deste cliente: não há número para o WhatsApp.',
+    onclick: () => { location.href = `whatsapp://send?phone=${phone}&text=${encodeURIComponent(whatsappText(draft.value))}`; }},
+    buttonIcon('chat'), 'Enviar por WhatsApp');
+  // 27/09: the same by SMS or iMessage: opens the Mac's Messages on this number with the draft written in; sent there
+  const sms = writable && el('button', {type: 'button', class: 'sms-action', disabled: !phone,
+    title: phone ? 'Abre as Mensagens do Mac (SMS ou iMessage) para este número, com o rascunho escrito. Envias tu, lá.'
+      : 'Sem telemóvel deste cliente: não há número para a mensagem.',
+    onclick: () => { location.href = `sms:+${phone}&body=${encodeURIComponent(whatsappText(draft.value))}`; }},
+    buttonIcon('phone'), 'Enviar por SMS / iMessage');
+  refreshDraftActions();
+  // 27/09: a reply from the API for this email alone (the same call as «Gerar respostas», with its extra instructions),
+  // after what was written in «Acrescentar ao conhecimento»: saved to the knowledge first, or for this reply only.
+  const noteField = noteBox(queueRef(), null, true, writable);
+  const generateOne = writable && el('button', {class: 'needs-fuel',
     title: settings?.openai_configured ? 'O prompt leva as instruções e a mensagem, sem o email nem o telefone do cliente.'
       : 'Sem chave OpenAI configurada: o clique explica como.',
     onclick: event => run(async () => {
-      if (draft.value.trim() && draft.value !== saved
+      if (draft.value.trim() && !sameText(draft.value, saved)
           && !confirm('O rascunho tem alterações por guardar, e a resposta nova substitui-as. Continuar?')) return;
-      const result = await call('api/prompt/generate', {property_ref: queueRef(), ids: [email.id], extra: $('extra').value});
+      const fact = await noteField.beforeGenerate();
+      const extra = [$('extra').value.trim(), fact.extra].filter(Boolean).join('\n');
+      const result = await call('api/prompt/generate', {property_ref: queueRef(), ids: [email.id], extra, only_extra: fact.only});
       lastGeneration[email.id] = generationUsage(result);
       state = result.state; renderState(); applyFuel(result.fuel, queueRef());
       const note = (result.notes || []).find(item => item.id === email.id)?.nota;
-      toast(result.saved ? `Resposta gerada (${lastGeneration[email.id]}): revê-a antes de enviar.` + (note ? ` Nota: ${note}` : '')
-        : 'A API não devolveu um rascunho para este email.', result.saved ? 'ok' : 'warn');
-    }, event.currentTarget)}, 'Gerar esta resposta');
+      const kept = fact.saved === 'agency' ? ' A informação ficou no know-how da agência.'
+        : fact.saved ? ' A informação ficou no conhecimento do imóvel.' : '';
+      // 27/09: with no draft, the AI's own note says why (it used to be dropped)
+      toast(result.saved ? `Resposta gerada (${lastGeneration[email.id]}): revê-a antes de enviar.` + kept + (note ? ` Nota: ${note}` : '')
+        : 'A IA não escreveu um rascunho para este email.' + (note ? ` Porquê, nas palavras dela: ${note}` : ' Não deixou nenhuma nota.')
+          + kept, result.saved ? 'ok' : 'warn');
+      if (fact.saved) await loadSettings();  // the Imóveis tab lists the knowledge files: keep it current
+    }, event.currentTarget)}, buttonIcon('refresh'),
+    // 27/09: what the last generation spent, inside the button, in small letters under its name (no taller button)
+    el('span', {class: 'button-text'}, el('span', {}, 'Atualizar resposta'),
+      lastGeneration[email.id] && el('small', {class: 'button-sub'}, 'Última: ' + lastGeneration[email.id])),
+    // 27/09: the engine in the button's right corner, small (it was a line of its own, «Resposta API · …», above it)
+    el('span', {class: 'kind button-badge'}, 'API · ' + (settings?.ai?.model || '')));
   // 27/09: the email and its draft on the left (2/3); on the right (1/3), what can be done with it: save, send, a reply
   // from the API, a fact for the knowledge, and, last, taking it out of the queue.
   // 27/09: taking it out of the queue sits on the left, under the customer's name and tags, as pills with a hover
   const exits = el('div', {class: 'exit-actions'},
-    el('button', {class: 'pill-action', title: 'Tira este email da fila sem responder. O Gmail não muda, e se o cliente '
+    el('button', {class: 'pill-action remove', title: 'Tira este email da fila sem responder. O Gmail não muda, e se o cliente '
         + 'voltar a escrever, a mensagem nova entra normalmente.', onclick: event => run(async () => {
-      if (!confirm('Retirar este email da fila sem responder? O Gmail não é alterado e o email não volta a entrar.')) return;
+      if (!confirm('Este email não precisa de resposta? Sai da fila sem resposta; o Gmail não é alterado e este email não '
+          + 'volta a entrar (se o cliente voltar a escrever, a mensagem nova entra normalmente).')) return;
       state = await call('api/dismiss', {property_ref: queueRef(), ids: [email.id]});
-      renderState(); toast('Email retirado da fila.');
-    }, event.currentTarget)}, 'Retirar da fila'),
-    ignoreTarget && el('button', {class: 'pill-action', title: 'O cliente disse que não quer: sai da fila e deixamos de lhe '
+      renderState(); toast('Sem resposta: o email saiu da fila.');
+    }, event.currentTarget)}, 'Não precisa de resposta'),
+    ignoreTarget && el('button', {class: 'pill-action grey', title: 'O cliente disse que não quer: sai da fila e deixamos de lhe '
         + 'escrever primeiro (propostas de visita, lembretes e outros envios automáticos). Se voltar a escrever, a mensagem '
         + 'entra, com um aviso. Reverte-se em Imóveis.', onclick: event => run(async () => {
       if (!confirm(`${ignoreTarget.name || ignoreTarget.email} disse que não tem interesse? Sai da fila e deixa de `
@@ -1113,6 +1196,8 @@ function card(email) {
           (email.visit_reminder?.when === 'vespera' ? 'lembrete de visita · amanhã ' : 'lembrete de visita · hoje ')
           + String(email.visit_reminder?.at || '').slice(11))
         : email.kind === 'addition' ? el('span', {class: 'tag visit'}, 'acrescento')
+        : email.phase === 'visited' ? el('span', {class: 'tag visit'}, 'já visitou')
+        : email.phase === 'booked' ? el('span', {class: 'tag visit', title: email.booked_at ? 'Visita: ' + slotLabel(email.booked_at) : ''}, 'visita marcada')
         : email.interaction && el('span', {class: 'tag'}, email.interaction + '.ª interação'),
       email.merged?.length > 1 && el('span', {class: 'tag visit', title: 'Vários emails deste cliente juntos: uma só resposta responde a todos.'},
         email.merged.length + ' mensagens'),
@@ -1127,9 +1212,15 @@ function card(email) {
       email.interaction === 2 && fichaTag(email.ficha_summary),
       el('span', {class: 'muted small'}, when(email.date))),
     exits,
-    contact && el('div', {class: 'muted small'}, contact),
+    (address || phoneShown || profileUrl) && el('div', {class: 'muted small contact-line'},
+      address && el('span', {}, address, copyButton(address, 'Copiar o email')),
+      phoneShown && el('span', {}, phoneShown, copyButton(phoneShown, 'Copiar o telefone')),
+      profileUrl && el('a', {href: profileUrl, target: '_blank', rel: 'noopener noreferrer', title: 'Abre o perfil do cliente no Idealista'},
+        'Perfil no Idealista ↗')),
     email.recipient_editable && recipientEditor(email),
-    email.blocked && el('p', {class: 'alert bad'}, email.blocked),
+    email.blocked && (email.phone_only
+      ? el('p', {class: 'alert warn'}, 'Sem email do cliente no aviso: a resposta não segue por email. Gera-a com «Atualizar resposta» e envia-a por WhatsApp ou SMS.')
+      : el('p', {class: 'alert bad'}, email.blocked)),
     (email.warnings || []).map(warning => el('p', {class: 'alert warn'}, warning)),
     email.reply_error && el('p', {class: 'alert bad'}, email.reply_error),
     (email.draft_checks || []).map(check => el('p', {class: 'alert warn'}, 'Verificação do rascunho: ' + check)),
@@ -1144,12 +1235,11 @@ function card(email) {
       state = await call('api/consent/confirm', {property_ref: queueRef(), id: email.id});
       renderState(); toast('Consentimento confirmado e registado em contactos.csv.');
     }, event.currentTarget)}, 'Confirmar consentimento (RGPD)'),
-    noteBox(queueRef(), null, true),
+    generateOne && quickReplies(noteField),
+    noteField,
     generateOne && el('div', {class: 'email-generate'},
-      el('p', {class: 'muted small'}, 'Gerar resposta ', el('span', {class: 'kind'}, 'API · ' + (settings?.ai?.model || ''))),
-      generateOne,
-      lastGeneration[email.id] && el('p', {class: 'muted small generation-usage'}, 'Última geração: ' + lastGeneration[email.id])),
-    sendOne, whatsapp);
+      generateOne),
+    sendOne, whatsapp, sms);
   return el('div', {class: 'email-row', 'data-customer': ((email.recipient || {}).email || '').toLowerCase()}, article, actions);
 }
 
@@ -1165,14 +1255,52 @@ function knowledgeView(ref) {
   return box;
 }
 
+// 27/09: quick replies — switches over «+ Acrescentar ao conhecimento», any number of them at once: each on writes its
+// line in that box (for this reply only, unless another place is chosen there), and «Atualizar resposta» uses it.
+const QUICK_REPLIES = [
+  ['Agradecer o email e as informações', 'Agradece o email e as informações que o cliente nos enviou.'],
+  ['Pedir que aguarde uns dias', 'Pede, por favor, que aguarde uns dias, para passarmos à próxima fase.'],
+  ['Perguntar se mantém o interesse', 'Pergunta, com cordialidade, se o cliente mantém o interesse no imóvel.'],
+  ['Perguntar se recebeu o email anterior', 'Pergunta se recebeu o nosso email anterior, porque não tivemos resposta e '
+    + 'pode ter ido parar à pasta de spam ou lixo; se for o caso, pede que o procure lá.'],
+  ['Confirmar que recebemos os documentos', 'Confirma que recebemos os documentos e que os vamos analisar.'],
+  ['Propor falar por telefone ou WhatsApp', 'Propõe falar por telefone ou WhatsApp e pergunta qual é a melhor hora para o contactarmos.'],
+  ['Enviar a morada e o link do Google Maps', 'Envia a morada completa do imóvel e o link do Google Maps, tal como estão na base de '
+    + 'conhecimento; se lá não estiverem, não os inventes e diz em nota que faltam.']];
+function quickReplies(noteField) {
+  // 27/09: the last one, a little apart and only with one or more of the others on, is a mode, not a line: the reply is
+  // then written with the chosen points only, leaving aside the interaction's prompt and what came before.
+  const only = el('button', {type: 'button', class: 'quick-reply only-these', 'aria-pressed': 'false', disabled: true,
+    title: 'Escreve só com os pontos marcados acima: sem seguir o prompt da interação nem responder ao que veio antes.',
+    onclick: event => {
+      const on = event.currentTarget.getAttribute('aria-pressed') !== 'true';
+      event.currentTarget.setAttribute('aria-pressed', String(on));
+      noteField.onlyThese = on;
+    }}, 'Ignorar os emails anteriores');
+  const toggles = QUICK_REPLIES.map(([label, line]) => el('button', {type: 'button', class: 'quick-reply', 'aria-pressed': 'false', title: line,
+    onclick: event => {
+      const on = event.currentTarget.getAttribute('aria-pressed') !== 'true';
+      event.currentTarget.setAttribute('aria-pressed', String(on));
+      noteField.setLine(line, on);
+      noteField.open = true;
+      const any = toggles.some(toggle => toggle.getAttribute('aria-pressed') === 'true');
+      only.disabled = !any;
+      if (!any) { only.setAttribute('aria-pressed', 'false'); noteField.onlyThese = false; }
+    }}, label));
+  return el('div', {class: 'quick-replies', role: 'group', 'aria-label': 'Respostas rápidas'}, toggles, only);
+}
+
 // One more fact while reviewing a reply: it goes to notas.md and the next prompt already carries it.
-// inCard (27/09): in an email's card it comes open, just above «Gerar esta resposta», which then uses it; the old
-// «Guardar e refazer esta resposta» button did no more than those two, one after the other.
-function noteBox(ref, onSaved, inCard = false) {
+// inCard (27/09): in an email's card it comes open, just above «Atualizar resposta». withGenerate: that card has the
+// button, and then there is no «Guardar no conhecimento» — «Atualizar resposta» saves the fact first (this property or
+// every one) or, with «Só para esta resposta», only hands it to this one reply (box.beforeGenerate).
+function noteBox(ref, onSaved, inCard = false, withGenerate = false) {
   const text = el('textarea', {rows: 2, 'aria-label': 'Informação a acrescentar ao conhecimento',
     placeholder: 'Ex.: Não tem arrecadação, mas pode guardar algumas coisas no lugar de garagem.'});
+  // 27/09: in an email's card, «Só para esta resposta» comes first and chosen: nothing is saved unless asked for
   const scope = el('select', {'aria-label': 'Onde guardar'},
-    el('option', {value: 'property'}, 'Só este imóvel'), el('option', {value: 'agency'}, 'Todos os imóveis (agência)'));
+    withGenerate && el('option', {value: 'reply', selected: true}, 'Só para esta resposta'),
+    el('option', {value: 'property', selected: !withGenerate}, 'Só este imóvel'), el('option', {value: 'agency'}, 'Todos os imóveis (agência)'));
   const saveNote = async () => {
     const result = await call('api/knowledge/note', {property_ref: ref, scope: scope.value, text: text.value});
     text.value = '';
@@ -1184,10 +1312,34 @@ function noteBox(ref, onSaved, inCard = false) {
   const save = el('button', {class: 'primary', onclick: event => run(async () => {
     const result = await saveNote();
     toast((result.scope === 'agency' ? 'Guardado no know-how da agência.' : 'Guardado no conhecimento do imóvel.')
-      + (inCard ? ' «Gerar esta resposta» já o usa.' : ' O próximo prompt já o leva.'));
+      + (inCard ? ' «Atualizar resposta» já o usa.' : ' O próximo prompt já o leva.'));
   }, event.currentTarget)}, 'Guardar no conhecimento');
-  return el('details', {class: 'note-box', open: inCard}, el('summary', {class: 'muted small'}, '+ Acrescentar ao conhecimento'),
-    text, el('div', {class: 'actions'}, scope, save));
+  const box = el('details', {class: 'note-box', open: inCard}, el('summary', {class: 'muted small'}, '+ Acrescentar ao conhecimento'),
+    text, el('div', {class: 'actions'}, scope, !withGenerate && save));
+  // 27/09: a quick reply switched on writes its line in the box; switched off, takes it out again
+  box.setLine = (line, on) => {
+    const lines = text.value.split('\n').filter(item => item.trim() && item.trim() !== line);
+    text.value = (on ? [...lines, line] : lines).join('\n');
+  };
+  // Before «Atualizar resposta»: a fact is saved (and the box emptied, so a retry does not save it twice); a line for
+  // this reply only comes back as an extra instruction. saved: where it went, if anywhere.
+  box.beforeGenerate = async () => {
+    const fact = text.value.trim();
+    if (!fact) return {extra: '', saved: null, only: false};
+    const points = fact.split('\n').map(line => line.trim()).filter(Boolean).map(line => '- ' + line).join('\n');
+    // 27/09: «Ignorar os emails anteriores»: these points are the whole reply (saved first if a place was chosen)
+    if (box.onlyThese) {
+      const saved = scope.value === 'reply' ? null : (await call('api/knowledge/note', {property_ref: ref, scope: scope.value, text: fact})).scope;
+      return {extra: 'Escreve só estes pontos:\n' + points, saved, only: true};
+    }
+    // 27/09: one point per line, added to the reply (the quick replies are lines here too), never the whole of it
+    if (scope.value === 'reply') return {extra: 'Só para esta resposta, junta também estes pontos ao que a interação pede:\n'
+      + points, saved: null, only: false};
+    const result = await call('api/knowledge/note', {property_ref: ref, scope: scope.value, text: fact});
+    text.value = '';
+    return {extra: '', saved: result.scope, only: false};
+  };
+  return box;
 }
 
 function renderPreview() {
@@ -1253,27 +1405,90 @@ function queueHover(properties, shows, header) {
   return (header ? header + '\n\n' : '') + lines.join('\n');
 }
 
-// Short, readable labels however many bars there are: every bar up to 14, fewer after that.
+// 27/09: the activity chart, redrawn. A y-axis with round ticks on hairline gridlines; per bucket a pair of columns
+// (requests, then sent), 2 px apart, with a 4 px rounded cap and square at the baseline; the busiest bucket's requests
+// labelled on the cap; and a tooltip per bucket, on hover and on keyboard focus, with both values. The classes are the
+// old ones (bar-requests, bar-sent, bar-label, grid-line), so the rich themes keep their colours.
+function niceStep(most) {
+  const raw = most / 4, power = 10 ** Math.floor(Math.log10(raw));
+  return [1, 2, 5, 10].map(factor => factor * power).find(step => step >= raw);
+}
+function bucketLabel(day, bucketDays) {
+  const short = `${day.day.slice(8)}/${day.day.slice(5, 7)}`;
+  return bucketDays >= 30 ? `30 dias desde ${short}` : bucketDays > 1 ? `Semana de ${short}` : dayLabel(day.day);
+}
 function chart(days, bucketDays) {
-  const width = 640, height = 150, base = height - 22, top = 12;
+  const width = 640, height = 210, left = 30, right = 6, top = 20, base = height - 24;
   const most = Math.max(1, ...days.map(day => Math.max(day.requests, day.sent)));
-  const slot = width / days.length, bar = Math.max(2, slot / 2 - 3);
-  const every = Math.ceil(days.length / 14);
-  const column = (value, x, cls, day, what) => value
-    ? svg('rect', {x, y: base - Math.max(3, (base - top) * value / most), width: bar,
-                   height: Math.max(3, (base - top) * value / most), rx: 2, class: cls},
-          svg('title', {}, `${bucketDays >= 30 ? '30 dias desde ' : bucketDays > 1 ? 'Semana de ' : ''}${day.day.slice(8)}/${day.day.slice(5, 7)}: ${value} ${what}`))
-    : null;
-  return svg('svg', {viewBox: `0 0 ${width} ${height}`, class: 'chart', role: 'img',
-                     'aria-label': 'Pedidos recebidos e respostas enviadas por ' + (bucketDays >= 30 ? '30 dias' : bucketDays > 1 ? 'semana' : 'dia')},
-    svg('line', {x1: 0, y1: base, x2: width, y2: base, class: 'grid-line'}),
+  const step = Math.max(1, niceStep(most)), ceiling = Math.ceil(most / step) * step;
+  const y = value => base - (base - top) * value / ceiling;
+  const slot = (width - left - right) / days.length;
+  const bar = Math.max(1.5, Math.min(24, (slot - 6) / 2));  // two columns, 2 px apart, and air around the pair
+  const pairLeft = i => left + i * slot + (slot - (2 * bar + 2)) / 2;
+  const every = Math.ceil(days.length / 8);
+  const column = (value, x, cls) => {
+    if (!value) return null;
+    const cap = y(value), r = Math.min(4, bar / 2, base - cap);
+    return svg('path', {class: cls, d: `M${x} ${base}V${cap + r}Q${x} ${cap} ${x + r} ${cap}H${x + bar - r}`
+      + `Q${x + bar} ${cap} ${x + bar} ${cap + r}V${base}Z`});
+  };
+  const ticks = Array.from({length: ceiling / step + 1}, (_, n) => n * step);
+  const busiest = days.reduce((best, day, i) => day.requests > (days[best]?.requests || 0) ? i : best, -1);
+  const tooltip = el('div', {class: 'chart-tooltip', role: 'status', hidden: true});
+  const band = svg('rect', {class: 'chart-band', x: 0, y: top - 8, width: slot, height: base - top + 8, visibility: 'hidden'});
+  const show = i => {
+    const day = days[i];
+    band.setAttribute('x', left + i * slot); band.setAttribute('visibility', 'visible');
+    tooltip.replaceChildren(el('strong', {}, bucketLabel(day, bucketDays)),
+      el('span', {class: 'tip-row'}, el('i', {class: 'tip-key requests'}), el('b', {}, String(day.requests)), ' pedido(s) recebido(s)'),
+      el('span', {class: 'tip-row'}, el('i', {class: 'tip-key sent'}), el('b', {}, String(day.sent)), ' resposta(s) enviada(s)'));
+    const x = (left + (i + 0.5) * slot) / width * 100;
+    tooltip.style.left = `${Math.min(88, Math.max(12, x))}%`;
+    tooltip.hidden = false;
+  };
+  const hide = () => { band.setAttribute('visibility', 'hidden'); tooltip.hidden = true; };
+  const hits = days.map((day, i) => {
+    const hit = svg('rect', {class: 'chart-hit', x: left + i * slot, y: top - 8, width: slot, height: base - top + 8, tabindex: 0,
+      'aria-label': `${bucketLabel(day, bucketDays)}: ${day.requests} pedido(s) recebido(s), ${day.sent} resposta(s) enviada(s)`});
+    hit.addEventListener('pointerenter', () => show(i)); hit.addEventListener('focus', () => show(i));
+    hit.addEventListener('pointerleave', hide); hit.addEventListener('blur', hide);
+    return hit;
+  });
+  const drawing = svg('svg', {viewBox: `0 0 ${width} ${height}`, class: 'chart', role: 'img',
+                              'aria-label': 'Pedidos recebidos e respostas enviadas por ' + (bucketDays >= 30 ? '30 dias' : bucketDays > 1 ? 'semana' : 'dia')},
+    band,
+    ticks.map(value => [
+      svg('line', {x1: left, y1: y(value), x2: width - right, y2: y(value), class: 'grid-line' + (value ? ' grid-minor' : '')}),
+      svg('text', {x: left - 8, y: y(value) + 3.5, class: 'axis-label'}, value.toLocaleString('pt-PT'))]),
     days.map((day, i) => [
-      column(day.requests, i * slot + 2, 'bar-requests', day, 'pedido(s) recebido(s)'),
-      column(day.sent, i * slot + slot / 2 + 1, 'bar-sent', day, 'resposta(s) enviada(s)'),
+      column(day.requests, pairLeft(i), 'bar-requests'),
+      column(day.sent, pairLeft(i) + bar + 2, 'bar-sent'),
       // null, not false: svg() only skips null children, and false would be drawn as the text "false".
       i % every === 0 || i === days.length - 1
-        ? svg('text', {x: i * slot + slot / 2, y: height - 6, class: 'bar-label'}, day.day.slice(8) + '/' + day.day.slice(5, 7))
-        : null]));
+        ? svg('text', {x: left + (i + 0.5) * slot, y: height - 6, class: 'bar-label'}, day.day.slice(8) + '/' + day.day.slice(5, 7))
+        : null]),
+    busiest >= 0 ? svg('text', {x: pairLeft(busiest) + bar / 2, y: y(days[busiest].requests) - 6, class: 'value-label'},
+      String(days[busiest].requests)) : null,
+    hits);
+  return el('div', {class: 'chart-wrap'}, drawing, tooltip);
+}
+
+// 27/09: over the activity chart, the period in three numbers; their colour keys are the chart's legend.
+function activitySummary(data) {
+  const days = data.by_day || [];
+  const requests = days.reduce((sum, day) => sum + day.requests, 0), sent = days.reduce((sum, day) => sum + day.sent, 0);
+  const span = Math.max(1, days.length * (data.bucket_days || 1));
+  const peak = days.reduce((best, day) => !best || day.requests > best.requests ? day : best, null);
+  const stat = (key, label, value, note) => el('div', {class: 'activity-stat'},
+    el('span', {class: 'activity-label'}, key && el('i', {class: 'stat-key ' + key, 'aria-hidden': 'true'}), label),
+    el('strong', {}, value), el('span', {class: 'muted small'}, note));
+  return [
+    stat('requests', 'Pedidos recebidos', requests.toLocaleString('pt-PT'),
+      `≈ ${(requests / span).toLocaleString('pt-PT', {maximumFractionDigits: 1})} por dia`),
+    stat('sent', 'Respostas enviadas', sent.toLocaleString('pt-PT'), `tempo médio até resposta: ${hoursText(data.reply_hours)}`),
+    stat(null, (data.bucket_days || 1) > 1 ? 'Período com mais pedidos' : 'Dia com mais pedidos',
+      peak && peak.requests ? peak.requests.toLocaleString('pt-PT') : '—',
+      peak && peak.requests ? bucketLabel(peak, data.bucket_days || 1) : 'ainda sem pedidos')];
 }
 
 // A retro desk clock + calendar in the dashboard header. The calendar marks days with a visit booked,
@@ -1358,15 +1573,13 @@ function renderQuality(report) {
   const box = $('dashboard-quality');
   box.hidden = !report;
   if (!report) return;
-  const interest = report.interest;
-  // Through a filter: replaceChildren itself would print a null as the text «null» (26/09).
+  // Through a filter: replaceChildren itself would print a null as the text «null» (26/09). 27/09: no «Continua
+  // interessado…» line under the dials; the answers themselves are in Imóveis.
   box.replaceChildren(...[el('div', {class: 'section-heading'},
       el('div', {}, el('p', {class: 'eyebrow'}, 'QUALIDADE · INQUÉRITOS PÓS-VISITA'), el('h2', {}, 'Como te avaliam, em todos os imóveis')),
       el('span', {class: 'tag'}, `${report.responses} resposta(s)`)),
     qualityGauges(report, 'painel:quality'),
-    report.responses ? null : el('p', {class: 'muted small'}, 'Ainda não há respostas ao inquérito: os ponteiros ficam a meio até chegarem, depois do agradecimento pós-visita.'),
-    report.responses ? el('p', {class: 'muted small'}, `Continua interessado: sim ${interest.sim} · talvez ${interest.talvez} · não ${interest['não']}`
-      + (report.alerts ? ` · ${report.alerts} com nota má ou sem interesse` : '') + '. O detalhe de cada imóvel está em Imóveis.') : null]
+    report.responses ? null : el('p', {class: 'muted small'}, 'Ainda não há respostas ao inquérito: os ponteiros ficam a meio até chegarem, depois do agradecimento pós-visita.')]
     .filter(Boolean));
 }
 
@@ -1402,6 +1615,7 @@ function renderDashboard(data) {
     metricCard(hoursText(data.reply_hours), 'Tempo médio até resposta'));
   $('dashboard-read').textContent = `Última leitura ${ago(data.last_read_at)}`
     + (data.last_read_at ? ` (${when(data.last_read_at)})` : '') + ` · conta ${data.account}`;
+  $('activity-summary').replaceChildren(...activitySummary(data));
   $('dashboard-chart').replaceChildren(chart(data.by_day, data.bucket_days || 1));
   $('chart-note').textContent = data.bucket_days >= 30 ? 'Cada barra soma 30 dias.' : data.bucket_days > 1 ? 'Cada barra soma uma semana.' : '';
   $('dashboard-properties').replaceChildren(...(data.properties.length ? data.properties.map(item =>
@@ -1430,7 +1644,7 @@ function renderDashboard(data) {
     check(data.setup.app_password, 'App Password guardada no Keychain', 'corre mac/password.command'),
     check(data.setup.voice, 'Voz completa', 'preenche o separador Voz e estilo'),
     check(data.setup.properties > 0, `Imóveis configurados: ${data.setup.properties}`, 'cria um no separador Imóveis'));
-  renderWallet(data.openai_usage);
+  renderWallet(data.openai_usage, data.properties.reduce((sum, item) => sum + (item.api_fuel?.capacity_eur || 0), 0));
   renderFuelOverview(data);
 }
 
@@ -1495,11 +1709,17 @@ const ACTIVE_HINT = 'Dos que responderam, os que continuam: sem os que deixaram 
 let notepadProperty = null;
 function renderDigest(view) {
   const pages = view?.properties || [];
+  // 27/09: the notepad shows the property picked here (it had tabs of its own)
+  if (!pages.some(page => page.property_ref === notepadProperty)) notepadProperty = pages[0]?.property_ref ?? null;
+  const pick = page => { notepadProperty = page.property_ref; renderDigest(view); };
   const total = key => pages.reduce((sum, page) => sum + (Array.isArray(page[key]) ? page[key].length : page[key] || 0), 0);
   const tile = (value, label, tone = '', title) => el('div', {class: 'digest-kpi ' + tone, title},
     el('strong', {}, String(value)), el('span', {}, label));
   const pill = (value, label, tone = '', title) => el('span', {class: 'digest-pill ' + tone, title}, el('b', {}, String(value)), ' ' + label);
-  const property = page => el('div', {class: 'digest-property' + (page.active ? '' : ' inactive')},
+  const property = page => el('div', {class: 'digest-property' + (page.active ? '' : ' inactive')
+      + (page.property_ref === notepadProperty ? ' selected' : ''), role: 'button', tabindex: 0,
+    'aria-pressed': String(page.property_ref === notepadProperty), title: 'Ver o texto para o proprietário no bloco de notas',
+    onclick: () => pick(page), onkeydown: event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); pick(page); } }},
     el('div', {class: 'digest-property-head'},
       el('span', {class: 'property-ref'}, page.property_ref), el('strong', {}, page.description),
       !page.active && el('span', {class: 'tag warn'}, 'INATIVO')),
@@ -1518,8 +1738,8 @@ function renderDigest(view) {
         tile(total('contacted'), 'contactaram'), tile(total('responded'), 'responderam à 1.ª mensagem'),
         tile(total('still_active'), 'ainda ativos', '', ACTIVE_HINT), tile(total('booked'), 'marcaram visita'),
         tile(total('visited'), 'visitaram', 'ok')),
-      el('p', {class: 'muted small digest-now'}, 'Os números são os de agora. O texto para o proprietário de cada imóvel '
-        + 'está no bloco de notas.'),
+      el('p', {class: 'muted small digest-now'}, 'Os números são os de agora. Clica num imóvel para ver, ao lado, o texto '
+        + 'para o proprietário.'),
       el('div', {class: 'digest-properties'}, pages.map(property)),
       pages.length > 1 && view.recipient && sendAll(view)]
       : [el('p', {class: 'muted small'}, 'Sem imóveis configurados: o ponto de situação é de cada imóvel.')])));
@@ -1546,8 +1766,8 @@ function sendAll(view) {
     }, event.currentTarget)}, 'Enviar-me o resumo de todos'));
 }
 
-// The notepad: one page per property, picked in its tabs. The text is kept on leaving it (no button); a page sent,
-// or maybe sent, stays as it went.
+// The notepad: one page per property, the one picked in the ponto de situação (27/09: no tabs). The text is kept on
+// leaving it (no button); a page sent, or maybe sent, stays as it went.
 function renderNotepad(view) {
   const box = $('digest-notepad'), pages = view?.properties || [];
   if (!pages.length) { box.replaceChildren(); return; }
@@ -1582,12 +1802,8 @@ function renderNotepad(view) {
     }, event.currentTarget)}, label);
   box.replaceChildren(el('article', {class: 'card notepad-card'},
     el('div', {class: 'section-heading'},
-      el('div', {}, el('p', {class: 'eyebrow'}, 'PARA O PROPRIETÁRIO'), el('h2', {}, 'Bloco de notas')),
+      el('div', {}, el('p', {class: 'eyebrow'}, 'PARA O PROPRIETÁRIO · ' + ref), el('h2', {}, 'Bloco de notas')),
       el('span', {class: 'tag' + (status === 'draft' ? ' draft' : status === 'sent' ? ' visit' : '')}, tag)),
-    pages.length > 1 && el('div', {class: 'notepad-tabs', role: 'tablist', 'aria-label': 'Imóvel'}, pages.map(item =>
-      el('button', {type: 'button', role: 'tab', class: 'notepad-tab' + (item === page ? ' active' : ''),
-        'aria-selected': String(item === page), title: item.description,
-        onclick: () => { notepadProperty = item.property_ref; renderNotepad(view); }}, item.property_ref))),
     page.reply_error && el('p', {class: 'alert bad'}, page.reply_error),
     el('div', {class: 'notepad'}, text),
     el('p', {class: 'muted small notepad-to'}, status === 'sent'
@@ -2826,7 +3042,8 @@ function lamp(label, count, tone, shown = String(count), icon = null) {
 
 // 1 € = 1 US$ for this assistant, by the owner's choice: OpenAI's cost reads in euros, with no conversion.
 const eurFormat = new Intl.NumberFormat('pt-PT', {style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2});
-const costFormat = new Intl.NumberFormat('pt-PT', {style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 4});
+// 27/09: what the API cost, to the cent and no further; a positive amount under half a cent reads «< 0,01 €».
+const costText = value => value > 0 && value < 0.005 ? '< 0,01 €' : eurFormat.format(value || 0);
 const litresText = litres => litres == null ? '— L' : litres.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + ' L';
 
 // A property's API tank as a fuel gauge: E to F, the red at the empty end (the reserve), needle on what is left.
@@ -2837,19 +3054,15 @@ function fuelGauge(fuel, key, caption, size = 'small') {
     readout: fuel.configured ? eurFormat.format(left) : 'sem limite', caption});
 }
 
-// The API tank as a real two-needle gauge (27/09, after the user's reference: a white automotive dial with a chrome
-// bezel, a blue scale and a red needle). The left half is what this property's API has cost so far, in euros (blue
-// needle); the right half is what is left in its token tank, E to F (red needle), with the reserve in red. Both
-// scales rise from the bottom towards the top, like a car's combination gauge; one dial instead of a gauge and a
-// line of text.
-function tankGauge(fuel, usage, key, caption, sizeClass = 'small', onFill = null) {
-  const spent = usage?.all_time?.cost_usd || 0;
+// A real automotive dial (27/09, after the user's reference): a white face with a chrome bezel, a blue scale, and two
+// half scales that rise from the bottom towards the top, like a car's combination gauge — each half with its needle
+// (blue on the left, red on the right), its value at the bottom and its own hover. left / right: {value, max, labels
+// (bottom, middle, top), text, hover, click, reserve (the right half's red end)}.
+function realDial({key, label, left, right, sizeClass = 'small', alert = false, caption = null}) {
   const id = 'gauge' + (++gaugeCount), c = 100, r = 80, low = 135, high = 12;
-  const capacity = fuel.capacity_eur || 0, left = fuel.configured ? Math.max(0, fuel.remaining_eur ?? 0) : capacity;
-  const spentMax = niceMax(Math.max(capacity, spent || 0, 1));
   const share = (value, max) => max ? Math.max(0, Math.min(1, value / max)) : 1;
-  const spentAngle = value => -low + (low - high) * share(value, spentMax);
-  const tankAngle = value => low - (low - high) * share(value, capacity);
+  const leftAngle = value => -low + (low - high) * share(value, left.max);
+  const rightAngle = value => low - (low - high) * share(value, right.max);
   const point = (a, radius) => [c + radius * Math.sin(a * Math.PI / 180), c - radius * Math.cos(a * Math.PI / 180)];
   const arc = (a1, a2, radius) => {
     const [x1, y1] = point(a1, radius), [x2, y2] = point(a2, radius);
@@ -2868,34 +3081,23 @@ function tankGauge(fuel, usage, key, caption, sizeClass = 'small', onFill = null
     }
     return marks;
   };
-  const euros = value => value.toLocaleString('pt-PT', {maximumFractionDigits: 1});
-  const needle = (name, target) => {
+  const needle = (name, start, target) => {
     const node = svg('g', {class: 'gauge-needle real-needle ' + name},
       svg('path', {d: `M ${c - 2.6} ${c + 16} L ${c - 0.9} ${c - r + 10} L ${c + 0.9} ${c - r + 10} L ${c + 2.6} ${c + 16} Z`}));
     const memory = key + ':' + name;
-    node.style.transform = `rotate(${needles[memory] ?? (name === 'needle-spent' ? -low : low)}deg)`;
+    node.style.transform = `rotate(${needles[memory] ?? start}deg)`;
     needles[memory] = target;
     requestAnimationFrame(() => requestAnimationFrame(() => { node.style.transform = `rotate(${target}deg)`; }));
     return node;
   };
-  const spentText = eurFormat.format(spent || 0), leftText = fuel.configured ? eurFormat.format(left) : 'sem limite';
-  const size = eurFormat.format(capacity);
-  // What each needle says, in words, on hover over its half (27/09: they were lines of text beside the gauge)
-  const spentHover = usage ? spendingText(usage) : `Gasto até hoje: ${spentText}.`;
-  const tankHover = (!fuel.configured ? 'Sem depósito: a via API não tem limite neste imóvel.'
-    : fuel.empty ? 'Vazio: a API está desligada neste imóvel.'
-    : fuel.reserve ? `Na reserva: restam ${leftText} de ${size}.` : `Restam ${leftText} de ${size}.`)
-    + (onFill ? ' Clicar para mudar os limites de gastos.' : '');
   const half = (sweep, text, click) => {
     const node = svg('path', {d: `M ${c} 1 A 99 99 0 0 ${sweep} ${c} 199 Z`, class: 'real-hit' + (click ? ' clickable' : '')},
       svg('title', {}, text));
     if (click) node.addEventListener('click', click);
     return node;
   };
-  const reserve = capacity * 0.15;
-  return el('figure', {class: `gauge gauge-${sizeClass} gauge-fuel gauge-real` + (fuel.empty ? ' gauge-alert' : '')},
-    svg('svg', {viewBox: '0 0 200 200', role: 'img',
-      'aria-label': `${spentHover} ${tankHover}`},
+  return el('figure', {class: `gauge gauge-${sizeClass} gauge-fuel gauge-real` + (alert ? ' gauge-alert' : '')},
+    svg('svg', {viewBox: '0 0 200 200', role: 'img', 'aria-label': `${left.hover} ${right.hover}`},
       svg('defs', {},
         svg('linearGradient', {id: id + '-bezel', x1: 0, y1: 0, x2: 0, y2: 1},
           svg('stop', {offset: '0%', 'stop-color': '#fbfbfb'}), svg('stop', {offset: '45%', 'stop-color': '#a9adb3'}),
@@ -2905,18 +3107,39 @@ function tankGauge(fuel, usage, key, caption, sizeClass = 'small', onFill = null
           svg('stop', {offset: '100%', 'stop-color': '#dfe3e9'}))),
       svg('circle', {cx: c, cy: c, r: 99, fill: `url(#${id}-bezel)`, class: 'real-bezel'}),
       svg('circle', {cx: c, cy: c, r: 92, fill: `url(#${id}-face)`, class: 'real-face'}),
-      fuel.configured && reserve > 0 ? svg('path', {d: arc(tankAngle(reserve), tankAngle(0), r - 4), class: 'real-reserve'}) : null,
-      scale(spentAngle, spentMax, ['0', euros(spentMax / 2), euros(spentMax)]),
-      scale(tankAngle, capacity || 1, ['E', '½', 'F']),
-      // under the needles' pivot, the dial's name (27/09: only «TOKEN$»); at the bottom, each needle's value
-      svg('text', {x: c, y: c + 27, class: 'real-label'}, 'TOKEN$'),
-      svg('text', {x: c - 27, y: c + 60, class: 'real-readout spent'}, spentText),
-      svg('text', {x: c + 27, y: c + 60, class: 'real-readout tank'}, leftText),
-      needle('needle-spent', spentAngle(spent || 0)),
-      needle('needle-tank', tankAngle(left)),
+      right.reserve > 0 ? svg('path', {d: arc(rightAngle(right.reserve), rightAngle(0), r - 4), class: 'real-reserve'}) : null,
+      scale(leftAngle, left.max, left.labels),
+      scale(rightAngle, right.max || 1, right.labels),
+      // under the needles' pivot, the dial's name; at the bottom, each needle's value
+      svg('text', {x: c, y: c + 27, class: 'real-label'}, label),
+      svg('text', {x: c - 27, y: c + 60, class: 'real-readout spent'}, left.text),
+      svg('text', {x: c + 27, y: c + 60, class: 'real-readout tank'}, right.text),
+      needle('needle-spent', -low, leftAngle(left.value)),
+      needle('needle-tank', low, rightAngle(right.value)),
       svg('circle', {cx: c, cy: c, r: 9, class: 'real-cap'}),
-      half(0, spentHover), half(1, tankHover, onFill)),  // on top of everything: the left half spent, the right the tank
+      half(0, left.hover, left.click), half(1, right.hover, right.click)),  // on top of everything
     caption ? el('figcaption', {}, caption) : null);
+}
+const dialEuros = value => value.toLocaleString('pt-PT', {maximumFractionDigits: 1});
+
+// A property's API tank (27/09): the left half is what its API has cost so far, in euros (blue needle); the right
+// half is what is left in its token tank, E to F (red needle), with the reserve in red.
+function tankGauge(fuel, usage, key, caption, sizeClass = 'small', onFill = null) {
+  const spent = usage?.all_time?.cost_usd || 0;
+  const capacity = fuel.capacity_eur || 0, left = fuel.configured ? Math.max(0, fuel.remaining_eur ?? 0) : capacity;
+  const spentMax = niceMax(Math.max(capacity, spent || 0, 1));
+  const spentText = costText(spent), leftText = fuel.configured ? eurFormat.format(left) : 'sem limite';
+  const size = eurFormat.format(capacity);
+  // What each needle says, in words, on hover over its half (27/09: they were lines of text beside the gauge)
+  const spentHover = usage ? spendingText(usage) : `Gasto até hoje: ${spentText}.`;
+  const tankHover = (!fuel.configured ? 'Sem depósito: a via API não tem limite neste imóvel.'
+    : fuel.empty ? 'Vazio: a API está desligada neste imóvel.'
+    : fuel.reserve ? `Na reserva: restam ${leftText} de ${size}.` : `Restam ${leftText} de ${size}.`)
+    + (onFill ? ' Clicar para mudar os limites de gastos.' : '');
+  return realDial({key, label: 'TOKEN$', sizeClass, alert: fuel.empty, caption,
+    left: {value: spent, max: spentMax, labels: ['0', dialEuros(spentMax / 2), dialEuros(spentMax)], text: spentText, hover: spentHover},
+    right: {value: left, max: capacity, labels: ['E', '½', 'F'], text: leftText, hover: tankHover, click: onFill,
+            reserve: fuel.configured ? capacity * 0.15 : 0}});
 }
 
 // Each property has its own tank (settings.properties[].api_fuel); settings.api_fuel is only for a folder
@@ -2933,7 +3156,7 @@ function holdFuelButtons() {
   for (const button of document.querySelectorAll('.needs-fuel')) {
     const ref = button.dataset.ref || queueRef(), fuel = fuelOf(ref);
     button.dataset.hold = fuel?.empty ? '1' : '';
-    button.disabled = !!fuel?.empty;
+    button.disabled = !!fuel?.empty || button.dataset.lock === '1';
     if (fuel?.empty) button.title = `Depósito da API${ref ? ' de ' + ref : ''} vazio: enche-o no painel do imóvel `
       + '(Imóveis).' + (apiOnly() ? '' : ' O copiar/colar com o ChatGPT continua a funcionar.');
     else if (button.title.startsWith('Depósito da API')) {
@@ -2954,7 +3177,7 @@ function applyFuel(fuel, ref) {
 // The Painel's view of the tanks: one per property, each filled on its own property's panel (Imóveis).
 // What this property spent on the API (26/09): its own numbers under its own tank; the folder's total is below, apart.
 function spendingText(usage) {
-  const text = item => item.calls ? `${costFormat.format(item.cost_usd)} · ${item.calls} pedido(s)` : 'nada';
+  const text = item => item.calls ? `${costText(item.cost_usd)} · ${item.calls} pedido(s)` : 'nada';
   const same = usage.period.calls === usage.all_time.calls && usage.period.cost_usd === usage.all_time.cost_usd;
   return same ? `Gasto neste período e desde sempre: ${text(usage.all_time)}.`
     : `Gasto neste período: ${text(usage.period)} · desde sempre: ${text(usage.all_time)}.`;
@@ -2976,20 +3199,22 @@ function fillTank(ref, capacity, after, button) {
   }, button);
 }
 
-// Depósitos (27/09): what the API cost, every property together, in a wallet at the right of the tanks (the totals
-// used to sit under the tanks, one per column, and read as theirs), and what it cost in the last month.
-function renderWallet(usage) {
+// Depósitos (27/09): what the API cost, every property together, at the right of the tanks — a dial like theirs (it
+// was a wallet, and clashed): on the left since always, on the right the last month, both on one scale in euros, to
+// the cent; requests and tokens on each half's hover. capacity: the tanks together, for the scale.
+function renderWallet(usage, capacity = 0) {
   const detail = item => `${item.calls} pedido${item.calls === 1 ? '' : 's'} · `
     + `${(item.prompt_tokens + item.completion_tokens).toLocaleString('pt-PT')} tokens`;
   const total = usage.all_time, month = usage.month || usage.period;
-  // 27/09: the last month always (not the chart's period), in two lines — what it cost, then requests and tokens
-  $('usage-wallet').replaceChildren(...[
-    el('div', {class: 'wallet-flap'}, el('p', {class: 'eyebrow'}, 'GASTO TOTAL', el('br'), 'TODOS OS IMÓVEIS')),
-    el('strong', {class: 'wallet-total'}, costFormat.format(total.cost_usd || 0)),
-    el('p', {class: 'wallet-detail'}, total.calls ? detail(total) + ' · desde sempre' : 'Sem pedidos ainda'),
-    total.calls ? el('p', {class: 'wallet-period'}, el('span', {}, `Último mês: ${costFormat.format(month.cost_usd || 0)}`),
-      el('span', {class: 'wallet-period-detail'}, detail(month))) : null]
-    .filter(Boolean));
+  const max = niceMax(Math.max(capacity, total.cost_usd || 0, 1));
+  const labels = ['0', dialEuros(max / 2), dialEuros(max)];
+  $('usage-wallet').replaceChildren(
+    el('p', {class: 'eyebrow wallet-title'}, 'GASTO TOTAL · TODOS OS IMÓVEIS'),
+    realDial({key: 'painel:wallet', label: 'GASTO €', sizeClass: 'wallet', caption: '← desde sempre · último mês →',
+      left: {value: total.cost_usd || 0, max, labels, text: costText(total.cost_usd),
+             hover: `Desde sempre: ${costText(total.cost_usd)}` + (total.calls ? ` · ${detail(total)}.` : ' · sem pedidos ainda.')},
+      right: {value: month.cost_usd || 0, max, labels, text: costText(month.cost_usd),
+              hover: `Último mês: ${costText(month.cost_usd)}` + (month.calls ? ` · ${detail(month)}.` : ' · sem pedidos.')}}));
 }
 
 function renderFuelOverview(metrics) {
@@ -3178,7 +3403,7 @@ function propertyCluster(property, data, metrics) {
       lamp('Greylist', data.ignored.grey, 'grey'),
       lamp('Reserva', signals.fuel.reserve || signals.fuel.empty ? 1 : 0, 'amber', signals.fuel.empty ? 'vazio' : '', 'fuel')),
     unattributed.calls ? el('p', {class: 'cluster-note'},
-      `${unattributed.calls} pedido(s) à API anteriores a 24/09 (${costFormat.format(unattributed.cost_usd)}) não guardaram `
+      `${unattributed.calls} pedido(s) à API anteriores a 24/09 (${costText(unattributed.cost_usd)}) não guardaram `
       + 'o imóvel: contam no custo total do Painel, mas não aqui.') : null);
 }
 
@@ -3352,6 +3577,10 @@ function renderVoice() {
   const afterVisit = el('textarea', {rows: 5}, settings.voice.after_visit || '');
   const afterVisitTemplate = el('textarea', {rows: 14}, settings.voice.after_visit_template || '');
   const visitReminder = el('textarea', {rows: 5}, settings.voice.visit_reminder || '');
+  // 27/09: a customer writing with a visit booked, or after the visit: each with its own prompt
+  const bookedReply = el('textarea', {rows: 5}, settings.voice.booked_reply || '');
+  const visitedReply = el('textarea', {rows: 5}, settings.voice.visited_reply || '');
+  const docsRequest = el('textarea', {rows: 5}, settings.voice.docs_request || '');
   // 27/09: the hours behind two of the dots in Comunicações' table of customers
   const alerts = settings.voice.alerts || {our_turn_hours: 48, no_visit_hours: 96};
   const ourTurnHours = el('input', {type: 'number', min: 1, max: 720, value: alerts.our_turn_hours});
@@ -3397,6 +3626,14 @@ function renderVoice() {
       'Na véspera e no próprio dia de cada visita marcada, a primeira leitura desse dia põe um rascunho nas Comunicações: '
       + 'o assistente escreve-o com estas instruções, no idioma do cliente, e lembra o que ainda falta na ficha.'),
     el('label', {class: 'field'}, 'Instruções do lembrete de visita', visitReminder),
+    el('p', {class: 'eyebrow voice-section'}, 'VISITA MARCADA E DEPOIS DA VISITA ', kind('prompt')),
+    el('p', {class: 'step voice-section'},
+      'Quando um cliente volta a escrever com a visita já marcada, ou depois de ter visitado, a resposta segue estas '
+      + 'instruções (e não as das interações 1 a 4). O email aparece marcado «visita marcada» ou «já visitou».'),
+    el('label', {class: 'field'}, 'Com visita marcada', bookedReply),
+    el('label', {class: 'field'}, 'Depois de visitar', visitedReply),
+    el('label', {class: 'field'}, 'Pedido de documentos (os escolhidos da short list, em Visitas → «Pedir documentos»; '
+      + 'sem nunca dizer «short list»)', docsRequest),
     el('p', {class: 'eyebrow voice-section'}, 'PONTO DE SITUAÇÃO ', kind('voice')),
     el('p', {class: 'step voice-section'},
       'O relatório de cada imóvel está no bloco de notas do Painel. Vai ao proprietário (o email dele fica em Imóveis), '
@@ -3411,7 +3648,8 @@ function renderVoice() {
         reminders: {day2: reminderDay2.value, day4: reminderDay4.value},
         alerts: {our_turn_hours: Number(ourTurnHours.value), no_visit_hours: Number(noVisitHours.value)},
         visits_closed: visitsClosed.value, consent_request: consentRequest.value, digest_recipient: digestRecipient.value,
-        after_visit: afterVisit.value, after_visit_template: afterVisitTemplate.value, visit_reminder: visitReminder.value});
+        after_visit: afterVisit.value, after_visit_template: afterVisitTemplate.value, visit_reminder: visitReminder.value,
+        booked_reply: bookedReply.value, visited_reply: visitedReply.value, docs_request: docsRequest.value});
       renderSettings(); await refreshState(); toast('Voz guardada.');
     }, event.currentTarget)}, 'Guardar voz')));
 }
@@ -3420,7 +3658,7 @@ document.querySelectorAll('[data-tab]').forEach(button => button.addEventListene
 $('queue').addEventListener('change', renderState);
 $('emails').addEventListener('change', updateSelection);
 $('read').addEventListener('click', event => run(async () => {
-  state = await call('api/read', {}); renderState();
+  state = await call('api/read', {}); stepsDone.read = true; renderState();
   if (state.added) playSound('read');
   // Replies written straight in Gmail (found in All Mail or Sent) answer their emails here too.
   const direct = state.direct ? ` ${state.direct} resposta(s) tua(s) enviada(s) diretamente do Gmail registada(s).` : '';
@@ -3465,6 +3703,8 @@ $('generate-api').addEventListener('click', event => run(async () => {
   const ids = selectedIds();
   if (!ids.length) throw new Error('Seleciona pelo menos um email.');
   const result = await call('api/prompt/generate', {property_ref: queueRef(), ids, extra: $('extra').value});
+  stepsDone.generated = true;
+  try { localStorage.setItem('aria-generated-at', String(Date.now())); } catch { /* Storage may be unavailable. */ }
   state = result.state; keepSteps(renderState); applyFuel(result.fuel, queueRef());
   $('notes').replaceChildren(...result.notes.map(note => el('p', {class: 'alert warn'}, `Nota sobre ${nameOf(note.id)}: ${note.nota}`)));
   markStep('prepare-step', true); markStep('import-step', true);  // this one button does the work of both
@@ -3497,11 +3737,11 @@ $('preview').addEventListener('click', event => run(async () => {
     // Only the page knows this: the server never sees a paste until "Guardar rascunhos".
     $('import-step').scrollIntoView({behavior: 'smooth', block: 'center'});
     throw new Error('Tens uma resposta colada no passo 03 que ainda não foi guardada. Carrega em «Guardar rascunhos» '
-      + '(ou apaga-a) antes de pré-visualizar.');
+      + '(ou apaga-a) antes de preparar os envios.');
   }
   preview = await call('api/preview', {property_ref: queueRef(), ids});
   renderPreview();
-  toast(`Pré-visualização pronta: ${preview.replies.length} email(s) por rever antes de enviar.`);
+  toast(`Envios preparados: ${preview.replies.length} email(s) por rever antes de enviar.`);
 }, event.currentTarget));
 $('listing-prompt').addEventListener('click', event => run(async () => {
   const {prompt} = await call('api/property/prompt', {listing_url: $('listing-url').value});
@@ -3531,4 +3771,5 @@ $('property-save').addEventListener('click', event => run(async () => {
 }, event.currentTarget));
 
 applySkin();  // here, once everything it draws with is defined
-run(async () => { await loadMetrics(); await loadDigest(); await refreshState(); await loadSettings(); });
+// 27/09: the cards drawn once more after the settings arrive (the model's name and the API buttons depend on them)
+run(async () => { await loadMetrics(); await loadDigest(); await refreshState(); await loadSettings(); renderState(); });

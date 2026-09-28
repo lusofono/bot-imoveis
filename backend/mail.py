@@ -224,7 +224,7 @@ def read_messages(account, password, subject_contains, date_from, date_to,
                 "references": (msg.get("References", "") or "").strip(),
             }
             if own and outgoing is not None and accept_outgoing and accept_outgoing(item):
-                item["body_text"], item["body_truncated"] = fetch_text_only(mail, uid, structure_bytes)
+                item["body_text"], item["body_truncated"], _ = fetch_text_only(mail, uid, structure_bytes)
                 outgoing.append(item)
                 continue
             if own_only or (own and incoming_only):
@@ -234,7 +234,9 @@ def read_messages(account, password, subject_contains, date_from, date_to,
             # Headers decide first: unrelated mail never has its text fetched.
             if accept and not accept(item):
                 continue
-            item["body_text"], item["body_truncated"] = fetch_text_only(mail, uid, structure_bytes)
+            item["body_text"], item["body_truncated"], profile = fetch_text_only(mail, uid, structure_bytes)
+            if profile:
+                item["profile_url"] = profile
             result.append(item)
         return len(uids)
 
@@ -386,10 +388,38 @@ def html_to_text(markup):
     return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
 
 
+def html_profile_link(markup):
+    """27/09: the link of a portal notice's «Ver perfil» (the customer's profile on the portal), which the text of the
+    email loses: the first link whose words say «perfil», https only and of a sane length; "" when there is none."""
+    from html.parser import HTMLParser
+    class Links(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.href, self.words, self.found = None, [], ""
+        def handle_starttag(self, tag, attrs):
+            if tag == "a" and not self.found:
+                self.href, self.words = dict(attrs).get("href") or "", []
+        def handle_data(self, text):
+            if self.href is not None:
+                self.words.append(text)
+        def handle_endtag(self, tag):
+            if tag == "a" and self.href is not None:
+                if not self.found and "perfil" in " ".join(self.words).casefold():
+                    href = self.href.strip()
+                    if href.startswith("https://") and len(href) <= 500 and not any(c.isspace() for c in href):
+                        self.found = href
+                self.href = None
+    parser = Links()
+    parser.feed(markup)
+    parser.close()
+    return parser.found
+
+
 def fetch_text_only(mail, uid, structure_bytes):
-    """The text parts only (plain, or HTML turned into text), never attachments; long texts are cut and flagged."""
+    """The text parts only (plain, or HTML turned into text), never attachments; long texts are cut and flagged.
+    Also the portal's «Ver perfil» link, when the HTML has one (see html_profile_link): (text, truncated, profile)."""
     sections = body_sections(parse_structure(structure_bytes))
-    texts = []
+    texts, profile = [], ""
     truncated = len(sections) > 10
     for section, kind in sections[:10]:
         mime = fetch_literal(mail, uid, section + ".MIME")
@@ -403,10 +433,11 @@ def fetch_text_only(mail, uid, structure_bytes):
         if not isinstance(text, str):
             continue
         if kind == "html":
+            profile = profile or html_profile_link(text)
             text = html_to_text(text)
         texts.append(text.strip())
     joined = "\n\n".join(texts)
-    return joined[:100000], truncated or len(joined) > 100000
+    return joined[:100000], truncated or len(joined) > 100000, profile
 
 
 # Replies: one plain-text message per email, threaded under the original.

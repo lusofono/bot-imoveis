@@ -48,7 +48,7 @@ def test_read_registers_a_new_contact_awaiting_rgpd(service):
     [row] = load_contacts(service.folder).values()
     assert row == {"email": CUSTOMER, "nome": "Ana Exemplo", "telefone": "900 000 001",
                    "primeiro_contacto": row["primeiro_contacto"], "imovel": REF, "fonte": "Idealista",
-                   "rgpd": "por_pedir", "rgpd_data": "", "rgpd_prova": ""}
+                   "rgpd": "por_pedir", "rgpd_data": "", "rgpd_prova": "", "perfil": ""}
     assert (service.folder / "contactos.csv").stat().st_mode & 0o077 == 0
 
 
