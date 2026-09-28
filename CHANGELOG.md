@@ -15,6 +15,24 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.71.0 — 28/09/2026
+
+- **O que foi feito no tema Default passa para os outros temas** (Noite, Dia, Índigo, 80's RacingCar, 90's Boat, 70's
+  Scooter, KW-Area e APalace):
+  - nos temas ricos, o desenho próprio dos botões deixa em paz as pills de cada email, as respostas rápidas, os ícones
+    de copiar e os nomes da tabela de clientes, que têm o seu (antes ficavam com o aspeto dos interruptores do tema e
+    perdiam as cores);
+  - «Enviar por WhatsApp» e «Enviar por SMS / iMessage» ficam com metade da altura também nos temas ricos;
+  - o ponto de situação e o bloco de notas são um só cartão do tema (sem moldura dupla nem costuras a mais no
+    RacingCar);
+  - no 90's Boat e no 70's Scooter, «Enviar já este por email» fica só com o seu envelope (o tema juntava-lhe outra
+    marca).
+- **As cores do gráfico da atividade, tema a tema, validadas** (claridade, saturação, separação para daltónicos e
+  contraste com o fundo): Noite, Dia e Índigo ganham um par que se distingue bem; no RacingCar passam a vermelho e
+  azul (amarelo e laranja não se distinguiam para um daltónico), também no painel de cada imóvel; no Scooter, vermelho
+  e verde (o laranja era demasiado parecido com o vermelho); no KW-Area e no APalace, um azul em vez do cinzento. As
+  barras, a legenda e as caixas do gráfico usam sempre o mesmo par.
+
 ## α.70.0 — 28/09/2026
 
 - **Respostas rápidas: nova opção «Ignorar os emails anteriores»**, a última, um pouco afastada e só clicável com uma ou

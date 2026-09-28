@@ -577,3 +577,20 @@ def test_ignoring_what_came_before_writes_the_chosen_points_only(service):
     only = reply_prompt(queue, ["1"], "Escreve só estes pontos:\n- Agradece.", only_extra=True)
     assert "substituem as da interação: escreve só uma resposta curta com estes pontos" in only
     assert "somam-se às de cima" not in only
+
+
+
+def test_every_theme_gets_the_new_parts(page):
+    # 28/09: the work done in Default ported to the others — the chart's validated pair in every theme, and the rich
+    # themes' button skin leaves alone the pills, quick replies, copy icons and names (they carry their own look).
+    client, _ = page
+    client.get(f"/?t={TOKEN}")
+    style = client.get("/style.css").text
+    for theme in ("day", "indigo", "amber"):
+        assert f':root[data-theme="{theme}"]{{--chart-requests:' in style
+    for theme in ("racing", "boat", "scooter", "kw", "apalace"):
+        css = client.get(f"/themes/{theme}.css").text
+        assert f':root[data-theme="{theme}"]{{--chart-requests:' in css
+        if theme in ("racing", "boat", "scooter"):
+            assert ".pill-action,.quick-reply,.copy-icon,.pipeline-name)" in css and "segmented *)" not in css
+    assert 'class="dashboard-grid digest-row card"' in client.get("/").text

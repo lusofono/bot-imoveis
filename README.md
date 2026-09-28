@@ -63,7 +63,7 @@ Abre `http://127.0.0.1:8765` no browser, já com o link certo. É o mesmo que `.
   sinais nos separadores) e o **70's Scooter** (uma scooter italiana dos anos 70: creme, cromados, verde-menta, as
   riscas dos anos 70 e um punho de mudanças como navegação), e ainda o **KW-Area** (as cores e a sinalética da
   Keller Williams, só cores e formas) e o **APalace** (o aspeto do site da A|Palace). O **Default** (antes «Âmbar») é o primeiro da lista e o tema de partida (desde 27/09: a
-  interface está a ser simplificada nele, e os outros acompanham no fim). Os temas ricos vivem em `frontend/themes/`, cada um com a sua folha de estilo e, quando
+  interface é simplificada nele primeiro, e os outros acompanham; a 28/09 passaram todos para o desenho novo). Os temas ricos vivem em `frontend/themes/`, cada um com a sua folha de estilo e, quando
   traz palavras, instrumentos, seletor, relógio ou sons próprios, o seu registo em `SKINS` no `app.js`.
 
 Tudo o que orienta as respostas edita-se na página, e cada campo diz o que é: **RAG** (factos que o

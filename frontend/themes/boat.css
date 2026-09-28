@@ -144,13 +144,13 @@
 
 /* Switchgear. Buttons: cream push-buttons in a chrome ring. Primary: navy lacquer. Anything that sends an email:
    signal red inside a lifebuoy's red-and-white ring. */
-:root[data-theme="boat"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *){border:1px solid #cdbfa6;border-radius:999px;
+:root[data-theme="boat"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name){border:1px solid #cdbfa6;border-radius:999px;
   color:var(--navy);font-family:var(--ui);font-weight:600;letter-spacing:.2px;background:linear-gradient(180deg,#fffefb,#f1eadc);
   box-shadow:inset 0 1px 0 #fff,0 0 0 2px #fdfbf7,0 0 0 3px #c9ced4,0 3px 8px #1b2a3a1f;
   transition:background .15s,box-shadow .15s,transform .08s,filter .15s}
-:root[data-theme="boat"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *):hover{border-color:#b9a988;
+:root[data-theme="boat"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name):hover{border-color:#b9a988;
   background:linear-gradient(180deg,#fff,#f6f0e4)}
-:root[data-theme="boat"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *):active{transform:translateY(1px);
+:root[data-theme="boat"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name):active{transform:translateY(1px);
   box-shadow:inset 0 2px 5px #1b2a3a2e,0 0 0 2px #fdfbf7,0 0 0 3px #c9ced4}
 :root[data-theme="boat"] :is(button,.button).primary{color:#fff;border-color:#0a1d33;text-shadow:0 1px 1px #0008;
   background:linear-gradient(180deg,#2a649f,#0f2a47);box-shadow:inset 0 1px 0 #ffffff4d,0 0 0 2px #fdfbf7,0 0 0 3.5px #aab1b8,0 6px 14px #0f2a4740}
@@ -163,6 +163,8 @@
   box-shadow:inset 0 1px 0 #ffffff2e,inset 0 -1px 0 #0000004d,0 2px 4px #0f2a4740}
 :root[data-theme="boat"] :is(button,.button).send-action::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;
   background:#48b8ac;box-shadow:0 0 0 1px #0f2a4799,0 0 6px #48b8ac99}
+/* 28/09: a send button with its own icon («Enviar já este por email») keeps only that one */
+:root[data-theme="boat"] :is(button,.button).send-action:has(.button-icon)::before{display:none}
 :root[data-theme="boat"] :is(button,.button).send-action:hover{border-color:#c4ced3;
   background:linear-gradient(180deg,#27607e,#1a4458 55%,#143545)}
 :root[data-theme="boat"] :is(button,.button).send-action:active{transform:translateY(1px);
@@ -301,8 +303,8 @@
     repeating-linear-gradient(0deg,#0000 0 29px,#8fb8d24d 29px 30px),repeating-linear-gradient(90deg,#0000 0 29px,#8fb8d24d 29px 30px),
     linear-gradient(180deg,#eaf5fb,#d3e9f5);
   box-shadow:0 0 0 1.5px #aab1b8,inset 0 0 0 1px #ffffff80,0 8px 18px #1b2a3a2e}
-:root[data-theme="boat"] .chart .bar-requests{fill:#0e5a8a}
-:root[data-theme="boat"] .chart .bar-sent{fill:var(--chart-secondary)}
+/* 28/09: the chart's pair (navy, magenta), validated against the white card; the bars, legend and tooltip use it */
+:root[data-theme="boat"]{--chart-requests:#0e5a8a;--chart-sent:#c2185b}
 :root[data-theme="boat"] .chart .bar-label{fill:#22384f}
 :root[data-theme="boat"] .chart .grid-line{stroke:var(--navy);stroke-opacity:.6}
 
@@ -348,8 +350,8 @@
 @keyframes boat-radar{to{transform:rotate(360deg)}}
 :root[data-theme="boat"] .tab.active::before{transform-origin:0 50%;animation:boat-flutter 2.8s ease-in-out infinite}
 @keyframes boat-flutter{0%,100%{transform:none}35%{transform:skewY(-5deg) scaleX(.94)}70%{transform:skewY(3deg) scaleX(.97)}}
-:root[data-theme="boat"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *):not(:disabled):hover{animation:boat-bob 1.6s ease-in-out infinite}
-:root[data-theme="boat"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *):not(:disabled):active{animation:none}
+:root[data-theme="boat"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name):not(:disabled):hover{animation:boat-bob 1.6s ease-in-out infinite}
+:root[data-theme="boat"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name):not(:disabled):active{animation:none}
 @keyframes boat-bob{0%,100%{transform:none}50%{transform:translateY(-2px)}}
 
 /* The Sons switch (app.js shows it only in a skin with sounds): a small push-button with a bell, navy when on */

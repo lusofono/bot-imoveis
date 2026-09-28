@@ -123,14 +123,14 @@
 
 /* Switchgear. Buttons: black rubberised switches that press in. Primary: the red engine-start button in a
    chrome ring. Anything that sends an email: a guarded switch, with the yellow-and-black hazard frame. */
-:root[data-theme="racing"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *){
+:root[data-theme="racing"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name){
   border:1px solid #040405;border-radius:8px;color:#ecebe8;font-family:var(--din);letter-spacing:.4px;
   background:linear-gradient(180deg,#2e2e33,#17171a 55%,#101012);
   box-shadow:inset 0 1px 0 #ffffff21,inset 0 -2px 0 #00000080,0 2px 0 #000,0 4px 10px #0009;
   transition:background .15s,box-shadow .15s,transform .08s,filter .15s}
-:root[data-theme="racing"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *):hover{
+:root[data-theme="racing"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name):hover{
   background:linear-gradient(180deg,#3a3a40,#1e1e22 55%,#141417);border-color:#040405}
-:root[data-theme="racing"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *):active{
+:root[data-theme="racing"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name):active{
   transform:translateY(2px);box-shadow:inset 0 2px 6px #000c,0 0 0 #000}
 :root[data-theme="racing"] :is(button,.button).primary{padding-inline:22px;border:1px solid #3d0402;border-radius:999px;color:#fff;
   font-weight:700;letter-spacing:.6px;text-shadow:0 1px 1px #0008;
@@ -280,11 +280,10 @@
 :root[data-theme="racing"] .lamp-icon-engine{--icon:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M3 10h2V8h2.5V6.5H11V5h4v1.5h1.5L18.5 9H21v7h-2.5l-2 2H9l-2-2H5v-2H3z'/%3E%3C/svg%3E")}
 :root[data-theme="racing"] .lamp-icon-blocked{--icon:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='6.2'/%3E%3Cpath d='M12 9v3.6M12 15.3h.01'/%3E %3Cpath d='M4.8 6.4a9 9 0 0 0 0 11.2M19.2 6.4a9 9 0 0 1 0 11.2'/%3E%3C/svg%3E")}
 :root[data-theme="racing"] .cluster-chart{border-top-color:#23262c}
-:root[data-theme="racing"] .cluster .chart .bar-requests{fill:var(--gauge-yellow)}
-:root[data-theme="racing"] .cluster .chart .bar-sent{fill:var(--gauge-orange)}
+/* 28/09: the chart's pair, red and blue, in the dashboard and in each property's cluster (yellow and orange could not be
+   told apart by a colour-blind reader), validated against the dark card; bars, legend and tooltip use it */
+:root[data-theme="racing"]{--chart-requests:#e8140c;--chart-sent:#2f86d6}
 :root[data-theme="racing"] .cluster .chart .bar-label{fill:#8b929a}
-:root[data-theme="racing"] .cluster .legend .requests:before{background:var(--gauge-yellow)}
-:root[data-theme="racing"] .cluster .legend .sent:before{background:var(--gauge-orange)}
 :root[data-theme="racing"] .cluster-note{color:#8b929a}
 
 /* Agenda: a leather-bound logbook with cream pages */

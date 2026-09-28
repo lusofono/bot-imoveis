@@ -82,6 +82,8 @@
 
 /* Buttons: the site's pills — the main ones gold with black capitals, the others white with a gray rule */
 :root[data-theme="apalace"] :is(button,.button):not(.tab,.todo-item,.link){border-radius:999px}
+/* 28/09: the chart's pair, a deeper gold and a blue (the grey read as no colour), validated against the white card */
+:root[data-theme="apalace"]{--chart-requests:#9c6d12;--chart-sent:#2b72a8}
 :root[data-theme="apalace"] :is(button.primary,.button.primary){background:var(--ap-gold);border-color:var(--ap-gold);color:#000;
   box-shadow:none;font:600 12px/1.5 var(--ap-display);letter-spacing:.1em;text-transform:uppercase}
 :root[data-theme="apalace"] :is(button.primary,.button.primary):hover{background:var(--ap-gold-hover);border-color:var(--ap-gold-hover)}

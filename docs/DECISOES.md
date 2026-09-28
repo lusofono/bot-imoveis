@@ -3,6 +3,17 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 28/09/2026: o trabalho do Default passa para os outros temas (α.71.0)
+
+**Decisão (pedido do utilizador; a regra de 27/09 era fazer tudo no Default e adaptar os outros no fim).**
+- **As peças com desenho próprio não levam o desenho de botão dos temas ricos** (pills, respostas rápidas, ícones de
+  copiar, nomes da tabela): têm cores com significado, que não podem virar interruptores do tema.
+- **Um par de cores do gráfico por tema, validado com o validador de paletas** contra o cartão de cada tema, em variáveis
+  próprias (`--chart-requests`, `--chart-sent`), usadas pelas barras, pela legenda e pelas caixas; onde o par do tema não
+  passava (cinzento, amarelo com laranja, laranja com vermelho), muda para um que passa.
+- Verificado em código, sem browser (regra do projeto): a especificidade das regras novas contra as dos temas, as
+  variáveis definidas em cada tema e as chavetas de cada folha de estilo. O aspeto confirma-o o utilizador.
+
 ## 28/09/2026: «Ignorar os emails anteriores», o único modo em que os pontos substituem a resposta (α.70.0)
 
 **Decisão (pedido do utilizador).**
