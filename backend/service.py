@@ -18,7 +18,7 @@ from . import APP_NAME
 from .ai import (AFTER_VISIT_RULE, AFTER_VISIT_TEMPLATE, BOOKED_REPLY_RULE, DOCS_REQUEST_RULE, KNOWLEDGE_RULE, VISIT_REMINDER_RULE, VISITED_REPLY_RULE, extract_json, ficha_profile_prompt,
                  fichas_prompt, parse_fichas_batch,
                  listing_text_prompt, parse_listing, agenda_prompt, describe, instructions,
-                 parse_agenda, parse_survey, visit_analysis_prompt)
+                 parse_agenda, parse_survey, visit_analysis_prompt, clean_round, round_text)
 from .configure import STARTER, example_profile
 from .mail import build_digest, build_reply, read_messages
 from .openai_client import MODEL_DEFAULT, MODELS, PRICE_PER_1K_USD, complete, estimate_cost_usd
@@ -65,7 +65,8 @@ CHART_PERIODS = {3: 1, 7: 1, 14: 1, 30: 1, 90: 7}
 VIEW_FIELDS = ("id", "kind", "date", "subject", "customer", "recipient", "blocked", "body_text", "body_truncated",
                "reply_text", "reply_status", "reply_error", "reply_message_id", "visit_window", "visit_slot",
                "visit_status", "reminder", "closing", "consent_suggested", "consent_confirmed", "history", "merged",
-               "merged_ids", "visit_done", "visit_reminder", "survey_reply", "docs_request", "visit_missed", "profile_url")
+               "merged_ids", "visit_done", "visit_reminder", "survey_reply", "docs_request", "visit_missed", "profile_url",
+               "round")
 # Page field → (profile prompt, key), the same prompts the terminal setup asks for.
 PROMPT_FIELDS = {"general": ("general", "text"), "first": ("first_interaction", "text"),
                  "first_template": ("first_interaction", "reply_template"), "second": ("second_interaction", "text"),
@@ -1192,7 +1193,11 @@ class MailService:
 
     def pipeline(self, ref, data, voice=None, moment=None):
         """27/09: each customer of a property in one column, the furthest they got — for the table above the emails.
-        contacto: not answered yet; i1 to i4: the interaction reached (i4: more than three); marcada, visitou,
+        contacto: not answered yet; qualificacao: answered, still gathering their file (no visit proposed yet);
+        pronto: their file is complete and no visit was proposed yet (the ones for the next round); proposta: a visit
+        proposed (by a round or in the conversation), no time booked yet; por_confirmar: they accepted or asked for a
+        time we have not confirmed yet (29/09: by phase, not by how many emails we sent — the 1.ª to «Mais de 3»
+        columns said little); marcada, visitou,
         shortlist and desistiu (declined the visit); and under the table, sem_resposta (our last email left unanswered
         NO_REPLY_DAYS or more, whatever the step, or inactive), greylist and blacklist. waiting: a message of theirs is
         in the queue for us to answer. dots, as the owner set them: orange, that message has waited longer than
@@ -1236,7 +1241,11 @@ class MailService:
             elif email not in waiting and stage and (conversation.get("inactive") or silent):
                 column = "sem_resposta"
             else:
-                column = f"i{min(stage, 4)}" if stage else "contacto"
+                complete = ficha_summary(conversation.get("ficha") or (new.get(email) or {}).get("ficha"))["complete"]
+                column = ("contacto" if not stage
+                          else "por_confirmar" if conversation.get("visit_accepted") or conversation.get("visit_offered")
+                          else "proposta" if was_proposed(conversation, email, proposed)
+                          else "pronto" if complete else "qualificacao")
             item = new.get(email) or {}
             dots = []
             if column not in ("desistiu", "greylist", "blacklist"):
@@ -2071,12 +2080,17 @@ class MailService:
                 results.append({**result, "fuel": self.api_fuel(ref)})
             return {"properties": results}
 
-    def propose_visits(self, property_ref, day, start, end, emails):
+    def propose_visits(self, property_ref, day, start, end, emails, note="", common=False):
         """The owner's visit window, and one draft per chosen customer, in the customer's own conversation.
 
         The drafts are written by the assistant like any other (3rd interaction) and sent after the preview.
-        Customers with an email still to answer, or a visit already booked, never get a second email."""
+        Customers with an email still to answer, or a visit already booked, never get a second email.
+        note: what the owner wants this round's emails to say (29/09). common: one text for everyone, reviewed and
+        sent in the round's own panel, never card by card in Comunicações (a card can still be taken there)."""
         window = check_window(day, start, end)
+        note = str(note or "").strip()[:2000]
+        if note:
+            window["note"] = note
         if window["day"] < date.today().isoformat():
             raise ValueError("Esse dia já passou.")
         chosen = list(dict.fromkeys(str(email or "").strip().casefold() for email in emails or []))
@@ -2127,15 +2141,85 @@ class MailService:
                     "recipient": {"name": name, "email": email},
                     "customer": {"name": name or None, "email": email, "phone": None, "message": None},
                     "blocked": None, "warnings": [], "visit_window": dict(window),
+                    **({"round": window["id"]} if common else {}),
                     # A snapshot of the conversation so far: the assistant proposes the visit with the
                     # same context it would have for any other reply, not as a message out of nowhere.
                     "history": list(conversation.get("history") or []),
                     "reply_text": "", "send_reply": False, "reply_status": "pending"})
                 created += 1
+            if note:
+                existing_window["note"] = note
             save_visits(self.folder, ref, agenda)
             self.save(data, ref)
-            self.log("visits_proposed", reference=ref, created=created)
-            return {"property_ref": ref, "created": created, "window": window}
+            self.log("visits_proposed", reference=ref, created=created, common=bool(common))
+            return {"property_ref": ref, "created": created, "window": window, "common": bool(common)}
+
+    @staticmethod
+    def round_items(data, window_id=None):
+        """A round's proposals still to send with the common text; without window_id, the latest round's."""
+        items = [item for item in data["emails"] if item.get("kind") == "visit_proposal" and item.get("round")]
+        if window_id is None and items:
+            window_id = max(items, key=lambda item: item.get("date") or "")["round"]
+        return window_id, [item for item in items if item["round"] == window_id]
+
+    def common_round(self, property_ref=None):
+        """The round being written with one text for all (29/09): its window, texts and the proposals still to send."""
+        with locked(self.folder):
+            ref = self.pick(self.profiles(), property_ref)
+            if not ref:
+                raise ValueError("As visitas só existem com imóveis.")
+            return self.round_view(ref, self.load(ref))
+
+    def round_view(self, ref, data):
+        window_id, items = self.round_items(data)
+        if not items:
+            return {"property_ref": ref, "window": None, "items": []}
+        window = next((w for w in load_visits(self.folder, ref)["windows"] if w["id"] == window_id), None) \
+            or items[0]["visit_window"]
+        common = window.get("common") or {}
+        return {"property_ref": ref, "window_id": window_id, "revision": data["revision"],
+                "window": {key: window.get(key) for key in ("day", "start", "end", "note")},
+                "texts": common.get("texts") or {}, "summaries": common.get("summaries") or {},
+                "items": [{"id": item["id"], "name": (item.get("recipient") or {}).get("name") or "",
+                           "email": (item.get("recipient") or {}).get("email") or "",
+                           **((common.get("clients") or {}).get(item["id"]) or {}),
+                           "reply_status": item.get("reply_status"), "reply_error": item.get("reply_error"),
+                           "has_draft": bool(str(item.get("reply_text") or "").strip())} for item in items]}
+
+    def save_round(self, property_ref, window_id, common):
+        """The round's common texts (from the assistant or edited in the page) become every proposal's draft."""
+        with locked(self.folder):
+            ref = self.pick(self.profiles(), property_ref)
+            data = self.load(ref)
+            window_id, items = self.round_items(data, window_id)
+            if not items:
+                raise ValueError("Esta ronda já não tem propostas por enviar.")
+            if any(item.get("reply_status") in ("sending", "uncertain") for item in items):
+                raise ValueError("Verifica primeiro no Gmail o envio com resultado incerto.")
+            common = clean_round(common, [item["id"] for item in items])
+            for item in items:
+                item.update(reply_text=round_text(common, item["id"]), send_reply=False, reply_status="draft")
+            data.pop("send_preview", None)
+            agenda = load_visits(self.folder, ref)
+            window = next((w for w in agenda["windows"] if w["id"] == window_id), None)
+            if window is not None:
+                window["common"] = common
+                save_visits(self.folder, ref, agenda)
+            self.save(data, ref)
+            self.log("round_texts_saved", reference=ref, count=len(items))
+            return self.round_view(ref, data)
+
+    def individual_round_item(self, property_ref, key):
+        """One proposal of a common round goes to Comunicações, to be written and sent on its own (its draft kept)."""
+        with locked(self.folder):
+            ref = self.pick(self.profiles(), property_ref)
+            data = self.load(ref)
+            item = next((item for item in data["emails"] if item["id"] == key and item.get("round")), None)
+            if item is None:
+                raise ValueError("Esta proposta já não está na ronda.")
+            item.pop("round")
+            self.save(data, ref)
+            return self.round_view(ref, data)
 
     def close_visits(self, property_ref=None):
         """One closing draft per customer of this property (pending and already answered), then closes it.

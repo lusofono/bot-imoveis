@@ -3,6 +3,19 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 29/09/2026: a ronda de visitas com um só texto para todos (α.72.0)
+
+**Decisão (pedido do utilizador: a ronda criou 33 cartões vazios que não se viam e não saíam).**
+- **Por defeito, a ronda é um só texto**, gerado numa chamada à IA, revisto e enviado no painel da ronda; cada cliente
+  recebe-o na sua conversa (o mesmo envio, a mesma pré-visualização com token e a mesma confirmação de sempre). As
+  propostas da ronda ficam fora dos cartões das Comunicações, que só dizem quantas há e onde estão.
+- **Idiomas da ronda:** português (pt-PT, também com brasileiros) para quem escreve em português, inglês para todos os
+  outros; o inglês é o texto completo e oficial, e quem escreve noutra língua recebe a seguir um resumo curto nela.
+  O texto não leva saudação: a de cada cliente vai à parte, para o texto ser mesmo igual para todos.
+- **Individualizar** é a exceção: a ronda inteira (como era até aqui) ou um cliente de cada vez.
+- **O conhecimento da ronda fica na janela da ronda** (`visitas.json`), não no conhecimento do imóvel: vale só para
+  esses emails.
+
 ## 28/09/2026: o trabalho do Default passa para os outros temas (α.71.0)
 
 **Decisão (pedido do utilizador; a regra de 27/09 era fazer tudo no Default e adaptar os outros no fim).**

@@ -782,6 +782,57 @@ const VISIT_STATES = {nao_quer: 'não quer visitar', outra_data: 'só pode noutr
 function dayLabel(day) {
   return new Date(day + 'T12:00:00').toLocaleDateString('pt-PT', {weekday: 'long', day: '2-digit', month: '2-digit'});
 }
+// 29/09: the day, the hour and the minutes of a visit change with arrows, without typing (typing still works); the
+// day always shows its weekday beside it.
+function stepperArrow(label, title, action) {
+  return el('button', {type: 'button', class: 'stepper-arrow', title, 'aria-label': title, onclick: action}, label);
+}
+function shiftTime(input, minutes) {
+  const [hours, mins] = (input.value || '00:00').split(':').map(Number);
+  const total = ((hours * 60 + mins + minutes) % 1440 + 1440) % 1440;
+  input.value = `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+  input.dispatchEvent(new Event('change', {bubbles: true}));
+}
+function timeStepper(input, slot) {
+  const pair = (unit, step, what) => el('div', {class: 'stepper-pair'},
+    stepperArrow('▲', `Mais ${what}`, () => shiftTime(input, step)), el('span', {class: 'stepper-unit'}, unit),
+    stepperArrow('▼', `Menos ${what}`, () => shiftTime(input, -step)));
+  // 29/09: both pairs on the right of the field, hours then minutes, in the order they are read
+  return el('div', {class: 'stepper stepper-time'}, input, pair('h', 60, 'uma hora'), pair('min', slot, `${slot} minutos`));
+}
+// The end moves with the start, keeping the interval chosen (also after the end itself was changed).
+function linkTimes(start, end) {
+  const minutes = value => { const [h, m] = (value || '00:00').split(':').map(Number); return h * 60 + m; };
+  let last = start.value;
+  start.addEventListener('change', () => {
+    const delta = minutes(start.value) - minutes(last);
+    last = start.value;
+    if (delta && start.value) shiftTime(end, delta);
+  });
+}
+function dateStepper(input) {
+  const today = new Date().toLocaleDateString('sv-SE');
+  input.min = today;
+  const weekday = el('span', {class: 'stepper-weekday'});
+  const show = () => {
+    // 29/09: on the same line, in three letters (Ter)
+    weekday.textContent = input.value ? ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][new Date(input.value + 'T12:00:00').getDay()]
+      : '';
+  };
+  const shift = days => {
+    const base = new Date((input.value || today) + 'T12:00:00');
+    if (input.value) base.setDate(base.getDate() + days);
+    const next = base.toLocaleDateString('sv-SE');
+    input.value = next < today ? today : next;
+    input.dispatchEvent(new Event('change', {bubbles: true}));
+  };
+  if (!input.value) input.value = today;
+  // the browser may put back a date typed before a reload without an event: shown again once it settled
+  for (const type of ['input', 'change', 'focus', 'blur']) input.addEventListener(type, show);
+  show(); setTimeout(show, 0); window.addEventListener('pageshow', show);
+  return el('div', {class: 'stepper stepper-date'}, stepperArrow('◀', 'Dia anterior', () => shift(-1)),
+    el('div', {class: 'stepper-field'}, input, weekday), stepperArrow('▶', 'Dia seguinte', () => shift(1)));
+}
 function slotLabel(value) { const [day, time] = String(value).split(' '); return `${dayLabel(day)}, ${time}`; }
 
 function when(value) { return value ? new Date(value).toLocaleString('pt-PT', {dateStyle: 'short', timeStyle: 'short'}) : ''; }
@@ -809,9 +860,39 @@ function keepSteps(redraw) {
   done.forEach(step => markStep(step, true));
 }
 
+// 29/09: the cards in the order chosen in «Ordenar»: by the latest interaction (read or sent), newest or oldest first,
+// or by the customer's step in the table above (first or last steps first, the newest first within a step).
+const CARD_SORTS = ['recent', 'oldest', 'early', 'late'];
+let cardSortChoice = null;  // this page view's choice, also when the browser keeps nothing
+function cardSort() {
+  if (cardSortChoice) return cardSortChoice;
+  try { const value = localStorage.getItem('aria-card-sort'); return CARD_SORTS.includes(value) ? value : 'recent'; }
+  catch { return 'recent'; }
+}
+function sortCards(emails, queue) {
+  const order = cardSort(), steps = PIPELINE.map(([key]) => key);
+  const stepOf = Object.fromEntries((queue?.pipeline || []).map(customer => [customer.email, steps.indexOf(customer.column)]));
+  const step = email => {
+    const found = stepOf[((email.recipient || {}).email || (email.customer || {}).email || '').toLowerCase()];
+    return found === undefined || found < 0 ? 0 : found;
+  };
+  // a tie (the same last email of ours to several customers, e.g. a round) goes by the date of the email itself
+  const sign = order === 'oldest' ? 1 : -1;
+  return emails.map((email, index) => ({email, index, at: lastActivity(email), own: Date.parse(email.date || '') || 0,
+    step: step(email)}))
+    .sort((a, b) => (order === 'early' ? a.step - b.step : order === 'late' ? b.step - a.step : 0)
+      || sign * (a.at - b.at) || sign * (a.own - b.own) || a.index - b.index)
+    .map(item => item.email);
+}
+function lastActivity(email) {
+  const moments = [email.date, ...(email.merged || []).map(part => part.date),
+    ...(email.conversation || email.history || []).map(turn => turn.ts || turn.at)];
+  return Math.max(0, ...moments.map(value => Date.parse(value || '') || 0));
+}
+
 function renderState() {
   $('account').textContent = state.account || '';
-  $('nav-count').textContent = state.properties.reduce((n, q) => n + q.emails.length, 0);
+  $('nav-count').textContent = state.properties.reduce((n, q) => n + q.emails.filter(email => !email.round).length, 0);
   $('error').hidden = !state.error; $('error').textContent = state.error || '';
   const select = $('queue'), chosen = select.value;
   // Only ATIVO properties; an INATIVO one still shows while it has emails waiting, so none gets lost.
@@ -823,7 +904,12 @@ function renderState() {
   // 27/09: no «Dias para trás» — each read goes on from the last one; a new property's first one from the day it chose.
   $('last-read').textContent = queue?.last_read_at ? `Última leitura: ${when(queue.last_read_at)}. A próxima traz o que chegou desde então.`
     : queue?.read_from ? `Ainda por ler: a primeira leitura traz os emails desde ${dayLabel(queue.read_from)}.` : '';
-  const emails = queue?.emails || [];
+  // 29/09: a round with one text for all is reviewed and sent in its own panel (Agenda), not card by card here.
+  const emails = sortCards((queue?.emails || []).filter(email => !email.round), queue);
+  const inRound = (queue?.emails || []).length - emails.length;
+  $('round-notice').hidden = !inRound;
+  $('round-notice').textContent = inRound ? `${inRound} proposta(s) de visita da ronda com texto comum: revê-as e envia-as `
+    + 'no painel «Ronda de visitas», na Agenda.' : '';
   $('emails').replaceChildren(...(emails.length ? emails.map(card)
     : [el('div', {class: 'empty-state'}, el('strong', {}, state.error ? 'Configuração pendente' : 'Tudo em dia.'), state.error ? 'Verifica o aviso acima para continuar.' : 'Não há emails em tratamento. Faz uma nova leitura quando quiseres.')]));
   const active = queue?.active || [];
@@ -874,15 +960,16 @@ setInterval(() => { if (state.properties) updateSteps(); }, 30000);
 // needs doing, as set in Voz e estilo, each on its own hover; a name with a card below scrolls to it.
 const PIPELINE = [
   ['contacto', '1.º contacto', 'Pediram informação e ainda não lhes respondemos.'],
-  ['i1', '1.ª', '1.ª interação: já lhes respondemos uma vez.'],
-  ['i2', '2.ª', '2.ª interação.'],
-  ['i3', '3.ª', '3.ª interação.'],
-  ['i4', 'Mais de 3', 'Mais de três interações.'],
+  ['qualificacao', 'Em qualificação', 'Já lhes respondemos e ainda estamos a recolher os dados da ficha; sem proposta de visita.'],
+  ['pronto', 'Pronto para visita', 'Ficha completa e ainda sem proposta de visita: são os clientes a convidar na próxima ronda.'],
+  ['proposta', 'Proposta de visita', 'Já receberam uma proposta de visita (numa ronda ou na conversa) e ainda não escolheram hora.'],
+  ['por_confirmar', 'Hora por confirmar', 'Aceitaram ou pediram uma hora que ainda não confirmámos na agenda.'],
   ['marcada', 'Visita marcada', 'Têm visita na agenda.'],
   ['visitou', 'Visitou', 'Já visitaram o imóvel.'],
   ['shortlist', 'Short list', 'Na short list de Visitas (com os escolhidos e os suplentes).'],
   ['desistiu', 'Desistiu', 'Recusaram a visita.']];
 const PIPELINE_ASIDE = new Set(['desistiu']);
+const PIPELINE_SHOWN = 10;  // names shown per column; the rest counted in one line
 const PIPELINE_BELOW = [
   ['sem_resposta', 'Sem resposta', 'o nosso último email está sem resposta há 3 dias ou mais, seja qual for a interação'],
   ['greylist', 'Greylist', 'ignorados por agora: disseram que não têm interesse; se voltarem a escrever, entram com um aviso'],
@@ -903,8 +990,14 @@ function renderPipeline(queue) {
   const customers = queue?.pipeline || [], box = $('pipeline');
   box.hidden = !customers.length;
   if (!customers.length) { box.replaceChildren(); return; }
-  const columns = PIPELINE.map(([key]) => customers.filter(customer => customer.column === key));
-  const rows = Math.max(0, ...columns.map(list => list.length));
+  const oldest = cardSort() === 'oldest';  // 29/09: the names in each column follow «Ordenar» (newest or oldest first)
+  const columns = PIPELINE.map(([key]) => customers.filter(customer => customer.column === key)
+    .sort((a, b) => (oldest ? 1 : -1) * String(a.last_at || '').localeCompare(String(b.last_at || ''))));
+  // 29/09: at most PIPELINE_SHOWN names a column (the most recent); past that, one more line with «+ N casos»
+  const rows = Math.min(PIPELINE_SHOWN + 1, Math.max(0, ...columns.map(list => list.length)));
+  const cell = (list, row) => row < PIPELINE_SHOWN || list.length === PIPELINE_SHOWN + 1 ? list[row] && name(list[row])
+    : row === PIPELINE_SHOWN && list.length > PIPELINE_SHOWN + 1
+      && el('span', {class: 'pipeline-more muted small'}, `+ ${list.length - PIPELINE_SHOWN} casos`);
   const name = customer => {
     const target = document.querySelector(`[data-customer="${CSS.escape(customer.email)}"]`);
     const title = [customer.name || customer.email, customer.last_at && 'último contacto ' + when(customer.last_at),
@@ -931,7 +1024,7 @@ function renderPipeline(queue) {
     el('thead', {}, el('tr', {}, PIPELINE.map(([key, label, hint], index) => el('th', {scope: 'col', title: hint,
       class: PIPELINE_ASIDE.has(key) ? 'aside' : ''}, label, el('span', {class: 'pipeline-count'}, String(columns[index].length)))))),
     el('tbody', {}, Array.from({length: rows}, (_, row) => el('tr', {}, columns.map((list, index) =>
-      el('td', {class: PIPELINE_ASIDE.has(PIPELINE[index][0]) ? 'aside' : ''}, list[row] && name(list[row])))))))),
+      el('td', {class: PIPELINE_ASIDE.has(PIPELINE[index][0]) ? 'aside' : ''}, cell(list, row)))))))),
     ...below.filter(Boolean));
 }
 
@@ -1039,7 +1132,8 @@ const BUTTON_ICONS = {
   mail: ['M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1z', 'M3.5 7 12 13l8.5-6'],
   chat: ['M12 4a8 8 0 1 1-3.7 15.1L4 20l1-3.9A8 8 0 0 1 12 4z', 'M9 10.5h6M9 13.5h4'],
   copy: ['M9 8h9a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z', 'M5 16V5a1 1 0 0 1 1-1h9'],
-  phone: ['M8 3h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z', 'M11 18h2']};
+  phone: ['M8 3h8a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z', 'M11 18h2'],
+  save: ['M5 4h11l3 3v12a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z', 'M8 4v5h7V4', 'M8 20v-6h8v6']};
 function buttonIcon(name) {
   return svg('svg', {viewBox: '0 0 24 24', width: 16, height: 16, class: 'button-icon', 'aria-hidden': 'true', fill: 'none',
     stroke: 'currentColor', 'stroke-width': 1.8, 'stroke-linecap': 'round', 'stroke-linejoin': 'round'},
@@ -1072,22 +1166,26 @@ function card(email) {
   const profileUrl = /^https:\/\//.test(email.profile_url || '') ? email.profile_url : '';
   const ignoreEmail = customer.email || (email.recipient || {}).email;
   const ignoreTarget = ignoreEmail && {email: ignoreEmail, name: customer.name};
-  // 27/09: «Guardar rascunho» sits under the draft and shows only while the text differs from what api/drafts last
-  // saved; «Enviar já este por email» and «Enviar por WhatsApp» only once there is a text to send (written, pasted or
-  // generated).
-  const saveButton = el('button', {class: 'primary'}, 'Guardar rascunho');
-  const saveLine = el('div', {class: 'save-line draft-save'}, saveButton, el('span', {class: 'muted small save-status warn'}, 'Por guardar'));
+  // 29/09: no «Guardar rascunho» button nor «Por guardar»: a small floppy in the draft's corner, beside its copy icon,
+  // for when the owner wants to keep a text without sending it (lit while the box differs from what was saved).
+  // «Enviar já este por email» saves what is in the box itself; «Enviar por WhatsApp» and «SMS» only show once there is
+  // a text to send (written, pasted or generated).
+  const saveIcon = el('button', {type: 'button', class: 'copy-icon save-icon', title: 'Guardar rascunho',
+    'aria-label': 'Guardar rascunho', onclick: event => run(async () => {
+      state = await call('api/drafts', {property_ref: queueRef(), replies: [{id: email.id, reply_text: draft.value}]});
+      renderState(); toast('Rascunho guardado.');
+    }, event.currentTarget)}, buttonIcon('save'));
+  const draftCopy = el('button', {type: 'button', class: 'copy-icon', title: 'Copiar o rascunho', 'aria-label': 'Copiar o rascunho',
+    onclick: async () => {
+      try { await navigator.clipboard.writeText(draft.value); toast('Copiado.'); }
+      catch { toast('Não consegui copiar sozinho: seleciona o texto e copia-o com ⌘C.', 'warn'); }
+    }}, buttonIcon('copy'));
   const refreshDraftActions = () => {
-    // 27/09: only a change of ours shows it — compared without line-ending or trailing-space differences, which the
-    // text box itself may introduce
-    saveLine.hidden = sameText(draft.value, saved);
+    // compared without line-ending or trailing-space differences, which the text box itself may introduce
+    saveIcon.classList.toggle('unsaved', !sameText(draft.value, saved));
     for (const button of [sendOne, whatsapp, sms]) if (button) button.hidden = !draft.value.trim();
   };
   draft.addEventListener('input', refreshDraftActions);
-  saveButton.addEventListener('click', event => run(async () => {
-    state = await call('api/drafts', {property_ref: queueRef(), replies: [{id: email.id, reply_text: draft.value}]});
-    renderState(); toast('Rascunho guardado.');
-  }, event.currentTarget));
   // Just this one, as it is in the box now: the same save → preview → send as the batch in step 04 (the
   // preview token is tied to this exact text), with the recipient and subject confirmed before it goes.
   const sendOne = !email.blocked && el('button', {class: 'send-action', onclick: event => run(async () => {
@@ -1228,7 +1326,7 @@ function card(email) {
     // An email the program prepared has no new message of the customer's: a line says what it is, over the conversation.
     programNote(email) && el('blockquote', {}, programNote(email)),
     historyBlock(email) || (!programNote(email) && el('blockquote', {}, customer.message || email.body_text || '')),
-    draft, saveLine);
+    el('div', {class: 'draft-box'}, draft, el('div', {class: 'draft-tools'}, draftCopy, saveIcon)));
   // 27/09: in the order of the work — a fact for the knowledge (open), the reply from the API, then sending it.
   const actions = el('aside', {class: 'card email-actions', 'aria-label': 'O que fazer com este email'},
     email.consent_suggested && el('button', {class: 'primary', onclick: event => run(async () => {
@@ -1865,31 +1963,152 @@ function renderVisitsRound() {
   const day = el('input', {type: 'date', 'aria-label': 'Dia das visitas'});
   const start = el('input', {type: 'time', value: '17:00', step: slot * 60, 'aria-label': 'Hora de início'});
   const end = el('input', {type: 'time', value: '19:00', step: slot * 60, 'aria-label': 'Hora de fim'});
+  linkTimes(start, end);
+  // 29/09: what this round's emails should say, and one text for everyone unless the owner individualizes
+  const note = el('textarea', {rows: 3, 'aria-label': 'Conhecimento desta ronda',
+    placeholder: 'Conhecimento desta ronda (opcional): o que estes emails devem dizer — por exemplo, que o inquilino '
+      + 'ainda lá está, onde estacionar ou quanto dura a visita.'});
+  const individual = el('input', {type: 'checkbox'});
+  // 29/09: nothing is sent at this click. With one text for all, it prepares the round and writes the draft at once
+  // (via API), shown at the end of this panel to review; only «Enviar a todos», there, sends.
+  // 29/09: 1 prepares the draft, 2 («Enviar a todos», beside it once there is a draft) sends
+  const stepNum = number => el('span', {class: 'step-num', 'aria-hidden': 'true'}, number);
+  const startLabel = () => individual.checked ? ['Iniciar ronda'] : [stepNum('1'), 'Preparar o texto da ronda'];
+  const roundActions = el('span', {class: 'round-actions'});
+  const startButton = el('button', {class: 'primary', onclick: event => run(async () => {
+    if (!day.value) throw new Error('Escolhe o dia das visitas.');
+    const ref = propertySelect.value, common = !individual.checked;
+    const data = await call('api/visits/candidates', {property_ref: ref});
+    const emails = data.customers.filter(customer => customer.state === 'ok').map(customer => customer.email);
+    if (!emails.length) throw new Error('Não há clientes elegíveis agora (por responder, já convidados ou recusaram).');
+    if (!common && !confirm(`Vais criar ${emails.length} proposta(s) de visita, uma por cliente de ${ref}, nas Comunicações: `
+        + `${dayLabel(day.value)}, das ${start.value} às ${end.value}. Nada é enviado antes de as reveres. Continuar?`)) return;
+    const result = await call('api/visits/propose', {property_ref: ref, day: day.value, start: start.value, end: end.value,
+      emails, note: note.value, common});
+    state = result.state; settings = result.settings;
+    let drafted = false;
+    if (common && (apiOnly() || settings.openai_configured)) {
+      try {
+        const generated = await call('api/visits/round-generate', {property_ref: ref});
+        state = generated.state; applyFuel(generated.fuel, ref); drafted = true;
+      } catch (error) { toast(`A ronda ficou preparada, mas o texto não foi gerado: ${error.message}`, 'warn'); }
+    }
+    roundScroll = common;
+    renderState(); renderSettings();
+    if (!common) toast(`${result.created} proposta(s) de visita na fila das Comunicações: ${apiOnly() ? 'gera-as com «Gerar respostas»' : 'prepara-as no ChatGPT ou via API'}, como as outras.`);
+    else if (drafted) toast(`Rascunho da ronda pronto (${result.created} cliente(s)), logo abaixo: revê-o e depois «2 Enviar a todos». Nada foi enviado.`);
+  }, event.currentTarget)}, startLabel());
+  individual.addEventListener('change', () => { startButton.replaceChildren(...startLabel()); });
   const summaryBox = el('div', {class: 'round-summary'});
+  const commonBox = el('div', {class: 'round-common'});
   const loadSummary = () => run(async () => {
     const data = await call('api/visits/round-summary', {property_ref: propertySelect.value});
     summaryBox.replaceChildren(...roundSummaryContent(data));
+    renderRoundCommon(commonBox, await call('api/visits/round', {property_ref: propertySelect.value}), loadSummary, roundActions);
   });
   propertySelect.addEventListener('change', () => { roundPanelProperty = propertySelect.value; loadSummary(); });
   card(
     el('p', {class: 'step'},
-      'Um email a cada cliente ativo deste imóvel, a propor o dia e o intervalo e a perguntar a hora que '
-      + 'lhe dá mais jeito dentro dele — fica na fila das Comunicações, por rever antes de enviar, como qualquer outra.'),
-    el('div', {class: 'row'}, propertySelect, day, start, end),
-    el('div', {class: 'actions'}, el('button', {class: 'primary', onclick: event => run(async () => {
-      if (!day.value) throw new Error('Escolhe o dia das visitas.');
-      const ref = propertySelect.value;
-      const data = await call('api/visits/candidates', {property_ref: ref});
-      const emails = data.customers.filter(customer => customer.state === 'ok').map(customer => customer.email);
-      if (!emails.length) throw new Error('Não há clientes elegíveis agora (por responder, já convidados ou recusaram).');
-      if (!confirm(`Vais avisar ${emails.length} cliente(s) de ${ref}: ${dayLabel(day.value)}, das ${start.value} `
-          + `às ${end.value}. Continuar?`)) return;
-      const result = await call('api/visits/propose', {property_ref: ref, day: day.value, start: start.value, end: end.value, emails});
-      state = result.state; settings = result.settings; renderState(); renderSettings();
-      toast(`${result.created} proposta(s) de visita na fila das Comunicações: ${apiOnly() ? 'gera-as com «Gerar respostas»' : 'prepara-as no ChatGPT ou via API'}, como as outras.`);
-    }, event.currentTarget)}, 'Iniciar ronda')),
-    summaryBox);
+      'Um email a cada cliente ativo deste imóvel, a propor o dia e o intervalo e a perguntar a hora que lhe dá mais '
+      + 'jeito dentro dele. O mesmo texto para todos (em português para quem escreve em português, em inglês para os '
+      + 'outros), que revês e envias aqui mesmo; individualizado, fica um por cliente na fila das Comunicações.'),
+    el('div', {class: 'row'}, propertySelect, dateStepper(day), timeStepper(start, slot), timeStepper(end, slot)),
+    note,
+    el('label', {class: 'check'}, individual, ' Individualizar: uma resposta por cliente, nas Comunicações'),
+    el('div', {class: 'actions'}, startButton, roundActions),
+    commonBox, summaryBox);
   loadSummary();
+}
+
+// 29/09: the round with one text for everyone: generate it (API, or copy/paste), review the Portuguese and the English
+// text, each customer's greeting and the short summaries in other languages, then send them all — each customer gets
+// it in their own conversation. «Individualizar» takes one customer to Comunicações, to be answered on their own.
+const ROUND_LANGS = {pt: 'português', en: 'inglês'};
+let roundScroll = false;  // after «Preparar o texto da ronda»: show the draft, right under the buttons
+const stepNum2 = () => el('span', {class: 'step-num', 'aria-hidden': 'true'}, '2');
+function renderRoundCommon(box, data, reload, actions) {
+  actions.replaceChildren();
+  if (!data.items?.length) { box.replaceChildren(); roundScroll = false; return; }
+  const ref = data.property_ref, items = data.items, hasTexts = Object.keys(data.texts || {}).length > 0;
+  const redraw = next => { state = next.state || state; renderState(); renderRoundCommon(box, next, reload, actions); };
+  const count = lang => items.filter(item => item.language === lang).length;
+  const texts = Object.fromEntries(Object.keys(ROUND_LANGS).filter(lang => data.texts?.[lang]).map(lang =>
+    [lang, el('textarea', {rows: 12, 'aria-label': `Texto em ${ROUND_LANGS[lang]}`}, data.texts[lang])]));
+  const summaries = Object.fromEntries(Object.entries(data.summaries || {}).map(([lang, text]) =>
+    [lang, el('textarea', {rows: 4, 'aria-label': `Resumo em ${lang}`}, text)]));
+  const greetings = Object.fromEntries(items.map(item =>
+    [item.id, el('input', {type: 'text', value: item.greeting || '', 'aria-label': `Saudação de ${item.name || item.email}`})]));
+  const common = () => ({texts: Object.fromEntries(Object.entries(texts).map(([lang, box]) => [lang, box.value])),
+    summaries: Object.fromEntries(Object.entries(summaries).map(([lang, box]) => [lang, box.value])),
+    clients: Object.fromEntries(items.map(item => [item.id, {language: item.language, lang: item.lang, greeting: greetings[item.id].value}]))});
+  const save = () => call('api/visits/round-save', {property_ref: ref, window_id: data.window_id, common: common()});
+  const promptText = el('pre', {}, '');
+  const promptBox = el('details', {class: 'copy-only'}, el('summary', {class: 'muted small'}, 'Prompt da ronda'), promptText);
+  const pasted = el('textarea', {class: 'copy-only', rows: 4, placeholder: 'Cola aqui a resposta do ChatGPT (o bloco JSON).',
+    'aria-label': 'Resposta colada'});
+  const span = data.window || {};
+  box.replaceChildren(el('div', {class: 'round-common-body'},
+    el('h3', {}, 'Ronda com texto comum'),
+    el('p', {class: 'muted small'}, `${dayLabel(span.day)}, das ${span.start} às ${span.end} · ${items.length} cliente(s) por enviar`),
+    span.note && el('p', {class: 'step'}, el('strong', {}, 'Conhecimento desta ronda: '), span.note),
+    el('div', {class: 'actions'},
+      el('button', {class: (hasTexts ? '' : 'primary ') + 'needs-fuel', 'data-ref': ref,
+        title: settings.openai_configured ? '' : 'Sem chave OpenAI configurada: o clique explica como.',
+        onclick: event => run(async () => {
+          if (hasTexts && !confirm('O texto é escrito de novo pela IA e perdes o que alteraste. Continuar?')) return;
+          const result = await call('api/visits/round-generate', {property_ref: ref});
+          applyFuel(result.fuel, ref); redraw(result);
+          toast('Texto comum pronto: revê-o abaixo antes de enviar.');
+        }, event.currentTarget)}, hasTexts ? 'Gerar de novo' : (apiOnly() ? 'Gerar o texto comum' : 'Gerar o texto comum via API')),
+      el('button', {class: 'copy-only', onclick: event => run(async () => {
+        promptText.textContent = (await call('api/visits/round-prompt', {property_ref: ref})).prompt;
+        await copyText(promptText.textContent, 'Prompt da ronda copiado: cola-o no ChatGPT e traz a resposta para a caixa abaixo.', promptBox);
+      }, event.currentTarget)}, 'Copiar o prompt'),
+      el('button', {class: 'copy-only', onclick: event => run(async () => {
+        if (!pasted.value.trim()) throw new Error('Cola primeiro a resposta do ChatGPT.');
+        redraw(await call('api/visits/round-paste', {property_ref: ref, text: pasted.value}));
+        toast('Texto comum pronto: revê-o abaixo antes de enviar.');
+      }, event.currentTarget)}, 'Usar a resposta colada')),
+    promptBox, pasted,
+    Object.entries(texts).map(([lang, textarea]) => el('label', {class: 'round-text'},
+      el('span', {class: 'muted small'}, `Texto em ${ROUND_LANGS[lang]} (${count(lang)} cliente(s))`
+        + (lang === 'en' ? ' — o completo e oficial para quem não escreve em português' : '')), textarea)),
+    Object.entries(summaries).map(([lang, textarea]) => el('label', {class: 'round-text'},
+      el('span', {class: 'muted small'}, `Resumo em «${lang}», a seguir ao texto em inglês (`
+        + `${items.filter(item => item.lang === lang).length} cliente(s))`), textarea)),
+    el('div', {class: 'client-list'}, items.map(item => el('div', {class: 'client-row'},
+      el('span', {}, item.name || item.email),
+      hasTexts && greetings[item.id],
+      el('span', {class: 'tag' + (item.reply_status === 'error' ? ' warn' : '')},
+        item.reply_status === 'error' ? `não saiu: ${item.reply_error || 'erro'}`
+          : item.language ? (ROUND_LANGS[item.language] + (item.lang && item.lang !== item.language ? ` · escreve em ${item.lang}` : ''))
+          : 'sem texto'),
+      el('button', {class: 'link', title: 'Tira-o da ronda: fica nas Comunicações, para escreveres e enviares só a ele.',
+        onclick: event => run(async () => {
+          redraw(await call('api/visits/round-individual', {property_ref: ref, id: item.id}));
+          toast(`${item.name || item.email} passou para as Comunicações.`);
+        }, event.currentTarget)}, 'Individualizar'))))));
+  if (hasTexts) actions.replaceChildren(
+      el('button', {onclick: event => run(async () => {
+        redraw(await save()); toast('Alterações guardadas em todos os emails da ronda.');
+      }, event.currentTarget)}, 'Guardar alterações'),
+      el('button', {class: 'primary send-action', onclick: event => run(async () => {
+        const saved = await save();
+        const ids = saved.items.map(item => item.id);
+        const check = await call('api/preview', {property_ref: ref, ids});
+        const warned = check.replies.filter(reply => (reply.warnings || []).length).length;
+        if (!confirm(`Enviar agora ${ids.length} email(s) reais, um a cada cliente da ronda, na conversa de cada um?`
+            + `\n\nPara: ${check.replies.map(reply => reply.to).join(', ')}`
+            + (warned ? `\n\n${warned} com avisos: vê-os nas Comunicações antes, se quiseres.` : ''))) { redraw(saved); return; }
+        const result = await call('api/send', {property_ref: ref, preview_token: check.preview_token, confirmed: true});
+        const sent = result.results.filter(item => item.status === 'sent').length;
+        if (sent) playSound('send');
+        state = await call('api/state'); renderState(); reload();
+        toast(`Ronda: enviados ${sent} de ${ids.length}.` + (sent < ids.length ? ' Os que ficaram continuam aqui, com o aviso.' : ''),
+          sent === ids.length ? 'ok' : 'warn');
+      }, event.currentTarget)}, stepNum2(), buttonIcon('mail'), `Enviar a todos (${items.length})`));
+  holdFuelButtons();
+  if (roundScroll) { roundScroll = false; box.scrollIntoView({behavior: 'smooth', block: 'start'}); }
 }
 
 // Contactos: contactos.csv as a table. The filters run here (it is one small file); every change goes to the API.
@@ -2494,6 +2713,7 @@ function visitsPanel(property) {
   const day = el('input', {type: 'date', 'aria-label': 'Dia das visitas'});
   const start = el('input', {type: 'time', value: '17:00', step: slot * 60, 'aria-label': 'Hora de início'});
   const end = el('input', {type: 'time', value: '19:00', step: slot * 60, 'aria-label': 'Hora de fim'});
+  linkTimes(start, end);
   const list = el('div', {class: 'visit-candidates'});
   const choose = event => run(async () => {
     const data = await call('api/visits/candidates', {property_ref: property.reference});
@@ -2530,7 +2750,8 @@ function visitsPanel(property) {
       : [el('p', {class: 'muted small'}, 'Sem visitas propostas.')]),
     !closed && visits.slots.map(booked => el('p', {class: 'small'}, el('strong', {}, slotLabel(booked.at)), ' · ', booked.name || booked.customer)),
     !closed && el('p', {class: 'step'}, `Escolhe o dia e o intervalo. Marcam-se de ${slot} em ${slot} minutos (em Voz e estilo).`),
-    !closed && el('div', {class: 'row'}, day, start, end, el('button', {onclick: choose}, 'Escolher clientes')), !closed && list,
+    !closed && el('div', {class: 'row'}, dateStepper(day), timeStepper(start, slot), timeStepper(end, slot),
+      el('button', {onclick: choose}, 'Escolher clientes')), !closed && list,
     el('div', {class: 'actions'}, !closed && closeVisits, requestConsent));
 }
 
@@ -3656,6 +3877,12 @@ function renderVoice() {
 
 document.querySelectorAll('[data-tab]').forEach(button => button.addEventListener('click', () => showTab(button.dataset.tab)));
 $('queue').addEventListener('change', renderState);
+$('card-sort').value = cardSort();
+$('card-sort').addEventListener('change', event => {
+  cardSortChoice = event.currentTarget.value;
+  try { localStorage.setItem('aria-card-sort', cardSortChoice); } catch { /* only this page view keeps it */ }
+  renderState();
+});
 $('emails').addEventListener('change', updateSelection);
 $('read').addEventListener('click', event => run(async () => {
   state = await call('api/read', {}); stepsDone.read = true; renderState();

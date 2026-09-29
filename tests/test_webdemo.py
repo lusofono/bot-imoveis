@@ -13,7 +13,9 @@ HERE = Path(__file__).resolve().parent / "webdemo"
 # What the demo answers from the recordings (the page's read-only calls) and what it says needs the full version.
 RECORDED = {"api/contacts/ignored", "api/todo", "api/visits/analysis-prompt", "api/visits/round-summary"}
 UNAVAILABLE = {"api/consent/confirm", "api/consent/request", "api/paste", "api/prompt", "api/property/extract",
-               "api/property/parse", "api/property/prompt", "api/property/save", "api/recipient", "api/visits/close"}
+               "api/property/parse", "api/property/prompt", "api/property/save", "api/recipient", "api/visits/close",
+               "api/visits/round-generate", "api/visits/round-individual", "api/visits/round-paste",
+               "api/visits/round-prompt", "api/visits/round-save"}
 
 
 @pytest.fixture(scope="module")

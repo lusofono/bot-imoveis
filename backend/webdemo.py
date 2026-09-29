@@ -640,7 +640,8 @@ class Recorder:
             found[key_of("api/metrics", {"days": days})] = self.call("api/metrics", {"days": days})
         for ref in refs:
             body = {"property_ref": ref}
-            for path in ("api/knowledge", "api/visits/candidates", "api/visits/round-summary", "api/contacts/ignored",
+            for path in ("api/knowledge", "api/visits/candidates", "api/visits/round-summary", "api/visits/round",
+                         "api/contacts/ignored",
                          "api/visits/analysis-prompt"):
                 found[key_of(path, body)] = self.call(path, body)
         found[key_of("api/knowledge", {"property_ref": None})] = self.call("api/knowledge", {"property_ref": None})

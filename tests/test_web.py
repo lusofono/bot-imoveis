@@ -592,5 +592,5 @@ def test_every_theme_gets_the_new_parts(page):
         css = client.get(f"/themes/{theme}.css").text
         assert f':root[data-theme="{theme}"]{{--chart-requests:' in css
         if theme in ("racing", "boat", "scooter"):
-            assert ".pill-action,.quick-reply,.copy-icon,.pipeline-name)" in css and "segmented *)" not in css
+            assert ".pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow)" in css and "segmented *)" not in css
     assert 'class="dashboard-grid digest-row card"' in client.get("/").text

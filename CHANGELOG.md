@@ -15,6 +15,116 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.75.0 — 29/09/2026
+
+- **«Ordenar» nas Comunicações:** mais recentes primeiro (o normal), mais antigos primeiro, primeiras fases primeiro ou
+  últimas fases primeiro (pela coluna do cliente na tabela; dentro da mesma fase, os mais recentes primeiro). A escolha
+  fica guardada neste browser, e os nomes em cada coluna da tabela seguem-na (mais recentes ou mais antigos primeiro).
+- **Um empate na última interação** (o mesmo email nosso a vários clientes, como uma ronda) decide-se pela data do
+  próprio email, em vez de voltar à ordem da fila.
+
+## α.74.3 — 29/09/2026
+
+- **Na tabela dos clientes por fase, no máximo 10 nomes por coluna** (os mais recentes); a partir daí, uma só linha
+  com «+ N casos», sem os listar. O número no título continua a ser o total.
+
+## α.74.2 — 29/09/2026
+
+- **Nas Comunicações, os emails mais recentes primeiro:** cada cartão ordena-se pela interação mais recente da conversa,
+  lida ou enviada (o email em si, os que se juntaram a ele e o histórico). Os «Enviados · clientes ativos» já vinham
+  pelo último envio.
+
+## α.74.1 — 29/09/2026
+
+- **Sem guardar automático, afinal:** no canto de cima do rascunho de cada email ficam dois ícones pequenos, copiar e
+  uma disquete para guardar, só para quando se quer mesmo guardar um texto sem o enviar; a disquete acende enquanto a
+  caixa tem alterações por guardar. «Enviar já este por email» continua a enviar (e guardar) o que está na caixa.
+
+## α.74.0 — 29/09/2026
+
+- **Sai o «Guardar rascunho» e o aviso «Por guardar» de cada email:** o rascunho guarda-se sozinho, um segundo depois
+  de se parar de escrever e ao sair da caixa, sem redesenhar a página (o cursor fica onde estava). Um clique logo a
+  seguir a escrever (Atualizar resposta, enviar) espera que o texto esteja guardado; um rascunho novo da IA nunca é
+  apagado pelo texto antigo da caixa. Se não conseguir guardar, diz porquê.
+
+## α.73.5 — 29/09/2026
+
+- **As setas da hora e dos minutos ficam as duas à direita do campo**, a da hora primeiro, pela ordem em que se lê.
+
+## α.73.4 — 29/09/2026
+
+- **As horas das visitas mais estreitas**, e **a hora de fim acompanha a de início**, mantendo o intervalo escolhido
+  (também depois de se mudar a hora de fim). O dia vem preenchido com hoje e mostra sempre o dia da semana.
+
+## α.73.3 — 29/09/2026
+
+- **Ronda de visitas, os passos lado a lado:** «1 Preparar o texto da ronda», «Guardar alterações» e «2 Enviar a todos»
+  ficam na mesma linha; o rascunho da ronda (dia, conhecimento, textos e saudações) aparece logo por baixo, antes da
+  lista de quem recebeu a última ronda.
+
+## α.73.2 — 29/09/2026
+
+- **Ronda de visitas: primeiro o rascunho, depois o envio.** Com o texto comum, o botão passa a dizer «Preparar o texto
+  da ronda», já não pergunta «Vais avisar N clientes» (não envia nada) e escreve logo o rascunho via API, que aparece no
+  fim do painel para rever; só «Enviar a todos», lá, envia. Sem API, fica o copiar/colar. Individualizada, continua
+  «Iniciar ronda», com um aviso que diz que nada é enviado antes de rever.
+
+## α.73.1 — 29/09/2026
+
+- **Mais duas fases na tabela dos clientes:** **«Pronto para visita»** (ficha completa e ainda sem proposta: os clientes
+  a convidar na próxima ronda), entre «Em qualificação» e «Proposta de visita», e **«Hora por confirmar»** (aceitou ou
+  pediu uma hora que ainda não confirmámos na agenda), antes de «Visita marcada».
+
+## α.73.0 — 29/09/2026
+
+- **A tabela dos clientes nas Comunicações passa a ser por fase**, não pelo número de emails trocados: as colunas «1.ª»,
+  «2.ª», «3.ª» e «Mais de 3» dão lugar a **«Em qualificação»** (já lhe respondemos e ainda estamos a recolher os dados
+  da ficha) e **«Proposta de visita»** (já recebeu uma proposta, numa ronda ou na conversa, e ainda não tem hora
+  marcada). As outras colunas ficam como estavam.
+- **O dia da semana fica na mesma linha da data**, em três letras (Ter).
+
+## α.72.2 — 29/09/2026
+
+- **Dia e horas das visitas com setas** (na ronda de visitas e nas Visitas de cada imóvel): ◀ ▶ mudam o dia (nunca para
+  antes de hoje), e cada hora tem ▲ ▼ para a hora e para os minutos (de marcação em marcação, 30 em 30 por defeito).
+  Escrever continua a funcionar. **O dia mostra sempre o dia da semana** por baixo. Nos temas ricos, as setas ficam com
+  o seu desenho, fora do dos botões do tema.
+
+## α.72.1 — 29/09/2026
+
+- **80's RacingCar, 90's Boat e 70's Scooter: o veículo deixa de passar no cabeçalho**, passa só no rodapé. A regra fica
+  em comentário no tema, para um dia voltar.
+
+## α.72.0 — 29/09/2026
+
+- **Ronda de visitas com um só texto para todos**, revisto e enviado no próprio painel da ronda (Agenda), sem encher as
+  Comunicações com um cartão por cliente:
+  - **«Conhecimento desta ronda»**: o que os emails desta ronda devem dizer (que o inquilino ainda lá está, onde
+    estacionar, quanto dura a visita…); vai para a IA só nesta ronda, também nas respostas individualizadas;
+  - **«Gerar o texto comum»** (ou copiar o prompt e colar a resposta do ChatGPT): uma só chamada à IA escreve o texto em
+    português (sempre pt-PT, também para brasileiros) e em inglês, a saudação de cada cliente e, para quem escreve
+    noutra língua, um resumo curto nela, a seguir ao inglês, que é o texto completo e oficial;
+  - revês e alteras os textos e as saudações ali mesmo; **«Enviar a todos»** envia a cada cliente o seu, na conversa
+    dele, depois de confirmares;
+  - **«Individualizar»**: na ronda inteira (antes de a iniciar) ou num cliente, que passa para as Comunicações para
+    lhe responderes à parte.
+
+## α.71.2 — 29/09/2026
+
+- **Empresa: só se fala nisso quando o cliente fala primeiro, mesmo que só o dê a entender** (por exemplo, colegas da
+  mesma empresa a morar na casa, ou um gerente da sua própria empresa). Então pergunta-se se o arrendamento fica em
+  nome da empresa e qual; se não, nunca se fala em empresa. A regra passa a estar no know-how comum a todos os imóveis,
+  e sai dos prompts de cada imóvel a pergunta pela empresa. Na ficha do cliente, a empresa conta também quando o cliente
+  só a deu a entender.
+
+## α.71.1 — 29/09/2026
+
+- **O mapa e o contacto de quem faz a visita vão sempre juntos, a quem já tem uma hora de visita marcada** (mesmo que
+  ainda não a tenha confirmado): na confirmação da hora, no lembrete de visita e na resposta a um cliente com a visita
+  marcada que pergunte onde fica. O contacto vai no corpo do email, logo a seguir à morada — «é a pessoa que vai fazer a
+  visita consigo», com o nome e o telefone, sem cargo nem título —, e já não depois da assinatura. Antes de haver hora
+  marcada, nenhum dos dois.
+
 ## α.71.0 — 28/09/2026
 
 - **O que foi feito no tema Default passa para os outros temas** (Noite, Dia, Índigo, 80's RacingCar, 90's Boat, 70's

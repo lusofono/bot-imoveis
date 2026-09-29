@@ -22,7 +22,8 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from starlette.routing import Route
 from . import APP_NAME
-from .ai import listing_prompt, parse_fichas, parse_listing, parse_replies, parse_visits, reply_prompt, short_id
+from .ai import (listing_prompt, parse_fichas, parse_listing, parse_replies, parse_round, parse_visits, reply_prompt,
+                 round_prompt, short_id)
 from .openai_client import complete, estimate_cost_usd
 from .rules import phone_in
 from .secrets import openai_api_key
@@ -228,8 +229,50 @@ def web_app(folder, token):
         if not isinstance(emails, list) or not all(isinstance(email, str) for email in emails):
             raise ValueError("Escolhe os clientes.")
         result = service.propose_visits(body.get("property_ref") or None, body.get("day"), body.get("start"),
-                                        body.get("end"), emails)
+                                        body.get("end"), emails, str(body.get("note") or ""), body.get("common") is True)
         return {**result, "state": state(), "settings": service.settings()}
+
+    # 29/09: a round with one text for everyone, written, reviewed and sent in the round's own panel.
+    def visit_round(body):
+        return service.common_round(body.get("property_ref") or None)
+
+    def round_ids(ref):
+        current = service.common_round(ref)
+        if not current["items"]:
+            raise ValueError("Esta ronda já não tem propostas por enviar.")
+        return current, [item["id"] for item in current["items"]]
+
+    def visit_round_prompt(body):
+        current, ids = round_ids(body.get("property_ref") or None)
+        return {"prompt": round_prompt(queue(current["property_ref"]), ids)}
+
+    def visit_round_generate(body):
+        current, ids = round_ids(body.get("property_ref") or None)
+        ref = current["property_ref"]
+        service.require_fuel(ref)
+        cfg = service.config()
+        model = service.model(cfg)
+        prompt_text = round_prompt(queue(ref), ids)
+        answer, usage = complete(openai_api_key(service.folder, cfg["account"]), model, prompt_text)
+        cost = estimate_cost_usd(model, **{k: usage[k] for k in ("prompt_tokens", "completion_tokens")})
+        service.log("openai_usage", model=model, **usage, reference=ref, cost_usd=round(cost, 6))
+        result = service.save_round(ref, current["window_id"], parse_round(answer, queue(ref), ids))
+        return {**result, "state": state(), "cost_usd": round(cost, 6), "fuel": service.api_fuel(ref)}
+
+    def visit_round_paste(body):
+        current, ids = round_ids(body.get("property_ref") or None)
+        ref = current["property_ref"]
+        result = service.save_round(ref, current["window_id"], parse_round(str(body.get("text") or ""), queue(ref), ids))
+        return {**result, "state": state()}
+
+    def visit_round_save(body):
+        result = service.save_round(body.get("property_ref") or None, str(body.get("window_id") or "") or None,
+                                    body.get("common") or {})
+        return {**result, "state": state()}
+
+    def visit_round_individual(body):
+        result = service.individual_round_item(body.get("property_ref") or None, str(body.get("id") or ""))
+        return {**result, "state": state()}
 
     def visits_close(body):
         result = service.close_visits(body.get("property_ref") or None)
@@ -405,6 +448,9 @@ def web_app(folder, token):
                 "ai/model": ("POST", lambda body: service.set_model(str(body.get("model") or ""))),
                 "property/active": ("POST", property_active),
                 "visits/candidates": ("POST", visit_candidates), "visits/propose": ("POST", visit_propose),
+                "visits/round": ("POST", visit_round), "visits/round-prompt": ("POST", visit_round_prompt),
+                "visits/round-generate": ("POST", visit_round_generate), "visits/round-paste": ("POST", visit_round_paste),
+                "visits/round-save": ("POST", visit_round_save), "visits/round-individual": ("POST", visit_round_individual),
                 "visits/analysis-prompt": ("POST", visit_analysis_prompt), "visits/analyze": ("POST", visit_analyze),
                 "visits/round-summary": ("POST", visit_round_summary), "visits/close": ("POST", visits_close),
                 "agenda/sync": ("POST", agenda_sync), "visits/check": ("POST", visit_check), "visits/thanks": ("POST", visit_thanks),

@@ -125,6 +125,12 @@
     </article>
     </div>
     <div id="preview-box"></div>
+    <!-- 29/09: the order of the cards (and of the names in each column of the table above), kept in this browser -->
+    <div class="row card-sort"><label>Ordenar <select id="card-sort" aria-label="Ordenar os emails">
+      <option value="recent">Mais recentes primeiro</option><option value="oldest">Mais antigos primeiro</option>
+      <option value="early">Primeiras fases primeiro</option><option value="late">Últimas fases primeiro</option>
+    </select></label></div>
+    <p id="round-notice" class="alert warn" hidden></p>
     <div id="emails"></div>
     <div id="active-cards"></div>
     <details><summary class="muted small">Instruções deste imóvel (voz, contexto, interações)</summary><pre id="instructions"></pre></details>

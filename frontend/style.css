@@ -105,6 +105,25 @@
 .client-list{display:grid;gap:6px;margin-top:10px}
 .client-row{display:flex;align-items:center;gap:10px;font-size:13px;padding:6px 0;border-bottom:1px solid var(--line)}
 .client-row:last-child{border-bottom:0}
+/* 29/09: the visit round — its own knowledge, «Individualizar» and the text common to everyone */
+.agenda-round textarea{margin-top:12px}
+.agenda-round label.check{display:flex;gap:10px;align-items:center;font-size:12px;margin:12px 0 0}
+.round-actions{display:contents}
+.round-common-body{margin-top:18px;border-top:1px solid var(--line);padding-top:18px}
+.round-text{display:grid;gap:6px;margin:14px 0}
+.round-common .client-row input{flex:0 1 260px;width:auto;padding:6px 10px}
+/* 29/09: arrows for the visit's day, hour and minutes; the weekday beside the date */
+.row>.stepper{flex:1 1 220px}
+.row>.stepper-time{flex:0 0 auto;gap:4px}
+.stepper-time>input{flex:none;width:7.5em}
+.stepper{display:flex;align-items:center;gap:6px;min-width:0}
+.stepper>input,.stepper-field>input{flex:1;min-width:0;width:auto}
+.stepper-field{flex:1;display:flex;align-items:center;gap:8px;min-width:0}
+.stepper-weekday{flex:none;min-width:3ch;font-size:13px;font-weight:600;color:var(--accent)}
+.stepper-pair{display:flex;flex-direction:column;align-items:center;gap:1px}
+.stepper-unit{font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;line-height:1}
+button.stepper-arrow{min-height:0;height:22px;min-width:30px;padding:0 6px;border-radius:6px;font-size:10px;line-height:1;box-shadow:none}
+.stepper-date button.stepper-arrow{height:42px}
 .client-row>span:first-child{flex:1;min-width:0;overflow-wrap:anywhere}
 .client-row>.muted{flex:none;max-width:40%;text-align:right}
 
@@ -506,6 +525,14 @@ body:not(.api-only) .api-only-show{display:none!important}
   color:var(--muted);cursor:pointer}
 .copy-icon:hover{color:var(--accent);background:none}
 .copy-icon .button-icon{width:15px;height:15px}
+/* 29/09: the draft's copy icon and floppy, in its top-right corner; the floppy lit while there is something to save */
+.draft-box{position:relative}
+.draft-tools{position:absolute;top:22px;right:12px;display:flex;gap:2px}
+.draft-box textarea{padding-right:62px}
+.save-icon.unsaved{color:var(--accent)}
+/* 29/09: «Ordenar» over the cards */
+.card-sort{justify-content:flex-end;margin:4px 0 8px}
+.card-sort select{width:auto}
 .recipient-edit{margin:8px 0}
 .recipient-edit input{flex:1 1 220px;width:auto}
 /* Ponto de situação (26/09; 27/09 for the owner): tiles, one block per property with who visited */
@@ -575,8 +602,6 @@ body:not(.api-only) .api-only-show{display:none!important}
 .gpt-box{margin:10px 0 0}
 .gpt-box textarea{margin-top:10px}
 .gpt-box pre{max-height:180px;margin:10px 0 0}
-/* 27/09: «Guardar rascunho» under the draft, only while there is something to save */
-.draft-save{display:flex;align-items:center;gap:10px;margin-top:10px}
 .email-generate{padding-top:10px;border-top:1px solid var(--line)}
 .email-generate p{margin:0 0 8px}
 .button-text{display:flex;flex-direction:column;align-items:flex-start;line-height:1.2}

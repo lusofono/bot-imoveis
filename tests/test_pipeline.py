@@ -24,15 +24,24 @@ def test_each_customer_sits_in_the_column_of_the_furthest_step_they_got_to(servi
     # Not answered yet: the first contact, waiting for us.
     assert columns(service) == {CUSTOMER: ("contacto", True)}
     draft_and_send(service, "1")
-    assert columns(service) == {CUSTOMER: ("i1", False)}
+    assert columns(service) == {CUSTOMER: ("qualificacao", False)}
     # Our email unanswered for 3 days or more, whatever the step: «Sem resposta».
     change(service, CUSTOMER, last_sent_at=(datetime.now(timezone.utc) - timedelta(days=3, minutes=1)).isoformat())
     assert columns(service)[CUSTOMER] == ("sem_resposta", False)
     # They write again: back in their step, waiting for us.
     read(service, [dict(lead("2"), thread_id="t1")])
-    assert columns(service)[CUSTOMER] == ("i1", True)
+    assert columns(service)[CUSTOMER] == ("qualificacao", True)
+    # 29/09: by phase, not by how many emails: however many questions it took, still «Em qualificação»...
     change(service, CUSTOMER, stage=5)
-    assert columns(service)[CUSTOMER] == ("i4", True)  # «Mais de 3»
+    assert columns(service)[CUSTOMER] == ("qualificacao", True)
+    # ...«Pronto para visita» once their file is complete...
+    change(service, CUSTOMER, ficha=ficha_update(None, COMPLETE))
+    assert columns(service)[CUSTOMER] == ("pronto", True)
+    # ...«Proposta de visita» once a visit is proposed to them, and «Hora por confirmar» once they accept a time.
+    change(service, CUSTOMER, visit_proposed=True)
+    assert columns(service)[CUSTOMER] == ("proposta", True)
+    change(service, CUSTOMER, visit_accepted={"at": "2026-10-01 18:00", "evidence": "Pode ser às 18h."})
+    assert columns(service)[CUSTOMER] == ("por_confirmar", True)
 
     # A visit on the agenda, then attended, then on the short list; declining it puts them aside.
     save_visits(service.folder, REF, {"windows": [], "slots": [{"at": "2026-10-01 18:00", "customer": CUSTOMER}]})
