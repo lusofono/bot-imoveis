@@ -530,6 +530,16 @@ body:not(.api-only) .api-only-show{display:none!important}
 .draft-tools{position:absolute;top:22px;right:12px;display:flex;gap:2px}
 .draft-box textarea{padding-right:62px}
 .save-icon.unsaved{color:var(--accent)}
+/* 29/09: the sending banner, on top of everything while emails go out, with an envelope flying across it */
+#sending-banner{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:14px;
+  width:min(620px,calc(100vw - 32px));padding:14px 20px;border-radius:14px;background:var(--warn-bg);color:var(--warn);
+  border:1px solid var(--warning-border);box-shadow:0 12px 40px #0008;font-size:13px;overflow:hidden}
+#sending-banner strong{color:var(--text)}
+.sending-flight{position:relative;flex:none;width:64px;height:28px}
+.sending-envelope{position:absolute;left:0;top:2px;font-size:22px;line-height:1;animation:sending-fly 1.6s ease-in-out infinite}
+@keyframes sending-fly{0%{transform:translate(0,6px) rotate(-8deg);opacity:0}20%{opacity:1}
+  50%{transform:translate(22px,-4px) rotate(4deg)}80%{opacity:1}100%{transform:translate(44px,4px) rotate(-6deg);opacity:0}}
+@media(prefers-reduced-motion:reduce){.sending-envelope{animation:none;left:20px}}
 /* 29/09: «Ordenar» over the cards */
 .card-sort{justify-content:flex-end;margin:4px 0 8px}
 .card-sort select{width:auto}
@@ -819,3 +829,19 @@ nav .tab[data-tab="voice"]::after{content:"";position:absolute;left:12%;right:12
 .engine-readout{padding:4px 10px;border:1px solid #1e293b;border-radius:8px;background:color-mix(in srgb,#070c17 90%,#fff);color:#94a3b8;font-size:11px}
 .engine-readout b{color:#22d3ee;font-weight:700;letter-spacing:1px}
 .engine-basis{margin:10px 0 0;color:var(--muted);font-size:10.5px;line-height:1.6}
+/* 29/09: the Oficina's link at the foot of the sidebar, and its token prices table */
+.workshop-link{margin:auto 14px 0;min-height:0;padding:6px 10px;font-size:11px;letter-spacing:1px;background:none;border:1px dashed var(--line);color:var(--muted)}
+.workshop-link.active{color:var(--accent);border-color:var(--accent)}
+.workshop-link+.sidebar-note{margin-top:0}
+.price-table{width:100%;border-collapse:collapse;font-size:13px}
+.price-table th,.price-table td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+.price-table .price-input{width:9em}
+.price-table td .tag{margin-left:8px}
+/* 29/09: «1 Ler emails» and «2 Gerar respostas» while they rest after being used: a step done, green, not greyed out */
+/* !important: a state over every theme's own button (their rules are more specific) */
+button.step-done,button.step-done:disabled{opacity:1!important;cursor:default;font-size:0;gap:0;background:var(--ok-bg)!important;
+  color:var(--ok)!important;border-color:var(--success-border)!important;box-shadow:none!important}
+button.step-done>*{display:none}
+button.step-done::after{content:"✓  " attr(data-done);font-size:14px;font-weight:600;white-space:pre}
+/* 29/09: «Enviar N email(s)» and «Cancelar» beside «3 Rever para Enviar Todos» */
+.preview-actions{display:contents}

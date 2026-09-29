@@ -28,6 +28,7 @@ from .openai_client import complete, estimate_cost_usd
 from .rules import phone_in
 from .secrets import openai_api_key
 from .service import MailService
+from . import testlab
 
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
 COOKIE = "bot_mail_web"
@@ -274,6 +275,36 @@ def web_app(folder, token):
         result = service.individual_round_item(body.get("property_ref") or None, str(body.get("id") or ""))
         return {**result, "state": state()}
 
+    # 29/09: the Oficina — token prices and the test platform (only with "admin": true in config.json)
+    def admin():
+        if service.config().get("admin") is not True:
+            raise ValueError("A Oficina não está ligada nesta pasta.")
+
+    def ai_price(body):
+        admin()
+        return service.set_price(body.get("model"), body.get("input_usd_per_1m"), body.get("output_usd_per_1m"),
+                                 body.get("reset") is True)
+
+    def lab_state(body):
+        admin()
+        return testlab.lab_view(service)
+
+    def lab_contest(body):
+        admin()
+        percent = body.get("new_percent")
+        return testlab.set_contest(service, body.get("on") is True, body.get("email"),
+                                   int(percent) if str(percent).isdigit() else percent)
+
+    def lab_clients(body):
+        admin()
+        if isinstance(body.get("contest"), dict):  # what is on the screen, saved first (29/09: it was lost otherwise)
+            percent = body["contest"].get("new_percent")
+            testlab.set_contest(service, body["contest"].get("on") is True, body["contest"].get("email"),
+                                int(percent) if str(percent).isdigit() else None)
+        count = body.get("count")
+        return testlab.generate_clients(service, int(count) if str(count or "").isdigit() else count,
+                                        datetime.now().astimezone().isoformat(timespec="seconds"))
+
     def visits_close(body):
         result = service.close_visits(body.get("property_ref") or None)
         return {**result, "state": state(), "settings": service.settings()}
@@ -446,6 +477,10 @@ def web_app(folder, token):
                 "property/photo": ("POST", property_photo), "property/panel": ("POST", property_panel),
                 "property/extract": ("POST", lambda body: service.extract_listing(body.get("text"), body.get("listing_url"))),
                 "ai/model": ("POST", lambda body: service.set_model(str(body.get("model") or ""))),
+                "ai/price": ("POST", ai_price), "testlab/state": ("POST", lab_state),
+                "testlab/contest": ("POST", lab_contest), "testlab/clients": ("POST", lab_clients),
+                "testlab/consultant": ("POST", lambda body: (admin(), testlab.send_to_consultant(service))[1]),
+                "testlab/wipe": ("POST", lambda body: (admin(), testlab.wipe(service))[1]),
                 "property/active": ("POST", property_active),
                 "visits/candidates": ("POST", visit_candidates), "visits/propose": ("POST", visit_propose),
                 "visits/round": ("POST", visit_round), "visits/round-prompt": ("POST", visit_round_prompt),

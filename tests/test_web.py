@@ -90,7 +90,7 @@ def test_the_page_is_served_as_its_own_files(page):
     assert "'Só para esta resposta'" in script.text and "noteField.beforeGenerate()" in script.text
     # 27/09: the buttons numbered in the order they are pressed; PASSO 02 beside «Rever e enviar», under the emails' heading.
     assert 'step-num" aria-hidden="true">1</span>Ler emails do Gmail' in html.text
-    assert 'step-num" aria-hidden="true">3</span>Preparar envios dos selecionados' in html.text
+    assert 'step-num" aria-hidden="true">3</span>Rever para Enviar Todos' in html.text
     assert html.text.index("Emails em tratamento") < html.text.index('id="prepare-step"') < html.text.index('id="send-step"')
     # 27/09: «Atualizar visitas» only in Visitas (it was in Comunicações too).
     assert 'id="agenda-sync"' not in html.text and 'id="agenda-sync-here"' in html.text
@@ -592,5 +592,5 @@ def test_every_theme_gets_the_new_parts(page):
         css = client.get(f"/themes/{theme}.css").text
         assert f':root[data-theme="{theme}"]{{--chart-requests:' in css
         if theme in ("racing", "boat", "scooter"):
-            assert ".pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow)" in css and "segmented *)" not in css
+            assert ".pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link)" in css and "segmented *)" not in css
     assert 'class="dashboard-grid digest-row card"' in client.get("/").text

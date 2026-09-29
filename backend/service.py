@@ -21,7 +21,8 @@ from .ai import (AFTER_VISIT_RULE, AFTER_VISIT_TEMPLATE, BOOKED_REPLY_RULE, DOCS
                  parse_agenda, parse_survey, visit_analysis_prompt, clean_round, round_text)
 from .configure import STARTER, example_profile
 from .mail import build_digest, build_reply, read_messages
-from .openai_client import MODEL_DEFAULT, MODELS, PRICE_PER_1K_USD, complete, estimate_cost_usd
+from .openai_client import (BUILTIN_PRICES, MODEL_DEFAULT, PRICE_PER_1K_USD, apply_prices, complete, estimate_cost_usd,
+                            models)
 from .rules import (DAY, EMAIL, KNOWLEDGE_FILE, RGPD_STATES, SUBJECT_DEFAULT, VISIT_SLOT_DEFAULT, VISIT_STATES,
                     DOCUMENTS, FICHA_FIELDS, SELECTION_STATES, build_profile, check_profile, clean_ficha, documents_summary, draft_checks,
                     ficha_summary, merge_ficha,
@@ -253,6 +254,7 @@ class MailService:
     def config(self):
         """config.json, with a usable account; nothing starts without one."""
         cfg = load_json(self.folder / "config.json", {})
+        apply_prices(cfg.get("token_prices"))  # 29/09: the Oficina's token prices, for every estimate from here
         account = cfg.get("account", "")
         if not account or "@" not in account or any(c in account for c in "\r\n"):
             raise ValueError("Configura uma conta válida antes de usar.")
@@ -274,13 +276,16 @@ class MailService:
 
     def model(self, cfg=None):
         """The one model for everything (replies, agenda, analysis, listings); an unknown one reads as the default."""
-        model = (cfg if cfg is not None else load_json(self.folder / "config.json", {})).get("openai_model")
-        return model if model in MODELS else MODEL_DEFAULT
+        cfg = cfg if cfg is not None else load_json(self.folder / "config.json", {})
+        apply_prices(cfg.get("token_prices"))
+        model = cfg.get("openai_model")
+        return model if model in models() else MODEL_DEFAULT
 
     def set_model(self, model):
         """The page's model choice, kept in config.json with everything else there untouched."""
-        if model not in MODELS:
-            raise ValueError("Modelo desconhecido: escolhe " + " ou ".join(MODELS) + ".")
+        self.model()  # the Oficina's prices, with any model of its own
+        if model not in models():
+            raise ValueError("Modelo desconhecido: escolhe " + " ou ".join(models()) + ".")
         with locked(self.folder):
             cfg = load_json(self.folder / "config.json", {})
             cfg["openai_model"] = model
@@ -308,11 +313,40 @@ class MailService:
                 "usd_per_eur": USD_PER_EUR, "rate_date": USD_PER_EUR_DATE}
 
     def ai_settings(self, events=None):
+        token_prices = load_json(self.folder / "config.json", {}).get("token_prices") or {}
+        apply_prices(token_prices)
         basis = self.interaction_cost(events)
         return {"mode": self.ai_mode(), "model": self.model(), "cost_basis": basis,
                 "models": [{"id": model, "input_usd_per_1m": round(rates[0] * 1000, 4), "output_usd_per_1m": round(rates[1] * 1000, 4),
-                            "per_100_usd": basis["per_100_usd"].get(model), "per_100_eur": basis["per_100_eur"].get(model)}
-                           for model, rates in PRICE_PER_1K_USD.items() if model in MODELS]}
+                            "per_100_usd": basis["per_100_usd"].get(model), "per_100_eur": basis["per_100_eur"].get(model),
+                            "builtin": model in BUILTIN_PRICES, "edited": model in token_prices}
+                           for model, rates in PRICE_PER_1K_USD.items()]}
+
+    def set_price(self, model, input_usd_per_1m=None, output_usd_per_1m=None, reset=False):
+        """29/09, Oficina: a model's price per 1M tokens (input, output), kept in config.json "token_prices" — one more
+        model when it is new. reset: back to the table's own price, or out of the list if it was the Oficina's."""
+        model = " ".join(str(model or "").split())
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,63}", model):
+            raise ValueError("Indica o nome do modelo, como a OpenAI o escreve (ex.: gpt-4o-mini).")
+        with locked(self.folder):
+            cfg = load_json(self.folder / "config.json", {})
+            prices = dict(cfg.get("token_prices") or {})
+            if reset:
+                prices.pop(model, None)
+                if model not in BUILTIN_PRICES and cfg.get("openai_model") == model:
+                    raise ValueError("É o motor em uso: escolhe outro antes de o tirar da lista.")
+            else:
+                try:
+                    values = [float(str(value).replace(",", ".")) for value in (input_usd_per_1m, output_usd_per_1m)]
+                except (TypeError, ValueError):
+                    raise ValueError("Indica os dois preços em dólares por 1M tokens (ex.: 0.15 e 0.60).") from None
+                if not all(0 < value <= 1000 for value in values):
+                    raise ValueError("Os preços têm de estar entre 0 e 1000 US$ por 1M tokens.")
+                prices[model] = {"input_usd_per_1m": values[0], "output_usd_per_1m": values[1]}
+            cfg["token_prices"] = prices
+            save_json(self.folder / "config.json", cfg)
+            self.log("token_price_set", model=model, reset=bool(reset))
+        return self.ai_settings()
 
     def extract_listing(self, text, url=None):
         """«Extrair com a API»: the listing's text, pasted by the owner, becomes the fields they review. Charged to
@@ -3013,6 +3047,7 @@ class MailService:
             for ref, profile in load_profiles(self.folder, account).items():
                 prompts = profile.get("reply", {}).get("prompts", {})
                 properties.append({"sender": profile["match"]["from_address_equals"], "active": property_active(profile),
+                                   "test": bool(profile.get("test")),
                                    "survey_report": self.survey_report(ref),
                                    "prompts": {name: (prompts.get(key) or {}).get(field) or ""
                                                for name, (key, field) in PROMPT_FIELDS.items()},
@@ -3034,6 +3069,7 @@ class MailService:
                                        "reference", "listing_id", "listing_url", "advertiser", "description",
                                        "advertised_rent_eur", "owner_email")}})
             return {"account": account, "voice": voice, "properties": properties, "ai": self.ai_settings(events),
+                    "admin": self.config().get("admin") is True,  # 29/09: the Oficina shows only with "admin": true
                     "first_read_days": FIRST_READ_DAYS,
                     "openai_configured": has_openai_api_key(self.folder, account), "api_fuel": self.api_fuel(None, events)}
 

@@ -17,7 +17,7 @@ PHONE = re.compile(r"\+?\d[\d .()-]{7,}\d")
 MESSAGE_PHONE = re.compile(r"(?<![\d+])(?:(?:\+|00)351[\s.-]?)?9[1236](?:[\s.-]?\d){7}(?!\d)"
                            r"|(?<![\d+])(?:\+|00)[1-9]\d{0,2}(?:[\s.-]?\d){6,12}(?!\d)")
 LISTING = re.compile(r"Código do anúncio:\s*(\d+)")
-SUBJECT_NAME = re.compile(r"\bde (.+?) sobre o teu imóvel")
+SUBJECT_NAME = re.compile(r"\bde (?:teste de )?(.+?) sobre o teu imóvel")  # 29/09: «Mensagem de teste de X…» too
 QUOTE = re.compile(r"^(>|(Em|On|No dia) .+(escreveu|wrote):?$|_{10,}$|-{3,} ?(Original Message|Mensagem original))")
 KNOWLEDGE_LIMIT = 30000
 COMMENT = re.compile(r"<!--.*?-->", re.S)
@@ -365,8 +365,10 @@ def phone_in(text):
 def route(item, profiles, queues):
     """Return (ref, kind, customer); kind is lead, follow_up, ambiguous or None (not ours)."""
     senders = {a.casefold() for a in addresses(item.get("from"))}
+    # 29/09: a test property (profile "test") takes only the test platform's notices, and a real one never does
     leads = [ref for ref, profile in profiles.items()
-             if senders == {profile["match"]["from_address_equals"].casefold()}
+             if bool(profile.get("test")) == bool(item.get("test"))
+             and senders == {profile["match"]["from_address_equals"].casefold()}
              and has_token(item.get("subject", ""), profile["match"]["subject_property_reference_equals"])]
     if leads:
         return (leads[0], "lead", None) if len(leads) == 1 else (None, "ambiguous", None)
@@ -374,6 +376,8 @@ def route(item, profiles, queues):
     ids = set(f'{item.get("in_reply_to", "")} {item.get("references", "")}'.split())
     thread = item.get("thread_id")
     found = {(ref, customer) for ref, data in queues.items()
+             # a test platform's message never reaches a real property's conversation
+             if not item.get("test") or (profiles.get(ref) or {}).get("test")
              for customer, conversation in data.get("conversations", {}).items()
              if ids & set(conversation.get("sent_message_ids", []))
              or (thread and thread in conversation.get("thread_ids", []))}
@@ -390,7 +394,8 @@ def prepare(item, kind, customer, profile, account):
     lines = [line.strip() for line in str(item.get("body_text", "")).splitlines() if line.strip()]
     warnings, blocked, recipient = [], None, None
     if kind == "follow_up":
-        senders = item.get("from") or []
+        # 29/09: a test customer's reply leaves from this account too; who they are is in the Reply-To
+        senders = (item.get("reply_to") if item.get("test") else item.get("from")) or []
         email = addresses(senders)[0] if len(addresses(senders)) == 1 else None
         name = str(senders[0].get("name", "")).strip() if len(senders) == 1 else ""
         cut = next((i for i, line in enumerate(lines) if QUOTE.match(line)), len(lines))

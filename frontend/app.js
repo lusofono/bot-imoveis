@@ -707,7 +707,18 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 
+// 29/09: while api/send runs (one email or a whole round), the sending banner stays up and leaving the page asks first
+let sendingNow = 0;
+function sendingBanner(delta) {
+  sendingNow = Math.max(0, sendingNow + delta);
+  $('sending-banner').hidden = !sendingNow;
+}
+window.addEventListener('beforeunload', event => { if (sendingNow) { event.preventDefault(); event.returnValue = ''; } });
 async function call(path, body) {
+  if (path === 'api/send') sendingBanner(1);
+  try { return await request(path, body); } finally { if (path === 'api/send') sendingBanner(-1); }
+}
+async function request(path, body) {
   $('busy').hidden = false;
   try {
     const response = await fetch(path, {method: body === undefined ? 'GET' : 'POST',
@@ -757,6 +768,7 @@ function showTab(name) {
   });
   $('page-label').textContent = TAB_NAMES[name];
   for (const tab of Object.keys(TAB_NAMES)) $('tab-' + tab).hidden = tab !== name;
+  $('tab-workshop').hidden = true; $('workshop-link').classList.remove('active');
   window.scrollTo({top: 0, behavior: 'instant'});
   if (name === 'dashboard') { run(loadMetrics); run(loadDigest); }
   if (name === 'voice') run(loadMetrics);  // «O teu espaço» (27/09) lives at the top of the settings now
@@ -764,6 +776,107 @@ function showTab(name) {
   if (name === 'agenda') renderAgenda();
   // Sends, refills and reads elsewhere change its numbers: the cluster is never shown out of date.
   if (name === 'properties' && settings) renderPropertySlider();
+}
+
+// 29/09: the Oficina, outside the tabs (the skins' gearboxes and helms know six of them): the AI engine, the token
+// prices and the test platform. Its link shows only with "admin": true in config.json.
+function showWorkshop() {
+  activeTab = 'workshop';
+  document.querySelectorAll('nav [data-tab]').forEach(button => { button.classList.remove('active'); button.removeAttribute('aria-current'); });
+  for (const tab of Object.keys(TAB_NAMES)) $('tab-' + tab).hidden = true;
+  $('tab-workshop').hidden = false; $('workshop-link').classList.add('active');
+  $('page-label').textContent = 'Oficina';
+  window.scrollTo({top: 0, behavior: 'instant'});
+  renderWorkshop();
+  run(async () => renderLab(await call('api/testlab/state', {})));
+}
+
+function renderWorkshop() {
+  $('workshop-link').hidden = !settings?.admin;
+  if (!settings?.admin) return;
+  $('workshop-engine').replaceChildren(el('p', {class: 'eyebrow'}, 'MOTOR DE IA · API OPENAI'), engineConsole());
+  // Token prices, US$ per 1M tokens as OpenAI writes them: change one, add a model, or put the table's own back
+  const models = (settings.ai?.models || []).slice().sort((a, b) => a.id.localeCompare(b.id));
+  const price = value => el('input', {type: 'number', min: 0, step: 'any', value: value ?? '', class: 'price-input'});
+  const apply = next => { settings.ai = next; renderWorkshop(); applyAiMode(); };
+  const row = model => {
+    const input = price(model.input_usd_per_1m), output = price(model.output_usd_per_1m);
+    return el('tr', {},
+      el('td', {}, model.id, model.builtin ? '' : el('span', {class: 'tag'}, 'da Oficina'),
+        model.edited && model.builtin ? el('span', {class: 'tag draft'}, 'alterado') : ''),
+      el('td', {}, input), el('td', {}, output),
+      el('td', {}, el('button', {type: 'button', onclick: event => run(async () => {
+        apply(await call('api/ai/price', {model: model.id, input_usd_per_1m: input.value, output_usd_per_1m: output.value}));
+        toast(`Preço de ${model.id} guardado: vale para todas as estimativas a partir de agora.`);
+      }, event.currentTarget)}, 'Guardar'),
+      model.edited && el('button', {type: 'button', class: 'link', onclick: event => run(async () => {
+        apply(await call('api/ai/price', {model: model.id, reset: true}));
+        toast(model.builtin ? `${model.id}: de volta ao preço da tabela.` : `${model.id} saiu da lista.`);
+      }, event.currentTarget)}, model.builtin ? 'Repor' : 'Tirar')));
+  };
+  const newModel = el('input', {type: 'text', placeholder: 'ex.: gpt-6-nova', 'aria-label': 'Nome do modelo novo'});
+  const newIn = price(null), newOut = price(null);
+  $('workshop-prices').replaceChildren(
+    el('p', {class: 'eyebrow'}, 'PREÇOS DOS TOKENS'),
+    el('p', {class: 'step'}, 'Em dólares por 1 milhão de tokens, como a OpenAI os publica. Valem para todos os imóveis: o custo de '
+      + 'cada chamada, os depósitos e o «/ 100 interações». Um modelo novo passa a poder escolher-se no motor acima.'),
+    el('div', {class: 'pipeline-scroll'}, el('table', {class: 'price-table'},
+      el('thead', {}, el('tr', {}, ['Modelo', 'Input', 'Output', ''].map(label => el('th', {scope: 'col'}, label)))),
+      el('tbody', {}, models.map(row),
+        el('tr', {}, el('td', {}, newModel), el('td', {}, newIn), el('td', {}, newOut),
+          el('td', {}, el('button', {type: 'button', class: 'primary', onclick: event => run(async () => {
+            apply(await call('api/ai/price', {model: newModel.value, input_usd_per_1m: newIn.value, output_usd_per_1m: newOut.value}));
+            toast('Modelo acrescentado: já o podes escolher no motor.');
+          }, event.currentTarget)}, 'Acrescentar')))))));
+}
+
+// The test platform: fictitious customers of the test property, whose emails go through Gmail for real
+function renderLab(lab) {
+  const count = el('input', {type: 'number', min: 1, max: 20, value: 3, 'aria-label': 'Quantos clientes'});
+  const contestOn = el('input', {type: 'checkbox', checked: !!lab.contest?.on});
+  const contestEmail = el('input', {type: 'email', value: lab.contest?.email || '', placeholder: 'email do consultor',
+    'aria-label': 'Email do consultor'});
+  const newPercent = el('input', {type: 'number', min: 0, max: 100, value: lab.new_percent ?? 10, 'aria-label': 'Clientes novos por ronda, em %'});
+  const settingsNow = () => ({on: contestOn.checked, email: contestEmail.value, new_percent: newPercent.value});
+  $('workshop-lab').replaceChildren(
+    el('p', {class: 'eyebrow'}, 'PLATAFORMA DE TESTES'),
+    el('p', {class: 'step'}, lab.property_ref
+      ? `Imóvel de teste: ${lab.property_ref}. Cada cliente é inventado pela IA; o aviso dele sai mesmo pelo Gmail, desta conta `
+        + 'para ela própria, com o cliente no Reply-To (um endereço +cdN desta conta). Depois, «Ler emails» nas Comunicações traz-os.'
+      : 'Ainda não há imóvel de teste (um profile.json com "test": true).'),
+    lab.property_ref && el('div', {class: 'row'},
+      el('label', {}, 'Clientes novos', count),
+      el('button', {type: 'button', class: 'primary needs-fuel', 'data-ref': lab.property_ref, onclick: event => run(async () => {
+        const result = await call('api/testlab/clients', {count: Number(count.value),
+          contest: settingsNow()});
+        applyFuel(result.fuel, lab.property_ref); renderLab(result);
+        toast(`${result.created.length} cliente(s) de teste enviados: ${result.created.join(', ')}. Lê os emails nas Comunicações.`);
+      }, event.currentTarget)}, 'Gerar clientes de teste')),
+    lab.property_ref && el('div', {class: 'row'},
+      el('label', {}, 'Clientes novos por ronda (%)', newPercent),
+      el('label', {class: 'check'}, contestOn, ' Human contest: cada aviso vai também, numa cópia à parte, para o consultor'),
+      contestEmail,
+      el('button', {type: 'button', onclick: event => run(async () => {
+        renderLab(await call('api/testlab/contest', settingsNow()));
+        toast('Guardado.' + (contestOn.checked ? ' Human contest ligado.' : ''));
+      }, event.currentTarget)}, 'Guardar'),
+      lab.contest?.on && lab.clients?.some(client => !client.consultant) && el('button', {type: 'button', onclick: event => run(async () => {
+        const result = await call('api/testlab/consultant', {});
+        renderLab(result); toast(`${result.sent} cópia(s) enviadas ao consultor.`);
+      }, event.currentTarget)}, `Enviar ao consultor os que faltam (${lab.clients.filter(client => !client.consultant).length})`)),
+    lab.clients?.length ? el('div', {class: 'client-list'}, lab.clients.slice().reverse().map(client => el('div', {class: 'client-row'},
+      el('span', {}, `${client.number}. ${client.name}`), el('span', {class: 'tag'}, client.language || '?'),
+      lab.contest?.on && el('span', {class: 'tag' + (client.consultant ? ' draft' : '')}, client.consultant ? 'consultor ✓' : 'sem cópia'),
+      el('span', {class: 'muted small'}, client.address)))) : el('p', {class: 'muted small'}, 'Ainda sem clientes de teste.'),
+    lab.property_ref && lab.clients?.length && el('div', {class: 'actions'}, el('button', {type: 'button', class: 'link danger',
+      onclick: event => run(async () => {
+        if (!confirm(`Apagar os ${lab.clients.length} clientes de teste e tudo do ${lab.property_ref} (fila, conversas, agenda e `
+            + 'contactos), para começar de novo? Os emails ficam no Gmail, mas a página nunca mais os lê.')) return;
+        const result = await call('api/testlab/wipe', {});
+        state = await call('api/state'); renderState(); renderLab(result);
+        toast(`${result.removed} clientes de teste apagados: o ${lab.property_ref} começa de novo.`);
+      }, event.currentTarget)}, 'Apagar clientes de teste')));
+  holdFuelButtons();
 }
 
 // The chart is drawn by hand: the page may not load anything from outside.
@@ -860,7 +973,7 @@ function keepSteps(redraw) {
   done.forEach(step => markStep(step, true));
 }
 
-// 29/09: the cards in the order chosen in «Ordenar»: by the latest interaction (read or sent), newest or oldest first,
+// 29/09: the cards in the order chosen in «Ordenar»: by the customer's latest message, newest or oldest first,
 // or by the customer's step in the table above (first or last steps first, the newest first within a step).
 const CARD_SORTS = ['recent', 'oldest', 'early', 'late'];
 let cardSortChoice = null;  // this page view's choice, also when the browser keeps nothing
@@ -876,17 +989,16 @@ function sortCards(emails, queue) {
     const found = stepOf[((email.recipient || {}).email || (email.customer || {}).email || '').toLowerCase()];
     return found === undefined || found < 0 ? 0 : found;
   };
-  // a tie (the same last email of ours to several customers, e.g. a round) goes by the date of the email itself
   const sign = order === 'oldest' ? 1 : -1;
-  return emails.map((email, index) => ({email, index, at: lastActivity(email), own: Date.parse(email.date || '') || 0,
-    step: step(email)}))
+  return emails.map((email, index) => ({email, index, at: lastActivity(email), step: step(email)}))
     .sort((a, b) => (order === 'early' ? a.step - b.step : order === 'late' ? b.step - a.step : 0)
-      || sign * (a.at - b.at) || sign * (a.own - b.own) || a.index - b.index)
+      || sign * (a.at - b.at) || a.index - b.index)
     .map(item => item.email);
 }
+// 29/09: the customer's latest message this card answers (the email itself and those merged into it) — never our own
+// sends, or a round or a batch sent a few seconds apart would decide the order
 function lastActivity(email) {
-  const moments = [email.date, ...(email.merged || []).map(part => part.date),
-    ...(email.conversation || email.history || []).map(turn => turn.ts || turn.at)];
+  const moments = [email.date, ...(email.merged || []).map(part => part.date)];
   return Math.max(0, ...moments.map(value => Date.parse(value || '') || 0));
 }
 
@@ -919,7 +1031,7 @@ function renderState() {
     ...active.map(activeCard)] : []));
   renderPipeline(queue);  // after the cards: its names go to them
   $('instructions').textContent = queue?.instructions || '';
-  preview = null; $('preview-box').replaceChildren();
+  preview = null; $('preview-box').replaceChildren(); $('preview-actions').replaceChildren();
   // A fresh batch of emails makes any earlier "done" (import, send) stale: back to work, not finished.
   $('import-status').hidden = true; markStep('import-step', false); markStep('send-step', false);
   updateSelection();
@@ -935,9 +1047,13 @@ function renderState() {
 const STEP_REST_MS = 10 * 60 * 1000;
 const stepsDone = {read: false, generated: false};
 function generatedAt() { try { return Number(localStorage.getItem('aria-generated-at')) || 0; } catch { return 0; } }
-function restButton(button, since, what) {
+function restButton(button, since, what, done) {
   const until = since + STEP_REST_MS, resting = Date.now() < until;
   button.dataset.lock = resting ? '1' : '';
+  // 29/09: resting reads as a step done (green, «✓ Emails lidos»), not as a switched-off button; a class, so a click's
+  // own label coming back (run) never undoes it
+  button.dataset.done = done;
+  button.classList.toggle('step-done', resting && button.dataset.hold !== '1');
   button.disabled = resting || button.dataset.hold === '1';
   const hhmm = moment => new Date(moment).toLocaleTimeString('pt-PT', {hour: '2-digit', minute: '2-digit'});
   if (resting) button.title = `${what} às ${hhmm(since)}: volta a estar disponível às ${hhmm(until)}.`;
@@ -946,8 +1062,8 @@ function restButton(button, since, what) {
 }
 function updateSteps() {
   const lastRead = Math.max(0, ...(state.properties || []).map(queue => Date.parse(queue.last_read_at || '') || 0));
-  const reading = restButton($('read'), lastRead, 'Leitura feita');
-  const generating = restButton($('generate-api'), generatedAt(), 'Respostas geradas');
+  const reading = restButton($('read'), lastRead, 'Leitura feita', 'Emails lidos');
+  const generating = restButton($('generate-api'), generatedAt(), 'Respostas geradas', 'Respostas geradas');
   const drafts = (currentQueue()?.emails || []).some(email => email.reply_status === 'draft');
   $('prepare-step').hidden = !(stepsDone.read || reading);
   $('send-step').hidden = !(stepsDone.generated || generating || drafts);
@@ -1442,18 +1558,16 @@ function noteBox(ref, onSaved, inCard = false, withGenerate = false) {
 
 function renderPreview() {
   const box = $('preview-box'), count = preview.replies.length;
-  box.replaceChildren(
-    el('p', {class: 'alert warn'}, `Vais enviar ${count} email(s) reais. Confere destinatários e textos; esta pré-visualização vale 15 minutos.`),
-    ...preview.replies.map(reply => el('article', {class: 'card'},
-      el('div', {}, el('strong', {}, 'Para: '), reply.to), el('div', {}, el('strong', {}, 'Assunto: '), reply.subject),
-      (reply.warnings || []).map(warning => el('p', {class: 'alert warn'}, warning)), el('pre', {}, reply.reply_text))),
-    el('div', {class: 'actions'},
+  // 29/09: «Enviar N email(s)» and «Cancelar» beside «3 Rever para Enviar Todos»; the emails to check stay below
+  const clear = () => { preview = null; box.replaceChildren(); $('preview-actions').replaceChildren(); };
+  $('preview-actions').replaceChildren(
       el('button', {class: 'primary send-action', onclick: event => run(async () => {
         if (!confirm(`Enviar agora ${count} email(s) reais?`)) return;
         const result = await call('api/send', {property_ref: queueRef(), preview_token: preview.preview_token, confirmed: true});
         const sent = result.results.filter(item => item.status === 'sent').length;
         if (sent) playSound('send');
         state = await call('api/state'); keepSteps(renderState);  // renderState clears preview-box first
+        $('preview-actions').replaceChildren();
         $('preview-box').replaceChildren(el('p', {class: 'alert ' + (sent === result.results.length ? 'ok' : 'warn')},
           `✓ Enviados ${sent} de ${result.results.length} email(s).`
           + (sent < result.results.length ? ' Vê os avisos nos que ficaram.' : ' Passa ao próximo lote no passo 01.')));
@@ -1461,7 +1575,12 @@ function renderPreview() {
         toast(`Enviados: ${sent} de ${result.results.length}.` + (sent < result.results.length ? ' Vê os avisos nos que ficaram.' : ''),
           sent === result.results.length ? 'ok' : 'warn');
       }, event.currentTarget)}, `Enviar ${count} email(s)`),
-      el('button', {class: 'link', onclick: () => { preview = null; box.replaceChildren(); }}, 'Cancelar')));
+      el('button', {class: 'link', onclick: clear}, 'Cancelar'));
+  box.replaceChildren(
+    el('p', {class: 'alert warn'}, `Vais enviar ${count} email(s) reais. Confere destinatários e textos; esta pré-visualização vale 15 minutos.`),
+    ...preview.replies.map(reply => el('article', {class: 'card'},
+      el('div', {}, el('strong', {}, 'Para: '), reply.to), el('div', {}, el('strong', {}, 'Assunto: '), reply.subject),
+      (reply.warnings || []).map(warning => el('p', {class: 'alert warn'}, warning)), el('pre', {}, reply.reply_text))));
 }
 
 function ago(value) {
@@ -2528,6 +2647,7 @@ function renderSettings() {
   $('api-hint').textContent = 'Sem chave OpenAI configurada ainda: corre mac/openai_key.command no terminal.';
   renderCalendar();
   renderVisitsRound();
+  renderWorkshop();
   holdFuelButtons();
 }
 
@@ -3808,8 +3928,8 @@ function renderVoice() {
   const noVisitHours = el('input', {type: 'number', min: 1, max: 720, value: alerts.no_visit_hours});
   // The AI engine (27/09): a console of its own, one button per model, as modes (ECO, TURBO…), each with its prices
   // and what 100 interactions cost here — the price to quote a client. A click switches the model for everything.
-  const aiSection = [el('p', {class: 'eyebrow voice-section'}, 'INTELIGÊNCIA ARTIFICIAL · API OPENAI'), engineConsole()];
-  $('voice-form').replaceChildren(...aiSection.filter(Boolean), el('p', {class: 'eyebrow'}, 'VOZ ', kind('voice')),
+  // 29/09: it moved to the Oficina, with the token prices (renderWorkshop)
+  $('voice-form').replaceChildren(el('p', {class: 'eyebrow'}, 'VOZ ', kind('voice')),
     choice('greeting', 'Saudação'), choice('languages', 'Idiomas'), choice('closing', 'Fecho'),
     el('label', {class: 'field'}, 'Assinatura (sempre igual, sem tradução)', signature),
     el('label', {class: 'field'}, 'Nome do remetente, ao lado do endereço', senderName),
@@ -3877,6 +3997,7 @@ function renderVoice() {
 
 document.querySelectorAll('[data-tab]').forEach(button => button.addEventListener('click', () => showTab(button.dataset.tab)));
 $('queue').addEventListener('change', renderState);
+$('workshop-link').addEventListener('click', showWorkshop);
 $('card-sort').value = cardSort();
 $('card-sort').addEventListener('change', event => {
   cardSortChoice = event.currentTarget.value;

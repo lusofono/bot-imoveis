@@ -15,6 +15,58 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.77.0 — 29/09/2026
+
+- **Plataforma de testes (Oficina):**
+  - **«Clientes novos por ronda (%)»**, 10% por defeito, editável (para o «Avançar o teste»);
+  - **«Apagar clientes de teste»**: o imóvel de teste começa de novo — fila, conversas, agenda e contactos, e a lista
+    dos clientes. Os emails ficam no Gmail, mas a página guarda os seus identificadores e nunca mais os lê; os
+    clientes novos nunca repetem um endereço `+cdN` já usado.
+
+## α.76.3 — 29/09/2026
+
+- **«3 Preparar envios dos selecionados» passa a «3 Rever para Enviar Todos»**, e o «Enviar N email(s)» e o
+  «Cancelar» ficam ao lado dele, em vez de no fim da lista dos emails a rever (que continua por baixo).
+
+## α.76.2 — 29/09/2026
+
+- **«1 Ler emails» e «2 Gerar respostas», depois de usados, parecem um passo feito e não um botão desligado:** verdes,
+  com «✓ Emails lidos» e «✓ Respostas geradas», durante os 10 minutos de repouso (que continuam, para não repetir a
+  leitura nem pagar duas vezes o mesmo lote); a hora a que voltam fica no título, ao passar o rato.
+
+## α.76.1 — 29/09/2026
+
+- **Human contest:** «Gerar clientes de teste» guarda primeiro o interruptor e o email do consultor tal como estão no
+  ecrã (sem «Guardar», as cópias não saíam). Botão novo, **«Enviar ao consultor os que faltam»**, para os clientes já
+  criados sem cópia; na lista, cada cliente diz se o consultor já recebeu a dele.
+
+## α.76.0 — 29/09/2026
+
+- **Oficina**, um espaço à parte para quem afina a ARIA, com um link no fundo da barra lateral que só aparece com
+  `"admin": true` no `config.json` (quem usa a página no dia a dia não a vê):
+  - **o motor de IA** sai da Voz e estilo e passa para aqui;
+  - **preços dos tokens** editáveis, em dólares por 1M tokens: mudar o de um modelo, repor o da tabela, ou acrescentar
+    um modelo novo, que passa a poder escolher-se no motor; valem para todas as estimativas (custo de cada chamada,
+    depósitos, «/ 100 interações»);
+  - **plataforma de testes**: «Gerar clientes de teste» inventa com a IA N clientes fictícios do imóvel de teste (um
+    `profile.json` com `"test": true`), cada um com uma personagem escondida, e envia de verdade o aviso de cada um pelo
+    Gmail, desta conta para ela própria, com o cliente no Reply-To (um endereço `+cdN` da conta) e a marca
+    `X-ARIA-Teste`; «Ler emails» trá-los como avisos do portal. **Human contest**: ligado, cada aviso vai também, numa
+    cópia à parte, para o email de um consultor, que responde à mão lado a lado.
+- **Leitura:** um email da própria conta com a marca de teste lê-se como aviso ou resposta de cliente, só no imóvel de
+  teste (o cliente vem do Reply-To); um imóvel real nunca o aceita. O nome no assunto ignora o «teste de».
+
+## α.75.2 — 29/09/2026
+
+- **Aviso enquanto os emails saem:** durante qualquer envio (um email, um lote ou a ronda), fica no topo da página uma
+  faixa com um envelope a voar — «A enviar emails… Não feches esta janela, o browser nem o portátil até terminar» — e
+  o browser pede confirmação se se tentar fechar ou recarregar a página. Some quando o envio acaba.
+
+## α.75.1 — 29/09/2026
+
+- **«Mais recentes» nas Comunicações conta a mensagem do cliente** que o cartão responde (e as que se juntaram a ela),
+  não os nossos envios: uma ronda ou um lote enviados com segundos de diferença baralhavam a ordem.
+
 ## α.75.0 — 29/09/2026
 
 - **«Ordenar» nas Comunicações:** mais recentes primeiro (o normal), mais antigos primeiro, primeiras fases primeiro ou

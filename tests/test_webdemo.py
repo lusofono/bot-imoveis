@@ -15,7 +15,10 @@ RECORDED = {"api/contacts/ignored", "api/todo", "api/visits/analysis-prompt", "a
 UNAVAILABLE = {"api/consent/confirm", "api/consent/request", "api/paste", "api/prompt", "api/property/extract",
                "api/property/parse", "api/property/prompt", "api/property/save", "api/recipient", "api/visits/close",
                "api/visits/round-generate", "api/visits/round-individual", "api/visits/round-paste",
-               "api/visits/round-prompt", "api/visits/round-save"}
+               "api/visits/round-prompt", "api/visits/round-save",
+               # 29/09: the Oficina (admin only): never in the sales demo
+               "api/ai/price", "api/testlab/state", "api/testlab/contest", "api/testlab/clients",
+               "api/testlab/consultant", "api/testlab/wipe"}
 
 
 @pytest.fixture(scope="module")

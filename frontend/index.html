@@ -27,6 +27,7 @@
   </nav>
   <!-- A skin's own tab selector (80's RacingCar: the gated gearbox); a copy of the nav above, for the mouse only. -->
   <div id="skin-selector" class="skin-selector" aria-hidden="true"></div>
+  <button id="workshop-link" class="workshop-link" type="button" hidden>Oficina</button>
   <div class="sidebar-note"><span class="status-dot"></span> Ambiente local<span class="app-version" title="Versão da aplicação (ver CHANGELOG.md) e quando este processo arrancou com este código"><strong>v{{VERSION}}</strong><span class="app-build">{{BUILD_AT}}</span></span></div>
   <div class="account-card"><span class="avatar" aria-hidden="true">@</span><div><span class="small muted">A tua conta</span><span id="account"></span></div></div>
 </header>
@@ -120,7 +121,7 @@
     <article class="card step-card" id="send-step">
       <div class="step-top"><p class="eyebrow" id="send-step-label">PASSO 04</p><h2>Rever e enviar</h2>
         <p class="step">Revê e corrige os rascunhos abaixo; o envio mostra primeiro os destinatários e os textos finais.</p></div>
-      <div class="step-action"><div class="actions"><button id="preview" class="primary"><span class="step-num" aria-hidden="true">3</span>Preparar envios dos selecionados</button></div></div>
+      <div class="step-action"><div class="actions"><button id="preview" class="primary"><span class="step-num" aria-hidden="true">3</span>Rever para Enviar Todos</button><span id="preview-actions" class="preview-actions"></span></div></div>
       <div class="step-extra"></div>
     </article>
     </div>
@@ -267,8 +268,19 @@
     <article class="card" id="voice-form"></article>
     <article class="card" id="agency-knowledge"></article>
   </section>
+
+  <!-- 29/09: the Oficina — the AI engine, token prices and the test platform; only with "admin": true in config.json -->
+  <section id="tab-workshop" hidden>
+    <div class="page-heading"><div><p class="eyebrow">OFICINA</p><h1>Oficina</h1><p class="step">Para quem afina a ARIA: o motor de IA, os preços dos tokens e a plataforma de testes. Quem usa a página no dia a dia não a vê.</p></div></div>
+    <article class="card" id="workshop-engine"></article>
+    <article class="card" id="workshop-prices"></article>
+    <article class="card" id="workshop-lab"></article>
+  </section>
 </main></div>
 <div id="toast" role="status" aria-live="polite" hidden></div>
+<!-- 29/09: while emails are going out, a banner with a flying envelope: do not close the window nor the laptop -->
+<div id="sending-banner" role="alert" hidden><span class="sending-flight" aria-hidden="true"><span class="sending-envelope">✉</span></span>
+  <span><strong>A enviar emails…</strong> Não feches esta janela, o browser nem o portátil até terminar.</span></div>
 
 <!-- The server writes a new token here at each start; app.js sends it with every API call. -->
 <script nonce="{{NONCE}}">const TOKEN = '{{TOKEN}}';</script>

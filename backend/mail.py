@@ -193,7 +193,10 @@ def read_messages(account, password, subject_contains, date_from, date_to,
             msg = BytesParser(policy=policy.default).parsebytes(raw)
             subject = decode_mime(msg.get("Subject"))
             from_list = parse_addresses(msg.get_all("From", []))
-            own = account.casefold() in {x["email"].casefold() for x in from_list if x["email"]}
+            # 29/09: the test platform's emails leave from this same account (Gmail keeps no other sender) with the
+            # X-ARIA-Teste header: they are read as incoming mail, never as the owner's own
+            test = msg.get(TEST_HEADER) == "1"  # the consultant's copy («consultor») stays the owner's own mail
+            own = not test and account.casefold() in {x["email"].casefold() for x in from_list if x["email"]}
             if not own and (own_only or (wanted and wanted not in normalise(subject))):
                 continue
             if own and incoming_only and outgoing is None:
@@ -223,6 +226,8 @@ def read_messages(account, password, subject_contains, date_from, date_to,
                 "in_reply_to": (msg.get("In-Reply-To", "") or "").strip(),
                 "references": (msg.get("References", "") or "").strip(),
             }
+            if test:
+                item["test"] = True
             if own and outgoing is not None and accept_outgoing and accept_outgoing(item):
                 item["body_text"], item["body_truncated"], _ = fetch_text_only(mail, uid, structure_bytes)
                 outgoing.append(item)
@@ -438,6 +443,10 @@ def fetch_text_only(mail, uid, structure_bytes):
         texts.append(text.strip())
     joined = "\n\n".join(texts)
     return joined[:100000], truncated or len(joined) > 100000, profile
+
+
+# 29/09: the header that marks a message of the test platform (backend/testlab.py). Only a test property reads it.
+TEST_HEADER = "X-ARIA-Teste"
 
 
 # Replies: one plain-text message per email, threaded under the original.

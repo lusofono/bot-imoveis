@@ -22,6 +22,24 @@ PRICE_PER_1K_USD = {"gpt-4o": (0.0025, 0.01), "gpt-4o-mini": (0.00015, 0.0006),
 PRICE_FALLBACK = PRICE_PER_1K_USD["gpt-4o"]
 # The models the page offers: only those whose price is confirmed in the table above (the owner's rule, 26/09).
 MODELS = tuple(PRICE_PER_1K_USD)
+BUILTIN_PRICES = dict(PRICE_PER_1K_USD)
+
+
+def apply_prices(overrides):
+    """29/09: the prices typed in the Oficina (config.json "token_prices", USD per 1M tokens) over the table above; a
+    model only there becomes one more to choose. Every cost estimate reads the table, so they all follow."""
+    PRICE_PER_1K_USD.clear()
+    PRICE_PER_1K_USD.update(BUILTIN_PRICES)
+    for model, price in (overrides or {}).items():
+        try:
+            PRICE_PER_1K_USD[str(model)] = (float(price["input_usd_per_1m"]) / 1000, float(price["output_usd_per_1m"]) / 1000)
+        except (TypeError, KeyError, ValueError):
+            continue  # a broken entry never stops the page: the table's own price stays
+
+
+def models():
+    """The models on offer now: the table's, with the Oficina's own."""
+    return tuple(PRICE_PER_1K_USD)
 
 
 def estimate_cost_usd(model, prompt_tokens, completion_tokens):
