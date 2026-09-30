@@ -16,9 +16,11 @@ from datetime import datetime
 import random
 import smtplib
 from email import message_from_bytes, policy
+from email.utils import parsedate_to_datetime
 from email.message import EmailMessage
 from email.utils import formataddr, formatdate, make_msgid
 from .ai import extract_json
+from .evaluator import averages, evaluation_prompt, parse_evaluations
 from .mail import TEST_HEADER, connect, find_all_mailbox, parse_addresses
 from .openai_client import complete, estimate_cost_usd
 from .rules import EMAIL, QUOTE
@@ -116,8 +118,18 @@ def lab_view(service):
         ref = test_property(service)[0]
     except ValueError:
         ref = None
+    evaluations = lab.get("evaluations") or []
+    last = max((e["at"] for e in evaluations), default=None)
+    side = lambda name: [e for e in evaluations if e["side"] == name]
+    waited = lambda name: (lambda hours: round(sum(hours) / len(hours), 1) if hours else None)(
+        [e["waited_hours"] for e in side(name) if e.get("waited_hours") is not None])
     return {"property_ref": ref, "contest": lab.get("contest") or {"on": False, "email": ""},
             "new_percent": lab.get("new_percent", NEW_PERCENT),
+            # 30/09: the evaluator's report — the averages of each side, and the last round's marks with its mistakes
+            "evaluation": {"aria": averages(side("aria")), "consultant": averages(side("consultant")),
+                           "waited": {"aria": waited("aria"), "consultant": waited("consultant")},
+                           "last": [{key: e.get(key) for key in ("name", "side", "score", "errors", "summary")}
+                                    for e in evaluations if e["at"] == last]},
             "clients": [{**{key: client.get(key) for key in ("number", "name", "language", "address", "created_at")},
                          "consultant": bool(client.get("consultant_notice_id")), "ended": bool(client.get("ended")),
                          "rounds": len(client.get("answered") or []) + len(client.get("consultant_answered") or [])}
@@ -391,15 +403,22 @@ def advance(service, now, rng=random):
                 turns = [{"who": "cliente", "text": client["message"]}] + (client.get("consultant_history") or [])
                 for message in mine:
                     if not any(turn.get("id") == message["message_id"] for turn in turns):
-                        turns.append({"who": "nos", "text": message["text"], "id": message["message_id"]})
+                        turns.append({"who": "nos", "text": message["text"], "id": message["message_id"], "ts": message["at"]})
                 client["consultant_history"] = turns[1:]
                 tasks.append({"id": f"c{client['number']}", "side": "consultant", "client": client,
                               "turns": turns[-HISTORY_TURNS:], "reply_to": mine[-1]["message_id"],
                               "references": client.get("consultant_notice_id") or "", "subject": mine[-1]["subject"]})
         cost, answered, silent = 0.0, {"aria": [], "consultant": []}, []
+        evaluated, evaluation_error = 0, None
+        if tasks:
+            try:
+                evaluated, spent = evaluate_round(service, ref, lab, tasks, now)
+                cost += spent
+            except Exception as exc:  # the round goes on: only the marks are missing this time
+                evaluation_error = str(exc)
         if tasks:
             answer, usage = complete(openai_api_key(service.folder, account), model, advance_prompt(profile, tasks))
-            cost = estimate_cost_usd(model, usage.get("prompt_tokens"), usage.get("completion_tokens"))
+            cost += estimate_cost_usd(model, usage.get("prompt_tokens"), usage.get("completion_tokens"))
             service.log("openai_usage", model=model, **usage, reference=ref, cost_usd=round(cost, 6))
             found = extract_json(answer)
             replies = {str(item.get("id")): item for item in (found.get("respostas") if isinstance(found, dict) else None) or []
@@ -418,7 +437,8 @@ def advance(service, now, rng=random):
                         smtp.send_message(msg)
                         answered[task["side"]].append(client["name"])
                         if not aria:
-                            client.setdefault("consultant_history", []).append({"who": "cliente", "text": text[:4000]})
+                            client.setdefault("consultant_history", []).append(
+                                {"who": "cliente", "text": text[:4000], "ts": datetime.now().astimezone().isoformat()})
                     # answered or silent, this email of ours has had its round
                     client.setdefault("answered" if aria else "consultant_answered", []).append(task["reply_to"])
                     if item.get("fim") is True:
@@ -431,4 +451,60 @@ def advance(service, now, rng=random):
     service.log("testlab_round", reference=ref, aria=len(answered["aria"]), consultant=len(answered["consultant"]),
                 silent=len(silent), new=len(made))
     return {**lab_view(service), "aria": answered["aria"], "consultant": answered["consultant"], "silent": silent,
-            "new": made, "cost_usd": round(cost, 6), "fuel": service.api_fuel(ref)}
+            "new": made, "evaluated": evaluated, "evaluation_error": evaluation_error, "cost_usd": round(cost, 6),
+            "fuel": service.api_fuel(ref)}
+
+
+def moment_of(value):
+    """An ISO time (our history) or an email's Date header (the consultant's), aware; None when neither."""
+    try:
+        return datetime.fromisoformat(str(value))
+    except ValueError:
+        try:
+            return parsedate_to_datetime(str(value))
+        except (TypeError, ValueError, IndexError):
+            return None
+
+
+def hours_between(before, after):
+    start, end = moment_of(before), moment_of(after)
+    if not (start and end and start.tzinfo and end.tzinfo):
+        return None
+    return round((end - start).total_seconds() / 3600, 1)
+
+
+def evaluate_round(service, ref, lab, tasks, now):
+    """30/09: before the customers answer, the evaluator marks the replies they got — the ARIA's and the consultant's —
+    knowing each customer's hidden profile. Each reply once. Returns (how many, cost)."""
+    items = []
+    for task in tasks:
+        client, turns = task["client"], task["turns"]
+        if task["reply_to"] in client.get("evaluated", []) or not turns or turns[-1]["who"] != "nos":
+            continue
+        before = turns[:-1]
+        asked = next((turn for turn in reversed(before) if turn["who"] == "cliente"), None)
+        items.append({"id": f"{task['side'][0]}{client['number']}", "task": task, "turns": before, "reply": turns[-1]["text"],
+                      "profile": client.get("profile") or {}, "side": "ARIA" if task["side"] == "aria" else "consultor",
+                      "waited": hours_between((asked or {}).get("ts") or (asked or {}).get("at"),
+                                              turns[-1].get("ts") or task.get("sent_at"))})
+    if not items:
+        return 0, 0.0
+    cfg = service.config()
+    model = service.reviewer_settings(cfg)["model"]
+    instructions = next(queue for queue in service.pending(ref)["properties"] if queue["property_ref"] == ref)["instructions"]
+    answer, usage = complete(openai_api_key(service.folder, cfg["account"]), model, evaluation_prompt(instructions, items))
+    cost = estimate_cost_usd(model, usage.get("prompt_tokens"), usage.get("completion_tokens"))
+    service.log("openai_usage", model=model, **usage, reference=ref, cost_usd=round(cost, 6), purpose="evaluation")
+    marks = parse_evaluations(answer, [item["id"] for item in items])
+    for item in items:
+        mark = marks.get(item["id"])
+        if not mark:
+            continue
+        client = item["task"]["client"]
+        lab.setdefault("evaluations", []).append({
+            "at": now, "number": client["number"], "name": client["name"], "side": item["task"]["side"],
+            "message_id": item["task"]["reply_to"], "waited_hours": item["waited"], **mark})
+        client.setdefault("evaluated", []).append(item["task"]["reply_to"])
+    del lab["evaluations"][:-500]
+    save_lab(service.folder, lab)
+    return len(marks), cost

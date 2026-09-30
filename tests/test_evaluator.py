@@ -1,0 +1,102 @@
+"""The evaluator (30/09): marks on fixed criteria and the mistakes quoted — for the real drafts (the reviewer) and for
+the test platform's rounds (the ARIA and the consultant, knowing each customer's hidden profile)."""
+import json
+from unittest.mock import patch
+import pytest
+from backend import testlab
+from backend.evaluator import CRITERIA, averages, evaluation_prompt, parse_evaluations
+from backend.openai_client import apply_context, apply_prices
+from backend.store import load_json, save_json
+from test_properties import REF, SMTP, lead, read, service  # noqa: F401 (service is a fixture)
+from test_testlab import ACCOUNT, TEST_REF, marked_notice, queue_of, with_test_property
+
+USAGE = {"prompt_tokens": 100, "completion_tokens": 20}
+
+
+@pytest.fixture(autouse=True)
+def tables():
+    yield
+    apply_prices({})
+    apply_context({})
+
+
+def marks(ids, score=8, errors=()):
+    return json.dumps({"avaliacoes": [{"id": key, "notas": {name: score for name in CRITERIA}, "erros": list(errors),
+                                       "resumo": "Clara e correta."} for key in ids]})
+
+
+def test_the_marks_are_read_bounded_and_averaged():
+    text = json.dumps({"avaliacoes": [{"id": "a", "notas": {"factos": 12, "voz": 7, "avanco": "x"},
+                                       "erros": ["  volta a perguntar o agregado  ", ""], "resumo": "ok"},
+                                      {"id": "fora", "notas": {"factos": 1}}]})
+    found = parse_evaluations(text, ["a"])
+    assert set(found) == {"a"} and found["a"]["notes"] == {"factos": 10.0, "voz": 7.0} and found["a"]["score"] == 8.5
+    assert found["a"]["errors"] == ["volta a perguntar o agregado"]
+    assert averages([found["a"], {**found["a"], "score": 6.5}])["score"] == 7.5
+    prompt = evaluation_prompt("REGRAS DO IMÓVEL", [{"id": "a", "turns": [{"who": "cliente", "text": "Tem garagem?"}],
+                                                     "reply": "Tem.", "profile": {"segredos": "um cão"}}])
+    assert "REGRAS DO IMÓVEL" in prompt and "Tem garagem?" in prompt and "um cão" in prompt and '"regras": 0' in prompt
+    assert "um cão" not in evaluation_prompt("x", [{"id": "a", "reply": "r", "profile": {"segredos": "um cão"}}], hidden=False)
+
+
+def test_the_reviewer_marks_the_real_drafts_while_their_text_is_the_one_read(service):
+    read(service, [lead("1")])
+    service.drafts([{"id": "1", "reply_text": "Olá, Ana."}], queue_of(service, REF)["revision"], REF)
+    with patch("backend.service.complete", return_value=(marks(["1"], 6, ["não responde à pergunta da hora"]), USAGE)) as ai, \
+            patch("backend.service.openai_api_key", return_value="k"):
+        result = service.review_drafts(REF, ["1"])
+    assert result["reviewed"] == 1 and ai.call_args.args[1] == "gpt-4o"  # the evaluator's model, stronger by default
+    assert "Olá, Ana." in ai.call_args.args[2] and "Bom dia, gostaria de visitar o imóvel." in ai.call_args.args[2]
+    [email] = queue_of(service, REF)["emails"]
+    assert email["review"]["score"] == 6 and email["review"]["errors"] == ["não responde à pergunta da hora"]
+    assert email["review_fresh"] is True
+    service.drafts([{"id": "1", "reply_text": "Olá, Ana. Pode ser às 18h."}], queue_of(service, REF)["revision"], REF)
+    assert queue_of(service, REF)["emails"][0]["review_fresh"] is False  # another text: the marks no longer hold
+    ai = service.set_reviewer("gpt-4o-mini", False)
+    assert ai["reviewer"] == {"model": "gpt-4o-mini", "auto": False}
+
+
+def test_generating_reviews_the_new_drafts_when_the_reviewer_is_on(service):
+    from starlette.testclient import TestClient
+    from backend.ai import short_id
+    from backend.api import web_app
+    client = TestClient(web_app(service.folder, "t"), base_url="http://127.0.0.1:8765")
+    read(service, [lead("1")])
+    draft = json.dumps({"respostas": [{"id": short_id("1"), "reply_text": "Olá, Ana."}]})
+    with patch("backend.api.complete", return_value=(draft, USAGE)), patch("backend.api.openai_api_key", return_value="k"), \
+            patch("backend.service.complete", return_value=(marks(["1"], 9), USAGE)), \
+            patch("backend.service.openai_api_key", return_value="k"):
+        result = client.post("/api/prompt/generate", json={"property_ref": REF, "ids": ["1"]},
+                             headers={"X-Bot-Mail-Token": "t"}).json()
+    assert result["saved"] == 1 and result["reviewed"] == 1 and result["review_error"] is None
+    assert result["state"]["properties"][0]["emails"][0]["review"]["score"] == 9
+
+
+def test_a_round_marks_the_aria_and_the_consultant_before_the_customers_answer(service):
+    with_test_property(service)
+    read(service, [marked_notice("t1")])
+    service.drafts([{"id": "t1", "reply_text": "Olá, quantos são?"}], queue_of(service, TEST_REF)["revision"], TEST_REF)
+    preview = service.preview(["t1"], TEST_REF)
+    with patch("backend.service.app_password", return_value="fake"), patch("backend.service.smtplib.SMTP_SSL", SMTP):
+        service.send(preview["preview_token"], True, TEST_REF)
+    lab = testlab.load_lab(service.folder)
+    lab["clients"] = [{"number": 1, "name": "Sergii Sviatokha", "address": "owner+cd1@example.com", "message": "Olá",
+                       "profile": {"agregado": "casal"}, "consultant_notice_id": "<copy@x>"}]
+    lab["contest"], lab["new_percent"] = {"on": True, "email": "consultor@example.com"}, 0
+    testlab.save_lab(service.folder, lab)
+    consultant = [{"number": 1, "message_id": "<c1@x>", "subject": "Re: x", "text": "Bom dia! Tem animais?",
+                   "at": "Tue, 29 Sep 2026 17:00:00 +0100"}]
+    replies = json.dumps({"respostas": [{"id": "a1", "responde": False}, {"id": "c1", "responde": False}]})
+    calls = [(marks(["a1", "c1"], 7, ["pergunta o que não é preciso"]), USAGE), (replies, USAGE)]
+    with patch("backend.testlab.complete", side_effect=calls) as ai, \
+            patch("backend.testlab.consultant_messages", return_value=consultant), \
+            patch("backend.testlab.openai_api_key", return_value="k"), patch("backend.testlab.app_password", return_value="p"), \
+            patch("backend.testlab.smtplib.SMTP_SSL", SMTP):
+        result = testlab.advance(service, "2026-09-30T10:00:00+01:00", type("Never", (), {"random": lambda self: .99})())
+    judged = ai.call_args_list[0].args
+    assert judged[1] == "gpt-4o" and '"agregado": "casal"' in judged[2].replace("'", '"') and "Bom dia! Tem animais?" in judged[2]
+    assert result["evaluated"] == 2
+    report = result["evaluation"]
+    assert report["aria"]["score"] == 7 and report["consultant"]["score"] == 7
+    assert {item["side"] for item in report["last"]} == {"aria", "consultant"}
+    assert report["last"][0]["errors"] == ["pergunta o que não é preciso"]

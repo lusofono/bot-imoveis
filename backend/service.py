@@ -21,6 +21,7 @@ from .ai import (AFTER_VISIT_RULE, AFTER_VISIT_TEMPLATE, BOOKED_REPLY_RULE, DOCS
                  listing_text_prompt, parse_listing, agenda_prompt, describe, instructions,
                  parse_agenda, parse_survey, visit_analysis_prompt, clean_round, round_text)
 from .configure import STARTER, example_profile
+from .evaluator import evaluation_prompt, parse_evaluations, text_hash
 from .mail import build_digest, build_reply, read_messages
 from .openai_client import (BUILTIN_CONTEXT, BUILTIN_PRICES, CONTEXT_FALLBACK, MODEL_DEFAULT, PRICE_PER_1K_USD,
                             apply_context, apply_prices, complete, context_of, estimate_cost_usd, models)
@@ -69,7 +70,7 @@ VIEW_FIELDS = ("id", "kind", "date", "subject", "customer", "recipient", "blocke
                "reply_text", "reply_status", "reply_error", "reply_message_id", "visit_window", "visit_slot",
                "visit_status", "reminder", "closing", "consent_suggested", "consent_confirmed", "history", "merged",
                "merged_ids", "visit_done", "visit_reminder", "survey_reply", "docs_request", "visit_missed", "profile_url",
-               "round")
+               "round", "review")
 # 30/09: the prompts common to every property that the Oficina edits (voice.json), with the code's own text; the
 # behaviour («Comportamento geral») lives at the root of voice.json, the others under style.
 COMMON_PROMPTS = {"application_instructions": "", "after_visit": AFTER_VISIT_RULE, "after_visit_template": AFTER_VISIT_TEMPLATE,
@@ -328,6 +329,7 @@ class MailService:
         apply_context(cfg.get("model_context"))
         basis = self.interaction_cost(events)
         return {"mode": self.ai_mode(), "model": self.model(), "cost_basis": basis, "limits": self.call_limits(cfg),
+                "reviewer": self.reviewer_settings(cfg),
                 "models": [{"id": model, "input_usd_per_1m": round(rates[0] * 1000, 4), "output_usd_per_1m": round(rates[1] * 1000, 4),
                             "per_100_usd": basis["per_100_usd"].get(model), "per_100_eur": basis["per_100_eur"].get(model),
                             "builtin": model in BUILTIN_PRICES, "edited": model in token_prices,
@@ -340,6 +342,66 @@ class MailService:
         so many emails (5, as before) —, so a batch never gets near the limit, where answers get worse."""
         limits = (cfg if cfg is not None else load_json(self.folder / "config.json", {})).get("call_limits") or {}
         return {"context_share": limits.get("context_share", CONTEXT_SHARE), "batch_emails": limits.get("batch_emails", BATCH_EMAILS)}
+
+    def reviewer_settings(self, cfg=None):
+        """30/09, Oficina: the evaluator's model (stronger than the one that writes: gpt-4o by default) and whether it
+        reviews the real drafts by itself after «Gerar respostas» (on by default)."""
+        cfg = cfg if cfg is not None else load_json(self.folder / "config.json", {})
+        reviewer = cfg.get("reviewer") or {}
+        model = reviewer.get("model")
+        return {"model": model if model in models() else ("gpt-4o" if "gpt-4o" in models() else self.model(cfg)),
+                "auto": reviewer.get("auto", True) is not False}
+
+    def set_reviewer(self, model, auto):
+        self.model()  # the Oficina's models too
+        if model not in models():
+            raise ValueError("Modelo desconhecido para o avaliador.")
+        with locked(self.folder):
+            cfg = load_json(self.folder / "config.json", {})
+            cfg["reviewer"] = {"model": model, "auto": bool(auto)}
+            save_json(self.folder / "config.json", cfg)
+            self.log("reviewer_set", model=model, auto=bool(auto))
+        return self.ai_settings()
+
+    def review_drafts(self, property_ref, ids):
+        """30/09: the draft reviewer — the evaluator marks these drafts (the conversation and the property's rules, no
+        hidden truth) and each one keeps its review, valid while its text is the one reviewed. Up to 5 per call."""
+        profiles = self.profiles()
+        ref = self.pick(profiles, property_ref)
+        current = next(queue for queue in self.pending(ref)["properties"] if queue["property_ref"] == ref)
+        chosen = [email for email in current["emails"] if email["id"] in set(ids) and str(email.get("reply_text") or "").strip()]
+        if not chosen:
+            return {"reviewed": 0, "cost_usd": 0.0}
+        self.require_fuel(ref)
+        cfg = self.config()
+        model = self.reviewer_settings(cfg)["model"]
+        key = openai_api_key(self.folder, cfg["account"])
+        found, cost = {}, 0.0
+        for start in range(0, len(chosen), 5):
+            batch = chosen[start:start + 5]
+            items = []
+            for email in batch:
+                turns = sorted(email.get("history") or [], key=lambda turn: str(turn.get("ts") or turn.get("at") or ""))
+                message = (email.get("customer") or {}).get("message")
+                if message and not any(turn.get("text") == message for turn in turns):
+                    turns.append({"who": "cliente", "text": message})
+                items.append({"id": email["id"], "turns": turns, "reply": email["reply_text"]})
+            answer, usage = complete(key, model, evaluation_prompt(current["instructions"], items, hidden=False))
+            part = estimate_cost_usd(model, usage.get("prompt_tokens"), usage.get("completion_tokens"))
+            cost += part
+            self.log("openai_usage", model=model, **usage, reference=ref, cost_usd=round(part, 6), purpose="review")
+            found.update(parse_evaluations(answer, [email["id"] for email in batch]))
+        texts = {email["id"]: email["reply_text"] for email in chosen}
+        with locked(self.folder):
+            data = self.load(ref)
+            for item in data["emails"]:
+                review = found.get(item["id"])
+                # only while the draft is the text that was read
+                if review and text_hash(item.get("reply_text")) == text_hash(texts.get(item["id"])):
+                    item["review"] = {**review, "hash": text_hash(item["reply_text"]), "model": model, "at": now()}
+            self.save(data, ref)
+        self.log("drafts_reviewed", reference=ref, count=len(found))
+        return {"reviewed": len(found), "cost_usd": round(cost, 6)}
 
     def set_call_limits(self, context_share, batch_emails):
         if (isinstance(context_share, bool) or not isinstance(context_share, int) or not 10 <= context_share <= 90
@@ -536,6 +598,8 @@ class MailService:
                 "booked_at": ((visits or {}).get("booked_at") or {}).get(email) if phase == "booked" else None,
                 "ficha": ficha, "ficha_summary": ficha_summary(ficha) if ref else None, "qualifying_limit": limit,
                 "draft_checks": draft_checks(item.get("reply_text"), signature, house, item.get("visit_slot")),
+                # 30/09: the reviewer's marks hold only for the text it read
+                "review_fresh": bool(item.get("review")) and (item.get("review") or {}).get("hash") == text_hash(item.get("reply_text")),
                 # A portal notice without a (valid) Reply-To: the owner may set or correct the recipient (26/09).
                 "recipient_editable": bool(ref and item.get("kind") == "lead" and (not item.get("reply_to") or item.get("blocked"))
                                            and item.get("reply_status") in (None, "pending", "draft")),

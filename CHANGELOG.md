@@ -15,6 +15,19 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.85.0 — 30/09/2026
+
+- **Avaliador:** um segundo modelo, mais forte do que o que escreve (gpt-4o por defeito, escolhido na Oficina), dá
+  nota de 0 a 10 às respostas em seis critérios — factos, perguntas do cliente, qualificação, regras da agência, voz e
+  avanço — e aponta os erros concretos, citados.
+  - **Revisor dos rascunhos reais:** logo depois de «Gerar respostas» (desligável na Oficina), cada rascunho mostra por
+    baixo a nota, uma linha de resumo e os avisos; a revisão só vale para o texto que leu (mudado o texto, diz
+    «Revisão de outra versão do texto»); «Rever com a IA» / «Rever outra vez» em cada cartão. Uma revisão que falhe
+    nunca perde os rascunhos.
+  - **Plataforma de testes:** em cada «Avançar o teste», antes de os clientes responderem, avalia as respostas da ARIA
+    e do consultor, sabendo a ficha escondida de cada cliente; a consola mostra as médias por critério lado a lado
+    (ARIA e consultor), o tempo de resposta e os erros da última ronda.
+
 ## α.84.0 — 30/09/2026
 
 - **Tema novo, «AgentVal»** (id `agentval`), a pedido de uma cliente, no espírito do site da agência dela: página creme

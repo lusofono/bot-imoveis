@@ -868,6 +868,28 @@ function limitsSection() {
       el('button', {type: 'button', onclick: event => run(async () => {
         settings.ai = await call('api/ai/limits', {context_share: share.value, batch_emails: batch.value});
         renderWorkshop(); toast('Limites guardados: valem a partir do próximo «Gerar respostas».');
+      }, event.currentTarget)}, 'Guardar')),
+    reviewerSection());
+}
+
+// 30/09: the evaluator — its model (stronger than the one that writes) and whether it reviews the real drafts by itself
+function reviewerSection() {
+  const reviewer = settings.ai?.reviewer || {model: 'gpt-4o', auto: true};
+  const model = el('select', {'aria-label': 'Modelo do avaliador'}, (settings.ai?.models || []).map(item =>
+    el('option', {value: item.id}, item.id)));
+  model.value = reviewer.model;
+  const auto = el('input', {type: 'checkbox', checked: reviewer.auto});
+  return el('div', {class: 'limits-section'},
+    el('p', {class: 'eyebrow'}, 'AVALIADOR'),
+    el('p', {class: 'step'}, 'Um segundo modelo, mais forte do que o que escreve, dá nota às respostas (factos, perguntas do cliente, '
+      + 'qualificação, regras da agência, voz e avanço) e aponta os erros concretos. Revê os rascunhos reais e avalia as '
+      + 'rondas da plataforma de testes (ARIA e consultor).'),
+    el('div', {class: 'row'},
+      el('label', {}, 'Modelo do avaliador', model),
+      el('label', {class: 'check'}, auto, ' Rever os rascunhos logo depois de «Gerar respostas»'),
+      el('button', {type: 'button', onclick: event => run(async () => {
+        settings.ai = await call('api/ai/reviewer', {model: model.value, auto: auto.checked});
+        renderWorkshop(); toast('Avaliador guardado.');
       }, event.currentTarget)}, 'Guardar')));
 }
 
@@ -923,6 +945,34 @@ function promptsCard() {
       }, event.currentTarget)}, `Guardar prompts de ${property.reference}`)))];
 }
 
+// 30/09: the evaluator's report in the lab — each side's average per criterion (ARIA and, with the Human contest, the
+// consultant), the waiting time, and the last round's marks with the mistakes quoted
+const CRITERIA_LABELS = {factos: 'Factos', perguntas: 'Perguntas do cliente', qualificacao: 'Qualificação',
+  regras: 'Regras da agência', voz: 'Voz', avanco: 'Avanço'};
+function labEvaluation(evaluation) {
+  if (!evaluation?.aria && !evaluation?.consultant) return null;
+  const cell = value => value == null ? '—' : decimal(value);
+  const both = !!evaluation.consultant;
+  return el('div', {class: 'lab-eval'},
+    el('p', {class: 'lab-eval-title'}, 'AVALIAÇÃO'),
+    el('table', {class: 'lab-eval-table'},
+      el('thead', {}, el('tr', {}, el('th', {}, ''), el('th', {}, 'ARIA'), both && el('th', {}, 'Consultor'))),
+      el('tbody', {},
+        Object.entries(CRITERIA_LABELS).map(([key, label]) => el('tr', {}, el('td', {}, label),
+          el('td', {}, cell(evaluation.aria?.criteria?.[key])), both && el('td', {}, cell(evaluation.consultant?.criteria?.[key])))),
+        el('tr', {class: 'lab-eval-total'}, el('td', {}, 'Nota geral'), el('td', {}, cell(evaluation.aria?.score)),
+          both && el('td', {}, cell(evaluation.consultant?.score))),
+        el('tr', {}, el('td', {}, 'Tempo de resposta (h)'), el('td', {}, cell(evaluation.waited?.aria)),
+          both && el('td', {}, cell(evaluation.waited?.consultant))),
+        el('tr', {}, el('td', {}, 'Respostas avaliadas'), el('td', {}, evaluation.aria?.count ?? 0),
+          both && el('td', {}, evaluation.consultant?.count ?? 0)))),
+    evaluation.last?.length ? el('div', {class: 'lab-eval-last'}, el('p', {class: 'lab-eval-title'}, 'ÚLTIMA RONDA'),
+      evaluation.last.map(item => el('div', {class: 'lab-eval-item'},
+        el('span', {}, `${item.name} · ${item.side === 'aria' ? 'ARIA' : 'consultor'} · ${decimal(item.score)}/10`),
+        item.errors?.length ? el('ul', {}, item.errors.map(error => el('li', {}, error)))
+          : el('span', {class: 'muted small'}, ' sem erros')))) : null);
+}
+
 // The test platform: fictitious customers of the test property, whose emails go through Gmail for real
 const labLog = [];  // what each «Avançar o teste» of this page view did, newest first
 function renderLab(lab) {
@@ -947,7 +997,8 @@ function renderLab(lab) {
         const said = [result.aria.length && `${result.aria.length} responderam à ARIA`,
           result.consultant.length && `${result.consultant.length} ao consultor`,
           result.silent.length && `${result.silent.length} ficaram calados`,
-          result.new.length && `${result.new.length} novos`].filter(Boolean).join(', ') || 'ninguém tinha email nosso por responder';
+          result.new.length && `${result.new.length} novos`, result.evaluated && `${result.evaluated} avaliada(s)`]
+          .filter(Boolean).join(', ') || 'ninguém tinha email nosso por responder';
         labLog.unshift(`${new Date().toLocaleTimeString('pt-PT', {hour: '2-digit', minute: '2-digit'})} · ${said}`
           + (result.aria.length ? ` · ARIA: ${result.aria.join(', ')}` : '')
           + (result.consultant.length ? ` · consultor: ${result.consultant.join(', ')}` : '')
@@ -958,6 +1009,7 @@ function renderLab(lab) {
       el('span', {class: 'muted small'}, 'Os clientes com um email nosso por responder respondem (à ARIA e, com o Human contest, '
         + 'ao consultor) ou ficam calados; entram os clientes novos da percentagem abaixo.')),
     labLog.length ? el('pre', {class: 'lab-log'}, labLog.slice(0, 12).join('\n')) : null,
+    labEvaluation(lab.evaluation),
     // 29/09: one line to generate (how many, the share per round, the button), one for the Human contest
     lab.property_ref && el('div', {class: 'row lab-row'},
       el('label', {}, 'Clientes novos', count),
@@ -1536,6 +1588,7 @@ function card(email) {
       toast(`${ignoreTarget.name || ignoreTarget.email} passou para a blacklist deste imóvel.`);
     }, event.currentTarget)}, 'Ignorar sempre / Blacklist'));
   const approve = reviewBar(email, draft);  // 29/09: «Aprovar» in the card's top corner
+  const reviewer = reviewNote(email, draft, saved);  // 30/09: the reviewer's marks and warnings, under the draft
   const article = el('article', {class: 'card email-card' + (email.blocked ? ' blocked' : '')},
     el('div', {class: 'card-head'},
       el('label', {class: 'who'}, el('input', {type: 'checkbox', class: 'pick', 'data-id': email.id, checked: !email.blocked, disabled: !!email.blocked}),
@@ -1581,7 +1634,8 @@ function card(email) {
     // An email the program prepared has no new message of the customer's: a line says what it is, over the conversation.
     programNote(email) && el('blockquote', {}, programNote(email)),
     historyBlock(email) || (!programNote(email) && el('blockquote', {}, customer.message || email.body_text || '')),
-    el('div', {class: 'draft-box'}, draft, el('div', {class: 'draft-tools'}, draftCopy, saveIcon)));
+    el('div', {class: 'draft-box'}, draft, el('div', {class: 'draft-tools'}, draftCopy, saveIcon)),
+    reviewer);
   // 27/09: in the order of the work — a fact for the knowledge (open), the reply from the API, then sending it.
   const actions = el('aside', {class: 'card email-actions', 'aria-label': 'O que fazer com este email'},
     email.consent_suggested && el('button', {class: 'primary', onclick: event => run(async () => {
@@ -1739,6 +1793,39 @@ function reviewBar(email, draft) {
   draft.addEventListener('input', () => { draw(); refreshSendButton(); });
   draw();
   return bar;
+}
+
+// 30/09: the reviewer — the evaluator's marks on this draft and the mistakes it found; valid only for the text it read.
+// «Rever com a IA» saves what is in the box and asks for a new review.
+const decimal = value => String(value).replace('.', ',');
+function reviewNote(email, draft, saved) {
+  if (email.blocked && !email.phone_only) return null;
+  const box = el('div', {class: 'review-note'});
+  const draw = () => {
+    const review = email.review, fresh = email.review_fresh && sameText(draft.value, saved);
+    const ask = el('button', {type: 'button', class: 'link', onclick: event => run(async () => {
+      if (!draft.value.trim()) throw new Error('Escreve o texto antes de o rever.');
+      state = await call('api/drafts', {property_ref: queueRef(), replies: [{id: email.id, reply_text: draft.value}]});
+      const result = await call('api/review', {property_ref: queueRef(), ids: [email.id]});
+      applyFuel(result.fuel, queueRef()); state = result.state; renderState();
+      toast(result.reviewed ? 'Revisto: vê a nota e os avisos por baixo do rascunho.' : 'O revisor não devolveu nada: tenta outra vez.');
+    }, event.currentTarget)}, review ? 'Rever outra vez' : 'Rever com a IA');
+    box.hidden = !draft.value.trim();
+    if (!review || !fresh) {
+      box.className = 'review-note muted';
+      box.replaceChildren(el('span', {class: 'small'}, review ? 'Revisão de outra versão do texto.' : 'Ainda sem revisão.'), ask);
+      return;
+    }
+    const level = review.score >= 8 ? 'ok' : review.score >= 6 ? 'warn' : 'bad';
+    box.className = 'review-note ' + level;
+    box.replaceChildren(
+      el('div', {class: 'review-head'}, el('strong', {}, `Revisor: ${decimal(review.score)}/10`),
+        review.summary && el('span', {class: 'small'}, review.summary), ask),
+      review.errors?.length ? el('ul', {}, review.errors.map(error => el('li', {}, '⚠ ' + error))) : null);
+  };
+  draft.addEventListener('input', draw);
+  draw();
+  return box;
 }
 
 function refreshSendButton() {
@@ -4212,7 +4299,9 @@ $('generate-api').addEventListener('click', event => run(async () => {
     + (result.visits ? ` e ${result.visits} marcação(ões) de visita` : '')
     + (tokens ? ` (${generationUsage(result)}${result.prompts?.length > 1 ? `, ${result.prompts.length} chamadas` : ''}`
       + (result.context_used != null ? `; a maior usou ${String(result.context_used).replace('.', ',')}% do contexto` : '') + ')' : '') + '.';
-  toast(summary + ' Revê-os no passo 01 antes de enviar.');
+  toast(summary + (result.reviewed ? ` O revisor leu ${result.reviewed}: vê as notas por baixo de cada rascunho.` : '')
+    + (result.review_error ? ` (A revisão falhou: ${result.review_error})` : '') + ' Revê-os antes de enviar.',
+    result.review_error ? 'warn' : 'ok');
 }, event.currentTarget));
 $('paste').addEventListener('click', event => run(async () => {
   const text = $('answer').value;

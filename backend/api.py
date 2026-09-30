@@ -167,8 +167,17 @@ def web_app(folder, token):
             totals["notes"] += result["notes"]
             totals["prompts"].append(prompt_text)  # «Ver o que foi enviado à IA», in the page only
             usage_total = {k: usage_total[k] + (usage.get(k) or 0) for k in usage_total}
+        # 30/09: the reviewer reads the new drafts at once (Oficina: on by default); a failure never loses the drafts
+        reviewed, review_error = 0, None
+        if totals["saved"] and service.reviewer_settings(cfg)["auto"]:
+            try:
+                review = service.review_drafts(ref, ids)
+                reviewed, cost_total = review["reviewed"], cost_total + review["cost_usd"]
+            except Exception as exc:  # the drafts are saved: only the review is missing, and it can be asked again
+                review_error = str(exc)
         return {**totals, "model": model, "state": state(), "tokens": usage_total, "cost_usd": round(cost_total, 6),
-                "fuel": service.api_fuel(ref), "calls": len(batches), "context_used": biggest}
+                "fuel": service.api_fuel(ref), "calls": len(batches), "context_used": biggest,
+                "reviewed": reviewed, "review_error": review_error}
 
     def drafts(body):
         current = queue(body.get("property_ref"))
@@ -495,6 +504,10 @@ def web_app(folder, token):
                 "property/extract": ("POST", lambda body: service.extract_listing(body.get("text"), body.get("listing_url"))),
                 "ai/model": ("POST", lambda body: service.set_model(str(body.get("model") or ""))),
                 "ai/price": ("POST", ai_price),
+                "ai/reviewer": ("POST", lambda body: (admin(), service.set_reviewer(str(body.get("model") or ""),
+                                                                                  body.get("auto") is True))[1]),
+                "review": ("POST", lambda body: {**service.review_drafts(body.get("property_ref") or None, ids_of(body)),
+                                                 "state": state(), "fuel": service.api_fuel(body.get("property_ref") or None)}),
                 "prompts/common": ("POST", lambda body: (admin(), service.save_common_prompts(body.get("prompts") or {}),
                                                          service.settings())[2]),
                 "ai/context": ("POST", lambda body: (admin(), service.set_context(
