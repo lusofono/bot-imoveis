@@ -64,6 +64,8 @@ INTERACTION_MARGIN = 0.20  # 27/09: the safety margin on the average cost of an 
 USD_PER_EUR, USD_PER_EUR_DATE = 1.1382, "2026-09-27"
 # Dashboard chart: period in days → days per bar (90 days per day would be 90 unreadable bars).
 CHART_PERIODS = {3: 1, 7: 1, 14: 1, 30: 1, 90: 7}
+ADDITION_MIN_TEXT = 20  # 30/09: an «acrescento» with less text than this goes when the customer writes again
+REVIEW_MIN_TEXT = 40  # 30/09: a draft shorter than this is not reviewed (a mark on 3 letters means nothing)
 CONTEXT_SHARE, BATCH_EMAILS = 50, 5  # 29/09: one call's limits by default (Oficina): % of the model's context, emails
 
 VIEW_FIELDS = ("id", "kind", "date", "subject", "customer", "recipient", "blocked", "body_text", "body_truncated",
@@ -369,7 +371,8 @@ class MailService:
         profiles = self.profiles()
         ref = self.pick(profiles, property_ref)
         current = next(queue for queue in self.pending(ref)["properties"] if queue["property_ref"] == ref)
-        chosen = [email for email in current["emails"] if email["id"] in set(ids) and str(email.get("reply_text") or "").strip()]
+        chosen = [email for email in current["emails"] if email["id"] in set(ids)
+                  and len(str(email.get("reply_text") or "").strip()) >= REVIEW_MIN_TEXT]
         if not chosen:
             return {"reviewed": 0, "cost_usd": 0.0}
         self.require_fuel(ref)
@@ -601,6 +604,7 @@ class MailService:
                 "draft_checks": draft_checks(item.get("reply_text"), signature, house, item.get("visit_slot")),
                 # 30/09: the reviewer's marks hold only for the text it read
                 "review_fresh": bool(item.get("review")) and (item.get("review") or {}).get("hash") == text_hash(item.get("reply_text")),
+                "answered_direct": bool(item.get("answered_directly")),  # 30/09: greyed out in the page, not ticked
                 # A portal notice without a (valid) Reply-To: the owner may set or correct the recipient (26/09).
                 "recipient_editable": bool(ref and item.get("kind") == "lead" and (not item.get("reply_to") or item.get("blocked"))
                                            and item.get("reply_status") in (None, "pending", "draft")),
@@ -788,6 +792,7 @@ class MailService:
                 for ref, data in queues.items():
                     contacts += self.repair_missing_reply_to(ref, data, profiles[ref], cfg["account"])
                     self.repair_surveys(data)
+                    self.drop_empty_additions(data)
                     self.merge_pending(data)
             add_contacts(self.folder, contacts)
             for ref, data in queues.items():
@@ -1217,6 +1222,20 @@ class MailService:
             self.save(data, ref)
             self.log("recipient_set", reference=ref)
             return {"property_ref": ref}
+
+    @staticmethod
+    def drop_empty_additions(data):
+        """30/09: an «acrescento» (Escrever mais) with next to no text leaves the queue once the same customer writes
+        again: their new email is the reply to write now (one left with «pdf» in it sat beside it as a second card)."""
+        writing = {recipient_email(item) for item in data["emails"]
+                   if item.get("kind") in ("lead", "follow_up") and not item.get("answered_directly")}
+        empty = [item for item in data["emails"] if item.get("kind") == "addition" and recipient_email(item) in writing
+                 and len(str(item.get("reply_text") or "").strip()) < ADDITION_MIN_TEXT
+                 and item.get("reply_status") in (None, "pending", "draft")]
+        for item in empty:
+            data["emails"].remove(item)
+            data["dismissed_message_ids"].append(item["id"])
+        return len(empty)
 
     @staticmethod
     def repair_surveys(data):

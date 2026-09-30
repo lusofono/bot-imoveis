@@ -1596,9 +1596,11 @@ function card(email) {
     }, event.currentTarget)}, 'Ignorar sempre / Blacklist'));
   const approve = reviewBar(email, draft);  // 29/09: «Aprovar» in the card's top corner
   const reviewer = reviewNote(email, draft, saved);  // 30/09: the reviewer's marks and warnings, under the draft
-  const article = el('article', {class: 'card email-card' + (email.blocked ? ' blocked' : '')},
+  // 30/09: already answered straight in Gmail: greyed out and not ticked (it stays, for something to add)
+  const article = el('article', {class: 'card email-card' + (email.blocked ? ' blocked' : '') + (email.answered_direct ? ' answered-direct' : '')},
     el('div', {class: 'card-head'},
-      el('label', {class: 'who'}, el('input', {type: 'checkbox', class: 'pick', 'data-id': email.id, checked: !email.blocked, disabled: !!email.blocked}),
+      el('label', {class: 'who'}, el('input', {type: 'checkbox', class: 'pick', 'data-id': email.id,
+        checked: !email.blocked && !email.answered_direct, disabled: !!email.blocked}),
         el('strong', {}, customer.name || sender.name || sender.email || 'Sem nome')),
       email.kind === 'visit_thanks' ? el('span', {class: 'tag visit'}, 'pós-visita')
         : email.kind === 'docs_request' ? el('span', {class: 'tag visit'}, 'pedido de documentos')
@@ -1814,6 +1816,7 @@ function reviewNote(email, draft, saved) {
   const box = el('div', {class: 'review-note'});
   const draw = () => {
     const review = email.review, fresh = email.review_fresh && sameText(draft.value, saved);
+    const tooShort = draft.value.trim().length < 40;  // 30/09: the server does not review a draft this short
     const ask = el('button', {type: 'button', class: 'link', onclick: event => run(async () => {
       if (!draft.value.trim()) throw new Error('Escreve o texto antes de o rever.');
       state = await call('api/drafts', {property_ref: queueRef(), replies: [{id: email.id, reply_text: draft.value}]});
@@ -1822,6 +1825,11 @@ function reviewNote(email, draft, saved) {
       toast(result.reviewed ? 'Revisto: vê a nota e os avisos por baixo do rascunho.' : 'O revisor não devolveu nada: tenta outra vez.');
     }, event.currentTarget)}, review ? 'Rever outra vez' : 'Rever com a IA');
     box.hidden = !draft.value.trim();
+    if (tooShort) {
+      box.className = 'review-note muted';
+      box.replaceChildren(el('span', {class: 'small'}, 'Rascunho demasiado curto para rever.'));
+      return;
+    }
     if (!review || !fresh) {
       box.className = 'review-note muted';
       box.replaceChildren(el('span', {class: 'small'}, review ? 'Revisão de outra versão do texto.' : 'Ainda sem revisão.'), ask);

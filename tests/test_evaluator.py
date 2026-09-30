@@ -41,16 +41,17 @@ def test_the_marks_are_read_bounded_and_averaged():
 
 def test_the_reviewer_marks_the_real_drafts_while_their_text_is_the_one_read(service):
     read(service, [lead("1")])
-    service.drafts([{"id": "1", "reply_text": "Olá, Ana."}], queue_of(service, REF)["revision"], REF)
+    service.drafts([{"id": "1", "reply_text": "Cara Ana, agradecemos o seu contacto. A visita pode ser ao fim da tarde."}], queue_of(service, REF)["revision"], REF)
     with patch("backend.service.complete", return_value=(marks(["1"], 6, ["não responde à pergunta da hora"]), USAGE)) as ai, \
             patch("backend.service.openai_api_key", return_value="k"):
         result = service.review_drafts(REF, ["1"])
     assert result["reviewed"] == 1 and ai.call_args.args[1] == "gpt-4o"  # the evaluator's model, stronger by default
-    assert "Olá, Ana." in ai.call_args.args[2] and "Bom dia, gostaria de visitar o imóvel." in ai.call_args.args[2]
+    assert "A visita pode ser ao fim da tarde." in ai.call_args.args[2] and "Bom dia, gostaria de visitar o imóvel." in ai.call_args.args[2]
     [email] = queue_of(service, REF)["emails"]
     assert email["review"]["score"] == 6 and email["review"]["errors"] == ["não responde à pergunta da hora"]
     assert email["review_fresh"] is True
-    service.drafts([{"id": "1", "reply_text": "Olá, Ana. Pode ser às 18h."}], queue_of(service, REF)["revision"], REF)
+    service.drafts([{"id": "1", "reply_text": "Cara Ana, agradecemos. A visita fica às 18h, como pediu."}],
+                   queue_of(service, REF)["revision"], REF)
     assert queue_of(service, REF)["emails"][0]["review_fresh"] is False  # another text: the marks no longer hold
     ai = service.set_reviewer("gpt-4o-mini", False)
     assert ai["reviewer"] == {"model": "gpt-4o-mini", "auto": False}
@@ -62,7 +63,7 @@ def test_generating_reviews_the_new_drafts_when_the_reviewer_is_on(service):
     from backend.api import web_app
     client = TestClient(web_app(service.folder, "t"), base_url="http://127.0.0.1:8765")
     read(service, [lead("1")])
-    draft = json.dumps({"respostas": [{"id": short_id("1"), "reply_text": "Olá, Ana."}]})
+    draft = json.dumps({"respostas": [{"id": short_id("1"), "reply_text": "Cara Ana, agradecemos o seu contacto. A visita pode ser ao fim da tarde."}]})
     with patch("backend.api.complete", return_value=(draft, USAGE)), patch("backend.api.openai_api_key", return_value="k"), \
             patch("backend.service.complete", return_value=(marks(["1"], 9), USAGE)), \
             patch("backend.service.openai_api_key", return_value="k"):
@@ -100,3 +101,12 @@ def test_a_round_marks_the_aria_and_the_consultant_before_the_customers_answer(s
     assert report["aria"]["score"] == 7 and report["consultant"]["score"] == 7
     assert {item["side"] for item in report["last"]} == {"aria", "consultant"}
     assert report["last"][0]["errors"] == ["pergunta o que não é preciso"]
+
+
+def test_a_draft_too_short_is_never_reviewed(service):
+    read(service, [lead("1")])
+    service.drafts([{"id": "1", "reply_text": "pdf"}], queue_of(service, REF)["revision"], REF)
+    with patch("backend.service.complete") as ai, patch("backend.service.openai_api_key", return_value="k"):
+        assert service.review_drafts(REF, ["1"]) == {"reviewed": 0, "cost_usd": 0.0}
+    ai.assert_not_called()
+    assert "SÓ o texto da «Resposta a avaliar»" in evaluation_prompt("x", [{"id": "a", "reply": "r"}])

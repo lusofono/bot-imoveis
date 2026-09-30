@@ -152,3 +152,23 @@ def test_one_dot_in_two_halves_what_they_gave_and_what_we_have_to_do(service):
     assert halves(service) == {CUSTOMER: ("yellow", "ok")}  # part of the file
     change(service, CUSTOMER, visit="nao_quer")
     assert halves(service)[CUSTOMER] == ("black", "black")  # declined: a dot too, all black
+
+
+
+def test_an_almost_empty_addition_goes_when_the_customer_writes_again_and_a_gmail_answer_is_greyed(service):
+    read(service, [lead("1")])
+    draft_and_send(service, "1")
+    service.write_more(REF, CUSTOMER)  # «Escrever mais»: an «acrescento» in their conversation
+    queue = service.load(REF)
+    [addition] = [item for item in queue["emails"] if item.get("kind") == "addition"]
+    addition["reply_text"] = "pdf"
+    service.save(queue, REF)
+    sent = service.load(REF)["conversations"][CUSTOMER]["sent_message_ids"][-1]
+    read(service, [{"gmail_message_id": "2", "from": [{"email": CUSTOMER}], "in_reply_to": sent,
+                    "subject": "Re: resposta", "body_text": "Tenho uma pergunta."}])
+    kinds = [item.get("kind") for item in service.pending()["properties"][0]["emails"]]
+    assert kinds == ["follow_up"]  # the «pdf» addition went, their new email stays
+    queue = service.load(REF)
+    queue["emails"][0]["answered_directly"] = {"at": "2026-09-30T17:19:41+00:00", "interaction": 2}
+    service.save(queue, REF)
+    assert service.pending()["properties"][0]["emails"][0]["answered_direct"] is True

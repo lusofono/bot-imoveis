@@ -1003,3 +1003,6 @@ body:not(.admin) .prompt-view{display:none!important}
 /* 30/09: the agency's know-how in three groups that open */
 .knowledge-group{border:1px solid var(--line);border-radius:12px;padding:6px 16px;margin:10px 0}
 .knowledge-group>summary{font-weight:600;padding:8px 0}
+/* 30/09: an email already answered straight in Gmail — greyed out, not ticked; it comes back to full colour on hover */
+.email-card.answered-direct{opacity:.55;filter:grayscale(.85);transition:opacity .2s,filter .2s}
+.email-card.answered-direct:hover,.email-card.answered-direct:focus-within{opacity:1;filter:none}

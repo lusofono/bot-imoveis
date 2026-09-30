@@ -15,6 +15,16 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.86.1 — 30/09/2026
+
+- **Um email já respondido diretamente no Gmail fica em cinzento** e deixa de vir selecionado (não entra no «Enviar
+  todos»); continua na fila, para se acrescentar algo, e volta às cores ao passar o rato.
+- **Um «acrescento» quase vazio** (menos de 20 caracteres) **sai da fila quando o mesmo cliente volta a escrever**:
+  o email novo é a resposta a escrever (um acrescento com «pdf» ficava ao lado dele como um segundo cartão).
+- **O revisor não avalia rascunhos com menos de 40 caracteres** («Rascunho demasiado curto para rever») e avalia só o
+  texto do rascunho: as mensagens anteriores da conversa são contexto, nunca o que avalia (deu 8,5/10 a «pdf» por
+  coisas ditas antes).
+
 ## α.86.0 — 30/09/2026
 
 - **O prompt sabe o dia e a hora em que é escrito** («AGORA: quarta-feira, 30/09/2026, 19:05»): o «hoje», o
