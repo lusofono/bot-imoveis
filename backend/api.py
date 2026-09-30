@@ -121,7 +121,8 @@ def web_app(folder, token):
         return current
 
     def prompt(body):
-        return {"prompt": reply_prompt(queue(body.get("property_ref")), ids_of(body), str(body.get("extra") or ""))}
+        return {"prompt": reply_prompt(queue(body.get("property_ref")), ids_of(body), str(body.get("extra") or ""),
+                                       now=datetime.now().astimezone())}
 
     def save_drafts_from(current, text):
         # Shared by "paste" (the human's copy from ChatGPT) and "generate" (the OpenAI API): same parsing,
@@ -155,7 +156,7 @@ def web_app(folder, token):
         for batch in batches:
             service.require_fuel(ref)
             current = queue(ref)  # fresh each time: the previous batch's drafts changed its revision
-            prompt_text = reply_prompt(current, batch, extra, only_extra)
+            prompt_text = reply_prompt(current, batch, extra, only_extra, now=datetime.now().astimezone())
             answer, usage = complete(key, model, prompt_text)  # raises OpenAIError, shown to the owner like any other
             # Tokens only: never the prompt or the answer, same rule as every other log entry.
             cost = estimate_cost_usd(model, **{k: usage[k] for k in ("prompt_tokens", "completion_tokens")})
@@ -270,7 +271,7 @@ def web_app(folder, token):
 
     def visit_round_prompt(body):
         current, ids = round_ids(body.get("property_ref") or None)
-        return {"prompt": round_prompt(queue(current["property_ref"]), ids)}
+        return {"prompt": round_prompt(queue(current["property_ref"]), ids, now=datetime.now().astimezone())}
 
     def visit_round_generate(body):
         current, ids = round_ids(body.get("property_ref") or None)
@@ -278,7 +279,7 @@ def web_app(folder, token):
         service.require_fuel(ref)
         cfg = service.config()
         model = service.model(cfg)
-        prompt_text = round_prompt(queue(ref), ids)
+        prompt_text = round_prompt(queue(ref), ids, now=datetime.now().astimezone())
         answer, usage = complete(openai_api_key(service.folder, cfg["account"]), model, prompt_text)
         cost = estimate_cost_usd(model, **{k: usage[k] for k in ("prompt_tokens", "completion_tokens")})
         service.log("openai_usage", model=model, **usage, reference=ref, cost_usd=round(cost, 6))

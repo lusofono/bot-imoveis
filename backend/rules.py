@@ -79,6 +79,16 @@ def knowledge(files):
     return parts
 
 
+# 30/09: the two kinds of business, each with the agency's own know-how (data/arrendamento/knowledge/,
+# data/venda/knowledge/), on top of the one common to all (data/knowledge/). A property without one is a rental.
+DEALS = ("arrendamento", "venda")
+
+
+def deal_of(profile):
+    deal = (profile.get("property") or {}).get("deal")
+    return deal if deal in DEALS else "arrendamento"
+
+
 def check_profile(ref, profile, account):
     match = profile.get("match", {})
     if (not REFERENCE.fullmatch(ref) or profile.get("property", {}).get("reference") != ref
@@ -267,6 +277,12 @@ def clean_property(fields):
         if owner and (len(owner) > 200 or not EMAIL.fullmatch(owner)):
             raise ValueError("O email do proprietário tem de ser um endereço de email.")
         clean["owner_email"] = owner or None
+    if "deal" in fields:
+        # 30/09: arrendamento or venda — which of the agency's two know-hows the property gets
+        deal = str(fields.get("deal") or "arrendamento").strip().lower()
+        if deal not in DEALS:
+            raise ValueError("O tipo de negócio é arrendamento ou venda.")
+        clean["deal"] = deal
     if clean["listing_id"] and not clean["listing_id"].isdigit():
         raise ValueError("O código do anúncio tem de ter só algarismos.")
     if clean["listing_url"] and urlsplit(clean["listing_url"]).scheme != "https":
@@ -315,7 +331,7 @@ def build_profile(fields, account, template, existing, today):
     kept = reply.get("never_reply_to") or [] if existing else []
     reply["never_reply_to"] = list(dict.fromkeys([*kept, sender, account]))
     prop.update({key: fields[key] for key in ("reference", "listing_id", "listing_url", "advertiser",
-                                              "description", "advertised_rent_eur", "owner_email") if key in fields})
+                                              "description", "advertised_rent_eur", "owner_email", "deal") if key in fields})
     prop["information_source"] = f"Página local, {today.isoformat()}"
     return profile
 

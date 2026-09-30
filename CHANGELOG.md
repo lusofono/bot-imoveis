@@ -15,6 +15,51 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.86.0 — 30/09/2026
+
+- **O prompt sabe o dia e a hora em que é escrito** («AGORA: quarta-feira, 30/09/2026, 19:05»): o «hoje», o
+  «amanhã» e o «ontem» de um cliente contam a partir da data do email dele, os da resposta a partir de agora. (Uma
+  resposta escrita a 30/09 dizia «não lhe é possível visitar hoje» do que o cliente escreveu a 29/09.) Também na
+  ronda de visitas, no revisor e nos clientes de teste.
+- **O know-how da agência dividido entre arrendamentos e vendas**, tratados de forma muito diferente: um comum a
+  todos (`data/knowledge/`), um só para arrendamentos (`data/arrendamento/knowledge/`) e um só para vendas
+  (`data/venda/knowledge/`). Cada imóvel tem um **«Tipo de negócio»** (Arrendamento ou Venda; sem ele, arrendamento)
+  e recebe o comum e o do seu tipo — o do outro tipo nunca lhe chega. Na Voz e estilo, o know-how aparece em três
+  blocos; no «Acrescentar ao conhecimento» de cada email há «Todos os arrendamentos» ou «Todos os imóveis à venda».
+
+## α.85.7 — 30/09/2026
+
+- **KW-Area: o logótipo do cérebro com a altura do «ARIA© / AI FOR REAL ESTATE» ao lado** (60 px); crescia até ao
+  tamanho da própria imagem.
+
+## α.85.6 — 30/09/2026
+
+- **As bolas da tabela dos clientes 20% maiores** (13 px de diâmetro, eram 11).
+
+## α.85.5 — 30/09/2026
+
+- **«Última leitura: ONTEM, terça-feira, 29/09/26, 18:40.»** — antes do dia, «HOJE», «ONTEM» ou «HÁ N DIAS», pelos
+  dias do calendário deste computador.
+
+## α.85.4 — 30/09/2026
+
+- **O seletor do separador Imóveis também ganha o título «IMÓVEL»** à esquerda, a altura e a letra maior dos outros.
+
+## α.85.3 — 30/09/2026
+
+- **O título «IMÓVEL» do seletor passa para a esquerda**, numa linha só dele, como o dos outros cartões.
+- **«GMAIL» passa a «CAIXA DE CORREIO»** no cartão «Ler emails».
+
+## α.85.2 — 30/09/2026
+
+- **Painel:** os cartões dos imóveis ganham espaço por cima (os números) e por baixo («A fazer»); estavam colados.
+
+## α.85.1 — 30/09/2026
+
+- **O seletor de imóvel ganha o título «IMÓVEL»**, 15% mais de altura e letra maior (Comunicações, Visitas e
+  Contactos).
+- **«Ler emails» com menos altura:** a «Última leitura» passa para a linha do botão, à direita.
+
 ## α.85.0 — 30/09/2026
 
 - **Avaliador:** um segundo modelo, mais forte do que o que escreve (gpt-4o por defeito, escolhido na Oficina), dá

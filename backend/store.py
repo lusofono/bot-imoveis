@@ -11,7 +11,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
-from .rules import KNOWLEDGE_LIMIT, REFERENCE, check_profile, check_voice, knowledge
+from .rules import DEALS, KNOWLEDGE_LIMIT, REFERENCE, check_profile, check_voice, knowledge
 
 PHOTO_TYPES = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
 CONTACT_FIELDS = ("email", "nome", "telefone", "primeiro_contacto", "imovel", "fonte",
@@ -105,6 +105,8 @@ def load_voice(folder):
     voice = check_voice(load_json(Path(folder) / "voice.json", {}))
     try:
         voice["_knowledge"] = load_knowledge(folder)
+        # 30/09: and each kind of business's own (data/arrendamento/knowledge/, data/venda/knowledge/)
+        voice["_knowledge_deal"] = {deal: load_knowledge(Path(folder) / deal) for deal in DEALS}
     except (ValueError, OSError) as exc:
         raise ValueError(f"Know-how comum: {exc}") from None
     return voice

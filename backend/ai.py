@@ -9,7 +9,7 @@ import json
 import re
 import unicodedata
 from datetime import date, datetime
-from .rules import DOCUMENTS, FICHA_FIELDS, FICHA_OPTIONAL, VISIT_STATES, clean_ficha, clean_property
+from .rules import DOCUMENTS, FICHA_FIELDS, FICHA_OPTIONAL, VISIT_STATES, clean_ficha, clean_property, deal_of
 
 NOT_INVENT = {"visit_availability": "disponibilidade para visitas", "rental_conditions": "condições do arrendamento",
               "property_facts": "factos sobre o imóvel"}
@@ -161,7 +161,17 @@ def instructions(profile, voice, visits=None):
         out += ["", "Know-how da agência, comum a todos os imóveis (se o imóvel disser outra coisa, prevalece o imóvel):"]
         for part in voice["_knowledge"]:
             out += [f"[{part['file']}]", part["text"]]
-    facts = [f"{prop.get('reference')}: {prop.get('description')}"]
+    # 30/09: the agency's know-how for this kind of business only — rentals and sales are handled very differently,
+    # sometimes the opposite way; the other one's never reaches this property's prompt
+    deal = deal_of(profile)
+    deal_parts = (voice.get("_knowledge_deal") or {}).get(deal) or []
+    if deal_parts:
+        out += ["", f"Know-how da agência para {'arrendamentos' if deal == 'arrendamento' else 'vendas'} (este imóvel é "
+                f"{'para arrendar' if deal == 'arrendamento' else 'para vender'}; vale sobre o comum, e o imóvel sobre os dois):"]
+        for part in deal_parts:
+            out += [f"[{part['file']}]", part["text"]]
+    facts = [f"{prop.get('reference')}: {prop.get('description')}",
+             "para arrendar" if deal_of(profile) == "arrendamento" else "para vender"]
     if prop.get("advertised_rent_eur"):
         facts.append(f"renda anunciada: {prop['advertised_rent_eur']} €")
     if prop.get("listing_url"):
@@ -229,7 +239,7 @@ def instructions(profile, voice, visits=None):
             "para este cliente. E nunca voltes a perguntar o que o cliente já respondeu em qualquer mensagem do histórico.",
             "- Um email com blocked não pode ser enviado: mostra o aviso e não prepares envio para outro endereço.",
             "- Mostra os warnings ao proprietário. Guardar rascunhos não envia; o envio exige a aprovação dele."]
-    if voice.get("_knowledge") or profile.get("_knowledge"):
+    if voice.get("_knowledge") or deal_parts or profile.get("_knowledge"):
         # Repeated here, right before the emails: a rule read once near the top of a long prompt is
         # easy to lose sight of by the time the model is drafting each answer. Named twice on purpose —
         # a note telling the model NOT to ask something is easy to read as "context" and not as binding
@@ -260,14 +270,25 @@ def extract_json(text):
         raise ValueError(f"A resposta colada não é JSON válido ({exc.msg}, linha {exc.lineno}).") from None
 
 
-def reply_prompt(queue, ids, extra="", only_extra=False):
-    """What ChatGPT needs to draft the chosen replies. Never the customers' email or phone."""
+def now_line(now):
+    """30/09: the day and time the reply is written — «hoje», «amanhã» and «ontem» count from here, never from the
+    email's own date (a reply written today said «hoje não pode» of what the customer wrote yesterday)."""
+    if not now:
+        return []
+    return [f"AGORA: {WEEKDAYS[now.weekday()]}, {now:%d/%m/%Y}, {now:%H:%M}. As datas de cada email e do histórico são "
+            "quando foram escritos: o «hoje», o «amanhã» e o «ontem» de um cliente contam a partir da data do email dele; "
+            "os da tua resposta contam a partir de agora. Nunca digas «hoje» de um dia que já passou.", ""]
+
+
+def reply_prompt(queue, ids, extra="", only_extra=False, now=None):
+    """What ChatGPT needs to draft the chosen replies. Never the customers' email or phone.
+    now: the moment the reply is written (the page passes it; the functions here keep no clock)."""
     chosen = [email for email in queue["emails"] if email["id"] in set(ids)]
     if not chosen:
         raise ValueError("Seleciona pelo menos um email.")
     if any(email.get("blocked") and not email.get("phone_only") for email in chosen):
         raise ValueError("Há emails bloqueados na seleção: trata-os à mão ou retira-os da fila.")
-    parts = ["Vais preparar respostas a clientes. Segue estas instruções do proprietário.", "",
+    parts = [*now_line(now), "Vais preparar respostas a clientes. Segue estas instruções do proprietário.", "",
              queue.get("instructions") or "Responde de forma clara e cordial, sem inventar factos."]
     if extra.strip() and only_extra:
         # 27/09: «Ignorar os emails anteriores»: the owner's points are the whole reply
@@ -369,15 +390,15 @@ que não sejam português nem inglês (vazio se não houver nenhuma). Os textos 
 separados por uma linha em branco, o fecho e a assinatura."""
 
 
-def round_prompt(queue, ids):
+def round_prompt(queue, ids, now=None):
     """One visit proposal for a whole round (29/09): a common text in Portuguese and in English, reviewed once,
     and each customer's greeting and language. Never the customers' email or phone."""
     chosen = [email for email in queue["emails"] if email["id"] in set(ids) and email.get("visit_window")]
     if not chosen:
         raise ValueError("Esta ronda já não tem propostas por enviar.")
     window = chosen[0]["visit_window"]
-    parts = ["Vais preparar a proposta de visita de uma ronda: um só texto, igual para todos os clientes abaixo. Segue "
-             "estas instruções do proprietário.", "",
+    parts = [*now_line(now), "Vais preparar a proposta de visita de uma ronda: um só texto, igual para todos os clientes "
+             "abaixo. Segue estas instruções do proprietário.", "",
              queue.get("instructions") or "Responde de forma clara e cordial, sem inventar factos.", "",
              "RONDA DE VISITAS (3.ª interação, o mesmo texto para todos; nesta ronda, estas regras de idioma substituem "
              "as da voz)",

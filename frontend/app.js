@@ -2,7 +2,7 @@
 // TOKEN is written into index.html by the server at each start and goes with every API call.
 const STATUS ={pending: 'por responder', draft: 'rascunho', error: 'erro no envio', sending: 'a enviar', uncertain: 'envio incerto'};
 const AUX_KINDS = ['reminder', 'consent_request', 'visits_closed', 'addition'];
-const FIELDS = ['reference', 'sender', 'listing_id', 'listing_url', 'advertiser', 'advertised_rent_eur', 'description',
+const FIELDS = ['reference', 'sender', 'deal', 'listing_id', 'listing_url', 'advertiser', 'advertised_rent_eur', 'description',
   'owner_email'];
 const $ = id => document.getElementById(id);
 let state = {properties: []}, settings = null, preview = null;
@@ -1170,6 +1170,12 @@ function sortCards(emails, queue) {
 }
 // 29/09: the customer's latest message this card answers (the email itself and those merged into it) — never our own
 // sends, or a round or a batch sent a few seconds apart would decide the order
+// 30/09: «HOJE, », «ONTEM, » or «HÁ 3 DIAS, » before the day of the last read, by the calendar days of this computer
+function daysAgo(value) {
+  const day = moment => { const d = new Date(moment); return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()); };
+  const days = Math.round((day(Date.now()) - day(value)) / 86400000);
+  return days <= 0 ? 'HOJE, ' : days === 1 ? 'ONTEM, ' : `HÁ ${days} DIAS, `;
+}
 function lastActivity(email) {
   const moments = [email.date, ...(email.merged || []).map(part => part.date)];
   return Math.max(0, ...moments.map(value => Date.parse(value || '') || 0));
@@ -1189,8 +1195,9 @@ function renderState() {
   // 27/09: no «Dias para trás» — each read goes on from the last one; a new property's first one from the day it chose.
   // 29/09: «Última leitura: terça-feira, 29/09/26, 18:40» bigger and bold, the rest as before
   $('last-read').replaceChildren(...(queue?.last_read_at
-    ? [el('strong', {class: 'last-read-when'}, `Última leitura: ${new Date(queue.last_read_at).toLocaleDateString('pt-PT', {weekday: 'long'})}, `
-        + `${when(queue.last_read_at)}.`), ' A próxima traz o que chegou desde então.']
+    ? [el('strong', {class: 'last-read-when'}, `Última leitura: ${daysAgo(queue.last_read_at)}`
+        + `${new Date(queue.last_read_at).toLocaleDateString('pt-PT', {weekday: 'long'})}, ${when(queue.last_read_at)}.`),
+       ' A próxima traz o que chegou desde então.']
     : queue?.read_from ? [`Ainda por ler: a primeira leitura traz os emails desde ${dayLabel(queue.read_from)}.`] : []));
   // 29/09: a round with one text for all is reviewed and sent in its own panel (Agenda), not card by card here.
   const emails = sortCards((queue?.emails || []).filter(email => !email.round), queue);
@@ -1707,7 +1714,11 @@ function noteBox(ref, onSaved, inCard = false, withGenerate = false) {
   // 27/09: in an email's card, «Só para esta resposta» comes first and chosen: nothing is saved unless asked for
   const scope = el('select', {'aria-label': 'Onde guardar'},
     withGenerate && el('option', {value: 'reply', selected: true}, 'Só para esta resposta'),
-    el('option', {value: 'property', selected: !withGenerate}, 'Só este imóvel'), el('option', {value: 'agency'}, 'Todos os imóveis (agência)'));
+    el('option', {value: 'property', selected: !withGenerate}, 'Só este imóvel'),
+    // 30/09: every property of this one's kind (the agency's rentals-only or sales-only know-how)
+    el('option', {value: 'agency-deal'}, (settings?.properties || []).find(item => item.reference === ref)?.deal === 'venda'
+      ? 'Todos os imóveis à venda (agência)' : 'Todos os arrendamentos (agência)'),
+    el('option', {value: 'agency'}, 'Todos os imóveis (agência)'));
   const saveNote = async () => {
     const result = await call('api/knowledge/note', {property_ref: ref, scope: scope.value, text: text.value});
     text.value = '';
@@ -2894,6 +2905,8 @@ function propertySwitcher(select) {
     const inactive = property?.active === false || /inativo/i.test(option.textContent);
     box.replaceChildren(...el('div', {},
       many && el('button', {type: 'button', class: 'slider-arrow prev', 'aria-label': 'Imóvel anterior', onclick: () => go(index - 1)}, '‹'),
+      // 30/09: a title on the left, on a line of its own, like the other cards' («CAIXA DE CORREIO»)
+      el('span', {class: 'eyebrow switcher-label'}, 'IMÓVEL'),
       el('div', {class: 'slider-title'},
         el('span', {class: 'property-ref'}, ref ? ref + (inactive ? ' · INATIVO' : '') : 'TODOS OS IMÓVEIS'),
         el('strong', {}, ref ? property?.description || option.textContent : 'Todos os imóveis, em conjunto'),
@@ -2919,8 +2932,14 @@ function renderSettings() {
   updateSkinPanels();
   applyAiMode();
   renderVoice();
+  // 30/09: the agency's know-how in three — common to all, rentals only, sales only (they are handled very differently)
   $('agency-knowledge').replaceChildren(el('p', {class: 'eyebrow'}, 'KNOW-HOW DA AGÊNCIA ', kind('rag')),
-    el('h2', {}, 'Conhecimento comum a todos os imóveis'), knowledgeEditor('agency', null));
+    el('h2', {}, 'Conhecimento da agência'),
+    el('p', {class: 'step'}, 'Cada imóvel recebe o comum e o do seu tipo de negócio (arrendamento ou venda, nos dados do imóvel); '
+      + 'o do seu tipo vale sobre o comum, e o do próprio imóvel sobre os dois.'),
+    ...[['agency', 'Comum a todos os imóveis'], ['agency-arrendamento', 'Só para arrendamentos'], ['agency-venda', 'Só para vendas']]
+      .map(([scope, title]) => el('details', {class: 'knowledge-group', open: scope === 'agency'},
+        el('summary', {}, title), knowledgeEditor(scope, null))));
   if (!$('f-first-read').value) $('f-first-read').value = settings.first_read_days || 45;
   renderPropertySlider();
   if (!$('f-sender').value) $('f-sender').value = settings.properties[0]?.sender || 'reply@idealista.pt';
@@ -3029,6 +3048,8 @@ function knowledgeEditor(scope, ref) {
     box.replaceChildren(
       el('p', {class: 'step'}, scope === 'agency'
         ? 'Vale para todos os imóveis; se o conhecimento de um imóvel disser outra coisa, prevalece o do imóvel.'
+        : scope === 'agency-arrendamento' ? 'Só para os imóveis para arrendar: os imóveis à venda nunca o recebem.'
+        : scope === 'agency-venda' ? 'Só para os imóveis à venda: os arrendamentos nunca o recebem.'
         : 'Só para este imóvel. O texto entre <!-- e --> fica para ti: não chega ao assistente.'),
       ...(files.length ? files.map(block) : [el('p', {class: 'muted small'}, 'Ainda não há ficheiros.')]),
       el('details', {}, el('summary', {class: 'muted small'}, '+ Novo ficheiro'), name, text,
@@ -3495,7 +3516,9 @@ function showPropertiesView(view) {
 function openPropertyEditor(fields, ref = null) {
   editorRef = ref;
   // The owner's email is not in the listing: filled from an extraction, the form keeps the one already saved (27/09).
-  const keep = {owner_email: settings?.properties?.find(property => property.reference === ref)?.owner_email};
+  const saved = settings?.properties?.find(property => property.reference === ref);
+  // 30/09: the kind of business: the one saved, else a rental
+  const keep = {owner_email: saved?.owner_email, deal: saved?.deal || 'arrendamento'};
   for (const name of FIELDS) if (name !== 'sender' || fields.sender) $('f-' + name).value = fields[name] ?? keep[name] ?? '';
   $('f-facts').value = (fields.facts || []).join('\n');
   $('editor-title').textContent = ref ? `Editar ${ref}` : 'Novo imóvel';
@@ -3520,6 +3543,7 @@ function renderPropertySlider() {
   // Through el(), which drops a false child: replaceChildren itself would print it as the text "false".
   $('property-slider').replaceChildren(...el('div', {},
     many && el('button', {class: 'slider-arrow prev', 'aria-label': 'Imóvel anterior', onclick: () => stepProperty(-1)}, '‹'),
+    el('span', {class: 'eyebrow switcher-label'}, 'IMÓVEL'),  // 30/09: titled like the other switchers
     el('div', {class: 'slider-title'},
       el('span', {class: 'property-ref'}, property.reference + (property.active === false ? ' · INATIVO' : '')),
       el('strong', {}, property.description || ''),

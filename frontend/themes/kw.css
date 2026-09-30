@@ -39,6 +39,8 @@
 :root[data-theme="kw"] .brand-mark{width:auto;height:auto;border:0;border-radius:0;background:none;box-shadow:none;font-size:0;
   margin-top:-4px}
 :root[data-theme="kw"] .brand-mark::after{content:"kw";color:#fff;font:700 34px/1 var(--kw-font);letter-spacing:-2.5px}
+/* 30/09: the brain as tall as «ARIA©» and «AI FOR REAL ESTATE» beside it (it grew to the picture's own size) */
+:root[data-theme="kw"] .brand-mark img{width:60px;height:60px;object-fit:contain}
 :root[data-theme="kw"] .brand .brand-name{color:#fff;font-family:var(--kw-font)}
 :root[data-theme="kw"] .brand .brand-name span{color:#ffffffc7;text-transform:uppercase;font-size:11px;letter-spacing:1.6px;
   margin-top:3px}

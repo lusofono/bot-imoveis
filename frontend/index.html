@@ -80,9 +80,10 @@
          emails»: its title, the last read, and below them the button, as in steps 2 and 3 -->
     <div class="queue-row"><label class="muted">Imóvel <select id="queue"></select></label></div>
     <div class="reply-layout"><aside class="batch-column" aria-label="Ler e preparar"><article class="card read-card" id="read-step">
-      <p class="eyebrow">GMAIL</p><h2>Ler emails</h2>
-      <p id="last-read" class="muted small"></p>
-      <div class="actions"><button id="read" class="primary"><span class="step-num" aria-hidden="true">1</span>Ler emails do Gmail</button></div>
+      <p class="eyebrow">CAIXA DE CORREIO</p><h2>Ler emails</h2>
+      <!-- 30/09: the last read on the button's line, on the right: one line less -->
+      <div class="actions read-actions"><button id="read" class="primary"><span class="step-num" aria-hidden="true">1</span>Ler emails do Gmail</button>
+        <p id="last-read" class="muted small"></p></div>
     </article><article class="card copy-only" id="import-step"><p class="eyebrow">PASSO 03</p><h2>Importar respostas <span class="kind kind-copy">Copiar/colar</span></h2>
     <textarea id="answer" aria-label="Resposta do ChatGPT" rows="6" placeholder="Cola aqui a resposta completa do ChatGPT (o bloco JSON)"></textarea>
     <div class="actions"><button id="paste" class="primary">Guardar rascunhos</button></div>
@@ -169,6 +170,8 @@
       <div class="grid">
         <label class="field">Referência (a que aparece nos avisos do portal)<input id="f-reference"></label>
         <label class="field">Remetente dos avisos do portal<input id="f-sender" placeholder="reply@idealista.pt"></label>
+        <!-- 30/09: which of the agency's two know-hows the property gets -->
+        <label class="field">Tipo de negócio<select id="f-deal"><option value="arrendamento">Arrendamento</option><option value="venda">Venda</option></select></label>
         <label class="field">Código do anúncio<input id="f-listing_id"></label>
         <label class="field">Link do anúncio<input id="f-listing_url"></label>
         <label class="field">Anunciante<input id="f-advertiser"></label>

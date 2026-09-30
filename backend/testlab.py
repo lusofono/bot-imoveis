@@ -19,7 +19,7 @@ from email import message_from_bytes, policy
 from email.utils import parsedate_to_datetime
 from email.message import EmailMessage
 from email.utils import formataddr, formatdate, make_msgid
-from .ai import extract_json
+from .ai import extract_json, now_line
 from .evaluator import averages, evaluation_prompt, parse_evaluations
 from .mail import TEST_HEADER, connect, find_all_mailbox, parse_addresses
 from .openai_client import complete, estimate_cost_usd
@@ -318,7 +318,7 @@ def consultant_messages(service, lab, account):
 
 def advance_prompt(profile, tasks):
     prop = profile.get("property") or {}
-    parts = [
+    parts = [*now_line(datetime.now().astimezone()),
         "Fazes de clientes fictícios de um imóvel para arrendar, num teste. Para cada conversa abaixo, escreve a próxima "
         "mensagem DO CLIENTE, como ele a escreveria por email, na pele dele: a mesma personagem da ficha, a língua dele, "
         "o feitio dele. Regras:",
@@ -492,7 +492,8 @@ def evaluate_round(service, ref, lab, tasks, now):
     cfg = service.config()
     model = service.reviewer_settings(cfg)["model"]
     instructions = next(queue for queue in service.pending(ref)["properties"] if queue["property_ref"] == ref)["instructions"]
-    answer, usage = complete(openai_api_key(service.folder, cfg["account"]), model, evaluation_prompt(instructions, items))
+    answer, usage = complete(openai_api_key(service.folder, cfg["account"]), model,
+                             evaluation_prompt(instructions, items, now=datetime.now().astimezone()))
     cost = estimate_cost_usd(model, usage.get("prompt_tokens"), usage.get("completion_tokens"))
     service.log("openai_usage", model=model, **usage, reference=ref, cost_usd=round(cost, 6), purpose="evaluation")
     marks = parse_evaluations(answer, [item["id"] for item in items])

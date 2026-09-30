@@ -25,7 +25,7 @@ from .evaluator import evaluation_prompt, parse_evaluations, text_hash
 from .mail import build_digest, build_reply, read_messages
 from .openai_client import (BUILTIN_CONTEXT, BUILTIN_PRICES, CONTEXT_FALLBACK, MODEL_DEFAULT, PRICE_PER_1K_USD,
                             apply_context, apply_prices, complete, context_of, estimate_cost_usd, models)
-from .rules import (DAY, EMAIL, KNOWLEDGE_FILE, RGPD_STATES, SUBJECT_DEFAULT, VISIT_SLOT_DEFAULT, VISIT_STATES,
+from .rules import (DAY, DEALS, EMAIL, KNOWLEDGE_FILE, deal_of, RGPD_STATES, SUBJECT_DEFAULT, VISIT_SLOT_DEFAULT, VISIT_STATES,
                     DOCUMENTS, FICHA_FIELDS, SELECTION_STATES, build_profile, check_profile, clean_ficha, documents_summary, draft_checks,
                     ficha_summary, merge_ficha,
                     survey_alerts, survey_report, check_slot, check_window, clean_property, consent_yes, free_times,
@@ -386,7 +386,8 @@ class MailService:
                 if message and not any(turn.get("text") == message for turn in turns):
                     turns.append({"who": "cliente", "text": message})
                 items.append({"id": email["id"], "turns": turns, "reply": email["reply_text"]})
-            answer, usage = complete(key, model, evaluation_prompt(current["instructions"], items, hidden=False))
+            answer, usage = complete(key, model, evaluation_prompt(current["instructions"], items, hidden=False,
+                                                                   now=datetime.now().astimezone()))
             part = estimate_cost_usd(model, usage.get("prompt_tokens"), usage.get("completion_tokens"))
             cost += part
             self.log("openai_usage", model=model, **usage, reference=ref, cost_usd=round(part, 6), purpose="review")
@@ -3215,7 +3216,7 @@ class MailService:
                                               "offered": self.pending_visits(ref, today, "visit_offered")},
                                    **{key: profile["property"].get(key) for key in (
                                        "reference", "listing_id", "listing_url", "advertiser", "description",
-                                       "advertised_rent_eur", "owner_email")}})
+                                       "advertised_rent_eur", "owner_email")}, "deal": deal_of(profile)})
             return {"account": account, "voice": voice, "properties": properties, "ai": self.ai_settings(events),
                     "admin": self.config().get("admin") is True,  # 29/09: the Oficina shows only with "admin": true
                     "first_read_days": FIRST_READ_DAYS,
@@ -3392,21 +3393,25 @@ class MailService:
             files = lambda folder: [{"file": name, "text": text} for name, text in knowledge_files(folder)]
             return {"property_ref": ref, "agency": load_knowledge(self.folder),
                     "property": load_knowledge(base) if ref else [],
-                    # The files as the owner wrote them, comments included, for editing in the page.
-                    "files": {"agency": files(self.folder), "property": files(base) if ref else []}}
+                    "deal": deal_of(profiles[ref]) if ref else None,
+                    # The files as the owner wrote them, comments included, for editing in the page; 30/09: the
+                    # agency's know-how in three — common, rentals only, sales only
+                    "files": {"agency": files(self.folder), "property": files(base) if ref else [],
+                              **{f"agency-{deal}": files(self.folder / deal) for deal in DEALS}}}
 
     def save_knowledge(self, property_ref, file, text, scope="property"):
         """Writes one knowledge (RAG) file, whole. An empty text leaves the file empty, so it no longer counts."""
         file, text = str(file or "").strip(), str(text or "").replace("\r\n", "\n")
         if not KNOWLEDGE_FILE.fullmatch(file):
             raise ValueError("O nome do ficheiro só pode ter letras, algarismos, _ e -, e acabar em .md.")
-        if scope not in ("property", "agency"):
+        if scope not in ("property", "agency", *(f"agency-{deal}" for deal in DEALS)):
             raise ValueError("Escolhe onde guardar: neste imóvel ou para todos.")
         with locked(self.folder):
             ref = self.pick(self.profiles(), property_ref) if scope == "property" else None
             if scope == "property" and not ref:
                 raise ValueError("Esta pasta não tem imóveis.")
-            base = property_folder(self.folder, ref) if ref else self.folder
+            # 30/09: the agency's rentals-only or sales-only know-how lives in data/<deal>/knowledge/
+            base = property_folder(self.folder, ref) if ref else self.folder / scope.split("-", 1)[1] if "-" in scope else self.folder
             # The whole base must stay within its limit, with this file as it will be.
             knowledge([(name, body) for name, body in knowledge_files(base) if name != file] + [(file, text)])
             save_text(base / "knowledge" / file, text if text.endswith("\n") or not text else text + "\n")
@@ -3418,13 +3423,17 @@ class MailService:
         text = " ".join(str(text or "").split())
         if not text or len(text) > 500:
             raise ValueError("Escreve a informação numa ou duas frases (até 500 caracteres).")
-        if scope not in ("property", "agency"):
+        if scope not in ("property", "agency", "agency-deal"):
             raise ValueError("Escolhe onde guardar: neste imóvel ou para todos.")
         with locked(self.folder):
-            ref = self.pick(self.profiles(), property_ref) if scope == "property" else None
-            if scope == "property" and not ref:
+            profiles = self.profiles()
+            ref = self.pick(profiles, property_ref) if scope in ("property", "agency-deal") else None
+            if scope in ("property", "agency-deal") and not ref:
                 raise ValueError("Esta pasta não tem imóveis.")
-            add_note(property_folder(self.folder, ref) if ref else self.folder, text, date.today())
+            # 30/09: «agency-deal»: every property of this one's kind (rentals or sales), in data/<deal>/knowledge/
+            base = (self.folder / deal_of(profiles[ref]) if scope == "agency-deal"
+                    else property_folder(self.folder, ref) if ref else self.folder)
+            add_note(base, text, date.today())
             self.log("note_added", scope=scope, reference=ref)
             return {"scope": scope, "property_ref": ref}
 

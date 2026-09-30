@@ -678,7 +678,7 @@ body:not(.api-only) .api-only-show{display:none!important}
 .pipeline-below-names{display:flex;flex-wrap:wrap;gap:4px 16px;padding:6px 0 2px}
 /* the dots keep their real colours in every theme: they are signals, not decoration */
 /* 29/09: one dot in two halves: the left, what the customer gave; the right, what we have to do (empty: nothing) */
-.pipeline-dot{display:inline-block;width:11px;height:11px;border-radius:50%;flex:none;--them:transparent;--us:transparent;
+.pipeline-dot{display:inline-block;width:13px;height:13px;  /* 30/09: 20% bigger (was 11px) */ border-radius:50%;flex:none;--them:transparent;--us:transparent;
   background:linear-gradient(90deg,var(--them) 50%,var(--us) 50%);box-shadow:inset 0 0 0 1px #8a8a8a66}
 .pipeline-dot.them-red{--them:#d64545}.pipeline-dot.them-yellow{--them:#e6c229}.pipeline-dot.them-green{--them:#2e9e5b}
 .pipeline-dot.them-black{--them:#1c1c1c}
@@ -988,3 +988,18 @@ body:not(.admin) .prompt-view{display:none!important}
 #workshop-lab .lab-eval-last{margin-top:12px}
 #workshop-lab .lab-eval-item{font-size:12px;padding:6px 0;border-bottom:1px dashed #1d3d6988}
 #workshop-lab .lab-eval-item ul{margin:4px 0 0;padding-left:18px;color:#ffb3e6}
+/* 30/09: the property switcher, titled «Imóvel», 15% taller and more prominent; «Ler emails» a line shorter, with the
+   last read on the button's line, on the right */
+#property-slider,.property-switcher{padding:16px 16px}
+#property-slider,.property-switcher{flex-wrap:wrap}
+:is(#property-slider,.property-switcher) .switcher-label{flex:0 0 100%;order:-1;margin:0 0 2px}
+:is(#property-slider,.property-switcher) .property-ref{font-size:12px;letter-spacing:.14em}
+:is(#property-slider,.property-switcher) .slider-title strong{font-size:21px}
+.read-card h2{margin-bottom:4px}
+.read-card .read-actions{align-items:center;margin-top:10px}
+.read-card .read-actions #last-read{margin:0 0 0 auto;text-align:right}
+/* 30/09: the Painel's property tiles, apart from the numbers above and «A fazer» below (they sat glued to both) */
+#dashboard-properties{margin:22px 0}
+/* 30/09: the agency's know-how in three groups that open */
+.knowledge-group{border:1px solid var(--line);border-radius:12px;padding:6px 16px;margin:10px 0}
+.knowledge-group>summary{font-weight:600;padding:8px 0}
