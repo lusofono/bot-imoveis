@@ -23,6 +23,30 @@ PRICE_FALLBACK = PRICE_PER_1K_USD["gpt-4o"]
 # The models the page offers: only those whose price is confirmed in the table above (the owner's rule, 26/09).
 MODELS = tuple(PRICE_PER_1K_USD)
 BUILTIN_PRICES = dict(PRICE_PER_1K_USD)
+# 29/09: each model's context window, in tokens, as OpenAI announces it — only the ones known for sure; the rest take
+# CONTEXT_FALLBACK until the Oficina says otherwise (config.json "model_context").
+BUILTIN_CONTEXT = {"gpt-4o": 128000, "gpt-4o-mini": 128000, "gpt-4.1": 1047576, "gpt-4.1-mini": 1047576,
+                   "gpt-4.1-nano": 1047576}
+CONTEXT_FALLBACK = 128000
+CONTEXT_TOKENS = dict(BUILTIN_CONTEXT)
+CHARS_PER_TOKEN = 3.2  # a prudent estimate for Portuguese (accents, short words): more tokens than the real count
+
+
+def estimate_tokens(text):
+    """How many tokens a prompt will take, before sending it: a prudent estimate, never below the real count by much."""
+    return int(len(str(text or "")) / CHARS_PER_TOKEN) + 1
+
+
+def context_of(model):
+    return CONTEXT_TOKENS.get(model, CONTEXT_FALLBACK)
+
+
+def apply_context(overrides):
+    CONTEXT_TOKENS.clear()
+    CONTEXT_TOKENS.update(BUILTIN_CONTEXT)
+    for model, tokens in (overrides or {}).items():
+        if isinstance(tokens, int) and not isinstance(tokens, bool) and tokens > 0:
+            CONTEXT_TOKENS[str(model)] = tokens
 
 
 def apply_prices(overrides):

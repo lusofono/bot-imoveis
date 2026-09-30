@@ -21,8 +21,8 @@ from .ai import (AFTER_VISIT_RULE, AFTER_VISIT_TEMPLATE, BOOKED_REPLY_RULE, DOCS
                  parse_agenda, parse_survey, visit_analysis_prompt, clean_round, round_text)
 from .configure import STARTER, example_profile
 from .mail import build_digest, build_reply, read_messages
-from .openai_client import (BUILTIN_PRICES, MODEL_DEFAULT, PRICE_PER_1K_USD, apply_prices, complete, estimate_cost_usd,
-                            models)
+from .openai_client import (BUILTIN_CONTEXT, BUILTIN_PRICES, CONTEXT_FALLBACK, MODEL_DEFAULT, PRICE_PER_1K_USD,
+                            apply_context, apply_prices, complete, context_of, estimate_cost_usd, models)
 from .rules import (DAY, EMAIL, KNOWLEDGE_FILE, RGPD_STATES, SUBJECT_DEFAULT, VISIT_SLOT_DEFAULT, VISIT_STATES,
                     DOCUMENTS, FICHA_FIELDS, SELECTION_STATES, build_profile, check_profile, clean_ficha, documents_summary, draft_checks,
                     ficha_summary, merge_ficha,
@@ -62,6 +62,7 @@ INTERACTION_MARGIN = 0.20  # 27/09: the safety margin on the average cost of an 
 USD_PER_EUR, USD_PER_EUR_DATE = 1.1382, "2026-09-27"
 # Dashboard chart: period in days → days per bar (90 days per day would be 90 unreadable bars).
 CHART_PERIODS = {3: 1, 7: 1, 14: 1, 30: 1, 90: 7}
+CONTEXT_SHARE, BATCH_EMAILS = 50, 5  # 29/09: one call's limits by default (Oficina): % of the model's context, emails
 
 VIEW_FIELDS = ("id", "kind", "date", "subject", "customer", "recipient", "blocked", "body_text", "body_truncated",
                "reply_text", "reply_status", "reply_error", "reply_message_id", "visit_window", "visit_slot",
@@ -255,6 +256,7 @@ class MailService:
         """config.json, with a usable account; nothing starts without one."""
         cfg = load_json(self.folder / "config.json", {})
         apply_prices(cfg.get("token_prices"))  # 29/09: the Oficina's token prices, for every estimate from here
+        apply_context(cfg.get("model_context"))
         account = cfg.get("account", "")
         if not account or "@" not in account or any(c in account for c in "\r\n"):
             raise ValueError("Configura uma conta válida antes de usar.")
@@ -313,14 +315,54 @@ class MailService:
                 "usd_per_eur": USD_PER_EUR, "rate_date": USD_PER_EUR_DATE}
 
     def ai_settings(self, events=None):
-        token_prices = load_json(self.folder / "config.json", {}).get("token_prices") or {}
+        cfg = load_json(self.folder / "config.json", {})
+        token_prices = cfg.get("token_prices") or {}
         apply_prices(token_prices)
+        apply_context(cfg.get("model_context"))
         basis = self.interaction_cost(events)
-        return {"mode": self.ai_mode(), "model": self.model(), "cost_basis": basis,
+        return {"mode": self.ai_mode(), "model": self.model(), "cost_basis": basis, "limits": self.call_limits(cfg),
                 "models": [{"id": model, "input_usd_per_1m": round(rates[0] * 1000, 4), "output_usd_per_1m": round(rates[1] * 1000, 4),
                             "per_100_usd": basis["per_100_usd"].get(model), "per_100_eur": basis["per_100_eur"].get(model),
-                            "builtin": model in BUILTIN_PRICES, "edited": model in token_prices}
+                            "builtin": model in BUILTIN_PRICES, "edited": model in token_prices,
+                            "context_tokens": context_of(model),
+                            "context_known": model in BUILTIN_CONTEXT or model in (cfg.get("model_context") or {})}
                            for model, rates in PRICE_PER_1K_USD.items()]}
+
+    def call_limits(self, cfg=None):
+        """29/09, Oficina: how big one call to the AI may be — a share of the model's context (50% by default) and at most
+        so many emails (5, as before) —, so a batch never gets near the limit, where answers get worse."""
+        limits = (cfg if cfg is not None else load_json(self.folder / "config.json", {})).get("call_limits") or {}
+        return {"context_share": limits.get("context_share", CONTEXT_SHARE), "batch_emails": limits.get("batch_emails", BATCH_EMAILS)}
+
+    def set_call_limits(self, context_share, batch_emails):
+        if (isinstance(context_share, bool) or not isinstance(context_share, int) or not 10 <= context_share <= 90
+                or isinstance(batch_emails, bool) or not isinstance(batch_emails, int) or not 1 <= batch_emails <= 10):
+            raise ValueError("O contexto vai de 10 a 90% e os emails por chamada de 1 a 10.")
+        with locked(self.folder):
+            cfg = load_json(self.folder / "config.json", {})
+            cfg["call_limits"] = {"context_share": context_share, "batch_emails": batch_emails}
+            save_json(self.folder / "config.json", cfg)
+            self.log("call_limits_set", context_share=context_share, batch_emails=batch_emails)
+        return self.ai_settings()
+
+    def set_context(self, model, tokens):
+        """A model's context window, in tokens, as OpenAI announces it; 0 puts the default back."""
+        model = " ".join(str(model or "").split())
+        if model not in models():
+            raise ValueError("Modelo desconhecido.")
+        if isinstance(tokens, bool) or not isinstance(tokens, int) or not (tokens == 0 or 4000 <= tokens <= 10_000_000):
+            raise ValueError("O contexto é um número de tokens, de 4.000 a 10.000.000 (0 para o valor de partida).")
+        with locked(self.folder):
+            cfg = load_json(self.folder / "config.json", {})
+            context = dict(cfg.get("model_context") or {})
+            if tokens:
+                context[model] = tokens
+            else:
+                context.pop(model, None)
+            cfg["model_context"] = context
+            save_json(self.folder / "config.json", cfg)
+            self.log("model_context_set", model=model, tokens=tokens)
+        return self.ai_settings()
 
     def set_price(self, model, input_usd_per_1m=None, output_usd_per_1m=None, reset=False):
         """29/09, Oficina: a model's price per 1M tokens (input, output), kept in config.json "token_prices" — one more
@@ -1281,22 +1323,37 @@ class MailService:
                           else "proposta" if was_proposed(conversation, email, proposed)
                           else "pronto" if complete else "qualificacao")
             item = new.get(email) or {}
-            dots = []
-            if column not in ("desistiu", "greylist", "blacklist"):
-                if email in waiting and moment - waiting[email] >= timedelta(hours=hours["our_turn_hours"]):
-                    dots.append("orange")
-                ficha = conversation.get("ficha") or item.get("ficha")
-                summary = ficha_summary(ficha)
-                if summary["complete"]:
-                    done = aware(ficha.get("complete_at") or ficha.get("at"))
-                    late = bool(done and moment - done >= timedelta(hours=hours["no_visit_hours"])
-                                and email not in booked and not was_proposed(conversation, email, proposed))
-                    dots.append("blue" if late else "green")
-                elif stage and (not self.replied_after_us(conversation) or not summary["known"]):
-                    dots.append("red")
+            # 29/09: one dot in two halves, two different things — on the left what THEY gave (red: nothing yet, yellow:
+            # part of the file, green: all of it, black: declined or ignored); on the right what WE have to do (late, red:
+            # their message waits for us past our_turn_hours, amber: it waits, not that long yet, blue: complete for
+            # no_visit_hours and still no visit date from us; ok, green: up to date; black: declined or ignored)
+            ficha = conversation.get("ficha") or item.get("ficha")
+            summary = ficha_summary(ficha)
+            if column in ("desistiu", "greylist", "blacklist"):
+                them = "black"
+            elif summary["complete"]:
+                them = "green"
+            elif stage and (not self.replied_after_us(conversation) or not summary["known"]):
+                them = "red"
+            else:
+                them = "yellow" if summary["known"] else None
+            us = None
+            if column != "blacklist" and email in waiting:
+                # 29/09: overdue is red, so a dot all red is really bad (and one all green really good)
+                us = "late" if moment - waiting[email] >= timedelta(hours=hours["our_turn_hours"]) else "amber"
+            elif summary["complete"] and column not in ("desistiu", "greylist", "blacklist"):
+                done = aware(ficha.get("complete_at") or ficha.get("at"))
+                if (done and moment - done >= timedelta(hours=hours["no_visit_hours"]) and email not in booked
+                        and not was_proposed(conversation, email, proposed)):
+                    us = "blue"
+            if us is None:
+                # 29/09: up to date — we have answered, or nothing needs an answer (green on the right); one who declined
+                # or is ignored, all black. An empty half is only «incógnito»: nothing known yet (a new request's left)
+                us = "black" if them == "black" else "ok"
+            dots = [color for color in (them, us) if color]
             last = history[-1].get("ts") or history[-1].get("at") if history else item.get("date")
             customers.append({"email": email, "column": column, "waiting": email in waiting, "selection": selection,
-                              "dots": dots, "reason": (conversation.get("ignored_reason") or "")
+                              "dots": dots, "them": them, "us": us, "reason": (conversation.get("ignored_reason") or "")
                               if column in ("greylist", "blacklist") else "",
                               "name": conversation.get("name") or (item.get("customer") or {}).get("name") or "",
                               "last_at": last or conversation.get("last_sent_at")})
@@ -1390,7 +1447,8 @@ class MailService:
             profiles = load_profiles(self.folder, self.config()["account"])
             digest = self.today_digest()
             return {"date": digest["date"], "recipient": self.digest_recipient(), "all": digest.get("all"),
-                    "properties": [self.owner_page(ref, profile, digest) for ref, profile in profiles.items()]}
+                    "properties": [self.owner_page(ref, profile, digest) for ref, profile in profiles.items()
+                                   if not profile.get("test")]}  # 29/09: no report for the test property
 
     def digest_page(self, profiles, property_ref, digest, changing=True):
         """The property and its page kept today (None: not edited yet). A page that went, or may have gone, is final."""
@@ -1492,6 +1550,7 @@ class MailService:
             if not EMAIL.fullmatch(recipient):
                 raise ValueError("Configura um destinatário válido em Voz e estilo.")
             profiles, digest = self.profiles(), self.today_digest()
+            profiles = {ref: profile for ref, profile in profiles.items() if not profile.get("test")}  # 29/09
             if not profiles:
                 raise ValueError("O ponto de situação é de um imóvel: configura um imóvel primeiro.")
             entry = digest.get("all") or {}
@@ -2775,6 +2834,8 @@ class MailService:
             moment = datetime.now()  # the agenda's times are local
             today, stamp = moment.date().isoformat(), moment.strftime("%Y-%m-%d %H:%M")
             for ref, profile in profiles.items():
+                if profile.get("test"):
+                    continue  # 29/09: the Painel's «A fazer» never lists the test property
                 data = self.load(ref)
                 emails, conversations = data["emails"], data.get("conversations", {})
                 reminders = [item for item in emails if item.get("kind") == "visit_reminder"]
@@ -2863,7 +2924,17 @@ class MailService:
         with locked(self.folder):
             account = self.config()["account"]
             profiles = load_profiles(self.folder, account)
-            refs = list(profiles) or [None]
+            # 29/09: the test property never counts in the Painel — not its tile, requests, replies, waiting times or
+            # survey —, even once its customers or itself are wiped: its references and message IDs are remembered
+            # in teste/clientes.json (the API's cost still counts: that money was spent)
+            lab = load_json(self.folder / "teste" / "clientes.json", {})
+            test_refs = {ref for ref, profile in profiles.items() if profile.get("test")} | set(lab.get("refs") or [])
+            test_ids = set(lab.get("message_ids") or [])
+            for ref in test_refs & set(profiles):
+                data = self.load(ref)
+                test_ids |= {str(key) for key in ({item["id"] for item in data["emails"]} | set(data.get("replied_message_ids") or [])
+                                                   | set(data.get("dismissed_message_ids") or []))}
+            refs = [ref for ref in profiles if ref not in test_refs] or [None]
             contacts = load_contacts(self.folder)
             events = load_events(self.folder, limit=100000)  # read once: the chart, the costs and every tank
             if everything:
@@ -2942,7 +3013,10 @@ class MailService:
                          "all_time": Counter()} for ref in refs}
             for event in events:
                 if event.get("event") == "read" and isinstance(event.get("received"), dict):
-                    arrived.update(event["received"])
+                    arrived.update({key: day for key, day in event["received"].items() if str(key) not in test_ids})
+                elif event.get("event") == "send" and (event.get("reference") in test_refs
+                                                       or str(event.get("message_id")) in test_ids):
+                    continue
                 elif event.get("event") == "send" and event.get("status") == "sent":
                     sent[bucket(event.get("at"))] += 1
                     ref = event.get("reference") or owner.get(str(event.get("message_id")))
@@ -2977,7 +3051,7 @@ class MailService:
                             per[event["reference"]]["period"].update(usage)
                     else:
                         unattributed.update(usage)
-            merged = {**derived, **arrived}
+            merged = {key: day for key, day in {**derived, **arrived}.items() if str(key) not in test_ids}
             requests = Counter(bucket(day) for day in merged.values())
             for message_id, day in merged.items():
                 ref = owner.get(str(message_id))

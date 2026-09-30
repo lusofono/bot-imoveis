@@ -71,25 +71,25 @@ COMPLETE = {"trabalho": "Engenheira", "agregado": "Casal", "datas": "Um ano", "d
 def test_the_dots_say_what_needs_doing_with_the_hours_set_in_the_voice(service):
     now = datetime.now(timezone.utc)
     read(service, [dict(lead("1"), date=(now - timedelta(hours=49)).isoformat())])
-    assert dots(service) == {CUSTOMER: ["orange"]}  # waiting for us more than 48 h
+    assert dots(service) == {CUSTOMER: ["late"]}  # waiting for us more than 48 h (red, on our half)
     draft_and_send(service, "1")
-    assert dots(service) == {CUSTOMER: ["red"]}  # never answered us
+    assert dots(service) == {CUSTOMER: ["red", "ok"]}  # never answered us; we are up to date
     change(service, CUSTOMER, ficha={**COMPLETE, "at": now.isoformat(), "complete_at": now.isoformat()})
-    assert dots(service) == {CUSTOMER: ["green"]}
+    assert dots(service) == {CUSTOMER: ["green", "ok"]}
     old = (now - timedelta(hours=97)).isoformat()
     change(service, CUSTOMER, ficha={**COMPLETE, "at": old, "complete_at": old})
-    assert dots(service) == {CUSTOMER: ["blue"]}  # complete for 4 days and still no visit date
+    assert dots(service) == {CUSTOMER: ["green", "blue"]}  # they gave all; we: complete for 4 days and no visit date
     # The hours come from Voz e estilo.
     voice = json.loads((service.folder / "voice.json").read_text(encoding="utf-8"))
     voice["style"]["alerts"] = {"our_turn_hours": 24, "no_visit_hours": 120}
     save_json(service.folder / "voice.json", voice)
-    assert dots(service) == {CUSTOMER: ["green"]}
+    assert dots(service) == {CUSTOMER: ["green", "ok"]}
     assert service.settings()["voice"]["alerts"] == {"our_turn_hours": 24, "no_visit_hours": 120}
     # A visit proposed: no blue, whatever the time.
     voice["style"]["alerts"] = {"our_turn_hours": 24, "no_visit_hours": 96}
     save_json(service.folder / "voice.json", voice)
     change(service, CUSTOMER, visit_offered={"at": now.isoformat()})
-    assert dots(service) == {CUSTOMER: ["green"]}
+    assert dots(service) == {CUSTOMER: ["green", "ok"]}
 
 
 def test_a_file_remembers_when_it_became_complete():
@@ -135,3 +135,20 @@ def test_a_customer_writing_with_a_visit_booked_or_after_it_gets_its_own_prompt(
 
 def NOW_ISO():
     return datetime.now(timezone.utc).isoformat()
+
+
+
+def halves(service):
+    return {customer["email"]: (customer["them"], customer["us"]) for customer in service.pending()["properties"][0]["pipeline"]}
+
+
+def test_one_dot_in_two_halves_what_they_gave_and_what_we_have_to_do(service):
+    read(service, [lead("1")])
+    assert halves(service) == {CUSTOMER: (None, "amber")}  # a new request: nothing asked yet, and ours to answer soon
+    draft_and_send(service, "1")
+    assert halves(service) == {CUSTOMER: ("red", "ok")}  # asked, nothing given yet; we are up to date
+    change(service, CUSTOMER, ficha={"trabalho": "Engenheira"},
+           history=[{"who": "nos", "text": "Olá."}, {"who": "cliente", "text": "Sou engenheira."}])
+    assert halves(service) == {CUSTOMER: ("yellow", "ok")}  # part of the file
+    change(service, CUSTOMER, visit="nao_quer")
+    assert halves(service)[CUSTOMER] == ("black", "black")  # declined: a dot too, all black

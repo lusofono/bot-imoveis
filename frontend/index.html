@@ -120,8 +120,8 @@
     </article>
     <article class="card step-card" id="send-step">
       <div class="step-top"><p class="eyebrow" id="send-step-label">PASSO 04</p><h2>Rever e enviar</h2>
-        <p class="step">Revê e corrige os rascunhos abaixo; o envio mostra primeiro os destinatários e os textos finais.</p></div>
-      <div class="step-action"><div class="actions"><button id="preview" class="primary"><span class="step-num" aria-hidden="true">3</span>Rever para Enviar Todos</button><span id="preview-actions" class="preview-actions"></span></div></div>
+        <p class="step">Lê e corrige cada rascunho no seu cartão, abaixo, e carrega em «Aprovar». Com os selecionados todos aprovados, «Enviar todos» liga-se e mostra os destinatários antes de enviar.</p></div>
+      <div class="step-action"><div class="actions"><button id="preview" class="primary send-action" disabled><span class="step-num" aria-hidden="true">3</span>Enviar todos</button></div></div>
       <div class="step-extra"></div>
     </article>
     </div>
@@ -130,6 +130,7 @@
     <div class="row card-sort"><label>Ordenar <select id="card-sort" aria-label="Ordenar os emails">
       <option value="recent">Mais recentes primeiro</option><option value="oldest">Mais antigos primeiro</option>
       <option value="early">Primeiras fases primeiro</option><option value="late">Últimas fases primeiro</option>
+      <option value="name">Por nome (A–Z)</option>
     </select></label></div>
     <p id="round-notice" class="alert warn" hidden></p>
     <div id="emails"></div>
@@ -273,8 +274,9 @@
   <section id="tab-workshop" hidden>
     <div class="page-heading"><div><p class="eyebrow">OFICINA</p><h1>Oficina</h1><p class="step">Para quem afina a ARIA: o motor de IA, os preços dos tokens e a plataforma de testes. Quem usa a página no dia a dia não a vê.</p></div></div>
     <article class="card" id="workshop-engine"></article>
+    <!-- the test console inside its own card, titled like the engine's -->
+    <article class="card" id="workshop-tests"><p class="eyebrow">TESTES &amp; DEBUG</p><div id="workshop-lab"></div></article>
     <article class="card" id="workshop-prices"></article>
-    <article class="card" id="workshop-lab"></article>
   </section>
 </main></div>
 <div id="toast" role="status" aria-live="polite" hidden></div>

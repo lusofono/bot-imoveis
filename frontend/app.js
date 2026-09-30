@@ -801,13 +801,19 @@ function renderWorkshop() {
   const apply = next => { settings.ai = next; renderWorkshop(); applyAiMode(); };
   const row = model => {
     const input = price(model.input_usd_per_1m), output = price(model.output_usd_per_1m);
+    // 29/09: the model's context window, in tokens; «por confirmar» while it is only the default
+    const context = el('input', {type: 'number', min: 4000, step: 1000, value: model.context_tokens, class: 'price-input',
+      title: model.context_known ? '' : 'Por confirmar: vale 128.000 até indicares o que a OpenAI anuncia para este modelo.'});
     return el('tr', {},
       el('td', {}, model.id, model.builtin ? '' : el('span', {class: 'tag'}, 'da Oficina'),
         model.edited && model.builtin ? el('span', {class: 'tag draft'}, 'alterado') : ''),
       el('td', {}, input), el('td', {}, output),
+      el('td', {}, context, model.context_known ? '' : el('span', {class: 'tag warn'}, 'por confirmar')),
       el('td', {}, el('button', {type: 'button', onclick: event => run(async () => {
-        apply(await call('api/ai/price', {model: model.id, input_usd_per_1m: input.value, output_usd_per_1m: output.value}));
-        toast(`Preço de ${model.id} guardado: vale para todas as estimativas a partir de agora.`);
+        if (Number(input.value) !== model.input_usd_per_1m || Number(output.value) !== model.output_usd_per_1m)
+          apply(await call('api/ai/price', {model: model.id, input_usd_per_1m: input.value, output_usd_per_1m: output.value}));
+        if (Number(context.value) !== model.context_tokens) apply(await call('api/ai/context', {model: model.id, tokens: context.value}));
+        toast(`${model.id} guardado: vale para todas as estimativas e chamadas a partir de agora.`);
       }, event.currentTarget)}, 'Guardar'),
       model.edited && el('button', {type: 'button', class: 'link', onclick: event => run(async () => {
         apply(await call('api/ai/price', {model: model.id, reset: true}));
@@ -821,16 +827,36 @@ function renderWorkshop() {
     el('p', {class: 'step'}, 'Em dólares por 1 milhão de tokens, como a OpenAI os publica. Valem para todos os imóveis: o custo de '
       + 'cada chamada, os depósitos e o «/ 100 interações». Um modelo novo passa a poder escolher-se no motor acima.'),
     el('div', {class: 'pipeline-scroll'}, el('table', {class: 'price-table'},
-      el('thead', {}, el('tr', {}, ['Modelo', 'Input', 'Output', ''].map(label => el('th', {scope: 'col'}, label)))),
+      el('thead', {}, el('tr', {}, ['Modelo', 'Input', 'Output', 'Contexto (tokens)', ''].map(label => el('th', {scope: 'col'}, label)))),
       el('tbody', {}, models.map(row),
-        el('tr', {}, el('td', {}, newModel), el('td', {}, newIn), el('td', {}, newOut),
+        el('tr', {}, el('td', {}, newModel), el('td', {}, newIn), el('td', {}, newOut), el('td', {}),
           el('td', {}, el('button', {type: 'button', class: 'primary', onclick: event => run(async () => {
             apply(await call('api/ai/price', {model: newModel.value, input_usd_per_1m: newIn.value, output_usd_per_1m: newOut.value}));
             toast('Modelo acrescentado: já o podes escolher no motor.');
-          }, event.currentTarget)}, 'Acrescentar')))))));
+          }, event.currentTarget)}, 'Acrescentar')))))),
+    limitsSection());
+}
+
+// 29/09: how big one call may be — so a batch never gets near the model's limit, where the answers get worse
+function limitsSection() {
+  const limits = settings.ai?.limits || {context_share: 50, batch_emails: 5};
+  const share = el('input', {type: 'number', min: 10, max: 90, value: limits.context_share, class: 'price-input'});
+  const batch = el('input', {type: 'number', min: 1, max: 10, value: limits.batch_emails, class: 'price-input'});
+  return el('div', {class: 'limits-section'},
+    el('p', {class: 'eyebrow'}, 'LIMITES DE CADA CHAMADA'),
+    el('p', {class: 'step'}, '«Gerar respostas» junta emails na mesma chamada enquanto couberem nos dois limites; se não couberem, '
+      + 'faz mais chamadas (custa o mesmo por token). Hoje, uma chamada de 5 emails anda pelos 15% do contexto de 128.000 tokens.'),
+    el('div', {class: 'row'},
+      el('label', {}, 'Não ultrapassar (% do contexto do modelo)', share),
+      el('label', {}, 'Emails por chamada, no máximo', batch),
+      el('button', {type: 'button', onclick: event => run(async () => {
+        settings.ai = await call('api/ai/limits', {context_share: share.value, batch_emails: batch.value});
+        renderWorkshop(); toast('Limites guardados: valem a partir do próximo «Gerar respostas».');
+      }, event.currentTarget)}, 'Guardar')));
 }
 
 // The test platform: fictitious customers of the test property, whose emails go through Gmail for real
+const labLog = [];  // what each «Avançar o teste» of this page view did, newest first
 function renderLab(lab) {
   const count = el('input', {type: 'number', min: 1, max: 20, value: 3, 'aria-label': 'Quantos clientes'});
   const contestOn = el('input', {type: 'checkbox', checked: !!lab.contest?.on});
@@ -838,22 +864,43 @@ function renderLab(lab) {
     'aria-label': 'Email do consultor'});
   const newPercent = el('input', {type: 'number', min: 0, max: 100, value: lab.new_percent ?? 10, 'aria-label': 'Clientes novos por ronda, em %'});
   const settingsNow = () => ({on: contestOn.checked, email: contestEmail.value, new_percent: newPercent.value});
-  $('workshop-lab').replaceChildren(
-    el('p', {class: 'eyebrow'}, 'PLATAFORMA DE TESTES'),
+  // el() leaves out null, false and 0 — replaceChildren would print them as text
+  $('workshop-lab').replaceChildren(el('div', {class: 'lab-body'},
+    el('p', {class: 'eyebrow', 'aria-label': 'Plataforma de testes'}),  // the console's own badge and cursor (CSS)
     el('p', {class: 'step'}, lab.property_ref
       ? `Imóvel de teste: ${lab.property_ref}. Cada cliente é inventado pela IA; o aviso dele sai mesmo pelo Gmail, desta conta `
         + 'para ela própria, com o cliente no Reply-To (um endereço +cdN desta conta). Depois, «Ler emails» nas Comunicações traz-os.'
       : 'Ainda não há imóvel de teste (um profile.json com "test": true).'),
-    lab.property_ref && el('div', {class: 'row'},
+    // 29/09: «Avançar o teste» — one round, by hand: the customers answer (the ARIA and the consultant), new ones come in
+    lab.property_ref && el('div', {class: 'row lab-row lab-advance'},
+      el('button', {type: 'button', class: 'primary needs-fuel', 'data-ref': lab.property_ref, onclick: event => run(async () => {
+        const result = await call('api/testlab/advance', {});
+        applyFuel(result.fuel, lab.property_ref); renderLab(result);
+        const said = [result.aria.length && `${result.aria.length} responderam à ARIA`,
+          result.consultant.length && `${result.consultant.length} ao consultor`,
+          result.silent.length && `${result.silent.length} ficaram calados`,
+          result.new.length && `${result.new.length} novos`].filter(Boolean).join(', ') || 'ninguém tinha email nosso por responder';
+        labLog.unshift(`${new Date().toLocaleTimeString('pt-PT', {hour: '2-digit', minute: '2-digit'})} · ${said}`
+          + (result.aria.length ? ` · ARIA: ${result.aria.join(', ')}` : '')
+          + (result.consultant.length ? ` · consultor: ${result.consultant.join(', ')}` : '')
+          + (result.new.length ? ` · novos: ${result.new.join(', ')}` : ''));
+        renderLab(result);
+        toast(`Ronda de teste: ${said}. Lê os emails nas Comunicações.`);
+      }, event.currentTarget)}, 'Avançar o teste'),
+      el('span', {class: 'muted small'}, 'Os clientes com um email nosso por responder respondem (à ARIA e, com o Human contest, '
+        + 'ao consultor) ou ficam calados; entram os clientes novos da percentagem abaixo.')),
+    labLog.length ? el('pre', {class: 'lab-log'}, labLog.slice(0, 12).join('\n')) : null,
+    // 29/09: one line to generate (how many, the share per round, the button), one for the Human contest
+    lab.property_ref && el('div', {class: 'row lab-row'},
       el('label', {}, 'Clientes novos', count),
+      el('label', {}, 'Clientes novos por ronda (%)', newPercent),
       el('button', {type: 'button', class: 'primary needs-fuel', 'data-ref': lab.property_ref, onclick: event => run(async () => {
         const result = await call('api/testlab/clients', {count: Number(count.value),
           contest: settingsNow()});
         applyFuel(result.fuel, lab.property_ref); renderLab(result);
         toast(`${result.created.length} cliente(s) de teste enviados: ${result.created.join(', ')}. Lê os emails nas Comunicações.`);
       }, event.currentTarget)}, 'Gerar clientes de teste')),
-    lab.property_ref && el('div', {class: 'row'},
-      el('label', {}, 'Clientes novos por ronda (%)', newPercent),
+    lab.property_ref && el('div', {class: 'row lab-row'},
       el('label', {class: 'check'}, contestOn, ' Human contest: cada aviso vai também, numa cópia à parte, para o consultor'),
       contestEmail,
       el('button', {type: 'button', onclick: event => run(async () => {
@@ -867,6 +914,7 @@ function renderLab(lab) {
     lab.clients?.length ? el('div', {class: 'client-list'}, lab.clients.slice().reverse().map(client => el('div', {class: 'client-row'},
       el('span', {}, `${client.number}. ${client.name}`), el('span', {class: 'tag'}, client.language || '?'),
       lab.contest?.on && el('span', {class: 'tag' + (client.consultant ? ' draft' : '')}, client.consultant ? 'consultor ✓' : 'sem cópia'),
+      client.ended ? el('span', {class: 'tag'}, 'terminou') : client.rounds ? el('span', {class: 'tag draft'}, `${client.rounds} resp.`) : null,
       el('span', {class: 'muted small'}, client.address)))) : el('p', {class: 'muted small'}, 'Ainda sem clientes de teste.'),
     lab.property_ref && lab.clients?.length && el('div', {class: 'actions'}, el('button', {type: 'button', class: 'link danger',
       onclick: event => run(async () => {
@@ -875,7 +923,7 @@ function renderLab(lab) {
         const result = await call('api/testlab/wipe', {});
         state = await call('api/state'); renderState(); renderLab(result);
         toast(`${result.removed} clientes de teste apagados: o ${lab.property_ref} começa de novo.`);
-      }, event.currentTarget)}, 'Apagar clientes de teste')));
+      }, event.currentTarget)}, 'Apagar clientes de teste'))));
   holdFuelButtons();
 }
 
@@ -975,7 +1023,11 @@ function keepSteps(redraw) {
 
 // 29/09: the cards in the order chosen in «Ordenar»: by the customer's latest message, newest or oldest first,
 // or by the customer's step in the table above (first or last steps first, the newest first within a step).
-const CARD_SORTS = ['recent', 'oldest', 'early', 'late'];
+const CARD_SORTS = ['recent', 'oldest', 'early', 'late', 'name'];
+// 29/09: «Por nome (A–Z)»: the customer's name, else the email, in Portuguese alphabetical order (accents ignored)
+const nameKey = email => ((email.customer || {}).name || (email.recipient || {}).name || (email.customer || {}).email
+  || (email.recipient || {}).email || '').trim();
+const byName = (a, b) => a.localeCompare(b, 'pt', {sensitivity: 'base'});
 let cardSortChoice = null;  // this page view's choice, also when the browser keeps nothing
 function cardSort() {
   if (cardSortChoice) return cardSortChoice;
@@ -991,7 +1043,8 @@ function sortCards(emails, queue) {
   };
   const sign = order === 'oldest' ? 1 : -1;
   return emails.map((email, index) => ({email, index, at: lastActivity(email), step: step(email)}))
-    .sort((a, b) => (order === 'early' ? a.step - b.step : order === 'late' ? b.step - a.step : 0)
+    .sort((a, b) => (order === 'name' ? byName(nameKey(a.email), nameKey(b.email)) : 0)
+      || (order === 'early' ? a.step - b.step : order === 'late' ? b.step - a.step : 0)
       || sign * (a.at - b.at) || a.index - b.index)
     .map(item => item.email);
 }
@@ -1014,8 +1067,11 @@ function renderState() {
   if ([...select.options].some(option => option.value === chosen)) select.value = chosen;
   const queue = currentQueue();
   // 27/09: no «Dias para trás» — each read goes on from the last one; a new property's first one from the day it chose.
-  $('last-read').textContent = queue?.last_read_at ? `Última leitura: ${when(queue.last_read_at)}. A próxima traz o que chegou desde então.`
-    : queue?.read_from ? `Ainda por ler: a primeira leitura traz os emails desde ${dayLabel(queue.read_from)}.` : '';
+  // 29/09: «Última leitura: terça-feira, 29/09/26, 18:40» bigger and bold, the rest as before
+  $('last-read').replaceChildren(...(queue?.last_read_at
+    ? [el('strong', {class: 'last-read-when'}, `Última leitura: ${new Date(queue.last_read_at).toLocaleDateString('pt-PT', {weekday: 'long'})}, `
+        + `${when(queue.last_read_at)}.`), ' A próxima traz o que chegou desde então.']
+    : queue?.read_from ? [`Ainda por ler: a primeira leitura traz os emails desde ${dayLabel(queue.read_from)}.`] : []));
   // 29/09: a round with one text for all is reviewed and sent in its own panel (Agenda), not card by card here.
   const emails = sortCards((queue?.emails || []).filter(email => !email.round), queue);
   const inRound = (queue?.emails || []).length - emails.length;
@@ -1031,7 +1087,8 @@ function renderState() {
     ...active.map(activeCard)] : []));
   renderPipeline(queue);  // after the cards: its names go to them
   $('instructions').textContent = queue?.instructions || '';
-  preview = null; $('preview-box').replaceChildren(); $('preview-actions').replaceChildren();
+  preview = null; $('preview-box').replaceChildren();
+  // 29/09: «3 Enviar todos» follows the approvals of the selected emails (refreshSendButton, from updateSelection)
   // A fresh batch of emails makes any earlier "done" (import, send) stale: back to work, not finished.
   $('import-status').hidden = true; markStep('import-step', false); markStep('send-step', false);
   updateSelection();
@@ -1091,12 +1148,17 @@ const PIPELINE_BELOW = [
   ['greylist', 'Greylist', 'ignorados por agora: disseram que não têm interesse; se voltarem a escrever, entram com um aviso'],
   ['blacklist', 'Blacklist', 'ignorados sempre: nada do que escrevem volta a entrar']];
 const belowOpen = {};  // which of those lines show their names, kept while the page redraws
+// 29/09: one dot in two halves — the left, what the customer gave; the right, what we have to do
 function dotMeaning(color) {
   const hours = settings?.voice?.alerts || {our_turn_hours: 48, no_visit_hours: 96};
-  return {orange: `à espera de resposta nossa há mais de ${hours.our_turn_hours} h`,
-    red: 'nunca nos respondeu, ou respondeu sem nada do que pedimos',
-    blue: `ficha completa há mais de ${hours.no_visit_hours} h e ainda sem data de visita`,
-    green: 'ficha completa: já sabemos tudo dele'}[color];
+  // 29/09: short, so the legend fits in fewer lines
+  return {red: 'nada dado', yellow: 'ficha a meio', green: 'ficha completa', black: 'desistiu / ignorado',
+    late: `resposta atrasada (+${hours.our_turn_hours} h)`, amber: 'responder em breve',
+    blue: `sem visita há +${hours.no_visit_hours} h`, ok: 'em dia', none: 'incógnito'}[color];
+}
+function splitDot(them, us, label = '') {
+  return el('span', {class: `pipeline-dot split them-${them || 'none'} us-${us || 'none'}`, role: 'img',
+    'aria-label': label || [them && 'eles: ' + dotMeaning(them), us && 'nós: ' + dotMeaning(us)].filter(Boolean).join('; ')});
 }
 function shortName(name) {  // first name and surname: «Ana Maria Exemplo» → «Ana Exemplo»
   const words = String(name || '').trim().split(/\s+/).filter(Boolean);
@@ -1106,9 +1168,10 @@ function renderPipeline(queue) {
   const customers = queue?.pipeline || [], box = $('pipeline');
   box.hidden = !customers.length;
   if (!customers.length) { box.replaceChildren(); return; }
-  const oldest = cardSort() === 'oldest';  // 29/09: the names in each column follow «Ordenar» (newest or oldest first)
+  const oldest = cardSort() === 'oldest';  // 29/09: the names in each column follow «Ordenar» (newest, oldest, A–Z)
   const columns = PIPELINE.map(([key]) => customers.filter(customer => customer.column === key)
-    .sort((a, b) => (oldest ? 1 : -1) * String(a.last_at || '').localeCompare(String(b.last_at || ''))));
+    .sort((a, b) => cardSort() === 'name' ? byName(a.name || a.email, b.name || b.email)
+      : (oldest ? 1 : -1) * String(a.last_at || '').localeCompare(String(b.last_at || ''))));
   // 29/09: at most PIPELINE_SHOWN names a column (the most recent); past that, one more line with «+ N casos»
   const rows = Math.min(PIPELINE_SHOWN + 1, Math.max(0, ...columns.map(list => list.length)));
   const cell = (list, row) => row < PIPELINE_SHOWN || list.length === PIPELINE_SHOWN + 1 ? list[row] && name(list[row])
@@ -1116,15 +1179,13 @@ function renderPipeline(queue) {
       && el('span', {class: 'pipeline-more muted small'}, `+ ${list.length - PIPELINE_SHOWN} casos`);
   const name = customer => {
     const target = document.querySelector(`[data-customer="${CSS.escape(customer.email)}"]`);
-    const title = [customer.name || customer.email, customer.last_at && 'último contacto ' + when(customer.last_at),
-      customer.selection && SELECTION_LABEL[customer.selection]].filter(Boolean).join(' · ');
-    // 27/09: no legend under the table — each dot says what it means on its own hover
-    const parts = [...(customer.dots || []).map(color => el('span', {class: 'pipeline-dot ' + color, title: dotMeaning(color),
-      role: 'img', 'aria-label': dotMeaning(color)})), shortName(customer.name) || customer.email];
-    return target ? el('button', {type: 'button', class: 'pipeline-name', title, onclick: () => {
+    // 29/09: no hover texts (they never showed well): the dots are explained in the legend under the table, and the
+    // name is only the link to the customer's card
+    const parts = [splitDot(customer.them, customer.us), shortName(customer.name) || customer.email];
+    return target ? el('button', {type: 'button', class: 'pipeline-name', onclick: () => {
       target.scrollIntoView({behavior: 'smooth', block: 'center'});
       target.classList.add('flash'); setTimeout(() => target.classList.remove('flash'), 1600);
-    }}, ...parts) : el('span', {class: 'pipeline-name', title}, ...parts);
+    }}, ...parts) : el('span', {class: 'pipeline-name'}, ...parts);
   };
   const below = PIPELINE_BELOW.map(([key, label, hint]) => {
     const list = customers.filter(customer => customer.column === key);
@@ -1141,6 +1202,14 @@ function renderPipeline(queue) {
       class: PIPELINE_ASIDE.has(key) ? 'aside' : ''}, label, el('span', {class: 'pipeline-count'}, String(columns[index].length)))))),
     el('tbody', {}, Array.from({length: rows}, (_, row) => el('tr', {}, columns.map((list, index) =>
       el('td', {class: PIPELINE_ASIDE.has(PIPELINE[index][0]) ? 'aside' : ''}, cell(list, row)))))))),
+    // 29/09: the dots' legend, under the table, on the right
+    el('div', {class: 'pipeline-legend'},
+      el('p', {}, el('strong', {}, 'Eles (esquerda):'),
+        el('span', {}, splitDot(null, null, dotMeaning('none')), dotMeaning('none')),
+        ['red', 'yellow', 'green'].map(color => el('span', {}, splitDot(color, null, dotMeaning(color)), dotMeaning(color))),
+        el('span', {}, splitDot('black', 'black', dotMeaning('black')), dotMeaning('black'))),
+      el('p', {}, el('strong', {}, 'Nós (direita):'), ['ok', 'amber', 'late', 'blue'].map(color =>
+        el('span', {}, splitDot(null, color, dotMeaning(color)), dotMeaning(color))))),
     ...below.filter(Boolean));
 }
 
@@ -1170,7 +1239,7 @@ function updateSelection() {
   const count = selectedIds().length;
   $('selection-count').textContent = `${count} selecionado(s)`;
   $('build-prompt').disabled = !count;
-  $('preview').disabled = !count;
+  refreshSendButton();
   markStep('inbox-step', count > 0);
   // A prompt already created stops matching once the selection (or the extra instructions) changes.
   $('copy-prompt').disabled = true;
@@ -1398,6 +1467,7 @@ function card(email) {
       state = result.state; renderState();
       toast(`${ignoreTarget.name || ignoreTarget.email} passou para a blacklist deste imóvel.`);
     }, event.currentTarget)}, 'Ignorar sempre / Blacklist'));
+  const approve = reviewBar(email, draft);  // 29/09: «Aprovar» in the card's top corner
   const article = el('article', {class: 'card email-card' + (email.blocked ? ' blocked' : '')},
     el('div', {class: 'card-head'},
       el('label', {class: 'who'}, el('input', {type: 'checkbox', class: 'pick', 'data-id': email.id, checked: !email.blocked, disabled: !!email.blocked}),
@@ -1424,7 +1494,8 @@ function card(email) {
       email.visit_slot && el('span', {class: 'tag visit'}, 'visita ' + slotLabel(email.visit_slot)),
       email.visit_status && el('span', {class: 'tag warn'}, VISIT_STATES[email.visit_status] || email.visit_status),
       email.interaction === 2 && fichaTag(email.ficha_summary),
-      el('span', {class: 'muted small'}, when(email.date))),
+      el('span', {class: 'muted small'}, when(email.date)),
+      approve),
     exits,
     (address || phoneShown || profileUrl) && el('div', {class: 'muted small contact-line'},
       address && el('span', {}, address, copyButton(address, 'Copiar o email')),
@@ -1556,31 +1627,87 @@ function noteBox(ref, onSaved, inCard = false, withGenerate = false) {
   return box;
 }
 
-function renderPreview() {
-  const box = $('preview-box'), count = preview.replies.length;
-  // 29/09: «Enviar N email(s)» and «Cancelar» beside «3 Rever para Enviar Todos»; the emails to check stay below
-  const clear = () => { preview = null; box.replaceChildren(); $('preview-actions').replaceChildren(); };
-  $('preview-actions').replaceChildren(
-      el('button', {class: 'primary send-action', onclick: event => run(async () => {
-        if (!confirm(`Enviar agora ${count} email(s) reais?`)) return;
-        const result = await call('api/send', {property_ref: queueRef(), preview_token: preview.preview_token, confirmed: true});
-        const sent = result.results.filter(item => item.status === 'sent').length;
-        if (sent) playSound('send');
-        state = await call('api/state'); keepSteps(renderState);  // renderState clears preview-box first
-        $('preview-actions').replaceChildren();
-        $('preview-box').replaceChildren(el('p', {class: 'alert ' + (sent === result.results.length ? 'ok' : 'warn')},
-          `✓ Enviados ${sent} de ${result.results.length} email(s).`
-          + (sent < result.results.length ? ' Vê os avisos nos que ficaram.' : ' Passa ao próximo lote no passo 01.')));
-        markStep('send-step', true);
-        toast(`Enviados: ${sent} de ${result.results.length}.` + (sent < result.results.length ? ' Vê os avisos nos que ficaram.' : ''),
-          sent === result.results.length ? 'ok' : 'warn');
-      }, event.currentTarget)}, `Enviar ${count} email(s)`),
-      el('button', {class: 'link', onclick: clear}, 'Cancelar'));
-  box.replaceChildren(
-    el('p', {class: 'alert warn'}, `Vais enviar ${count} email(s) reais. Confere destinatários e textos; esta pré-visualização vale 15 minutos.`),
-    ...preview.replies.map(reply => el('article', {class: 'card'},
-      el('div', {}, el('strong', {}, 'Para: '), reply.to), el('div', {}, el('strong', {}, 'Assunto: '), reply.subject),
-      (reply.warnings || []).map(warning => el('p', {class: 'alert warn'}, warning)), el('pre', {}, reply.reply_text))));
+// 29/09: «3 Enviar todos» — every draft is approved in its own card (the whole conversation, the draft and its buttons
+// are there already): «Aprovar» under the draft saves what is in the box; changing the text takes the approval back.
+// The button lights up once every selected email is approved, and still shows the recipients before sending.
+const approvals = new Map();  // email id → the text approved (this page view: a reload asks again)
+function approvedNow(id) {
+  const text = approvals.get(id);
+  const box = document.querySelector(`.pick[data-id="${CSS.escape(id)}"]`)?.closest('article')
+    ?.querySelector('textarea[aria-label="Rascunho da resposta"]');
+  return text != null && !!box && sameText(text, box.value);
+}
+
+function reviewBar(email, draft) {
+  if (email.blocked) return null;  // never sent by email (a phone-only one goes by WhatsApp or SMS)
+  const bar = el('div', {class: 'review-bar'});
+  const draw = () => {
+    const approved = approvals.get(email.id);
+    const current = approved != null && sameText(approved, draft.value);
+    bar.hidden = !draft.value.trim();
+    bar.classList.toggle('approved', current);
+    bar.replaceChildren(...(current
+      ? [el('span', {class: 'review-state'}, '✓ Aprovado'),
+         el('button', {type: 'button', class: 'link', onclick: () => { approvals.delete(email.id); draw(); refreshSendButton(); }}, 'Desfazer')]
+      : [el('span', {class: 'review-state'}, approved != null ? 'Alterado: aprova outra vez' : 'Por aprovar'),
+         el('button', {type: 'button', class: 'primary', onclick: event => run(async () => {
+           if (!draft.value.trim()) throw new Error('Escreve o texto antes de aprovar.');
+           // what is in the box is what gets approved, and saved as its draft
+           state = await call('api/drafts', {property_ref: queueRef(), replies: [{id: email.id, reply_text: draft.value}]});
+           approvals.set(email.id, draft.value);
+           draw(); refreshSendButton();
+           const next = selectedIds().find(id => !approvedNow(id));
+           if (next) {
+             document.querySelector(`.pick[data-id="${CSS.escape(next)}"]`)?.closest('article')
+               ?.scrollIntoView({behavior: 'smooth', block: 'start'});
+           } else {
+             // 29/09: the last one approved: up to «3 Enviar todos», now lit, for the owner to press
+             $('preview').scrollIntoView({behavior: 'smooth', block: 'center'});
+             $('preview').classList.add('flash'); setTimeout(() => $('preview').classList.remove('flash'), 1600);
+             toast('Todos aprovados: carrega em «3 Enviar todos».');
+           }
+         }, event.currentTarget)}, 'Aprovar')]));
+  };
+  draft.addEventListener('input', () => { draw(); refreshSendButton(); });
+  draw();
+  return bar;
+}
+
+function refreshSendButton() {
+  const ids = selectedIds(), approved = ids.filter(approvedNow).length, all = ids.length > 0 && approved === ids.length;
+  const button = $('preview');
+  button.replaceChildren(el('span', {class: 'step-num', 'aria-hidden': 'true'}, '3'),
+    !ids.length ? 'Enviar todos' : all ? `Enviar todos (${ids.length})` : `Enviar todos (${approved} de ${ids.length} aprovados)`);
+  button.disabled = !all;
+  button.title = all ? '' : 'Aprova primeiro cada email selecionado, no seu cartão.';
+}
+
+async function sendApproved() {
+  const ids = selectedIds();
+  if (!ids.length || !ids.every(approvedNow)) throw new Error('Aprova primeiro cada email selecionado, no seu cartão.');
+  if ($('answer').value.trim()) {
+    // Only the page knows this: the server never sees a paste until "Guardar rascunhos".
+    $('import-step').scrollIntoView({behavior: 'smooth', block: 'center'});
+    throw new Error('Tens uma resposta colada no passo 03 que ainda não foi guardada. Carrega em «Guardar rascunhos» '
+      + '(ou apaga-a) antes de enviar.');
+  }
+  const check = await call('api/preview', {property_ref: queueRef(), ids});
+  const changed = check.replies.filter(reply => !sameText(reply.reply_text, approvals.get(reply.id) || ''));
+  if (changed.length) throw new Error(`${changed.length} email(s) mudaram depois de aprovados: aprova-os outra vez.`);
+  const warned = check.replies.filter(reply => (reply.warnings || []).length).length;
+  if (!confirm(`Enviar agora ${ids.length} email(s) aprovados?\n\nPara: ${check.replies.map(reply => reply.to).join(', ')}`
+      + (warned ? `\n\n${warned} com avisos (estão no cartão de cada um).` : ''))) return;
+  const result = await call('api/send', {property_ref: queueRef(), preview_token: check.preview_token, confirmed: true});
+  const sent = result.results.filter(item => item.status === 'sent').length;
+  if (sent) playSound('send');
+  for (const item of result.results) if (item.status === 'sent') approvals.delete(item.id);
+  state = await call('api/state'); keepSteps(renderState);
+  $('preview-box').replaceChildren(el('p', {class: 'alert ' + (sent === result.results.length ? 'ok' : 'warn')},
+    `✓ Enviados ${sent} de ${result.results.length} email(s).`
+    + (sent < result.results.length ? ' Vê os avisos nos que ficaram.' : ' Passa ao próximo lote no passo 01.')));
+  markStep('send-step', true);
+  toast(`Enviados: ${sent} de ${result.results.length}.` + (sent < result.results.length ? ' Vê os avisos nos que ficaram.' : ''),
+    sent === result.results.length ? 'ok' : 'warn');
 }
 
 function ago(value) {
@@ -4061,7 +4188,8 @@ $('generate-api').addEventListener('click', event => run(async () => {
   const tokens = (result.tokens?.prompt_tokens || 0) + (result.tokens?.completion_tokens || 0);
   const summary = `${result.saved} rascunho(s) gerado(s) com ${result.model || 'a API'}`
     + (result.visits ? ` e ${result.visits} marcação(ões) de visita` : '')
-    + (tokens ? ` (${generationUsage(result)}${result.prompts?.length > 1 ? `, ${result.prompts.length} chamadas` : ''})` : '') + '.';
+    + (tokens ? ` (${generationUsage(result)}${result.prompts?.length > 1 ? `, ${result.prompts.length} chamadas` : ''}`
+      + (result.context_used != null ? `; a maior usou ${String(result.context_used).replace('.', ',')}% do contexto` : '') + ')' : '') + '.';
   toast(summary + ' Revê-os no passo 01 antes de enviar.');
 }, event.currentTarget));
 $('paste').addEventListener('click', event => run(async () => {
@@ -4078,19 +4206,7 @@ $('paste').addEventListener('click', event => run(async () => {
   toast(summary + ' Revê-os no passo 01 antes de enviar.');
 }, event.currentTarget));
 $('answer').addEventListener('input', () => { $('import-status').hidden = true; markStep('import-step', false); });
-$('preview').addEventListener('click', event => run(async () => {
-  const ids = selectedIds();
-  if (!ids.length) throw new Error('Seleciona pelo menos um email.');
-  if ($('answer').value.trim()) {
-    // Only the page knows this: the server never sees a paste until "Guardar rascunhos".
-    $('import-step').scrollIntoView({behavior: 'smooth', block: 'center'});
-    throw new Error('Tens uma resposta colada no passo 03 que ainda não foi guardada. Carrega em «Guardar rascunhos» '
-      + '(ou apaga-a) antes de preparar os envios.');
-  }
-  preview = await call('api/preview', {property_ref: queueRef(), ids});
-  renderPreview();
-  toast(`Envios preparados: ${preview.replies.length} email(s) por rever antes de enviar.`);
-}, event.currentTarget));
+$('preview').addEventListener('click', event => run(sendApproved, event.currentTarget).then(refreshSendButton));
 $('listing-prompt').addEventListener('click', event => run(async () => {
   const {prompt} = await call('api/property/prompt', {listing_url: $('listing-url').value});
   $('listing-prompt-text').textContent = prompt;

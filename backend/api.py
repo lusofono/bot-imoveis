@@ -24,7 +24,7 @@ from starlette.routing import Route
 from . import APP_NAME
 from .ai import (listing_prompt, parse_fichas, parse_listing, parse_replies, parse_round, parse_visits, reply_prompt,
                  round_prompt, short_id)
-from .openai_client import complete, estimate_cost_usd
+from .openai_client import complete, context_of, estimate_cost_usd, estimate_tokens
 from .rules import phone_in
 from .secrets import openai_api_key
 from .service import MailService
@@ -32,7 +32,21 @@ from . import testlab
 
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
 COOKIE = "bot_mail_web"
-GENERATE_BATCH = 5  # emails per API call in «Gerar respostas»
+def plan_batches(current, ids, extra, only_extra, model, limits):
+    """29/09: the selection in calls that keep within the Oficina's limits: at most batch_emails emails, and a prompt of
+    at most context_share % of the model's context (estimated before sending). An email too big alone goes alone.
+    Returns ([[ids]], the biggest share of the context one call takes, in %)."""
+    budget = context_of(model) * limits["context_share"] / 100
+    batches, biggest = [], 0.0
+    for key in ids:
+        if batches and len(batches[-1]) < limits["batch_emails"] \
+                and estimate_tokens(reply_prompt(current, batches[-1] + [key], extra, only_extra)) <= budget:
+            batches[-1].append(key)
+        else:
+            batches.append([key])
+    for batch in batches:
+        biggest = max(biggest, 100 * estimate_tokens(reply_prompt(current, batch, extra, only_extra)) / context_of(model))
+    return batches, round(biggest, 1)
 # The page's own files. index.html is only served at "/", with the token written into it. A rich theme (a
 # "skin": 80's RacingCar now, more to come) keeps its stylesheet in frontend/themes/, listed once at start.
 ASSETS = {"app.js": "text/javascript", "style.css": "text/css",
@@ -126,8 +140,8 @@ def web_app(folder, token):
     def generate(body):
         # «Gerar respostas» (the only path in «Modo: só API»): the same prompt as the copy/paste, answered by the
         # OpenAI API. Everything after that — parsing, drafts, preview, send — is identical and needs the same
-        # review and confirmation before anything goes out. A big selection goes in calls of GENERATE_BATCH
-        # emails: past that, answers get worse and a long JSON risks being cut.
+        # review and confirmation before anything goes out. A big selection goes in several calls (plan_batches),
+        # within the Oficina's limits: past them, answers get worse and a long JSON risks being cut.
         ref = queue(body.get("property_ref"))["property_ref"]
         ids, extra = ids_of(body), str(body.get("extra") or "")
         only_extra = body.get("only_extra") is True and len(ids) == 1  # 27/09: one email, its points only
@@ -137,10 +151,11 @@ def web_app(folder, token):
         totals = {"saved": 0, "notes": [], "visits": 0, "fichas": 0, "prompts": []}
         usage_total = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         cost_total = 0.0
-        for start in range(0, len(ids), GENERATE_BATCH):
+        batches, biggest = plan_batches(queue(ref), ids, extra, only_extra, model, service.call_limits(cfg))
+        for batch in batches:
             service.require_fuel(ref)
             current = queue(ref)  # fresh each time: the previous batch's drafts changed its revision
-            prompt_text = reply_prompt(current, ids[start:start + GENERATE_BATCH], extra, only_extra)
+            prompt_text = reply_prompt(current, batch, extra, only_extra)
             answer, usage = complete(key, model, prompt_text)  # raises OpenAIError, shown to the owner like any other
             # Tokens only: never the prompt or the answer, same rule as every other log entry.
             cost = estimate_cost_usd(model, **{k: usage[k] for k in ("prompt_tokens", "completion_tokens")})
@@ -153,7 +168,7 @@ def web_app(folder, token):
             totals["prompts"].append(prompt_text)  # «Ver o que foi enviado à IA», in the page only
             usage_total = {k: usage_total[k] + (usage.get(k) or 0) for k in usage_total}
         return {**totals, "model": model, "state": state(), "tokens": usage_total, "cost_usd": round(cost_total, 6),
-                "fuel": service.api_fuel(ref)}
+                "fuel": service.api_fuel(ref), "calls": len(batches), "context_used": biggest}
 
     def drafts(body):
         current = queue(body.get("property_ref"))
@@ -477,10 +492,17 @@ def web_app(folder, token):
                 "property/photo": ("POST", property_photo), "property/panel": ("POST", property_panel),
                 "property/extract": ("POST", lambda body: service.extract_listing(body.get("text"), body.get("listing_url"))),
                 "ai/model": ("POST", lambda body: service.set_model(str(body.get("model") or ""))),
-                "ai/price": ("POST", ai_price), "testlab/state": ("POST", lab_state),
+                "ai/price": ("POST", ai_price),
+                "ai/context": ("POST", lambda body: (admin(), service.set_context(
+                    body.get("model"), int(body["tokens"]) if str(body.get("tokens", "")).isdigit() else body.get("tokens")))[1]),
+                "ai/limits": ("POST", lambda body: (admin(), service.set_call_limits(*(
+                    int(body[key]) if str(body.get(key, "")).isdigit() else body.get(key)
+                    for key in ("context_share", "batch_emails"))))[1]), "testlab/state": ("POST", lab_state),
                 "testlab/contest": ("POST", lab_contest), "testlab/clients": ("POST", lab_clients),
                 "testlab/consultant": ("POST", lambda body: (admin(), testlab.send_to_consultant(service))[1]),
                 "testlab/wipe": ("POST", lambda body: (admin(), testlab.wipe(service))[1]),
+                "testlab/advance": ("POST", lambda body: (admin(), testlab.advance(
+                    service, datetime.now().astimezone().isoformat(timespec="seconds")))[1]),
                 "property/active": ("POST", property_active),
                 "visits/candidates": ("POST", visit_candidates), "visits/propose": ("POST", visit_propose),
                 "visits/round": ("POST", visit_round), "visits/round-prompt": ("POST", visit_round_prompt),

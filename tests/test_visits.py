@@ -324,3 +324,22 @@ def test_the_agenda_keeps_every_past_window_and_visit(service):
     save_visits(service.folder, REF, agenda)
     assert [s["at"] for s in service.settings()["properties"][0]["visits"]["slots"]] == [f"{old} 13:00"]
     assert service.agenda_slots(REF, date.today().isoformat()) == []  # «visitas por registar»: still 14 days
+
+
+def test_the_prompt_gets_the_history_in_order_and_whole_and_never_contradicts_what_we_said(service):
+    read(service, [customer("1", "a@example.com")])
+    draft_and_send(service, "1", "Olá.")
+    queue = service.load(REF)
+    long_answer = "Somos cinco. " + "x" * 1200 + " FIM DA MENSAGEM"
+    # A customer's email read late: kept after ours, but written before it
+    queue["conversations"]["a@example.com"]["history"] += [
+        {"who": "nos", "text": "Proposta de visita.", "at": "2026-09-29", "ts": "2026-09-29T10:40:00+00:00"},
+        {"who": "cliente", "text": long_answer, "at": "2026-09-28", "ts": "2026-09-28T09:55:00+00:00"}]
+    service.save(queue, REF)
+    read(service, [{"gmail_message_id": "2", "from": [{"email": "a@example.com"}], "subject": "Re: resposta",
+                    "in_reply_to": queue["conversations"]["a@example.com"]["sent_message_ids"][-1], "body_text": "Hoje não posso."}])
+    current = service.pending()["properties"][0]
+    prompt = reply_prompt(current, ["2"])
+    assert "FIM DA MENSAGEM" in prompt
+    assert prompt.index("Somos cinco.") < prompt.index("Proposta de visita.")
+    assert "nunca o contradigas" in current["instructions"]

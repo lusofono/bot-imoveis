@@ -15,6 +15,128 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.82.4 — 29/09/2026
+
+- **A legenda das bolas mais curta** (cabe em menos linhas): «Eles (esquerda): incógnito · nada dado · ficha a meio ·
+  ficha completa · desistiu / ignorado» e «Nós (direita): em dia · responder em breve · resposta atrasada (+48 h) · sem
+  visita há +96 h».
+
+## α.82.3 — 29/09/2026
+
+- **Ao aprovar o último email selecionado, a página sobe até «3 Enviar todos»** (já ligado), que pisca um instante,
+  com o aviso «Todos aprovados: carrega em «3 Enviar todos»». Enquanto falta algum, continua a descer para o seguinte.
+
+## α.82.2 — 29/09/2026
+
+- **«Aprovar» passa para o canto superior direito de cada email**, na linha do nome, com a moldura tracejada; o
+  aspeto de aprovado (verde, «✓ Aprovado» e «Desfazer») fica igual.
+
+## α.82.1 — 29/09/2026
+
+- **Bolas:** a metade direita fica **verde, «em dia»**, quando já respondemos ou não é preciso responder; **vermelha**
+  quando lhe devemos resposta há mais de 48 h (era laranja) — assim, toda verde é mesmo bom e toda vermelha mesmo mau.
+  **Metade vazia = incógnito** (ainda não sabemos nada: um pedido novo); quem desistiu ou foi ignorado fica toda preta.
+- **«Ordenar»: nova opção «Por nome (A–Z)»**, pelo nome do cliente (ou o email, sem nome), também nos nomes da tabela.
+- **O passo 2 («Gerar respostas») aparece sempre que há emails na fila**, e não só depois de uma leitura recente: o
+  passo 3 já não aparece sozinho.
+
+## α.82.0 — 29/09/2026
+
+- **Uma bola por cliente, em duas metades** (na tabela dos clientes por fase), porque são duas coisas diferentes: à
+  esquerda **o que eles deram** — vermelha (nada ainda), **amarela (parte da ficha)**, verde (ficha completa), **preta
+  (desistiu ou foi ignorado: as desistências passam a ter bola)** —; à direita **o que nós temos de fazer** — laranja
+  (devemos-lhe resposta há mais de 48 h), **âmbar (devemos-lhe resposta, há pouco tempo)**, azul (ficha completa há
+  mais de 96 h e sem data de visita), vazia (nada a fazer). A legenda, por baixo da tabela, explica as duas metades.
+- **«Última leitura…»** alinhada à direita do painel.
+
+## α.81.0 — 29/09/2026
+
+- **O passo de envio passa a «3 Enviar todos»:** cada rascunho tem sempre, por baixo, «Aprovar» (lê-se e corrige-se
+  no próprio cartão, com a conversa toda); o botão mostra «Enviar todos (2 de 5 aprovados)» e só se liga com os
+  selecionados todos aprovados; mudar um texto depois de aprovado tira-lhe a aprovação. Continua a mostrar os
+  destinatários antes de enviar e confirma que nada mudou desde a aprovação. Sai o passo intermédio de revisão.
+- **Tabela dos clientes por fase:** saem os textos ao passar o rato por cima das bolas e dos nomes (o nome fica só como
+  ligação ao cartão); **a legenda das bolas passa para baixo da tabela, à direita**.
+- **«Última leitura»** com o dia da semana, maior e a negrito.
+
+## α.80.0 — 29/09/2026
+
+- **Limites de cada chamada à IA (Oficina):** «não ultrapassar X% do contexto do modelo» (50% por defeito) e «no
+  máximo N emails por chamada» (5, como antes). «Gerar respostas» estima o tamanho de cada prompt antes de o enviar e
+  junta emails na mesma chamada só enquanto couberem nos dois; se não, faz mais chamadas. O aviso no fim diz quantas
+  chamadas houve e quanto do contexto a maior usou.
+- **Contexto de cada modelo**, em tokens, numa coluna nova da tabela dos preços: os que se conhecem já preenchidos
+  (gpt-4o e 4o-mini 128.000, gpt-4.1 1.047.576); os outros «por confirmar», a valer 128.000 até se indicar.
+- Medido com os dados de hoje: as instruções (voz, know-how, conhecimento do imóvel e prompts) andam pelos 7.400
+  tokens e cada email com o seu histórico até 2.400; um lote de 5 anda pelos 15% de 128.000. O histórico cresce (até
+  20 mensagens de 4.000 caracteres por cliente): no pior caso, 5 conversas longas passariam o contexto do gpt-4o — é
+  isso que os limites evitam.
+
+## α.79.0 — 29/09/2026
+
+- **«3 Rever para Enviar Todos» faz a revisão nos próprios cartões:** sai a lista que repetia os textos todos. Cada
+  email selecionado ganha, por baixo do rascunho, **«Aprovar»** — lê-se com a conversa toda à vista e os botões de
+  sempre; aprovar guarda o texto da caixa. Mudar o texto depois tira a aprovação («Alterado: aprova outra vez»). Ao
+  lado do «3» ficam a contagem («2 de 5 aprovado(s)»), **«Enviar todos (N)»**, que só se liga com todos aprovados, e
+  «Cancelar revisão». O envio confirma que nada mudou depois de aprovado.
+
+## α.78.5 — 29/09/2026
+
+- **As respostas deixam de contradizer o que já dissemos ao cliente:** uma regra nova diz à IA que o que nós já
+  escrevemos a um cliente foi decidido pelo proprietário e vale mesmo que o conhecimento do imóvel diga outra coisa (é
+  uma exceção para esse cliente), e que nunca volte a perguntar o que o cliente já respondeu. (Um rascunho voltava a
+  dizer «no máximo 4 pessoas» e «2 anos, sem renovação» a quem já tinha ouvido que 5 e 1 ano serviam.)
+- **O histórico vai para a IA pela ordem em que as coisas aconteceram** (um email do cliente lido tarde ficava depois
+  do nosso seguinte) **e inteiro** (cada mensagem era cortada aos 1.000 caracteres; agora 4.000, o que se guarda).
+
+## α.78.4 — 29/09/2026
+
+- **Os mostradores da qualidade (inquéritos pós-visita) 20% maiores** no Painel.
+
+## α.78.3 — 29/09/2026
+
+- **O imóvel de teste nunca conta no Painel:** nem o cartão dele, nem os pedidos, as respostas enviadas, o tempo de
+  resposta, o gráfico e o inquérito, nem o ponto de situação (e o envio do resumo de todos) e o «A fazer». Continua a
+  não contar depois de apagar os clientes de teste, ou o próprio imóvel: a referência e os identificadores das
+  mensagens ficam guardados na plataforma de testes. O custo da API continua a contar no gasto total, porque foi
+  dinheiro gasto.
+
+## α.78.2 — 29/09/2026
+
+- **Os clientes de teste nunca respondem ao inquérito pós-visita**, para nenhuma nota de teste entrar nas médias do
+  inquérito: o «Avançar o teste» salta a conversa cujo último email nosso é o agradecimento com o inquérito.
+
+## α.78.1 — 29/09/2026
+
+- **Consola de testes mais legível:** letras mais brancas (texto, legendas, endereços e o que se escreve nos campos).
+  Saem um «null» e um «0» que apareciam como texto quando ainda não havia registo nem clientes.
+
+## α.78.0 — 29/09/2026
+
+- **«▶ Avançar o teste»** (Oficina, uma ronda por clique): cada cliente de teste com um email nosso por responder
+  responde na pele da personagem dele — ou fica calado nesta ronda —, numa só chamada à IA: responde a tudo ou só a
+  parte, faz perguntas novas sobre o imóvel, revela os segredos só se lhe perguntarem, escolhe a hora da visita ou pede
+  outra data, desiste, conforme o feitio e o destino da ficha. A resposta sai pelo Gmail na conversa certa
+  (In-Reply-To do nosso último email) e «Ler emails» trá-la como a interação seguinte.
+- **Human contest:** na mesma ronda, o cliente responde também ao consultor, na conversa dele: a página lê no Gmail os
+  emails do consultor para os endereços `+cdN` e o cliente responde-lhes em separado, com a mesma personagem.
+- Cada email nosso (e do consultor) tem uma só ronda de resposta; uma história que acabou («terminou») não volta a
+  responder. Entram os clientes novos da percentagem definida. Um registo das rondas fica no painel.
+- **Oficina:** a ordem passa a Motor de IA, **Testes & Debug** (a consola de testes, dentro do seu cartão) e Preços dos
+  tokens.
+
+## α.77.2 — 29/09/2026
+
+- **A plataforma de testes com cara de laboratório de IA**, igual em todos os temas: fundo preto com grelha de circuito,
+  néon ciano e magenta, letra monoespaçada, linhas de monitor antigo e um brilho a varrer, uma borda de luz a dar a
+  volta ao painel, cursor a piscar no título, «⚡ Gerar clientes de teste» em gradiente e a lista dos clientes como um
+  registo de terminal. Com «reduzir movimento», fica tudo parado.
+
+## α.77.1 — 29/09/2026
+
+- **Plataforma de testes em duas linhas:** «Clientes novos», «Clientes novos por ronda (%)» e «Gerar clientes de teste»
+  numa; o Human contest, o email do consultor e «Guardar» na de baixo.
+
 ## α.77.0 — 29/09/2026
 
 - **Plataforma de testes (Oficina):**
