@@ -17,7 +17,7 @@ UNAVAILABLE = {"api/consent/confirm", "api/consent/request", "api/paste", "api/p
                "api/visits/round-generate", "api/visits/round-individual", "api/visits/round-paste",
                "api/visits/round-prompt", "api/visits/round-save",
                # 29/09: the Oficina (admin only): never in the sales demo
-               "api/ai/price", "api/ai/context", "api/ai/limits", "api/testlab/state", "api/testlab/contest", "api/testlab/clients",
+               "api/ai/price", "api/prompts/common", "api/ai/context", "api/ai/limits", "api/testlab/state", "api/testlab/contest", "api/testlab/clients",
                "api/testlab/consultant", "api/testlab/wipe", "api/testlab/advance"}
 
 

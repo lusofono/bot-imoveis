@@ -314,3 +314,25 @@ def table_context():
     yield
     from backend.openai_client import apply_context
     apply_context({})
+
+
+
+def test_the_common_prompts_change_only_in_the_oficina_and_reach_the_instructions(service):
+    from starlette.testclient import TestClient
+    from backend.api import web_app
+    client = TestClient(web_app(service.folder, "t"), base_url="http://127.0.0.1:8765")
+    call = lambda path, body: client.post(path, json=body, headers={"X-Bot-Mail-Token": "t"})
+    new = {"survey_reply": "Agradece só, em duas linhas.", "application_instructions": "Tom formal."}
+    assert call("/api/prompts/common", {"prompts": new}).status_code == 400
+    config = load_json(service.folder / "config.json", {})
+    save_json(service.folder / "config.json", {**config, "admin": True})
+    settings = call("/api/prompts/common", {"prompts": new}).json()
+    assert settings["voice"]["survey_reply"] == "Agradece só, em duas linhas."
+    instructions = queue_of(service, REF)["instructions"]
+    assert "Resposta ao inquérito (emails marcados «resposta ao inquérito»): Agradece só, em duas linhas." in instructions
+    assert "Tom formal." in instructions
+    # Voz e estilo never changes a prompt, even when sent one
+    voice = json.loads((service.folder / "voice.json").read_text(encoding="utf-8"))
+    choices = {key: voice["style"][key]["selected"] for key in ("greeting", "languages", "closing")}
+    call("/api/voice", {**choices, "signature": "Equipa", "survey_reply": "Outra coisa."})
+    assert service.settings()["voice"]["survey_reply"] == "Agradece só, em duas linhas."

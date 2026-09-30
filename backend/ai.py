@@ -193,9 +193,13 @@ def instructions(profile, voice, visits=None):
     after_template = style.get("after_visit_template") or {}
     out += ["- Pós-visita (agradecimento, emails marcados «pós-visita»): " + (after.get("text") or AFTER_VISIT_RULE),
             "  Conteúdo base:\n" + (after_template.get("text") or AFTER_VISIT_TEMPLATE),
-            "- Resposta ao inquérito (emails marcados «resposta ao inquérito»): " + SURVEY_REPLY_RULE,
-            "- Lembrete sem resposta (emails marcados «lembrete aos 2 dias» ou «lembrete aos 4 dias»): " + REMINDER_RULE,
-            "- Visita que não aconteceu (emails marcados «visita falhada»): " + VISIT_MISSED_RULE,
+            # 30/09: these three, too, can be changed in the Oficina (they were only in the code)
+            "- Resposta ao inquérito (emails marcados «resposta ao inquérito»): "
+            + ((style.get("survey_reply") or {}).get("text") or SURVEY_REPLY_RULE),
+            "- Lembrete sem resposta (emails marcados «lembrete aos 2 dias» ou «lembrete aos 4 dias»): "
+            + ((style.get("reminder_rule") or {}).get("text") or REMINDER_RULE),
+            "- Visita que não aconteceu (emails marcados «visita falhada»): "
+            + ((style.get("visit_missed") or {}).get("text") or VISIT_MISSED_RULE),
             "- Pedido de documentos (emails marcados «pedido de documentos»): "
             + ((style.get("docs_request") or {}).get("text") or DOCS_REQUEST_RULE),
             "- Lembrete de visita (emails marcados «lembrete de visita»): "

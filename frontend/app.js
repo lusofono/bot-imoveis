@@ -11,7 +11,7 @@ let state = {properties: []}, settings = null, preview = null;
 // APalace is first, and the one a browser with no choice saved starts in (27/09).
 // «Default» (id amber, once «Âmbar») first and the one to start with (27/09): the interface is being simplified in it,
 // the others follow later.
-const THEMES = ['amber', 'apalace', 'night', 'day', 'indigo', 'racing', 'boat', 'scooter', 'kw'];
+const THEMES = ['amber', 'apalace', 'agentval', 'night', 'day', 'indigo', 'racing', 'boat', 'scooter', 'kw'];
 function applyTheme(theme) {
   const chosen = THEMES.includes(theme) ? theme : 'amber';
   document.documentElement.dataset.theme = chosen;
@@ -37,6 +37,19 @@ const TAB_NAMES = {voice: 'Voz e estilo', dashboard: 'Painel', replies: 'Centro 
 // 90's Boat (id boat) fills the same slots with its own words, instruments and selector (its clock is dressed in its
 // stylesheet); a grand-luxury skin would do the same.
 const SKINS = {
+  // 30/09: AgentVal speaks with a warmer, more human voice; its colours and type are in themes/agentval.css
+  agentval: {
+    words: {
+      'dashboard.eyebrow': 'O SEU DIA', 'dashboard.title': 'Cada contacto, uma decisão a acompanhar.',
+      'activity.eyebrow': 'PERCURSO', 'activity.title': 'Pedidos e respostas, lado a lado',
+      'setup.eyebrow': 'PRÓXIMO PASSO', 'setup.title': 'Tudo pronto para acompanhar',
+      'replies.eyebrow': 'CONVERSAS', 'replies.title': 'Responder com cuidado, a cada pessoa.',
+      'properties.eyebrow': 'SELEÇÃO', 'properties.title': 'Cada imóvel, a sua história.',
+      'contacts.eyebrow': 'PESSOAS', 'contacts.title': 'Quem nos procurou, com nome e percurso.',
+      'agenda.eyebrow': 'VISITAS', 'agenda.title': 'A semana, visita a visita.',
+      'voice.eyebrow': 'A NOSSA VOZ', 'voice.title': 'As nossas palavras, o nosso cuidado.',
+    },
+  },
   racing: {
     words: {
       'dashboard.eyebrow': 'COCKPIT', 'dashboard.title': 'O teu dia, a todo o gás.',
@@ -793,7 +806,10 @@ function showWorkshop() {
 
 function renderWorkshop() {
   $('workshop-link').hidden = !settings?.admin;
+  // 30/09: without "admin", the prompts are never shown (with the customers' data in them): only «Copiar»
+  document.body.classList.toggle('admin', !!settings?.admin);
   if (!settings?.admin) return;
+  $('workshop-prompts').replaceChildren(...promptsCard());
   $('workshop-engine').replaceChildren(el('p', {class: 'eyebrow'}, 'MOTOR DE IA · API OPENAI'), engineConsole());
   // Token prices, US$ per 1M tokens as OpenAI writes them: change one, add a model, or put the table's own back
   const models = (settings.ai?.models || []).slice().sort((a, b) => a.id.localeCompare(b.id));
@@ -853,6 +869,58 @@ function limitsSection() {
         settings.ai = await call('api/ai/limits', {context_share: share.value, batch_emails: batch.value});
         renderWorkshop(); toast('Limites guardados: valem a partir do próximo «Gerar respostas».');
       }, event.currentTarget)}, 'Guardar')));
+}
+
+// 30/09: every prompt, to change when needed — those common to every property (voice.json) and each property's own
+// (its profile.json). Only here: Voz e estilo and Imóveis no longer show them.
+const COMMON_PROMPT_FIELDS = [
+  ['application_instructions', 'Comportamento geral: como aplicar a voz em todas as respostas', 5],
+  ['after_visit', 'Pós-visita: instruções do agradecimento', 5],
+  ['after_visit_template', 'Pós-visita: conteúdo base (inquérito de 1 a 5 e ficha de visita; os <…> são preenchidos)', 12],
+  ['survey_reply', 'Resposta ao inquérito pós-visita', 5],
+  ['visit_reminder', 'Lembrete de visita (na véspera e no dia)', 5],
+  ['booked_reply', 'Cliente com visita marcada', 5],
+  ['visited_reply', 'Cliente que já visitou', 5],
+  ['visit_missed', 'Visita que não aconteceu', 4],
+  ['reminder_rule', 'Lembrete sem resposta (aos 2 e aos 4 dias, quando não há frase fixa)', 4],
+  ['docs_request', 'Pedido de documentos (sem nunca dizer «short list»)', 5]];
+const PROPERTY_PROMPT_FIELDS = [
+  ['general', 'Prompt base: contexto do imóvel', 4], ['first', '1.ª interação: primeira resposta', 4],
+  ['first_template', 'Texto base da 1.ª resposta (opcional)', 5], ['second', '2.ª interação: qualificação (pedir o que falta)', 5],
+  ['third', '3.ª interação: proposta de visita', 4], ['fourth', '4.ª interação: marcar a visita', 6],
+  ['knowledge', 'Como usar a base de conhecimento (RAG)', 3]];
+let promptsProperty = null;
+function promptsCard() {
+  const boxes = Object.fromEntries(COMMON_PROMPT_FIELDS.map(([key, , rows]) =>
+    [key, el('textarea', {rows}, settings.voice[key] || '')]));
+  const properties = settings.properties || [];
+  if (!properties.some(property => property.reference === promptsProperty)) promptsProperty = properties[0]?.reference || null;
+  const property = properties.find(item => item.reference === promptsProperty);
+  const select = el('select', {'aria-label': 'Imóvel'}, properties.map(item =>
+    el('option', {value: item.reference}, item.reference + (item.test ? ' (teste)' : ''))));
+  select.value = promptsProperty || '';
+  select.addEventListener('change', () => { promptsProperty = select.value; renderWorkshop(); });
+  const own = Object.fromEntries(PROPERTY_PROMPT_FIELDS.map(([key, , rows]) =>
+    [key, el('textarea', {rows}, property?.prompts?.[key] || '')]));
+  const field = (label, box) => el('label', {class: 'field'}, el('span', {}, label, kind('prompt')), box);
+  return [
+    el('p', {class: 'eyebrow'}, 'PROMPTS'),
+    el('p', {class: 'step'}, 'Tudo o que a IA segue, para mudares quando precisares. Um texto apagado volta ao de partida. '
+      + 'Quem usa a página não os vê nem os muda: só copia o prompt, sem o ver.'),
+    el('details', {class: 'prompts-group'}, el('summary', {}, 'Comuns a todos os imóveis'),
+      COMMON_PROMPT_FIELDS.map(([key, label]) => field(label, boxes[key])),
+      el('div', {class: 'actions'}, el('button', {class: 'primary', onclick: event => run(async () => {
+        settings = await call('api/prompts/common', {prompts: Object.fromEntries(Object.entries(boxes).map(([key, box]) => [key, box.value]))});
+        renderSettings(); await refreshState(); toast('Prompts comuns guardados.');
+      }, event.currentTarget)}, 'Guardar prompts comuns'))),
+    property && el('details', {class: 'prompts-group'}, el('summary', {}, 'De cada imóvel'),
+      el('div', {class: 'row'}, el('label', {}, 'Imóvel', select)),
+      PROPERTY_PROMPT_FIELDS.map(([key, label]) => field(label, own[key])),
+      el('div', {class: 'actions'}, el('button', {class: 'primary', onclick: event => run(async () => {
+        settings = await call('api/property/prompts', {reference: property.reference,
+          prompts: Object.fromEntries(Object.entries(own).map(([key, box]) => [key, box.value]))});
+        renderSettings(); await refreshState(); toast(`Prompts de ${property.reference} guardados.`);
+      }, event.currentTarget)}, `Guardar prompts de ${property.reference}`)))];
 }
 
 // The test platform: fictitious customers of the test property, whose emails go through Gmail for real
@@ -2289,7 +2357,7 @@ function renderRoundCommon(box, data, reload, actions) {
     clients: Object.fromEntries(items.map(item => [item.id, {language: item.language, lang: item.lang, greeting: greetings[item.id].value}]))});
   const save = () => call('api/visits/round-save', {property_ref: ref, window_id: data.window_id, common: common()});
   const promptText = el('pre', {}, '');
-  const promptBox = el('details', {class: 'copy-only'}, el('summary', {class: 'muted small'}, 'Prompt da ronda'), promptText);
+  const promptBox = el('details', {class: 'copy-only prompt-view'}, el('summary', {class: 'muted small'}, 'Prompt da ronda'), promptText);
   const pasted = el('textarea', {class: 'copy-only', rows: 4, placeholder: 'Cola aqui a resposta do ChatGPT (o bloco JSON).',
     'aria-label': 'Resposta colada'});
   const span = data.window || {};
@@ -2789,11 +2857,7 @@ function propertyCover(ref, hasPhoto) {
 }
 
 function propertyCard(property) {
-  const areas = {};
-  const area = (name, label, rows) => {
-    areas[name] = el('textarea', {rows}, property.prompts[name] || '');
-    return el('label', {class: 'field'}, el('span', {}, label, kind('prompt')), areas[name]);
-  };
+  // 30/09: the property's prompts are edited in the Oficina (promptsCard)
   const link = /^https:\/\//.test(property.listing_url || '')
     && el('a', {href: property.listing_url, target: '_blank', rel: 'noopener noreferrer'}, property.listing_url);
   // Two columns on a wide screen: what the property is on the left, what is happening with it on the right.
@@ -2807,18 +2871,6 @@ function propertyCard(property) {
       .filter(Boolean).join(' · ')),
     link,
     knowledgeDetails(property.reference),
-    el('details', {}, el('summary', {class: 'muted small'}, 'Prompts deste imóvel ', kind('prompt')),
-      area('general', 'Prompt base: contexto do imóvel', 4),
-      area('first', '1.ª interação: primeira resposta', 4), area('first_template', 'Texto base da 1.ª resposta (opcional)', 4),
-      area('second', '2.ª interação: confirmar e pedir o que falta', 3),
-      area('third', '3.ª interação: proposta de visita', 3),
-      area('fourth', '4.ª interação: marcar a visita', 3),
-      area('knowledge', 'Como usar a base de conhecimento', 3),
-      el('button', {class: 'primary', onclick: event => run(async () => {
-        const prompts = Object.fromEntries(Object.entries(areas).map(([name, box]) => [name, box.value]));
-        settings = await call('api/property/prompts', {reference: property.reference, prompts});
-        renderSettings(); await refreshState(); toast('Prompts guardados.');
-      }, event.currentTarget)}, 'Guardar prompts')),
     el('button', {class: 'link', onclick: () => openPropertyEditor(property, property.reference)}, 'Editar dados do anúncio'),
     activeSwitch(property)),
     el('div', {class: 'property-operations'},
@@ -2928,7 +2980,7 @@ function activeClientsList(property) {
 function analysisPanel(property) {
   if (property.visits?.closed_at) return false;
   const promptText = el('pre', {}, '');
-  const promptBox = el('details', {class: 'copy-only'}, el('summary', {class: 'muted small'}, 'Prompt de análise'), promptText);
+  const promptBox = el('details', {class: 'copy-only prompt-view'}, el('summary', {class: 'muted small'}, 'Prompt de análise'), promptText);
   const copyBtn = el('button', {class: 'copy-only', disabled: true, onclick: event => run(async () => {
     await copyText(promptText.textContent, 'Prompt copiado. Cola-o numa conversa do ChatGPT e lê a resposta lá — não é preciso trazê-la de volta.', promptBox);
   }, event.currentTarget)}, 'Copiar');
@@ -4035,20 +4087,13 @@ function renderVoice() {
   const slot = el('input', {type: 'number', min: 10, max: 180, step: 5, value: visits.slot_minutes || 30});
   const rental = el('input', {value: visits.rental || '', placeholder: 'ex.: 15 a 20 minutos'});
   const sale = el('input', {value: visits.sale || '', placeholder: 'ex.: 30 a 40 minutos'});
-  const behaviour = el('textarea', {rows: 4}, settings.voice.application_instructions || '');
   const reminders = settings.voice.reminders || {day2: '', day4: ''};
   const reminderDay2 = el('textarea', {rows: 2, placeholder: 'ex.: Ainda precisa de alguma informação sobre o imóvel?'}, reminders.day2 || '');
   const reminderDay4 = el('textarea', {rows: 2, placeholder: 'ex.: Ficamos à disposição se ainda tiver interesse em visitar.'}, reminders.day4 || '');
   const visitsClosed = el('textarea', {rows: 4, placeholder: 'ex.: Agradecemos o interesse. As visitas a este imóvel já estão fechadas.'}, settings.voice.visits_closed || '');
   const consentRequest = el('textarea', {rows: 4, placeholder: 'ex.: Podemos guardar o seu contacto para futuras oportunidades semelhantes? Responda "sim" se concordar.'}, settings.voice.consent_request || '');
   const digestRecipient = el('input', {type: 'email', value: settings.voice.digest_recipient || '', placeholder: 'o teu email: recebe as cópias e o resumo de todos'});
-  const afterVisit = el('textarea', {rows: 5}, settings.voice.after_visit || '');
-  const afterVisitTemplate = el('textarea', {rows: 14}, settings.voice.after_visit_template || '');
-  const visitReminder = el('textarea', {rows: 5}, settings.voice.visit_reminder || '');
-  // 27/09: a customer writing with a visit booked, or after the visit: each with its own prompt
-  const bookedReply = el('textarea', {rows: 5}, settings.voice.booked_reply || '');
-  const visitedReply = el('textarea', {rows: 5}, settings.voice.visited_reply || '');
-  const docsRequest = el('textarea', {rows: 5}, settings.voice.docs_request || '');
+  // 30/09: the prompts (behaviour, after the visit, reminders, booked and visited, documents) are in the Oficina now
   // 27/09: the hours behind two of the dots in Comunicações' table of customers
   const alerts = settings.voice.alerts || {our_turn_hours: 48, no_visit_hours: 96};
   const ourTurnHours = el('input', {type: 'number', min: 1, max: 720, value: alerts.our_turn_hours});
@@ -4063,7 +4108,6 @@ function renderVoice() {
     el('label', {class: 'field'},
       'Assunto das respostas a pedidos do portal ({imovel} e {referencia}). Nas respostas do próprio cliente mantém-se o assunto dele.',
       replySubject),
-    el('label', {class: 'field'}, el('span', {}, 'Comportamento geral: como aplicar a voz em todas as respostas', kind('prompt')), behaviour),
     el('div', {class: 'grid'},
       el('label', {class: 'field'}, 'Marcar visitas de quantos em quantos minutos', slot),
       el('label', {class: 'field'}, 'Uma visita de arrendamento dura', rental),
@@ -4082,26 +4126,6 @@ function renderVoice() {
     el('div', {class: 'grid'},
       el('label', {class: 'field'}, 'Laranja: à espera de resposta nossa há mais de … horas', ourTurnHours),
       el('label', {class: 'field'}, 'Azul (em vez da verde): ficha completa há mais de … horas sem data de visita', noVisitHours)),
-    el('p', {class: 'eyebrow voice-section'}, 'PÓS-VISITA ', kind('prompt')),
-    el('p', {class: 'step voice-section'},
-      'Depois de marcares em Visitas que o cliente apareceu, «Criar agradecimento» põe um rascunho nas Comunicações: o assistente '
-      + 'escreve-o com estas instruções, no idioma do cliente, com a tua nota pública, o inquérito e a ficha de visita. '
-      + 'O cliente responde ao próprio email; a leitura seguinte guarda as notas na visita dele, em Visitas.'),
-    el('label', {class: 'field'}, 'Instruções do agradecimento', afterVisit),
-    el('label', {class: 'field'}, 'Conteúdo base: inquérito (1 a 5) e ficha de visita — os <…> são preenchidos pelo assistente', afterVisitTemplate),
-    el('p', {class: 'eyebrow voice-section'}, 'LEMBRETES DE VISITA ', kind('prompt')),
-    el('p', {class: 'step voice-section'},
-      'Na véspera e no próprio dia de cada visita marcada, a primeira leitura desse dia põe um rascunho nas Comunicações: '
-      + 'o assistente escreve-o com estas instruções, no idioma do cliente, e lembra o que ainda falta na ficha.'),
-    el('label', {class: 'field'}, 'Instruções do lembrete de visita', visitReminder),
-    el('p', {class: 'eyebrow voice-section'}, 'VISITA MARCADA E DEPOIS DA VISITA ', kind('prompt')),
-    el('p', {class: 'step voice-section'},
-      'Quando um cliente volta a escrever com a visita já marcada, ou depois de ter visitado, a resposta segue estas '
-      + 'instruções (e não as das interações 1 a 4). O email aparece marcado «visita marcada» ou «já visitou».'),
-    el('label', {class: 'field'}, 'Com visita marcada', bookedReply),
-    el('label', {class: 'field'}, 'Depois de visitar', visitedReply),
-    el('label', {class: 'field'}, 'Pedido de documentos (os escolhidos da short list, em Visitas → «Pedir documentos»; '
-      + 'sem nunca dizer «short list»)', docsRequest),
     el('p', {class: 'eyebrow voice-section'}, 'PONTO DE SITUAÇÃO ', kind('voice')),
     el('p', {class: 'step voice-section'},
       'O relatório de cada imóvel está no bloco de notas do Painel. Vai ao proprietário (o email dele fica em Imóveis), '
@@ -4111,13 +4135,11 @@ function renderVoice() {
     el('div', {class: 'actions'}, el('button', {class: 'primary', onclick: event => run(async () => {
       const choices = Object.fromEntries(Object.entries(selects).map(([key, select]) => [key, select.value]));
       settings = await call('api/voice', {...choices, signature: signature.value,
-        sender_name: senderName.value, reply_subject: replySubject.value, application_instructions: behaviour.value,
+        sender_name: senderName.value, reply_subject: replySubject.value,
         visits: {slot_minutes: Number(slot.value), rental: rental.value, sale: sale.value},
         reminders: {day2: reminderDay2.value, day4: reminderDay4.value},
         alerts: {our_turn_hours: Number(ourTurnHours.value), no_visit_hours: Number(noVisitHours.value)},
-        visits_closed: visitsClosed.value, consent_request: consentRequest.value, digest_recipient: digestRecipient.value,
-        after_visit: afterVisit.value, after_visit_template: afterVisitTemplate.value, visit_reminder: visitReminder.value,
-        booked_reply: bookedReply.value, visited_reply: visitedReply.value, docs_request: docsRequest.value});
+        visits_closed: visitsClosed.value, consent_request: consentRequest.value, digest_recipient: digestRecipient.value});
       renderSettings(); await refreshState(); toast('Voz guardada.');
     }, event.currentTarget)}, 'Guardar voz')));
 }

@@ -15,6 +15,28 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.84.0 — 30/09/2026
+
+- **Tema novo, «AgentVal»** (id `agentval`), a pedido de uma cliente, no espírito do site da agência dela: página creme
+  (`#f8f2ee`), cartões um tom mais claros, tinta antracite, títulos numa serifada clara (Cormorant Garamond quando o
+  computador a tem; senão Garamond, Hoefler Text ou Georgia — a página não carrega letras de fora), rótulos em
+  maiúsculas bem espaçadas depois de um traço terracota, cantos quase retos (2 px), botões principais antracite com
+  maiúsculas creme e os três acentos da paleta: terracota, azulejo e oliva. Barra lateral antracite, com um V de
+  linhas paralelas (desenho nosso, à maneira do logótipo) e «AGENTVAL» numa wordmark fina. Os títulos das páginas
+  falam num tom mais caloroso («Cada contacto, uma decisão a acompanhar.», «Responder com cuidado, a cada pessoa.»).
+  Contrastes verificados (texto 8:1, rótulos 4,8:1, barra lateral 10:1).
+
+## α.83.0 — 30/09/2026
+
+- **Todos os prompts passam para a Oficina** (cartão «Prompts»), para os mudar quando for preciso: os comuns a todos
+  os imóveis (comportamento geral, pós-visita e o seu conteúdo base, resposta ao inquérito, lembrete de visita, visita
+  marcada, já visitou, visita falhada, lembrete sem resposta, pedido de documentos) e os de cada imóvel (prompt base,
+  1.ª a 4.ª interação, texto base da 1.ª, como usar o conhecimento). A resposta ao inquérito, o lembrete sem resposta e
+  a visita falhada, que só existiam no código, passam a poder mudar-se. Um texto apagado volta ao de partida.
+- **Saem da Voz e estilo e dos Imóveis**; o servidor recusa mudar um prompt sem `"admin": true`.
+- **Sem «admin», nenhum prompt se vê** (tinham os dados dos clientes): nas Comunicações, na ronda, na análise e nos
+  anúncios ficam só «Criar prompt» e «Copiar»; também as instruções do imóvel e «Ver o que foi enviado à IA».
+
 ## α.82.4 — 29/09/2026
 
 - **A legenda das bolas mais curta** (cabe em menos linhas): «Eles (esquerda): incógnito · nada dado · ficha a meio ·

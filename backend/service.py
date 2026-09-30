@@ -16,6 +16,7 @@ import time
 import os
 from . import APP_NAME
 from .ai import (AFTER_VISIT_RULE, AFTER_VISIT_TEMPLATE, BOOKED_REPLY_RULE, DOCS_REQUEST_RULE, KNOWLEDGE_RULE, VISIT_REMINDER_RULE, VISITED_REPLY_RULE, extract_json, ficha_profile_prompt,
+                 REMINDER_RULE, SURVEY_REPLY_RULE, VISIT_MISSED_RULE,
                  fichas_prompt, parse_fichas_batch,
                  listing_text_prompt, parse_listing, agenda_prompt, describe, instructions,
                  parse_agenda, parse_survey, visit_analysis_prompt, clean_round, round_text)
@@ -69,6 +70,12 @@ VIEW_FIELDS = ("id", "kind", "date", "subject", "customer", "recipient", "blocke
                "visit_status", "reminder", "closing", "consent_suggested", "consent_confirmed", "history", "merged",
                "merged_ids", "visit_done", "visit_reminder", "survey_reply", "docs_request", "visit_missed", "profile_url",
                "round")
+# 30/09: the prompts common to every property that the Oficina edits (voice.json), with the code's own text; the
+# behaviour («Comportamento geral») lives at the root of voice.json, the others under style.
+COMMON_PROMPTS = {"application_instructions": "", "after_visit": AFTER_VISIT_RULE, "after_visit_template": AFTER_VISIT_TEMPLATE,
+                  "visit_reminder": VISIT_REMINDER_RULE, "booked_reply": BOOKED_REPLY_RULE, "visited_reply": VISITED_REPLY_RULE,
+                  "docs_request": DOCS_REQUEST_RULE, "survey_reply": SURVEY_REPLY_RULE, "reminder_rule": REMINDER_RULE,
+                  "visit_missed": VISIT_MISSED_RULE}
 # Page field → (profile prompt, key), the same prompts the terminal setup asks for.
 PROMPT_FIELDS = {"general": ("general", "text"), "first": ("first_interaction", "text"),
                  "first_template": ("first_interaction", "reply_template"), "second": ("second_interaction", "text"),
@@ -3113,6 +3120,9 @@ class MailService:
             voice["booked_reply"] = (style.get("booked_reply") or {}).get("text") or BOOKED_REPLY_RULE
             voice["visited_reply"] = (style.get("visited_reply") or {}).get("text") or VISITED_REPLY_RULE
             voice["docs_request"] = (style.get("docs_request") or {}).get("text") or DOCS_REQUEST_RULE
+            for key, default in COMMON_PROMPTS.items():  # 30/09: the Oficina's prompts, as they stand (or the code's)
+                if key not in voice and key != "application_instructions":
+                    voice[key] = (style.get(key) or {}).get("text") or default
             voice["digest_recipient"] = (style.get("digest_recipient") or {}).get("text") or ""
             voice["alerts"] = alert_hours({"style": style})
             today = date.today().isoformat()
@@ -3248,6 +3258,30 @@ class MailService:
                     text=recipient, status="configured" if recipient else "not_configured")
             save_json(path, voice)
             self.log("voice_saved")
+
+    def save_common_prompts(self, texts):
+        """30/09, Oficina: the prompts common to every property (voice.json). A text left as the code's own is kept
+        empty, so it keeps following the code; an empty one goes back to it."""
+        with locked(self.folder):
+            path = self.folder / "voice.json"
+            voice = load_json(path, None)
+            if not voice:
+                raise ValueError("Falta voice.json nesta pasta: corre o setup primeiro.")
+            style = voice["style"]
+            for key, default in COMMON_PROMPTS.items():
+                if key not in texts:
+                    continue
+                text = str(texts.get(key) or "").strip()
+                if len(text) > 5000:
+                    raise ValueError("Texto demasiado longo (até 5000 caracteres).")
+                if key == "application_instructions":
+                    voice["application_instructions"] = text
+                    continue
+                same = " ".join(text.split()) == " ".join(default.split())
+                style.setdefault(key, {}).update(text="" if same else text,
+                                                 status="configured" if text and not same else "not_configured")
+            save_json(path, voice)
+            self.log("prompts_saved", reference="comuns")
 
     def save_property(self, fields, first_read_days=None):
         """Create or update a property from listing data; the facts go to its knowledge base. A new property's

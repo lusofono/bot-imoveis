@@ -962,3 +962,8 @@ button.step-done::after{content:"✓  " attr(data-done);font-size:14px;font-weig
 .last-read-when{font-size:15px;font-weight:700;color:var(--text)}
 /* 29/09: «Última leitura…» on the right of its panel */
 #last-read{text-align:right}
+/* 30/09: without "admin", a prompt (with the customers' data in it) is never shown — only copied */
+body:not(.admin) .prompt-view{display:none!important}
+/* the Oficina's prompts, in two groups that open */
+.prompts-group{border:1px solid var(--line);border-radius:12px;padding:8px 16px;margin:12px 0}
+.prompts-group>summary{font-weight:600;padding:8px 0}

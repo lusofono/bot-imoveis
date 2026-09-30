@@ -27,7 +27,7 @@ from .ai import (listing_prompt, parse_fichas, parse_listing, parse_replies, par
 from .openai_client import complete, context_of, estimate_cost_usd, estimate_tokens
 from .rules import phone_in
 from .secrets import openai_api_key
-from .service import MailService
+from .service import COMMON_PROMPTS, MailService
 from . import testlab
 
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
@@ -195,7 +195,8 @@ def web_app(folder, token):
         return state()
 
     def voice(body):
-        service.save_voice(body)
+        # 30/09: the prompts are changed only in the Oficina; Voz e estilo keeps the voice's own settings
+        service.save_voice({key: value for key, value in body.items() if key not in COMMON_PROMPTS})
         return service.settings()
 
     def property_prompt(body):
@@ -336,6 +337,7 @@ def web_app(folder, token):
         return {**result, "state": state()}
 
     def property_prompts(body):
+        admin()  # 30/09: only in the Oficina
         service.save_prompts(str(body.get("reference") or ""), body.get("prompts") or {})
         return service.settings()
 
@@ -493,6 +495,8 @@ def web_app(folder, token):
                 "property/extract": ("POST", lambda body: service.extract_listing(body.get("text"), body.get("listing_url"))),
                 "ai/model": ("POST", lambda body: service.set_model(str(body.get("model") or ""))),
                 "ai/price": ("POST", ai_price),
+                "prompts/common": ("POST", lambda body: (admin(), service.save_common_prompts(body.get("prompts") or {}),
+                                                         service.settings())[2]),
                 "ai/context": ("POST", lambda body: (admin(), service.set_context(
                     body.get("model"), int(body["tokens"]) if str(body.get("tokens", "")).isdigit() else body.get("tokens")))[1]),
                 "ai/limits": ("POST", lambda body: (admin(), service.set_call_limits(*(

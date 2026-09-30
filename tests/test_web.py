@@ -130,6 +130,10 @@ def test_the_page_is_served_as_its_own_files(page):
     assert '<select id="theme-select" aria-label="Tema visual"><option value="amber">Default</option>' in html.text
     assert "const THEMES = ['amber'," in script.text and "THEMES.includes(theme) ? theme : 'amber'" in script.text
     assert ':root[data-theme="apalace"]' in client.get("/themes/apalace.css").text
+    # 30/09: AgentVal, a colours-and-words theme, after APalace
+    assert '<option value="apalace">APalace</option><option value="agentval">AgentVal</option>' in html.text
+    assert '<link rel="stylesheet" href="themes/agentval.css">' in html.text and "'agentval'" in script.text
+    assert "--av-terracotta:#cb6443" in client.get("/themes/agentval.css").text
     # A skin's Sons switch starts hidden and off: nothing plays until the owner turns it on.
     assert re.search(r'<button id="sound-toggle"[^>]*aria-pressed="false"[^>]*\bhidden\b', html.text)
     # The template itself, with its placeholders, is never served; nor is a theme that does not exist.
@@ -245,9 +249,13 @@ def test_property_from_a_listing_answer_keeps_the_safety_rules(service, page):
     result = read(service, [lead("9", ref="AP_NOVO", listing="12345678")])
     queue = next(item for item in result["properties"] if item["property_ref"] == "AP_NOVO")
     assert queue["added"] == 1 and "Mobilado" in queue["instructions"]
-    # The owner can type the prompts, including the 2nd interaction.
-    status, settings = call("/api/property/prompts", {"reference": "AP_NOVO", "prompts": {
-        "general": "Contexto do AP_NOVO.", "first": "Pede rendimentos.", "second": "Propõe uma visita."}})
+    # The prompts, including the 2nd interaction, change only in the Oficina (30/09): refused without "admin"
+    prompts = {"reference": "AP_NOVO", "prompts": {
+        "general": "Contexto do AP_NOVO.", "first": "Pede rendimentos.", "second": "Propõe uma visita."}}
+    assert call("/api/property/prompts", prompts)[0] == 400
+    config = json.loads((service.folder / "config.json").read_text(encoding="utf-8"))
+    (service.folder / "config.json").write_text(json.dumps({**config, "admin": True}), encoding="utf-8")
+    status, settings = call("/api/property/prompts", prompts)
     assert status == 200
     status, state = call("/api/state")
     queue = next(item for item in state["properties"] if item["property_ref"] == "AP_NOVO")
@@ -588,7 +596,7 @@ def test_every_theme_gets_the_new_parts(page):
     style = client.get("/style.css").text
     for theme in ("day", "indigo", "amber"):
         assert f':root[data-theme="{theme}"]{{--chart-requests:' in style
-    for theme in ("racing", "boat", "scooter", "kw", "apalace"):
+    for theme in ("racing", "boat", "scooter", "kw", "apalace", "agentval"):
         css = client.get(f"/themes/{theme}.css").text
         assert f':root[data-theme="{theme}"]{{--chart-requests:' in css
         if theme in ("racing", "boat", "scooter"):
