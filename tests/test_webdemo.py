@@ -19,7 +19,9 @@ UNAVAILABLE = {"api/consent/confirm", "api/consent/request", "api/paste", "api/p
                # 29/09: the Oficina (admin only): never in the sales demo
                "api/ai/price", "api/read/progress", "api/ai/hidden", "api/ai/effort", "api/ai/reviewer", "api/review", "api/prompts/common", "api/ai/context", "api/ai/limits", "api/testlab/state", "api/testlab/contest", "api/testlab/clients",
                "api/testlab/consultant", "api/testlab/wipe", "api/testlab/advance",
-               "api/testlab/transcript"}
+               "api/testlab/transcript",
+               "api/notices/update",  # 02/10: the notice board is only read in the demo
+               "api/contact/farewell"}
 
 
 @pytest.fixture(scope="module")

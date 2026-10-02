@@ -16,7 +16,8 @@ import time
 import os
 from . import APP_NAME
 from .ai import (AFTER_VISIT_RULE, AFTER_VISIT_TEMPLATE, BOOKED_REPLY_RULE, DOCS_REQUEST_RULE, KNOWLEDGE_RULE, VISIT_REMINDER_RULE, VISITED_REPLY_RULE, extract_json, ficha_profile_prompt,
-                 REMINDER_RULE, SURVEY_REPLY_RULE, VISIT_MISSED_RULE,
+                 REMINDER_RULE, SURVEY_REPLY_RULE, VISIT_MISSED_RULE, CLOSING_FROM, CLOSING_REPLY_RULE, LATER_REPLY_RULE,
+                 CONCLUSIVE_AT, CONCLUSIVE_REPLY_RULE, ALERT_KINDS,
                  fichas_prompt, parse_fichas_batch,
                  listing_text_prompt, parse_listing, agenda_prompt, describe, instructions,
                  parse_agenda, parse_survey, visit_analysis_prompt, clean_round, round_text)
@@ -33,6 +34,7 @@ from .rules import (DAY, DEALS, EMAIL, KNOWLEDGE_FILE, deal_of, RGPD_STATES, SUB
                     knowledge, photo_of, prepare, property_active, route, subject_of, QUOTE, addresses)
 from .secrets import app_password, has_app_password, has_openai_api_key, openai_api_key
 from .store import (CONTACT_FIELDS, add_contacts, add_note, find_photo, knowledge_files, load_contacts, load_digest,
+                    load_notices, save_notices,
                     load_events, load_knowledge, load_panel, load_visits, locked, load_json, load_profiles, load_voice,
                     property_folder, read_photo, save_contacts, save_digest, save_json, save_panel, save_text,
                     save_visits, write_photo)
@@ -81,7 +83,8 @@ VIEW_FIELDS = ("id", "kind", "date", "subject", "customer", "recipient", "blocke
 COMMON_PROMPTS = {"application_instructions": "", "after_visit": AFTER_VISIT_RULE, "after_visit_template": AFTER_VISIT_TEMPLATE,
                   "visit_reminder": VISIT_REMINDER_RULE, "booked_reply": BOOKED_REPLY_RULE, "visited_reply": VISITED_REPLY_RULE,
                   "docs_request": DOCS_REQUEST_RULE, "survey_reply": SURVEY_REPLY_RULE, "reminder_rule": REMINDER_RULE,
-                  "visit_missed": VISIT_MISSED_RULE}
+                  "visit_missed": VISIT_MISSED_RULE, "later_reply": LATER_REPLY_RULE,
+                  "conclusive_reply": CONCLUSIVE_REPLY_RULE, "closing_reply": CLOSING_REPLY_RULE}
 # Page field → (profile prompt, key), the same prompts the terminal setup asks for.
 PROMPT_FIELDS = {"general": ("general", "text"), "first": ("first_interaction", "text"),
                  "first_template": ("first_interaction", "reply_template"), "second": ("second_interaction", "text"),
@@ -104,6 +107,9 @@ IGNORE_KINDS = ("black", "grey")
 # (properties/<REF>/painel.json), since that is where it is best watched. OpenAI's cost is in US$, estimated
 # from tokens; for this assistant 1 € = 1 US$, by the owner's choice (24/09): no rate, no conversion shown.
 # data/api_fuel.json was the one shared tank before: a property not filled since keeps its size and fill time.
+NOTICES_KEPT = 300  # 02/10: the notice board keeps the latest ones; the oldest (archived or not) fall off
+NOTICE_LEVELS = ("info", "warn", "bad")
+WAITING_NOTICE_HOURS = 72  # 02/10: a customer waiting this long for our answer is on the board (once a day)
 FUEL_DEFAULT_EUR = 5.0
 FUEL_TEST_EUR = 3.0  # 02/10: the test property's tank, unless the owner fills it with another amount
 FUEL_RESERVE = 0.15  # below this share of the tank, the reserve lamp lights up
@@ -584,6 +590,82 @@ class MailService:
         data.setdefault("stats", {})["emails_in_queue"] = len(data["emails"])
         save_json(self.queue_path(ref), data)
 
+    # ===== The notice board (02/10): the system's important messages for the owner, on the Painel. Each one once (by
+    # its key), with when, which property and where to go; read or archived by the owner. Events, not to-dos: «A fazer»
+    # is worked out from the data and goes away when done, a notice stays until archived.
+
+    def notify(self, key, text, ref=None, level="warn", tab=None):
+        """Puts a message on the board, once per key; never fails what the caller was doing."""
+        try:
+            with locked(self.folder, "notices", wait=SHORT_WAIT):
+                board = load_notices(self.folder)
+                if any(notice.get("key") == key for notice in board["notices"]):
+                    return False
+                board["notices"].append({"id": secrets.token_hex(6), "key": key, "at": now(), "ref": ref,
+                                         "level": level if level in NOTICE_LEVELS else "warn", "text": text[:600],
+                                         "tab": tab, "read": False, "archived": False})
+                del board["notices"][:-NOTICES_KEPT]
+                save_notices(self.folder, board)
+                return True
+        except Exception:
+            return False
+
+    def flag_alerts(self, ref, alerts):
+        """02/10: messages the AI flagged as important, dramatic or insulting — a warning on their card and a notice on
+        the board, for the owner to read before answering (and maybe the grey or the black list)."""
+        with locked(self.folder, wait=SHORT_WAIT):
+            data = self.load(ref)
+            by_id = {item["id"]: item for item in data["emails"]}
+            flagged = []
+            for alert in alerts:
+                item = by_id.get(alert["id"])
+                if item is not None:
+                    item["ai_alert"] = {"kind": alert["kind"], "reason": alert["reason"], "at": now()}
+                    flagged.append((item, alert))
+            if flagged:
+                self.save(data, ref)
+        for item, alert in flagged:
+            name = (str((item.get("recipient") or {}).get("name") or (item.get("customer") or {}).get("name") or "").split()
+                    or ["Um cliente"])[0]
+            self.notify(f"alerta-{ref}-{item['id']}", f"{name} ({ref}): mensagem {ALERT_KINDS[alert['kind']]}"
+                        + (f" — {alert['reason']}" if alert["reason"] else "") + ". Lê-a antes de responder; se for caso "
+                        "disso, põe-o na lista cinzenta ou na lista negra.", ref,
+                        "warn" if alert["kind"] == "importante" else "bad", "replies")
+
+    def waiting_notices(self, ref, data):
+        """02/10, the board: customers waiting WAITING_NOTICE_HOURS or more for our answer, one notice per property a day."""
+        waiting = [item for item in data["emails"] if item.get("kind") in ("lead", "follow_up") and not item.get("blocked")
+                   and not item.get("answered_directly") and (waited_hours(item) or 0) >= WAITING_NOTICE_HOURS]
+        if not waiting:
+            return
+        names = [(str((item.get("recipient") or {}).get("name") or (item.get("customer") or {}).get("name") or "").split()
+                  or ["sem nome"])[0] for item in waiting]
+        days = int(max(waited_hours(item) for item in waiting) // 24)
+        self.notify(f"espera-{ref}-{date.today().isoformat()}",
+                    f"{len(waiting)} cliente(s) de {ref} à espera da nossa resposta há 3 dias ou mais (o mais antigo, há "
+                    f"{days} dias): " + ", ".join(names[:8]) + ("…" if len(names) > 8 else "") + ".", ref, "warn", "replies")
+
+    def notices(self):
+        """The board as the page shows it: the ones not archived, newest first, and how many are unread."""
+        board = load_notices(self.folder)
+        shown = [notice for notice in reversed(board["notices"]) if not notice.get("archived")]
+        return {"notices": shown, "unread": sum(1 for notice in shown if not notice.get("read"))}
+
+    def update_notices(self, ids, action):
+        """Marks notices read, or archives them (they leave the board); ids None: every one shown."""
+        if action not in ("read", "archive"):
+            raise ValueError("Ação desconhecida no quadro de avisos.")
+        with locked(self.folder, "notices", wait=SHORT_WAIT):
+            board = load_notices(self.folder)
+            chosen = None if ids is None else {str(key) for key in ids}
+            for notice in board["notices"]:
+                if chosen is None or notice.get("id") in chosen:
+                    notice["read"] = True
+                    if action == "archive":
+                        notice["archived"] = True
+            save_notices(self.folder, board)
+        return self.notices()
+
     def log(self, event, **fields):
         # No bodies, passwords, OAuth tokens, subjects or recipient addresses in logs.
         folder = self.folder / "logs"
@@ -592,6 +674,24 @@ class MailService:
         fd = os.open(folder / "events.jsonl", os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
         with os.fdopen(fd, "a") as stream:
             stream.write(json.dumps({"at": now(), "event": event, **fields}) + "\n")
+        if event == "openai_usage" and fields.get("reference"):
+            self.tank_notice(fields["reference"])
+
+    def tank_notice(self, ref):
+        """02/10, the board: a property's API tank in the reserve, or empty (once per fill)."""
+        try:
+            fuel = self.api_fuel(ref)
+        except Exception:
+            return
+        if not fuel["configured"] or not (fuel["reserve"] or fuel["empty"]):
+            return
+        left = f"{max(fuel['remaining_eur'], 0):.2f}".replace(".", ",")
+        if fuel["empty"]:
+            self.notify(f"deposito-vazio-{ref}-{fuel['filled_at']}", f"O depósito da API de {ref} está vazio: a API parou "
+                        "neste imóvel até o encheres (Painel → Depósitos).", ref, "bad", "dashboard")
+        else:
+            self.notify(f"deposito-reserva-{ref}-{fuel['filled_at']}", f"O depósito da API de {ref} está na reserva: "
+                        f"restam {left} €.", ref, "warn", "dashboard")
 
     @staticmethod
     def view(ref, profile, data, voice, added=None, visits=None):
@@ -653,8 +753,27 @@ class MailService:
             # still written, to be sent by WhatsApp or SMS
             phone_only = bool(item.get("blocked") and not item.get("recipient") and item.get("kind") == "lead"
                               and (item.get("customer") or {}).get("phone"))
+            chosen = (conversation.get("selection") or {}).get("status")
+            if chosen in SELECTION_STATES and item.get("kind") in ("lead", "follow_up"):
+                warnings.append(f"Cliente na short list ({SELECTION_STATES[chosen]}): é urgente, responde quanto antes.")
+            if item.get("ai_alert"):  # 02/10: the AI flagged it for the owner (also on the notice board)
+                alert = item["ai_alert"]
+                warnings.append(f"A IA assinalou esta mensagem como {ALERT_KINDS.get(alert.get('kind'), 'importante')}"
+                                + (f": {alert['reason']}" if alert.get("reason") else "") + ". Lê-a antes de responder.")
+            # 02/10: a customer's own email after the 4th, with no visit booked: the 5th to the 7th wait for the owner
+            # (the grey list, if it makes sense), the 8th asks them to step in, and from the 9th on the closing
+            later = bool(email and phase is None and item.get("kind") in ("lead", "follow_up") and not item.get("survey_reply"))
+            closing_reply = later and interaction >= CLOSING_FROM or bool(item.get("farewell"))
+            if later and 5 <= interaction < CONCLUSIVE_AT:
+                warnings.append(f"{interaction}.ª interação sem visita marcada: a IA responde só ao que perguntou e "
+                                "aguarda por ti. Se não fizer sentido continuar, põe-no na lista cinzenta.")
+            if later and interaction == CONCLUSIVE_AT:
+                warnings.append(f"{CONCLUSIVE_AT}.ª interação sem visita marcada: a resposta é conclusiva e a próxima é o "
+                                "fecho. Precisa da tua intervenção: lista cinzenta, propor-lhe uma visita ou deixar seguir.")
             emails.append({key: item.get(key) for key in VIEW_FIELDS} | {
                 "interaction": interaction if email else None, "warnings": warnings, "phase": phase, "phone_only": phone_only,
+                "closing_reply": closing_reply, "conclusive_reply": later and interaction == CONCLUSIVE_AT and not closing_reply,
+                "farewell": bool(item.get("farewell")),
                 "booked_at": ((visits or {}).get("booked_at") or {}).get(email) if phase == "booked" else None,
                 "ficha": ficha, "ficha_summary": ficha_summary(ficha) if ref else None, "qualifying_limit": limit,
                 "draft_checks": draft_checks(item.get("reply_text"), signature, house, item.get("visit_slot")),
@@ -716,6 +835,12 @@ class MailService:
         self.reading.update(stage="connect")  # 02/10: what the read is doing, for the page (api read/progress)
         try:
             return self.read_now(days)
+        except Exception as exc:
+            if not isinstance(exc, RuntimeError):  # «another operation is running» is no failure
+                message = " ".join(str(exc).split())[:300] or type(exc).__name__
+                self.notify(f"leitura-{date.today().isoformat()}-{hashlib.sha256(message.encode()).hexdigest()[:8]}",
+                            f"A leitura do Gmail falhou: {message}", None, "bad", "replies")
+            raise
         finally:
             self.reading.clear()
 
@@ -832,6 +957,13 @@ class MailService:
                             if item["survey_reply"]["alerts"]:
                                 item["warnings"].append("Atenção ao inquérito: " + "; ".join(item["survey_reply"]["alerts"])
                                                         + ". Lê o comentário antes de responder.")
+                    selection = ((conversation or {}).get("selection") or {}).get("status")
+                    if selection in SELECTION_STATES and not item.get("blocked"):
+                        # 02/10: someone on the short list wrote: urgent, on the notice board at once
+                        who = (str(item["customer"].get("name") or (conversation or {}).get("name") or "").split()
+                               or ["Um cliente"])[0]
+                        self.notify(f"shortlist-{ref}-{key}", f"{who} ({ref}), na short list ({SELECTION_STATES[selection]}), "
+                                    "escreveu: é urgente, responde quanto antes.", ref, "bad", "replies")
                     if conversation is not None:
                         # A snapshot of everything before this message: shown in "Email completo" and sent
                         # in the prompt, so the assistant (ChatGPT or the API) sees the whole exchange.
@@ -874,6 +1006,8 @@ class MailService:
                     self.mark_inactive(ref, data)
                     self.schedule_visit_reminders(ref, data)
                 self.save(data, ref)
+                if ref:
+                    self.waiting_notices(ref, data)
             # received: message ID → the day the customer's email arrived, so the dashboard still counts it
             # after it is answered or dismissed and leaves the queue. IDs and dates only, never an address.
             self.log("read", added=sum(added.values()), ambiguous=ambiguous, direct=sum(direct.values()),
@@ -1138,6 +1272,42 @@ class MailService:
         history.append(turn)
         del history[:-HISTORY_LIMIT]
 
+    def farewell(self, property_ref, item_id):
+        """02/10, «Encerrar contacto»: this customer's reply becomes a cordial goodbye (the closing's prompt), which the
+        owner reviews and sends; once sent, no more rounds or reminders — without the grey list."""
+        with locked(self.folder, wait=SHORT_WAIT):
+            ref = self.pick(self.profiles(), property_ref)
+            data = self.load(ref)
+            item = next((entry for entry in data["emails"] if entry["id"] == item_id), None)
+            if item is None or not item.get("recipient") or item.get("kind") not in ("lead", "follow_up"):
+                raise ValueError("Só se encerra o contacto a partir de um email do cliente, com destinatário.")
+            item["farewell"] = True
+            self.save(data, ref)
+            self.log("farewell_marked", reference=ref, message_id=item_id)
+        return ref
+
+    def interaction_notice(self, ref, data, item):
+        """02/10, the board: our conclusive 8th email went out with no visit booked (the owner steps in), or the closing."""
+        if item.get("kind") not in ("lead", "follow_up") or item.get("survey_reply") or item.get("farewell"):
+            return  # a farewell is the owner's own decision: nothing to tell them
+        email = ((item.get("recipient") or {}).get("email") or "").casefold()
+        conversation = data.get("conversations", {}).get(email) or {}
+        stage = conversation.get("stage", 0)
+        if stage not in (CONCLUSIVE_AT, CLOSING_FROM) or conversation.get("visit_check"):
+            return
+        today = date.today().isoformat()
+        if any(slot["customer"] == email and slot["at"][:10] >= today for slot in load_visits(self.folder, ref)["slots"]):
+            return
+        name = (str(conversation.get("name") or "").split() or ["Um cliente"])[0]
+        key = f"interacao-{stage}-{ref}-{hashlib.sha256(email.encode()).hexdigest()[:8]}"
+        if stage == CONCLUSIVE_AT:
+            self.notify(key, f"{name} ({ref}): foi a {CONCLUSIVE_AT}.ª interação sem visita marcada. Precisa da tua "
+                        "intervenção — lista cinzenta, propor-lhe uma visita ou deixar seguir para o fecho.",
+                        ref, "warn", "contacts")
+        else:
+            self.notify(key, f"{name} ({ref}): levou o email de fecho ({CLOSING_FROM}.ª interação). Deixamos de "
+                        "insistir: fica fora das rondas de visitas.", ref, "info", "contacts")
+
     @classmethod
     def advance(cls, data, item):
         """After a successful send: the customer's conversation moves to the next interaction.
@@ -1163,6 +1333,8 @@ class MailService:
             conversation["stage"] = max(stage, 3) if item.get("kind") == "visit_proposal" else stage
         if item.get("kind") == "visit_proposal":
             conversation["visit_proposed"] = True  # the qualification is over for them
+        if item.get("farewell"):
+            conversation["closed_at"] = now()  # 02/10: «Encerrar contacto»: no rounds or reminders from now on
         if item.get("ficha") and (conversation.get("ficha") or {}).get("at", "") <= item["ficha"].get("at", ""):
             conversation["ficha"] = item["ficha"]
         if item.get("kind") == "reminder" and item.get("reminder"):
@@ -1226,7 +1398,7 @@ class MailService:
                   for item in data["emails"] if item.get("kind") == "reminder"}
         created = 0
         for email, conversation in data.get("conversations", {}).items():
-            if (email in waiting or conversation.get("reminders_stopped") or conversation.get("ignored")
+            if (email in waiting or conversation.get("reminders_stopped") or conversation.get("ignored") or conversation.get("closed_at")
                     or not conversation.get("last_sent_at") or email in booked or conversation.get("visit_check")
                     or conversation.get("inactive") or was_proposed(conversation, email, proposed)
                     or conversation.get("stage", 0) >= 3):
@@ -1830,6 +2002,7 @@ class MailService:
                         item["reply_status"] = "sent"
                         if ref:
                             self.advance(data, item)
+                            self.interaction_notice(ref, data, item)
                         if agenda is not None and item.get("visit_slot"):
                             agenda["slots"].append({"at": item["visit_slot"], "customer": recipient.casefold(),
                                                     "name": (item.get("recipient") or {}).get("name") or "",
@@ -1889,6 +2062,7 @@ class MailService:
                 data["emails"].remove(item)
                 if ref:
                     self.advance(data, item)
+                    self.interaction_notice(ref, data, item)
             else:
                 item.update(reply_status="draft", send_reply=False)
             data.pop("send_preview", None)
@@ -1965,6 +2139,12 @@ class MailService:
                 state, reason = "booked", "já tem visita marcada"
             elif email in waiting:
                 state, reason = "pending", "tem um email por responder"
+            elif conversation.get("closed_at"):
+                state, reason = "closed", "contacto encerrado (despedida enviada)"  # 02/10: «Encerrar contacto»
+            elif conversation.get("stage", 0) >= CLOSING_FROM and not conversation.get("visit_check"):
+                # 02/10: the closing went out (our CLOSING_FROM-th email): no more rounds — we stopped insisting.
+                # The latest word, so before «another date» or «does not want to visit».
+                state, reason = "closed", "conversa fechada (já levou o email de fecho)"
             elif conversation.get("visit") in VISIT_STATES:
                 state, reason = conversation["visit"], VISIT_STATES[conversation["visit"]]
             else:
@@ -2983,8 +3163,8 @@ class MailService:
             return False
 
     # «A fazer», most urgent first: what goes out to customers today, then the queue, the agenda, the rounds, setup.
-    TODO_ORDER = ("expired", "survey_alert", "visit_reminder", "uncertain", "blocked", "reply", "draft", "accepted", "check", "thanks", "ready",
-                  "brake", "setup")
+    TODO_ORDER = ("expired", "survey_alert", "visit_reminder", "uncertain", "blocked", "reply", "draft", "accepted", "check", "thanks",
+                  "intervene", "ready", "brake", "setup")
 
     def survey_report(self, ref, data=None):
         """A property's survey report: one dial per part asked, interest, and each answer with its comment."""
@@ -3057,15 +3237,21 @@ class MailService:
                                                and not slot.get("thanks_sent_at") and slot["customer"] not in thanking],
                     "Agradecimentos pós-visita por criar")
                 proposed = self.proposed_to(load_visits(self.folder, ref))
-                ready, brake = [], []
+                ready, brake, intervene = [], [], []
                 for customer in self.candidates(ref, data):
                     conversation = conversations[customer["email"]]
+                    # 02/10: our conclusive 8th email went out with no visit booked: the owner steps in before the closing
+                    if (conversation.get("stage", 0) == CONCLUSIVE_AT and customer["state"] not in ("booked", "closed")
+                            and not conversation.get("visit_check")):
+                        intervene.append(customer["name"])
                     if customer["state"] != "ok" or was_proposed(conversation, customer["email"], proposed):
                         continue
                     if ficha_summary(conversation.get("ficha"))["complete"]:
                         ready.append(customer["name"])
                     elif conversation.get("stage", 0) >= 4:
                         brake.append(customer["name"])
+                add("intervene", "contacts", ref, intervene, f"{CONCLUSIVE_AT}.ª interação sem visita marcada: decidir "
+                    "(lista cinzenta, propor visita ou deixar seguir para o fecho)")
                 add("ready", "properties", ref, ready, "Ficha completa, sem proposta de visita: incluir na próxima ronda")
                 add("brake", "contacts", ref, brake, "Três pedidos de informação sem ficha completa: decidir se propões visita")
             expired = self.expired_contacts(moment.astimezone(timezone.utc))

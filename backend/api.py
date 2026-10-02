@@ -23,7 +23,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from starlette.routing import Route
 from . import APP_NAME
-from .ai import (listing_prompt, parse_fichas, parse_listing, parse_replies, parse_round, parse_visits, reply_prompt,
+from .ai import (listing_prompt, parse_fichas, parse_listing, parse_alerts, parse_replies, parse_round, parse_visits, reply_prompt,
                  round_prompt, short_id, sign)
 from .openai_client import complete, context_of, estimate_cost_usd, estimate_tokens
 from .rules import phone_in
@@ -153,6 +153,9 @@ def web_app(folder, token):
         saved = 0
         if replies or visits or fichas:
             saved = service.drafts(replies, current["revision"], current["property_ref"], visits, fichas)["saved"]
+        alerts = parse_alerts(text, current) if current["property_ref"] else []
+        if alerts:  # 02/10: important, dramatic or insulting: on the card and on the notice board
+            service.flag_alerts(current["property_ref"], alerts)
         return {"saved": saved, "notes": notes, "visits": len(visits), "fichas": len(fichas), "state": state()}
 
     def paste(body):
@@ -598,6 +601,13 @@ def web_app(folder, token):
                                                         **service.contacts()}), "contacts/ignored": ("POST", contacts_ignored),
                 "fuel/fill": ("POST", fuel_fill),
                 "digest": ("GET", lambda body: service.digest_view()), "todo": ("GET", lambda body: service.todo()),
+                # 02/10: «Encerrar contacto»: the reply becomes a cordial goodbye; once sent, no rounds or reminders
+                "contact/farewell": ("POST", lambda body: (service.farewell(body.get("property_ref") or None,
+                                                                            str(body.get("id") or "")), {"state": state()})[1]),
+                # 02/10: the notice board (Painel): the system's important messages for the owner
+                "notices": ("GET", lambda body: service.notices()),
+                "notices/update": ("POST", lambda body: service.update_notices(
+                    body.get("ids") if isinstance(body.get("ids"), list) else None, body.get("action"))),
                 "digest/save": ("POST", digest_save), "digest/send": ("POST", digest_send),
                 "digest/send-all": ("POST", digest_send_all),
                 "digest/refresh": ("POST", lambda body: service.refresh_digest(body.get("property_ref") or None)),

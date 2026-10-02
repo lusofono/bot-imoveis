@@ -255,6 +255,16 @@ def save_digest(folder, digest):
     save_json(Path(folder) / "digest.json", digest)
 
 
+def load_notices(folder):
+    """<folder>/avisos.json (02/10): the owner's notice board — the system's important messages, newest last."""
+    board = load_json(Path(folder) / "avisos.json", None)
+    return board if isinstance(board, dict) and isinstance(board.get("notices"), list) else {"notices": []}
+
+
+def save_notices(folder, board):
+    save_json(Path(folder) / "avisos.json", board)
+
+
 def load_visits(folder, ref):
     """properties/<REF>/visitas.json: the windows proposed, the times booked, and whether visits are closed."""
     agenda = load_json(property_folder(folder, ref) / "visitas.json", {"windows": [], "slots": []})

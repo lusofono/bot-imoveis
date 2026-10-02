@@ -736,9 +736,19 @@ function sendingBanner(delta) {
   $('sending-banner').hidden = !sendingNow;
 }
 window.addEventListener('beforeunload', event => { if (sendingNow) { event.preventDefault(); event.returnValue = ''; } });
+// 02/10: the calls that may leave a message on the notice board (a send, a read, the API's tank): the board and the
+// count on the Painel tab are fetched again after each one
+const NOTICE_SOURCES = new Set(['api/send', 'api/read', 'api/prompt/generate', 'api/review', 'api/visits/round-generate',
+  'api/visits/analyze', 'api/testlab/advance', 'api/testlab/clients', 'api/fichas/fill', 'api/property/extract']);
 async function call(path, body) {
   if (path === 'api/send') sendingBanner(1);
-  try { return await request(path, body); } finally { if (path === 'api/send') sendingBanner(-1); }
+  try { return await request(path, body); } finally {
+    if (path === 'api/send') sendingBanner(-1);
+    if (NOTICE_SOURCES.has(path)) refreshNotices();
+  }
+}
+function refreshNotices() {
+  request('api/notices').then(renderNotices).catch(() => { /* the board waits for the next call */ });
 }
 async function request(path, body) {
   $('busy').hidden = false;
@@ -933,6 +943,10 @@ function reviewerSection() {
 // (its profile.json). Only here: Voz e estilo and Imóveis no longer show them.
 const COMMON_PROMPT_FIELDS = [
   ['application_instructions', 'Comportamento geral: como aplicar a voz em todas as respostas', 5],
+  // 02/10: after the 4th interaction — the customer goes on writing with no visit booked — and then the closing
+  ['later_reply', '5.ª a 7.ª interação: o cliente continua a escrever, sem visita marcada (responde e aguarda por ti)', 5],
+  ['conclusive_reply', '8.ª interação: conclusiva (e um aviso para ti intervires)', 5],
+  ['closing_reply', 'Fecho, da 9.ª interação em diante: agradece e despede-se até as condições mudarem', 5],
   ['after_visit', 'Pós-visita: instruções do agradecimento', 5],
   ['after_visit_template', 'Pós-visita: conteúdo base (inquérito de 1 a 5 e ficha de visita; os <…> são preenchidos)', 12],
   ['survey_reply', 'Resposta ao inquérito pós-visita', 5],
@@ -1642,6 +1656,24 @@ function card(email, index, list) {
       state = await call('api/dismiss', {property_ref: queueRef(), ids: [email.id]});
       renderState(); toast('Sem resposta: o email saiu da fila.');
     }, event.currentTarget)}, 'Não precisa de resposta'),
+    // 02/10: closing the contact without the grey list: a cordial goodbye, reviewed and sent like any reply
+    ignoreTarget && !email.farewell && ['lead', 'follow_up'].includes(email.kind) && el('button', {class: 'pill-action farewell',
+      title: 'Encerra o contacto com uma despedida cordial (o prompt do fecho), que revês antes de enviar. Depois de enviada, '
+        + 'deixamos de lhe escrever primeiro (rondas e lembretes), sem lista cinzenta; se voltar a escrever, entra normalmente.',
+      onclick: event => run(async () => {
+        const who = ignoreTarget.name || ignoreTarget.email;
+        if (!confirm(`Encerrar o contacto com ${who}? A resposta passa a ser uma despedida cordial, que revês antes de enviar.`)) return;
+        state = (await call('api/contact/farewell', {property_ref: queueRef(), id: email.id})).state;
+        renderState();
+        if (!settings?.openai_configured) {
+          toast(`${who}: a resposta vai ser a despedida. Gera-a (copiar/colar) e envia.`);
+          return;
+        }
+        const result = await call('api/prompt/generate', {property_ref: queueRef(), ids: [email.id], extra: '', only_extra: false});
+        state = result.state; renderState(); applyFuel(result.fuel, queueRef());
+        toast(result.saved ? `Despedida para ${who} escrita: revê-a e envia.` : 'A despedida não foi escrita: usa «Atualizar resposta».',
+          result.saved ? 'ok' : 'warn');
+      }, event.currentTarget)}, 'Encerrar contacto'),
     ignoreTarget && el('button', {class: 'pill-action grey', title: 'O cliente disse que não quer: sai da fila e deixamos de lhe '
         + 'escrever primeiro (propostas de visita, lembretes e outros envios automáticos). Se voltar a escrever, a mensagem '
         + 'entra, com um aviso. Reverte-se em Imóveis.', onclick: event => run(async () => {
@@ -1676,7 +1708,10 @@ function card(email, index, list) {
       el('label', {class: 'who'}, el('input', {type: 'checkbox', class: 'pick', 'data-id': email.id,
         checked: !email.blocked && !email.answered_direct, disabled: !!email.blocked}),
         el('strong', {}, customer.name || sender.name || sender.email || 'Sem nome')),
-      email.kind === 'visit_thanks' ? el('span', {class: 'tag visit'}, 'pós-visita')
+      // 02/10: «Encerrar contacto»: the reply is a cordial goodbye
+      email.farewell ? el('span', {class: 'tag warn', title: 'A resposta é uma despedida cordial (o prompt do fecho). Depois de '
+        + 'enviada, deixamos de lhe escrever primeiro (rondas e lembretes), sem lista cinzenta.'}, 'encerrar contacto · despedida')
+        : email.kind === 'visit_thanks' ? el('span', {class: 'tag visit'}, 'pós-visita')
         : email.kind === 'docs_request' ? el('span', {class: 'tag visit'}, 'pedido de documentos')
         : email.kind === 'visit_missed' ? el('span', {class: 'tag warn'}, 'visita falhada')
         : email.survey_reply ? el('span', {class: 'tag ' + (email.survey_reply.alerts?.length ? 'warn' : 'visit')}, 'resposta ao inquérito')
@@ -1686,6 +1721,12 @@ function card(email, index, list) {
         : email.kind === 'addition' ? el('span', {class: 'tag visit'}, 'acrescento')
         : email.phase === 'visited' ? el('span', {class: 'tag visit'}, 'já visitou')
         : email.phase === 'booked' ? el('span', {class: 'tag visit', title: email.booked_at ? 'Visita: ' + slotLabel(email.booked_at) : ''}, 'visita marcada')
+        // 02/10: from the 9th on, the closing — the reply says goodbye and the rounds leave them out
+        : email.closing_reply ? el('span', {class: 'tag warn', title: 'Já trocámos muitos emails sem a visita avançar: a '
+          + 'resposta é o fecho (agradece e despede-se) e as rondas de visitas deixam de o incluir. Muda-se na Oficina.'},
+          email.interaction + '.ª interação · fecho')
+        : email.conclusive_reply ? el('span', {class: 'tag warn', title: 'A resposta é conclusiva e a próxima é o fecho: '
+          + 'decide agora (lista cinzenta, propor visita ou deixar seguir).'}, email.interaction + '.ª interação · conclusiva')
         : email.interaction && el('span', {class: 'tag'}, email.interaction + '.ª interação'),
       email.merged?.length > 1 && el('span', {class: 'tag visit', title: 'Vários emails deste cliente juntos: uma só resposta responde a todos.'},
         email.merged.length + ' mensagens'),
@@ -2243,7 +2284,36 @@ function renderDashboard(data) {
 
 async function loadMetrics() {
   renderDashboard(await call('api/metrics', {days: chartDays()}));
+  renderNotices(await call('api/notices'));
   renderTodo(await call('api/todo'));
+}
+
+// 02/10: the notice board — the system's important messages, newest first, the unread in bold; each with «Ver» (where
+// it is dealt with) and «Arquivar» (it leaves the board). The Painel tab shows how many are unread.
+function renderNotices(data) {
+  const notices = data.notices || [], unread = data.unread || 0;
+  $('notice-count').textContent = String(unread);
+  $('notice-count').hidden = !unread;
+  const box = $('dashboard-notices');
+  box.hidden = !notices.length;
+  if (!notices.length) { box.replaceChildren(); return; }
+  const update = (ids, action, button) => run(async () => renderNotices(await call('api/notices/update', {ids, action})), button);
+  const stamp = at => { const moment = new Date(at);
+    return `${moment.toLocaleDateString('pt-PT', {day: '2-digit', month: '2-digit'})} ${moment.toLocaleTimeString('pt-PT', {hour: '2-digit', minute: '2-digit'})}`; };
+  box.replaceChildren(
+    el('div', {class: 'section-heading'}, el('div', {}, el('p', {class: 'eyebrow'}, 'QUADRO DE AVISOS'),
+      el('h2', {}, unread ? `${unread} aviso${unread === 1 ? '' : 's'} por ler` : 'Avisos do sistema')),
+      el('div', {class: 'notices-actions'},
+        unread ? el('button', {type: 'button', class: 'link', onclick: event => update(null, 'read', event.currentTarget)}, 'Marcar todos como lidos') : null,
+        el('button', {type: 'button', class: 'link', onclick: event => update(null, 'archive', event.currentTarget)}, 'Arquivar todos'))),
+    el('ul', {class: 'notice-list'}, notices.slice(0, 40).map(notice => el('li', {class: `notice ${notice.level}${notice.read ? '' : ' unread'}`},
+      el('span', {class: 'notice-dot', 'aria-hidden': 'true'}),
+      el('span', {class: 'notice-when'}, stamp(notice.at)),
+      el('span', {class: 'notice-text'}, notice.text),
+      el('span', {class: 'notice-buttons'},
+        notice.tab && notice.tab !== 'dashboard' && el('button', {type: 'button', class: 'link', onclick: () => {
+          update([notice.id], 'read'); openTask({tab: notice.tab, property_ref: notice.ref}); }}, 'Ver →'),
+        el('button', {type: 'button', class: 'link', title: 'Sai do quadro', onclick: event => update([notice.id], 'archive', event.currentTarget)}, 'Arquivar'))))));
 }
 
 // «A fazer» (26/09): worked out from the data, most urgent first; each line takes you to where it is done.
@@ -2456,6 +2526,7 @@ function roundCounts(data) {
     [by.booked, n => `${n} já com visita marcada`],
     [by.nao_quer, n => plural(n, 'não quer visitar', 'não querem visitar')],
     [by.outra_data, n => plural(n, 'só pode noutra data', 'só podem noutra data')],
+    [by.closed, n => plural(n, 'já levou o email de fecho', 'já levaram o email de fecho')],
     [out.ignored, n => `${n} na lista de ignorados`],
     [out.inactive, n => plural(n, 'inativo', 'inativos') + ' (dois emails nossos sem resposta)']]
     .filter(([n], index) => index === 0 || n).map(([n, text]) => text(n)).join(' · ');
@@ -3169,7 +3240,7 @@ function knowledgeEditor(scope, ref) {
   return box;
 }
 
-const CLIENT_STATE_LABEL = {ok: 'ativo', pending: 'por responder', booked: 'visita marcada'};
+const CLIENT_STATE_LABEL = {ok: 'ativo', pending: 'por responder', booked: 'visita marcada', closed: 'conversa fechada'};
 
 // Persistent, not behind a click: everyone this property has written to, and where they stand — until
 // the property closes (sold/rented/withdrawn is the same "Fechar visitas" event, not a separate state).

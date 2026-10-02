@@ -3,6 +3,50 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 02/10/2026: equipas — cada consultor com a ARIA no seu Mac, o chefe com um painel conjunto (para o futuro)
+
+**Não é para agora** (o utilizador, 02/10): fica registado para quando se avançar.
+
+**Pergunta do utilizador:** o consultor usa a ARIA no seu Mac, o chefe tem acesso aos dados para um painel, e com
+dois consultores cada um tem a sua caixa de correio.
+- **Já é assim hoje:** uma pasta de dados é uma conta Gmail (`BOT_MAIL_INSTANCE` escolhe a pasta). Cada consultor tem a
+  sua instalação, o seu Gmail, os seus imóveis e as suas conversas; os dados dos clientes ficam no Mac de quem os trata.
+- **Decidido: a conta da OpenAI é da BigLearn**, com uma chave por agência (cliente grande) e um plafond por agência; a
+  BigLearn dá depois 5 € a cada consultor e gere esses carregamentos. Na prática:
+  - **na OpenAI, um projeto por agência**, com a sua chave e o seu limite de gasto: é o limite duro, que nenhum Mac
+    ultrapassa (confirmar no painel da OpenAI se o limite do projeto corta os pedidos ou só avisa). Dentro do projeto
+    pode haver uma chave por consultor (o mesmo plafond e a mesma fatura; quando alguém sai, apaga-se só a sua);
+  - **na ARIA, o depósito de 5 € por consultor** (a instalação toda), carregado só pela BigLearn. Proposta, sem
+    servidor: **carregamentos por código assinado** — a BigLearn gera um código («+5 € para esta instalação, n.º 3»),
+    assinado com uma chave privada que só ela tem; a ARIA confere-o com a chave pública que leva dentro, aceita cada
+    código uma só vez e, numa instalação gerida, «Encher» só aceita códigos. O código pode chegar colado na página ou
+    por um ficheiro na pasta partilhada;
+  - a chave da OpenAI nunca vai para a pasta partilhada: instala-se em cada Mac. Quem a tirar do Mac só gasta até ao
+    plafond da agência.
+- **Proposto, por confirmar: o painel do chefe por uma pasta partilhada** (Google Drive, iCloud ou Dropbox da agência,
+  sem servidor). Cada ARIA grava, depois de cada leitura, um resumo só com números (pedidos, respostas, tempos, fases,
+  visitas, inquéritos, gasto da API, por imóvel; nunca emails, telefones nem conversas) num ficheiro só seu; o chefe
+  abre a ARIA em «modo chefe», que os lê e junta. Pelo mesmo caminho, ao contrário, o know-how da agência, a voz e os
+  prompts do chefe chegam aos consultores. Nunca a pasta de dados inteira na nuvem: os bloqueios de ficheiros não
+  sobrevivem à sincronização, e as conversas ficariam à vista de todos. Alternativas afastadas por agora: um email
+  diário ao chefe (não é um painel) e um servidor central (o plano HTTPS em pausa desde 18/09).
+- **A pasta partilhada é, em princípio, o Google Drive** (resposta do utilizador). Na prática: o Google Drive para
+  computador instalado em cada Mac, e a ARIA escreve e lê numa pasta local que ele sincroniza (escolhida na Oficina).
+  De preferência num Drive partilhado da agência (Google Workspace), para os ficheiros serem da agência e não de quem
+  os criou; com contas pessoais, uma pasta partilhada com cada consultor, que a tem de juntar ao seu Drive (atalho em
+  «O meu disco») para aparecer no Mac.
+- **Decidido (respostas do utilizador):**
+  - **o chefe vê só números**, nunca as conversas;
+  - **um imóvel é de uma caixa de correio**; quem a trata é indiferente. A unidade do painel do chefe é a caixa (a
+    instalação), não a pessoa. Cuidado: a mesma caixa lida em dois Macs dava duas filas e duas respostas ao mesmo
+    cliente — uma caixa, uma instalação;
+  - **um limite mensal da app (a instalação, o Mac), hard: quem usa a ARIA não o recarrega nem o muda** — é da
+    BigLearn (por exemplo 5 € por mês). Por baixo, **os limites por imóvel ficam como estão**: quem usa a ARIA muda-os
+    e gere-os como achar melhor, dentro do limite da app. Um dia, um limite por grupo de clientes.
+- **Em aberto:** uma chave por agência ou uma por consultor dentro do projeto da agência; como a BigLearn define e
+  muda o limite mensal de cada instalação sem que quem a usa o possa alterar (proposta: um ficheiro de limite
+  assinado pela BigLearn, que a ARIA confere com a chave pública que leva dentro).
+
 ## 29/09/2026: a ronda de visitas com um só texto para todos (α.72.0)
 
 **Decisão (pedido do utilizador: a ronda criou 33 cartões vazios que não se viam e não saíam).**

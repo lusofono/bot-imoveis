@@ -634,7 +634,7 @@ class Recorder:
         """Every call the page makes to show what is there, with the bodies it sends."""
         refs = [info["ref"] for info in PROPS.values()]
         found = {}
-        for path in ("api/state", "api/settings", "api/digest", "api/todo", "api/contacts"):
+        for path in ("api/state", "api/settings", "api/digest", "api/todo", "api/notices", "api/contacts"):
             found[key_of(path)] = self.call(path)
         for days in (3, 7, 14, 30, 90):
             found[key_of("api/metrics", {"days": days})] = self.call("api/metrics", {"days": days})

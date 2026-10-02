@@ -708,6 +708,9 @@ button.pipeline-name:hover{background:none;color:var(--accent);text-decoration:u
 .exit-actions .pill-action.remove:hover{color:#fff;background:#bf8716;border-color:#bf8716}
 .exit-actions .pill-action.grey{color:#fff;background:#c0392b;border-color:#c0392b}
 .exit-actions .pill-action.grey:hover{color:#fff;background:#a02f23;border-color:#a02f23}
+/* 02/10: «Encerrar contacto» on a calm slate-blue pill, white letters (5.7:1): a goodbye, not a list */
+.exit-actions .pill-action.farewell{color:#fff;background:#4a6a8a;border-color:#4a6a8a}
+.exit-actions .pill-action.farewell:hover{color:#fff;background:#3b5672;border-color:#3b5672}
 /* 27/09: «Ignorar sempre / Blacklist» on a dark grey pill, white letters: the one that cannot be taken lightly */
 .exit-actions .pill-action.danger{color:#fff;background:#3a3a3c;border-color:#3a3a3c}
 .exit-actions .pill-action.danger:hover{color:#fff;background:#1f1f21;border-color:#1f1f21}
@@ -1074,3 +1077,21 @@ body:not(.admin) .prompt-view{display:none!important}
 :root #tab-replies.test-mode button.send-action:hover:not(:disabled){background:#25844b;border-color:#25844b}
 :root #tab-replies.test-mode button.send-action .step-num{color:#2e9e5b}
 :root #tab-replies.test-mode button.send-action::before,:root #tab-replies.test-mode button.send-action::after{display:none}
+/* 02/10: the notice board (Painel) — one line per message: a dot of its level, when, the text, then «Ver» and «Arquivar»;
+   the unread ones in bold, on a tint of the accent */
+.notices-card .section-heading{align-items:flex-start}
+.notices-actions{display:flex;flex-wrap:wrap;gap:4px 16px}
+.notice-list{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:6px}
+.notice{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;align-items:baseline;gap:4px 12px;padding:8px 12px;
+  border:1px solid var(--line);border-radius:10px;font-size:13px}
+.notice.unread{background:var(--accent-tint);font-weight:600}
+.notice-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);align-self:center}
+.notice.warn .notice-dot{background:var(--warn)}
+.notice.bad .notice-dot{background:var(--bad)}
+.notice.info .notice-dot{background:var(--ok)}
+.notice-when{color:var(--muted);font-size:11.5px;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:400}
+.notice-text{overflow-wrap:anywhere}
+.notice-buttons{display:flex;gap:12px;white-space:nowrap}
+.notice-buttons .link{padding:0;min-height:0;font-size:12.5px;font-weight:500}
+@media(max-width:760px){.notice{grid-template-columns:auto minmax(0,1fr)}.notice-when{grid-column:2}.notice-text{grid-column:1/-1}
+  .notice-buttons{grid-column:1/-1}}

@@ -15,6 +15,52 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.97.0 — 02/10/2026
+
+- **Quadro de avisos: o que é importante.** Juntam-se aos avisos do α.96.0:
+  - **cliente à espera da nossa resposta há 3 dias ou mais** (`WAITING_NOTICE_HOURS = 72`): um aviso por imóvel e por
+    dia, com quantos são e os nomes, depois de cada leitura;
+  - **mensagem importante, dramática ou insultuosa**: ao escrever as respostas, a IA assinala-a (`alerta` e
+    `alerta_motivo` no formato da resposta, só nesses casos, sem responder a insultos); o cartão mostra o aviso e o
+    quadro pede-te para a leres antes de responder e, se for caso disso, pôr o cliente na lista cinzenta ou negra;
+  - **um cliente da short list (escolhido, suplente ou short list) escreveu**: urgente, no quadro logo na leitura, e o
+    cartão diz para responderes quanto antes.
+- **Comunicações: «Encerrar contacto»**, uma pílula azul-ardósia no cartão de um email do cliente: a resposta passa a
+  ser uma despedida cordial (o prompt do fecho), escrita logo pela API, que revês e envias. Depois de enviada, o contacto
+  fica encerrado — sem rondas de visitas nem lembretes —, mas sem lista cinzenta: se voltar a escrever, entra
+  normalmente. O cartão diz «encerrar contacto · despedida».
+
+## α.96.0 — 02/10/2026
+
+- **Painel: quadro de avisos**, por cima de tudo — as mensagens importantes do sistema para ti, da mais recente para a
+  mais antiga, com a data e a hora, o imóvel e onde se tratam («Ver →»); as por ler a negrito, e o separador Painel
+  mostra quantas são. «Arquivar» tira um aviso do quadro; «Marcar todos como lidos» e «Arquivar todos» tratam de todos.
+  Cada aviso aparece uma só vez. Para já, avisam:
+  - **a 8.ª interação enviada sem visita marcada**: precisa da tua intervenção (lista cinzenta, propor visita ou deixar
+    seguir para o fecho);
+  - **o email de fecho enviado** (a 9.ª): deixamos de insistir;
+  - **o depósito da API de um imóvel na reserva ou vazio** (uma vez por enchimento);
+  - **uma leitura do Gmail que falhou** (uma vez por dia e por erro).
+  Ficam em `data/avisos.json` (os últimos 300), fora do Git. Na demonstração, o quadro só se lê.
+
+## α.95.0 — 02/10/2026
+
+- **Da 5.ª interação em diante, em três degraus.** Um cliente que continua a escrever depois da 4.ª sem visita marcada
+  (o dia da ronda passou, só pode noutra data, mais uma pergunta) ficava sem prompt («avisa o proprietário») e o
+  rascunho vinha vazio. Agora, cada degrau com o seu prompt, comum a todos os imóveis e editável na Oficina:
+  - **5.ª a 7.ª:** responde só ao que perguntou, dentro do que sabemos; não propõe visita nem datas por iniciativa
+    própria (se quer visitar ou só pode noutra data, diz que vamos ver e põe-no em nota) e aguarda por ti. O cartão
+    lembra que, se não fizer sentido continuar, o pões na lista cinzenta.
+  - **8.ª, conclusiva** (`CONCLUSIVE_AT = 8`): resume o ponto em que estamos e pergunta se quer continuar, sem pressão,
+    e escreve-te em nota que precisa da tua intervenção. O cartão diz «8.ª interação · conclusiva», com o aviso, e
+    depois de enviada aparece no Painel, em «A fazer»: decidir (lista cinzenta, propor visita ou deixar seguir para o
+    fecho).
+  - **9.ª em diante, o fecho** (`CLOSING_FROM = 9`): quase uma despedida — agradece e diz que, quando as condições se
+    alterarem, entraremos de novo em contacto, sem perguntas nem proposta; se o cliente pedir claramente para visitar,
+    não fecha e avisa em nota. O cartão diz «9.ª interação · fecho»; depois do fecho, as rondas de visitas deixam de o
+    incluir («já levou o email de fecho» na linha da ronda). Os lembretes automáticos já paravam depois da proposta.
+  - As fases com prompt próprio (visita marcada, já visitou, documentos, inquérito) continuam a valer sobre estes.
+
 ## α.94.0 — 02/10/2026
 
 - **Painel → Depósitos: o imóvel de teste também tem o seu depósito, de 3 €**, mostrado no fim e marcado «· TESTE».

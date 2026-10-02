@@ -22,7 +22,7 @@ KNOWLEDGE_RULE = ("Esta base tem dois tipos de conteúdo, os dois obrigatórios:
 
 REPLY_FORMAT = """FORMATO DA RESPOSTA
 Responde só com um bloco JSON, sem mais texto:
-{"respostas": [{"id": "<id do email>", "reply_text": "<email: saudação, texto e fecho — sem assinatura>", "nota": "<opcional, em português de Portugal: o que o proprietário deve saber>", "visita": "<opcional: AAAA-MM-DD HH:MM, só quando marcas uma hora de visita>", "visita_estado": "<opcional: nao_quer ou outra_data, só se o cliente disser que não quer visitar ou que só pode noutra data>", "ficha": {"trabalho": "<ou null>", "agregado": "<ou null>", "datas": "<ou null>", "disponibilidade": "<ou null>", "empresa": "<ou null>", "animais": "<ou null>", "falta": ["<empresa e/ou animais, só se o cliente os referiu ou deu a entender e ainda faltam dados>"]}}]}
+{"respostas": [{"id": "<id do email>", "reply_text": "<email: saudação, texto e fecho — sem assinatura>", "nota": "<opcional, em português de Portugal: o que o proprietário deve saber>", "alerta": "<opcional: importante, dramatica ou insulto — só nesses casos>", "alerta_motivo": "<com alerta: uma frase para o proprietário>", "visita": "<opcional: AAAA-MM-DD HH:MM, só quando marcas uma hora de visita>", "visita_estado": "<opcional: nao_quer ou outra_data, só se o cliente disser que não quer visitar ou que só pode noutra data>", "ficha": {"trabalho": "<ou null>", "agregado": "<ou null>", "datas": "<ou null>", "disponibilidade": "<ou null>", "empresa": "<ou null>", "animais": "<ou null>", "falta": ["<empresa e/ou animais, só se o cliente os referiu ou deu a entender e ainda faltam dados>"]}}]}
 Um objeto por email, com o id exatamente como aparece acima.
 "reply_text": escreve-o como um email — a saudação, parágrafos curtos separados por uma linha em branco e o fecho —,
 nunca como um bloco de frases seguidas. Não escrevas assinatura: o programa acrescenta-a por baixo do fecho.
@@ -30,7 +30,11 @@ nunca como um bloco de frases seguidas. Não escrevas assinatura: o programa acr
 mensagem, em frases curtas e só com o que ele disse (nunca inventes nem avalies); null no que ainda não se sabe. Se não deves responder a um email
 (por exemplo, uma interação sem prompt configurada), deixa reply_text vazio e explica em nota.
 "nota" e "ficha" são para o proprietário, não para o cliente: escreve-as sempre em português de Portugal, seja qual for
-a língua do cliente e da resposta (só o reply_text vai na língua do cliente)."""
+a língua do cliente e da resposta (só o reply_text vai na língua do cliente).
+"alerta": só quando a mensagem do cliente pede que o proprietário a leia já — importante (uma reclamação séria, um
+problema no imóvel, dinheiro, um prazo, um pedido que só ele pode decidir), dramatica (aflição, urgência pessoal,
+ameaça) ou insulto (ofensas, desrespeito); escreve então "alerta_motivo", em português de Portugal. Numa mensagem
+normal, sem alerta. Com alerta, a resposta continua a ser escrita como sempre, sem responder a insultos."""
 
 LISTING_FIELDS = {
     "reference": "referência do anunciante, como aparece no anúncio e nos avisos do portal (ex.: AP_ABC_1), ou null",
@@ -58,6 +62,33 @@ WEEKDAYS = ("segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "se
 INTERACTIONS = ((1, "first_interaction"), (2, "second_interaction"), (3, "third_interaction"),
                 (4, "fourth_interaction"))
 
+
+# 02/10: after the 4th — the customer goes on writing with no visit booked (the round's day went by, another date,
+# a question more) — the 5th and later had no prompt («avisa o proprietário») and the draft came back empty. In three
+# steps, each editable in the Oficina: the 5th to the 7th answer what is asked and wait for the owner (who may put
+# them on the grey list); the 8th is conclusive and asks the owner to step in; from the 9th on, the closing.
+CONCLUSIVE_AT = 8
+CLOSING_FROM = 9
+LATER_REPLY_RULE = ("O cliente continua a escrever depois da proposta de visita e ainda não tem visita marcada. Responde "
+                    "só ao que perguntou, em poucas linhas e dentro do que sabemos: a base de conhecimento e as regras "
+                    "da agência; o que lá não estiver, diz que vamos confirmar. Não proponhas visita nem datas por "
+                    "iniciativa própria (a decisão é do proprietário): se quer visitar ou só pode noutra data, diz que "
+                    "vamos ver e respondemos em breve, e escreve-o em nota. Não voltes a pedir o que já está na ficha, "
+                    "não repitas o que já lhe dissemos e não insistas. Se desistir, agradece e despede-te.")
+CONCLUSIVE_REPLY_RULE = ("É a 8.ª troca sem a visita avançar: esta resposta é mais conclusiva. Responde ao que o cliente "
+                         "perguntou, só com a base de conhecimento, e resume numa ou duas frases o ponto em que estamos "
+                         "(o que falta para avançar). Pergunta-lhe, de forma direta e cordial, se quer continuar com o "
+                         "processo, sem pressionar e sem propor datas. Escreve sempre em nota ao proprietário que é a "
+                         "8.ª interação sem visita marcada e que precisa da intervenção dele: pô-lo na lista cinzenta, "
+                         "propor-lhe uma visita ou deixar seguir para o fecho.")
+CLOSING_REPLY_RULE = ("Já trocámos muitos emails com este cliente sem a visita avançar: este é o email de fecho, quase "
+                      "uma despedida. Responde em poucas linhas ao que escreveu (às perguntas, só com a base de "
+                      "conhecimento; o que lá não estiver, diz que vamos confirmar), agradece o interesse e o tempo dele "
+                      "e diz que, por agora, ficamos por aqui: quando as condições se alterarem (novas datas de visita, "
+                      "novidades sobre o imóvel ou outro imóvel que lhe possa servir), entraremos de novo em contacto. "
+                      "Não faças perguntas, não proponhas visita nem peças nada. Se o cliente pedir claramente para "
+                      "visitar ou disser que quer avançar, não feches: diz que vamos ver e respondemos em breve, e "
+                      "escreve em nota que quer visitar.")
 
 # After the visit (25/09): thanks, the visit sheet and a short survey the customer answers by replying to the
 # email itself — no link, no form, works in every mail app. Used when Voz e estilo has none of its own.
@@ -202,7 +233,13 @@ def instructions(profile, voice, visits=None):
                "a quem ainda não propusemos visita vem sempre como 2.ª, seja a segunda troca ou a sexta. Em cada "
                "um, pede só o que ainda falta na ficha do cliente (indicada em cada email), nunca o que já se sabe, "
                "mesmo que tenha sido dito em emails anteriores; com a ficha completa, não faças perguntas novas.")
-    out.append("- 5.ª e seguintes: sem prompt configurada; avisa o proprietário e aguarda instruções.")
+    # 02/10: the 5th and later had no prompt (an empty draft and «avisa o proprietário»); now three steps
+    out.append(f"- 5.ª a {CONCLUSIVE_AT - 1}.ª (o cliente continua a escrever, sem visita marcada): "
+               + ((style.get("later_reply") or {}).get("text") or LATER_REPLY_RULE))
+    out.append(f"- {CONCLUSIVE_AT}.ª, conclusiva (emails marcados «{CONCLUSIVE_AT}.ª, conclusiva»): "
+               + ((style.get("conclusive_reply") or {}).get("text") or CONCLUSIVE_REPLY_RULE))
+    out.append(f"- Fecho (emails marcados «fecho», da {CLOSING_FROM}.ª em diante): "
+               + ((style.get("closing_reply") or {}).get("text") or CLOSING_REPLY_RULE))
     after = style.get("after_visit") or {}
     after_template = style.get("after_visit_template") or {}
     out += ["- Pós-visita (agradecimento, emails marcados «pós-visita»): " + (after.get("text") or AFTER_VISIT_RULE),
@@ -344,10 +381,13 @@ def reply_prompt(queue, ids, extra="", only_extra=False, now=None):
             message = ("(sem mensagem nova do cliente: é o pedido de documentos para a candidatura) Documentos: "
                        + "; ".join(wanted) + (". Com fiador: pede também os mesmos do fiador." if docs.get("fiador")
                                               else ". Sem fiador indicado."))
-        step = ("acrescento" if addition else "pós-visita" if visited else "lembrete de visita" if reminder
+        step = ("fecho (encerrar contacto)" if email.get("farewell")  # 02/10: the owner closes the contact
+                else "acrescento" if addition else "pós-visita" if visited else "lembrete de visita" if reminder
                 else "resposta ao inquérito" if survey else "pedido de documentos" if docs
                 else f"lembrete aos {nudge[0]} dias" if nudge else "visita falhada" if missed
                 else "já visitou" if email.get("phase") == "visited" else "visita marcada" if email.get("phase") == "booked"
+                else f"fecho ({email['interaction']}.ª)" if (email.get("interaction") or 0) >= CLOSING_FROM
+                else f"{CONCLUSIVE_AT}.ª, conclusiva" if email.get("interaction") == CONCLUSIVE_AT
                 else f"{email.get('interaction') or 1}.ª")
         parts += [f"--- id: {short_id(email['id'])} | interação: {step}"
                   f" | data: {email.get('date') or '?'}", f"Cliente: {name}"]
@@ -544,6 +584,24 @@ def parse_replies(text, queue):
     if not replies and not notes:
         raise ValueError("A resposta colada não tem rascunhos.")
     return replies, notes
+
+
+ALERT_KINDS = {"importante": "importante", "dramatica": "dramática", "insulto": "insultuosa"}
+
+
+def parse_alerts(text, queue):
+    """02/10: the messages the AI flagged for the owner to read now: [{"id", "kind", "reason"}], ids as in the queue."""
+    data = extract_json(text)
+    items = data.get("respostas", data.get("replies")) if isinstance(data, dict) else data
+    known = {short_id(email["id"]): email["id"] for email in queue["emails"]}
+    known.update({email["id"]: email["id"] for email in queue["emails"]})
+    found = []
+    for item in items if isinstance(items, list) else []:
+        key = str(item.get("id", "")).strip() if isinstance(item, dict) else ""
+        kind = str(item.get("alerta") or "").strip().casefold().replace("á", "a") if key in known else ""
+        if kind in ALERT_KINDS:
+            found.append({"id": known[key], "kind": kind, "reason": " ".join(str(item.get("alerta_motivo") or "").split())[:300]})
+    return found
 
 
 def parse_visits(text, queue):
