@@ -22,9 +22,10 @@
     <button class="tab" data-tab="voice" data-gear="R"><span aria-hidden="true" class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7"/><circle cx="12" cy="12" r="6.6"/></svg></span>Voz e estilo</button>
     <button class="tab active" data-tab="dashboard" data-gear="1" aria-current="page"><span aria-hidden="true" class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17a8 8 0 1 1 16 0"/><path d="M6.3 12.2l1.2.7M12 7.5V9M17.7 12.2l-1.2.7"/><path d="M12 17l3.6-4.6"/><circle cx="12" cy="17" r="1.3" fill="currentColor" stroke="none"/></svg></span>Painel <span id="notice-count" class="nav-count" title="Avisos por ler" hidden>0</span></button>
     <button class="tab" data-tab="replies" data-gear="2"><span aria-hidden="true" class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10.5 8.5 21.5M12 10.5l3.5 11M9.6 18h4.8M10.6 14.8h2.8"/><circle cx="12" cy="8.5" r="1.5" fill="currentColor" stroke="none"/><path d="M8.6 5.4a4.5 4.5 0 0 0 0 6.2M15.4 5.4a4.5 4.5 0 0 1 0 6.2M6 3a8 8 0 0 0 0 11M18 3a8 8 0 0 1 0 11"/></svg></span>Comunicações <span id="nav-count" class="nav-count">0</span></button>
-    <button class="tab" data-tab="properties" data-gear="3"><span aria-hidden="true" class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 11L12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5h4v5"/><path d="M8.3 12h1.8M13.9 12h1.8"/></svg></span>Imóveis</button>
-    <button class="tab" data-tab="contacts" data-gear="4"><span aria-hidden="true" class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20a7 7 0 0 1 14 0"/></svg></span>Contactos</button>
-    <button class="tab" data-tab="agenda" data-gear="5"><span aria-hidden="true" class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/><path d="M8 13.5h2M12 13.5h2M16 13.5h.01M8 16.8h2M12 16.8h2"/></svg></span>Visitas</button>
+    <button class="tab" data-tab="contacts" data-gear="3"><span aria-hidden="true" class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20a7 7 0 0 1 14 0"/></svg></span>Contactos</button>
+    <button class="tab" data-tab="agenda" data-gear="4"><span aria-hidden="true" class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/><path d="M8 13.5h2M12 13.5h2M16 13.5h.01M8 16.8h2M12 16.8h2"/></svg></span>Visitas</button>
+    <button class="tab" data-tab="properties" data-gear="5"><span aria-hidden="true" class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 11L12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5h4v5"/><path d="M8.3 12h1.8M13.9 12h1.8"/></svg></span>Imóveis</button>
+    <button class="tab" data-tab="owners" data-gear="6"><span aria-hidden="true" class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15.5" r="3.6"/><path d="M10.6 13 19.5 4.1M15.6 8l2.2 2.2M17.8 5.8 20 8"/></svg></span>Proprietários <span id="owner-count" class="nav-count" title="Mensagens de proprietários por responder" hidden>0</span></button>
   </nav>
   <!-- A skin's own tab selector (80's RacingCar: the gated gearbox); a copy of the nav above, for the mouse only. -->
   <div id="skin-selector" class="skin-selector" aria-hidden="true"></div>
@@ -157,6 +158,21 @@
     </div></div>
   </section>
 
+  <!-- 02/10: each property's owner is the agency's client, not a customer: their messages apart, answered with the
+       property's state and the agency's know-how for owners -->
+  <section id="tab-owners" hidden>
+    <div class="page-heading"><div><p class="eyebrow">PROPRIETÁRIOS</p><h1>Falar com quem é dono do imóvel.</h1>
+      <p class="step">As mensagens do proprietário de cada imóvel, à parte das dos clientes. A IA responde com o estado do
+        imóvel e o conhecimento para proprietários; tu revês antes de enviar.</p></div></div>
+    <div class="queue-row"><label class="muted">Imóvel <select id="owners-property"></select></label></div>
+    <!-- 02/10: the owner of the property chosen (email and name; the same owner may have several) and a new email to them -->
+    <article class="card owner-box" id="owners-box"></article>
+    <div id="owners-emails"></div>
+    <!-- 02/10: the ponto de situação of this property, the same as in the Painel -->
+    <div id="owners-digest" class="owners-digest"></div>
+    <details class="card owners-knowledge"><summary class="eyebrow">CONHECIMENTO PARA PROPRIETÁRIOS</summary>
+      <div id="owners-knowledge"></div></details>
+  </section>
   <section id="tab-properties" hidden>
     <div class="page-heading"><div><p class="eyebrow" data-word="properties.eyebrow">CARTEIRA</p><h1 data-word="properties.title">Cada imóvel, o seu contexto.</h1><p class="step" data-word="properties.step">Anúncios, conhecimento e instruções para respostas mais úteis.</p></div>
       <div class="segmented" role="group" aria-label="Vista de Imóveis">
@@ -298,6 +314,10 @@
     <article class="card" id="workshop-tests"><p class="eyebrow">TESTES &amp; DEBUG</p><div id="workshop-lab"></div></article>
     <article class="card" id="workshop-prompts"></article>
     <article class="card" id="workshop-prices"></article>
+    <!-- 02/10: the portal's senders and rules (Idealista today) -->
+    <article class="card" id="workshop-portal"></article>
+    <!-- 02/10: the backups of the data folder -->
+    <article class="card" id="workshop-backup"></article>
   </section>
 </main></div>
 <div id="toast" role="status" aria-live="polite" hidden></div>

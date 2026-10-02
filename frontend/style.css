@@ -789,7 +789,12 @@ button.primary .step-num{background:var(--accent-text);color:var(--accent)}
    line across the middle of the gap — chrome in the rich themes */
 nav .tab[data-tab="voice"]{position:relative;margin-bottom:14px}
 nav .tab[data-tab="voice"]::after{content:"";position:absolute;left:12%;right:12%;bottom:-11px;height:1px;background:var(--line);pointer-events:none}
-@media(max-width:760px){nav .tab[data-tab="voice"]{margin-bottom:0}nav .tab[data-tab="voice"]::after{display:none}}
+/* 02/10: a second line, after Visitas: the day-to-day above (Painel, Comunicações, Contactos, Visitas), the setup below
+   (Imóveis, Proprietários) */
+nav .tab[data-tab="agenda"]{position:relative;margin-bottom:14px}
+nav .tab[data-tab="agenda"]::after{content:"";position:absolute;left:12%;right:12%;bottom:-11px;height:1px;background:var(--line);pointer-events:none}
+@media(max-width:760px){nav .tab:is([data-tab="voice"],[data-tab="agenda"]){margin-bottom:0}
+  nav .tab:is([data-tab="voice"],[data-tab="agenda"])::after{display:none}}
 /* The customers' own words in the Comunicações' cards (27/09): on light paper in black ink in every theme, the dark ones
    (Noite, Índigo, 80's RacingCar) included — the message, and each turn of the full email / conversation. The doubled
    class outranks the rich themes' own blockquote and pre rules. */
@@ -1095,3 +1100,22 @@ body:not(.admin) .prompt-view{display:none!important}
 .notice-buttons .link{padding:0;min-height:0;font-size:12.5px;font-weight:500}
 @media(max-width:760px){.notice{grid-template-columns:auto minmax(0,1fr)}.notice-when{grid-column:2}.notice-text{grid-column:1/-1}
   .notice-buttons{grid-column:1/-1}}
+/* 02/10: Proprietários — the owner's cards: the conversation (newest first, scrolling when long) above the draft */
+.owner-card .owner-history{display:grid;gap:8px;max-height:420px;overflow:auto;margin:6px 0 12px}
+.owner-card textarea{margin-top:4px}
+.owners-knowledge summary{cursor:pointer;margin:0}
+.owner-box .row{margin:8px 0}
+.owner-box .owner-fields input{flex:1 1 220px;width:auto}
+.owner-box .owner-write input{flex:1 1 320px;width:auto}
+.owner-card.outbound{border-style:dashed}
+/* 02/10: the warning lights' explanation, over the panel, on hover or focus: name and state, meaning, reading, click */
+.telltales{position:relative}
+.telltale-tip{position:absolute;left:0;right:0;bottom:calc(100% + 8px);z-index:6;display:grid;gap:3px;padding:10px 12px;
+  border-radius:10px;background:var(--card);color:var(--text);border:1px solid var(--line);box-shadow:0 8px 24px #0005;
+  font:400 12px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;text-align:left;pointer-events:none}
+.telltale-tip strong{font-weight:700}
+.telltale-tip .telltale-now{font-weight:600}
+.telltale-tip .telltale-go{color:var(--muted)}
+/* 02/10: the portal's fields in the Oficina: two columns, the rules in a monospace face */
+.portal-fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:0 18px}
+.portal-fields .rule-input{font:12px/1.5 ui-monospace,SFMono-Regular,monospace}

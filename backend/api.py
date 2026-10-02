@@ -158,6 +158,23 @@ def web_app(folder, token):
             service.flag_alerts(current["property_ref"], alerts)
         return {"saved": saved, "notes": notes, "visits": len(visits), "fichas": len(fichas), "state": state()}
 
+    def owners_generate(body):
+        # 02/10: one call for the owner's emails chosen; the same parsing, signature, drafts-only save and review as the
+        # customers' — nothing goes out without the owner of the page approving it
+        ref, prompt_text, chosen = service.owner_prompt_for(body.get("property_ref") or None, ids_of(body),
+                                                            now=datetime.now().astimezone(), extra=str(body.get("extra") or ""))
+        service.require_fuel(ref)
+        cfg = service.config()
+        model = service.model(cfg)
+        answer, usage = complete(openai_api_key(service.folder, cfg["account"]), model, prompt_text)
+        cost = estimate_cost_usd(model, **{k: usage[k] for k in ("prompt_tokens", "completion_tokens")})
+        service.log("openai_usage", model=model, **usage, reference=ref, cost_usd=round(cost, 6), purpose="owner")
+        replies, notes = parse_replies(answer, chosen)
+        signature = service.voice_signature()
+        replies = [{**reply, "reply_text": sign(reply["reply_text"], signature)} for reply in replies]
+        saved = service.drafts(replies, queue(ref)["revision"], ref)["saved"] if replies else 0
+        return {"saved": saved, "notes": notes, "state": state(), "fuel": service.api_fuel(ref), "prompt": prompt_text}
+
     def paste(body):
         return save_drafts_from(queue(body.get("property_ref")), str(body.get("text") or ""))
 
@@ -601,6 +618,23 @@ def web_app(folder, token):
                                                         **service.contacts()}), "contacts/ignored": ("POST", contacts_ignored),
                 "fuel/fill": ("POST", fuel_fill),
                 "digest": ("GET", lambda body: service.digest_view()), "todo": ("GET", lambda body: service.todo()),
+                # 02/10: the portal's senders and rules (Oficina)
+                "portal": ("POST", lambda body: (admin(), service.portal_view())[1]),
+                "portal/save": ("POST", lambda body: (admin(), service.save_portal(body.get("fields") or {},
+                                                                                   body.get("reset") is True))[1]),
+                # 02/10: the backups (Oficina): where they go, and one now
+                "backup": ("POST", lambda body: (admin(), service.backup_settings())[1]),
+                "backup/folder": ("POST", lambda body: (admin(), service.set_backup_folder(body.get("folder"),
+                                                                                         body.get("create") is True))[1]),
+                "backup/now": ("POST", lambda body: (admin(), service.backup())[1]),
+                # 02/10: the Mac's folder chooser (it stays open while the owner picks: never holds the other calls)
+                "backup/choose": ("POST", lambda body: (admin(), service.set_backup_folder(service.choose_folder()))[1]),
+                # 02/10: the Proprietários tab: the owner's emails answered with a prompt of their own (API)
+                "owners/generate": ("POST", owners_generate),
+                "owners/set": ("POST", lambda body: (service.set_owner(body.get("property_ref") or None, body.get("email"),
+                                                                       body.get("name")), {"state": state(), "settings": service.settings()})[1]),
+                "owners/write": ("POST", lambda body: {**service.write_to_owner(body.get("property_ref") or None, body.get("subject")),
+                                                       "state": state()}),
                 # 02/10: «Encerrar contacto»: the reply becomes a cordial goodbye; once sent, no rounds or reminders
                 "contact/farewell": ("POST", lambda body: (service.farewell(body.get("property_ref") or None,
                                                                             str(body.get("id") or "")), {"state": state()})[1]),
@@ -613,7 +647,7 @@ def web_app(folder, token):
                 "digest/refresh": ("POST", lambda body: service.refresh_digest(body.get("property_ref") or None)),
                 "knowledge": ("POST", lambda body: service.knowledge(body.get("property_ref") or None)),
                 "knowledge/note": ("POST", note), "knowledge/save": ("POST", knowledge_save)}
-    concurrent.update({handlers["read/progress"][1], handlers["prompt/generate"][1]})
+    concurrent.update({handlers["read/progress"][1], handlers["prompt/generate"][1], handlers["backup/choose"][1]})
     routes = ([Route("/", page), Route("/photo/{ref}", photo), Route("/contactos.csv", contacts_csv)]
               + [Route(f"/{name}", asset(name)) for name in ASSETS]
               + [Route(f"/api/{name}", api(handler), methods=[method]) for name, (method, handler) in handlers.items()])

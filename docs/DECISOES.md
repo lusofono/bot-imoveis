@@ -3,6 +3,25 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 02/10/2026: cópias de segurança, marca escondida e reconstrução a partir do Gmail
+
+**Decisão (conversa com o utilizador, 02/10).**
+- **O que não está no Gmail tem cópia de segurança:** a configuração dos imóveis, as notas e o conhecimento, a voz e os
+  proprietários (a pasta de dados inteira, uma vez por dia, para uma pasta à escolha; nunca as chaves). Feito no α.100.0.
+- **O que aconteceu no negócio reconstrói-se a partir do Gmail** (≈ 90 %), sempre para o utilizador rever: o que já
+  existe fica, o que falta aparece com «Adicionar?». Serve também para começar: quem respondia à mão no Gmail liga a
+  ARIA, escolhe quantos dias para trás, e revê as conversas, fichas, agenda e short list propostas.
+- **A marca escondida** (α.101.0): cada email que a ARIA envia leva, em ASCII e fora da vista, o imóvel, o nosso n.º de
+  email a esse cliente, o tipo de email, a visita e a janela que nomeia e o lugar na short list (no pedido de
+  documentos) — no cabeçalho `X-ARIA` (fica nos Enviados) e no Message-ID (que a resposta do cliente traz de volta).
+  Os dois viajam com o email e vêem-se em «Mostrar original»: vão selados (cifrados e assinados com uma chave que fica
+  nas Chaves do Mac), um código ASCII opaco. Só os emails enviados depois dela a trazem.
+- **Emails antigos, sem marca:** a IA lê as conversas. A agenda volta assim («Atualizar visitas» com quantos dias para
+  trás: as visitas que já passaram entram «por registar», sem enviar nada). **A short list deduz-se do que pedimos:**
+  documentos de identificação ou o comprovativo do IRS (dados protegidos pelo RGPD, pedidos por nós e não enviados
+  sem pedido) só se pedem a quem passou à short list; antes só se pedem dados e valores. Os inquéritos são as respostas
+  aos nossos agradecimentos pós-visita.
+
 ## 02/10/2026: equipas — cada consultor com a ARIA no seu Mac, o chefe com um painel conjunto (para o futuro)
 
 **Não é para agora** (o utilizador, 02/10): fica registado para quando se avançar.
@@ -43,6 +62,9 @@ dois consultores cada um tem a sua caixa de correio.
   - **um limite mensal da app (a instalação, o Mac), hard: quem usa a ARIA não o recarrega nem o muda** — é da
     BigLearn (por exemplo 5 € por mês). Por baixo, **os limites por imóvel ficam como estão**: quem usa a ARIA muda-os
     e gere-os como achar melhor, dentro do limite da app. Um dia, um limite por grupo de clientes.
+- **Para o futuro: um Drive global da BigLearn para as cópias de segurança** das instalações. Só com as cópias cifradas
+  no Mac, com uma chave que a agência guarda (a BigLearn guarda, mas não lê, os dados dos clientes delas), e com o
+  acordo de tratamento de dados com cada agência. Hoje: cada instalação escolhe a sua pasta (α.101.1).
 - **Em aberto:** uma chave por agência ou uma por consultor dentro do projeto da agência; como a BigLearn define e
   muda o limite mensal de cada instalação sem que quem a usa o possa alterar (proposta: um ficheiro de limite
   assinado pela BigLearn, que a ARIA confere com a chave pública que leva dentro).

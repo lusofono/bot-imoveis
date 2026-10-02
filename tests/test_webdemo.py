@@ -21,7 +21,8 @@ UNAVAILABLE = {"api/consent/confirm", "api/consent/request", "api/paste", "api/p
                "api/testlab/consultant", "api/testlab/wipe", "api/testlab/advance",
                "api/testlab/transcript",
                "api/notices/update",  # 02/10: the notice board is only read in the demo
-               "api/contact/farewell"}
+               "api/contact/farewell", "api/owners/generate", "api/owners/set", "api/owners/write",
+               "api/backup", "api/backup/folder", "api/backup/now", "api/backup/choose", "api/portal", "api/portal/save"}
 
 
 @pytest.fixture(scope="module")

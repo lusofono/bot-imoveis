@@ -104,3 +104,28 @@ def has_openai_api_key(folder, account):
         return bool(openai_api_key(folder, account))
     except RuntimeError:
         return False
+
+
+def tag_key(folder, account):
+    """02/10: the key that signs the hidden mark of our emails (mark.py). A file if one is set (BOT_MAIL_TAG_KEY_FILE or
+    secrets/aria_tag_key), else the Mac Keychain item "aria_tag_key"; made once when missing. Outside the data folder's
+    backups (secrets/ never goes) and, on a Mac, in the Keychain: it survives the data folder being lost."""
+    import secrets as random
+    secret_path = os.environ.get("BOT_MAIL_TAG_KEY_FILE")
+    path = Path(secret_path) if secret_path else Path(folder) / "secrets" / "aria_tag_key"
+    if path.exists():
+        return path.read_text().strip()
+    key = random.token_hex(32)
+    if sys.platform == "darwin" and not secret_path:
+        result = subprocess.run(["security", "find-generic-password", "-a", account, "-s", "aria_tag_key", "-w"],
+                                capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+        subprocess.run(["security", "add-generic-password", "-U", "-a", account, "-s", "aria_tag_key", "-w", key],
+                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return key
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as stream:
+        stream.write(key + "\n")
+    return key

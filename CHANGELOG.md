@@ -15,6 +15,87 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.102.0 — 02/10/2026
+
+- **O portal passa a ser configurável** (Oficina → «Portal · Idealista»): tudo o que é próprio dele num só sítio
+  (`backend/portals.py`), em vez de espalhado pelo código — quem envia os avisos de pedidos (`reply@idealista.pt`) e os de
+  chamadas (`naoresponder@idealista.pt`), como o assunto diz o nome do cliente, o código e o link do anúncio, e os campos
+  de um aviso de chamada (telefone, data e hora, estado, duração, anúncio e referência). Se o portal mudar os emails, ou
+  para outro portal, muda-se aí; cada regra é conferida antes de guardar (compila, e tem o grupo com o valor a ler), e
+  «Repor os de origem» volta atrás. Só se guarda o que difere do de origem (config.json, `portal`).
+- **Os avisos de chamadas já se leem** (`rules.parse_call`): quem ligou, a hora da própria chamada (não a do email, que
+  pode chegar dias depois), atendida ou não, a duração, e o anúncio e a referência quando vêm. Ainda não entram na
+  leitura: é o passo das chamadas, a seguir.
+
+## α.101.1 — 02/10/2026
+
+- **A marca escondida passa a ir selada:** o cabeçalho `X-ARIA` e o Message-ID viajam com o email (vêem-se em «Mostrar
+  original»), por isso o que dizem — o lugar na short list, o tipo de email — vai cifrado e assinado com a chave das
+  Chaves do Mac: um código ASCII opaco («1.k3f9…»), que só esta ARIA abre e que, alterado, é recusado.
+- **Cópias de segurança: nada se apaga, só se acrescenta** (antes ficavam as últimas 14). E, se o «Google Drive para
+  computador» estiver instalado, a Oficina mostra «Usar o Google Drive (conta)», que cria a pasta `ARIA-copias` no Drive e
+  passa a usá-la. (A palavra-passe do Gmail não dá acesso ao Drive.) «Escolher pasta…» abre a janela de escolha de pastas
+  do próprio Mac, para qualquer pasta (o servidor local abre-a; a página não pode).
+
+## α.101.0 — 02/10/2026
+
+- **A marca escondida em cada email que a ARIA envia** (`backend/mark.py`): em ASCII e fora da vista de quem lê, diz o
+  imóvel, o nosso n.º de email a esse cliente, o tipo de email (resposta, proposta de visita, agradecimento, pedido de
+  documentos, despedida, proprietário…), a visita e a janela que nomeia, e o lugar na short list num pedido de
+  documentos. Vai no cabeçalho `X-ARIA` (fica na nossa cópia, nos Enviados) e no Message-ID, que o programa de email do
+  cliente copia para a resposta — a resposta diz sozinha a que email nosso responde. Assinada com uma chave criada uma
+  vez e guardada nas Chaves do Mac (fora da pasta de dados e das cópias): confere que foi esta ARIA. Sem a chave, o
+  email sai na mesma, sem marca. A leitura já guarda o `X-ARIA` dos nossos emails, para a reconstrução a partir do Gmail.
+
+## α.100.0 — 02/10/2026
+
+- **Cópias de segurança** (Oficina → «Cópias de segurança»): a pasta de dados — imóveis, conversas, agenda, contactos,
+  conhecimento, voz, proprietários — comprimida uma vez por dia, na primeira leitura, para uma pasta à tua escolha (por
+  exemplo, uma que o Google Drive sincroniza); ficam as 14 mais recentes. Nunca as chaves (Gmail, OpenAI) nem os
+  ficheiros internos. «Fazer cópia agora» faz mais uma; uma cópia que falha vai para o quadro de avisos e não pára a
+  leitura. Para repor, descomprime-se a cópia para a pasta da ARIA.
+
+## α.99.1 — 02/10/2026
+
+- **70's Scooter:** sai a fila de botões R a 6 debaixo do guiador (ganha espaço); no punho preto, ▲ passa à mudança de
+  cima e ▼ à de baixo, e o tambor roda até ao número novo. O tambor segue a ordem do menu.
+- **Luzes de aviso (80's RacingCar e 70's Scooter):** ao passar o rato (ou com o foco), uma explicação por cima do
+  painel — o nome da luz e se está acesa, o que quer dizer, o que lê agora e para onde leva o clique. Sai o título do
+  browser, que chegava tarde e só dizia a leitura.
+- **90's Boat:** sai a legenda dos sensores debaixo do barco; ao passar o rato num círculo, um tooltip com o sensor, o que
+  lê e para onde leva o clique. O leme ganha o 7.º raio, com a bandeira O (Oscar) dos Proprietários, na ordem do menu.
+
+## α.99.0 — 02/10/2026
+
+- **Proprietários: o proprietário define-se no próprio separador** — nome e email, em cima, com «Guardar»; o mesmo email
+  em vários imóveis é um proprietário com vários («Também é proprietário de…»). Sem email, um aviso diz que as mensagens
+  dele entram como as de um cliente.
+- **«Escrever ao proprietário»**, sem ele ter escrito primeiro: um cartão novo (tracejado, «email novo · assunto»), com o
+  assunto que escolheres (por defeito, a referência e a descrição do imóvel), escrito à mão ou com «Gerar resposta». Sai
+  como um email novo, não como resposta. Em cada cartão, uma caixa opcional «o que lhe queres dizer» segue com o prompt.
+- **O ponto de situação também nos Proprietários**, o do imóvel escolhido (continua no Painel): o mesmo bloco de notas,
+  o mesmo envio ao proprietário ou para ti.
+- **Menu:** Voz e estilo, linha, Painel, Comunicações, Contactos, Visitas, linha, Imóveis e Proprietários. As mudanças
+  do 80's RacingCar seguem esta ordem (Proprietários é a 6.ª); a segunda linha tem a tira cromada dos temas ricos, e no
+  90's Boat os Proprietários levam a bandeira O (Oscar).
+
+## α.98.0 — 02/10/2026
+
+- **Proprietários: um separador novo, à parte dos clientes.** O proprietário de cada imóvel é o «Email do proprietário»
+  do imóvel (o mesmo do ponto de situação). Na leitura, os emails dele vão para uma fila sua (`kind: "owner"`) e a
+  conversa para `owner_conversations`: nunca nos cartões das Comunicações, nas rondas, nos contactos, nas fichas nem nos
+  números do Painel. O que já tinha entrado como cliente (antes de o email estar no imóvel) passa para o lado dele na
+  leitura seguinte ou ao guardar o imóvel.
+  - **O separador «Proprietários»** (a 6.ª mudança no 80's RacingCar): o imóvel em cima, um cartão por mensagem — a
+    conversa, o rascunho, «Gerar resposta», «Guardar», «Enviar» (com a confirmação do destinatário) e «Não precisa de
+    resposta» — e o contador no menu.
+  - **O prompt do proprietário** (editável na Oficina, «Respostas ao proprietário»): é o cliente da agência, não um
+    interessado; responde com o estado do imóvel (o do ponto de situação), dos interessados só o primeiro nome e o
+    ponto em que estão, nunca decide por ele nem promete prazos, e escreve em nota o que ele pediu ou decidiu.
+  - **Conhecimento para proprietários**, no fundo do separador (`data/proprietarios/knowledge/`): o tom, o que se
+    reporta e o que se decide com eles; só entra nas respostas aos proprietários.
+  - No Painel, «A fazer» ganha «Mensagens do proprietário por responder».
+
 ## α.97.0 — 02/10/2026
 
 - **Quadro de avisos: o que é importante.** Juntam-se aos avisos do α.96.0:

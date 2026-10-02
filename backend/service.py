@@ -12,12 +12,14 @@ from pathlib import Path
 import re
 import secrets
 import smtplib
+import subprocess
+import sys
 import time
 import os
 from . import APP_NAME
 from .ai import (AFTER_VISIT_RULE, AFTER_VISIT_TEMPLATE, BOOKED_REPLY_RULE, DOCS_REQUEST_RULE, KNOWLEDGE_RULE, VISIT_REMINDER_RULE, VISITED_REPLY_RULE, extract_json, ficha_profile_prompt,
                  REMINDER_RULE, SURVEY_REPLY_RULE, VISIT_MISSED_RULE, CLOSING_FROM, CLOSING_REPLY_RULE, LATER_REPLY_RULE,
-                 CONCLUSIVE_AT, CONCLUSIVE_REPLY_RULE, ALERT_KINDS,
+                 CONCLUSIVE_AT, CONCLUSIVE_REPLY_RULE, ALERT_KINDS, OWNER_REPLY_RULE, owner_prompt,
                  fichas_prompt, parse_fichas_batch,
                  listing_text_prompt, parse_listing, agenda_prompt, describe, instructions,
                  parse_agenda, parse_survey, visit_analysis_prompt, clean_round, round_text)
@@ -31,8 +33,11 @@ from .rules import (DAY, DEALS, EMAIL, KNOWLEDGE_FILE, deal_of, RGPD_STATES, SUB
                     DOCUMENTS, FICHA_FIELDS, SELECTION_STATES, build_profile, check_profile, clean_ficha, documents_summary, draft_checks,
                     ficha_summary, merge_ficha,
                     survey_alerts, survey_report, check_slot, check_window, clean_property, consent_yes, free_times,
-                    knowledge, photo_of, prepare, property_active, route, subject_of, QUOTE, addresses)
-from .secrets import app_password, has_app_password, has_openai_api_key, openai_api_key
+                    knowledge, photo_of, prepare, property_active, route, subject_of, QUOTE, addresses, has_token,
+                    apply_portal, parse_call)
+from . import portals
+from .secrets import app_password, has_app_password, has_openai_api_key, openai_api_key, tag_key
+from . import mark
 from .store import (CONTACT_FIELDS, add_contacts, add_note, find_photo, knowledge_files, load_contacts, load_digest,
                     load_notices, save_notices,
                     load_events, load_knowledge, load_panel, load_visits, locked, load_json, load_profiles, load_voice,
@@ -84,7 +89,8 @@ COMMON_PROMPTS = {"application_instructions": "", "after_visit": AFTER_VISIT_RUL
                   "visit_reminder": VISIT_REMINDER_RULE, "booked_reply": BOOKED_REPLY_RULE, "visited_reply": VISITED_REPLY_RULE,
                   "docs_request": DOCS_REQUEST_RULE, "survey_reply": SURVEY_REPLY_RULE, "reminder_rule": REMINDER_RULE,
                   "visit_missed": VISIT_MISSED_RULE, "later_reply": LATER_REPLY_RULE,
-                  "conclusive_reply": CONCLUSIVE_REPLY_RULE, "closing_reply": CLOSING_REPLY_RULE}
+                  "conclusive_reply": CONCLUSIVE_REPLY_RULE, "closing_reply": CLOSING_REPLY_RULE,
+                  "owner_reply": OWNER_REPLY_RULE}
 # Page field → (profile prompt, key), the same prompts the terminal setup asks for.
 PROMPT_FIELDS = {"general": ("general", "text"), "first": ("first_interaction", "text"),
                  "first_template": ("first_interaction", "reply_template"), "second": ("second_interaction", "text"),
@@ -107,6 +113,12 @@ IGNORE_KINDS = ("black", "grey")
 # (properties/<REF>/painel.json), since that is where it is best watched. OpenAI's cost is in US$, estimated
 # from tokens; for this assistant 1 € = 1 US$, by the owner's choice (24/09): no rate, no conversion shown.
 # data/api_fuel.json was the one shared tank before: a property not filled since keeps its size and fill time.
+# 02/10: the backups — the data folder, zipped once a day (at the first read) into a folder the owner chose; the keys
+# never go (data/secrets/, the Keychain), nor the lock and temporary files. Nothing is ever deleted: only added (each is
+# under 1 MB). Google Drive for desktop's folder on this Mac is offered (the Gmail App Password gives no Drive access).
+BACKUP_PREFIX = "ARIA-copia-"
+DRIVE_NAMES = ("My Drive", "O meu disco", "Meu Drive", "A minha unidade")
+OWNER_FOLDER = "proprietarios"  # 02/10: the agency's know-how for owners, in data/proprietarios/knowledge/
 NOTICES_KEPT = 300  # 02/10: the notice board keeps the latest ones; the oldest (archived or not) fall off
 NOTICE_LEVELS = ("info", "warn", "bad")
 WAITING_NOTICE_HOURS = 72  # 02/10: a customer waiting this long for our answer is on the board (once a day)
@@ -280,6 +292,7 @@ class MailService:
         apply_context(cfg.get("model_context"))
         apply_effort(cfg.get("reasoning_effort"))  # 02/10: how much the model reasons (Oficina)
         apply_hidden(cfg.get("hidden_models"))  # 02/10: the models not offered (old and dear, or above 3 €)
+        apply_portal(cfg.get("portal"))  # 02/10: the portal's senders and rules (Oficina)
         account = cfg.get("account", "")
         if not account or "@" not in account or any(c in account for c in "\r\n"):
             raise ValueError("Configura uma conta válida antes de usar.")
@@ -719,6 +732,18 @@ class MailService:
                         if not warning.startswith("Sem Reply-To: o destinatário é o email do corpo")]
             if email and counts[email] > 1:
                 warnings.append("Há outro email pendente deste cliente neste imóvel; evita respostas repetidas.")
+            if item.get("kind") == "owner":
+                # 02/10: the owner's email (the Proprietários tab): their own conversation, no customer step
+                talk = (data.get("owner_conversations") or {}).get(email) or {}
+                emails.append({key: item.get(key) for key in VIEW_FIELDS} | {
+                    "owner": True, "outbound": bool(item.get("outbound")), "new_subject": item.get("new_subject"),
+                    "interaction": None, "warnings": list(item.get("warnings") or []), "phase": None,
+                    "phone_only": False, "closing_reply": False, "conclusive_reply": False, "farewell": False,
+                    "ficha": None, "ficha_summary": None, "qualifying_limit": False, "booked_at": None,
+                    "draft_checks": draft_checks(item.get("reply_text"), signature, False, None),
+                    "review_fresh": False, "answered_direct": False, "recipient_editable": False,
+                    "conversation": list(talk.get("history") or [])})
+                continue
             conversation = conversations.get(email, {})
             interaction = 3 if item.get("kind") == "visit_proposal" else conversation.get("stage", 0) + 1
             if item.get("kind") == "addition":
@@ -857,6 +882,11 @@ class MailService:
                 except ValueError:
                     pass  # incomplete voice: the read still runs, just without auto-drafts this time
             queues = {ref: self.load(ref) for ref in refs}
+            # 02/10: each property's owner (its owner_email): their emails are not a customer's — a queue of their own
+            owners = self.owner_index(profiles)
+            for owner_email, owner_refs in owners.items():
+                for owner_ref in owner_refs:
+                    self.adopt_owner(owner_ref, queues[owner_ref], owner_email)
             start_at = now()
             today = datetime.now(timezone.utc).date()
             starts = {}
@@ -885,6 +915,9 @@ class MailService:
                     return False
                 if not profiles:
                     return True
+                owner_ref = self.owner_route(item, owners)
+                if owner_ref:
+                    return not before(item, starts[owner_ref])
                 ref, kind, _ = route(item, profiles, queues)
                 if kind is None or (ref in starts and before(item, starts[ref])):
                     return False
@@ -899,7 +932,8 @@ class MailService:
             talks = [conversation for data in queues.values() for conversation in data.get("conversations", {}).values()]
             ours = {sent for conversation in talks for sent in conversation.get("sent_message_ids", [])}
             people = ({email for data in queues.values() for email in data.get("conversations", {})}
-                      | {recipient_email(item) for data in queues.values() for item in data["emails"]}) - {""}
+                      | {recipient_email(item) for data in queues.values() for item in data["emails"]
+                         if item.get("kind") != "owner"}) - {""}
             threads = ({item.get("thread_id") for data in queues.values() for item in data["emails"]}
                        | {thread for conversation in talks for thread in conversation.get("thread_ids", [])}) - {None, ""}
 
@@ -921,6 +955,13 @@ class MailService:
             self.reading.update(stage="save")
             added, ambiguous, contacts, received = dict.fromkeys(refs, 0), 0, [], {}
             for item in messages:
+                owner_ref = self.owner_route(item, owners) if profiles else None
+                if owner_ref:
+                    key = message_key(item)
+                    if key not in known[owner_ref]:
+                        self.take_owner_email(owner_ref, queues[owner_ref], item, profiles[owner_ref], cfg["account"])
+                        known[owner_ref].add(key)
+                    continue
                 ref, kind, customer = route(item, profiles, queues) if profiles else (None, "general", None)
                 if kind == "ambiguous":
                     ambiguous += 1
@@ -1010,6 +1051,8 @@ class MailService:
                     self.waiting_notices(ref, data)
             # received: message ID → the day the customer's email arrived, so the dashboard still counts it
             # after it is answered or dismissed and leaves the queue. IDs and dates only, never an address.
+            if profiles:
+                self.auto_backup()  # 02/10: once a day, at the first read (the queue is saved and still locked: a clean copy)
             self.log("read", added=sum(added.values()), ambiguous=ambiguous, direct=sum(direct.values()),
                      pending=sum(len(data["emails"]) for data in queues.values()), received=received)
             if not profiles:
@@ -1095,7 +1138,8 @@ class MailService:
         it. Counted like a send, with the customer's wait.
         """
         recorded = Counter()
-        ours = {sent for data in queues.values() for conversation in data["conversations"].values()
+        ours = {sent for data in queues.values()
+                for conversation in [*data["conversations"].values(), *data.get("owner_conversations", {}).values()]
                 for sent in conversation.get("sent_message_ids", [])}
         dated = [(aware(message.get("date")), message) for message in outgoing or []]
         for sent_at, message in sorted((pair for pair in dated if pair[0]), key=lambda pair: pair[0]):
@@ -1107,7 +1151,7 @@ class MailService:
 
             def answers(item):
                 arrived = aware(item.get("date"))
-                return (item.get("kind") not in PROGRAM_KINDS and bool(recipient_email(item))
+                return (item.get("kind") not in PROGRAM_KINDS | {"owner"} and bool(recipient_email(item))
                         and item.get("reply_status") not in ("sending", "uncertain")
                         and (arrived is None or arrived <= sent_at))
 
@@ -1272,6 +1316,246 @@ class MailService:
         history.append(turn)
         del history[:-HISTORY_LIMIT]
 
+    # ===== Owners (02/10): each property's owner (property.owner_email) is not a customer. Their emails go to a queue
+    # of their own (kind "owner", answered in the Proprietários tab with a prompt of their own), and their conversation
+    # to data["owner_conversations"]: never in the customers' cards, rounds, files, contacts or the Painel's numbers.
+
+    def backup_settings(self, cfg=None):
+        """Where the backups go and the last one there (name, size, when)."""
+        cfg = cfg or self.config()
+        folder = str(cfg.get("backup_folder") or "")
+        copies = sorted(Path(folder).glob(BACKUP_PREFIX + "*.zip")) if folder and Path(folder).is_dir() else []
+        last = copies[-1] if copies else None
+        return {"folder": folder, "count": len(copies), "drives": self.drive_folders(),
+                "last": {"file": last.name, "bytes": last.stat().st_size,
+                         "at": datetime.fromtimestamp(last.stat().st_mtime, timezone.utc).isoformat()} if last else None}
+
+    @staticmethod
+    def drive_folders():
+        """Google Drive for desktop on this Mac: its «My Drive» folders, with the ARIA-copias folder the backups would use."""
+        base = Path.home() / "Library" / "CloudStorage"
+        found = []
+        for root in sorted(base.glob("GoogleDrive-*")) if base.is_dir() else []:
+            mine = next((root / name for name in DRIVE_NAMES if (root / name).is_dir()), None)
+            if mine:
+                found.append({"account": root.name.split("-", 1)[1], "path": str(mine / "ARIA-copias")})
+        return found
+
+    def portal_view(self, cfg=None):
+        """02/10, Oficina: the portal as it stands, its defaults and what each field is."""
+        cfg = cfg or self.config()
+        return {"fields": portals.merged(cfg.get("portal")), "defaults": portals.DEFAULT, "labels": portals.LABELS,
+                "changed": sorted((cfg.get("portal") or {}).keys())}
+
+    def save_portal(self, fields, reset=False):
+        """02/10, Oficina: the portal's changes (only what differs from the defaults is kept); reset: the defaults back."""
+        changes = {} if reset else portals.check(fields)
+        with locked(self.folder, "config", wait=SHORT_WAIT):
+            path = self.folder / "config.json"
+            cfg = load_json(path, {})
+            cfg["portal"] = changes
+            save_json(path, cfg)
+        self.log("portal_saved", changed=sorted(changes))
+        return self.portal_view()
+
+    @staticmethod
+    def choose_folder():
+        """02/10: «Escolher pasta…»: the Mac's own folder chooser, opened by the local server (the page cannot get a path
+        from the browser). Its path, or ValueError when cancelled or not on a Mac."""
+        if sys.platform != "darwin":
+            raise ValueError("Escreve o caminho completo da pasta.")
+        script = ['tell application "System Events"', "activate",
+                  'POSIX path of (choose folder with prompt "Escolhe a pasta para as cópias de segurança da ARIA")', "end tell"]
+        result = subprocess.run(["osascript", *[part for line in script for part in ("-e", line)]],
+                                capture_output=True, text=True, timeout=600)
+        path = result.stdout.strip()
+        if result.returncode != 0 or not path:
+            raise ValueError("Nenhuma pasta escolhida.")
+        return path.rstrip("/") or "/"
+
+    def set_backup_folder(self, folder, create=False):
+        """The folder for the backups (a local path, e.g. one Google Drive syncs); empty: no backups. create: make the
+        folder itself (only it: its parent must exist), as for Google Drive's ARIA-copias."""
+        folder = str(folder or "").strip()
+        if folder:
+            path = Path(folder).expanduser()
+            if create and path.is_absolute() and path.parent.is_dir():
+                path.mkdir(exist_ok=True)
+            if not path.is_absolute() or not path.is_dir():
+                raise ValueError("Indica uma pasta que exista, com o caminho completo (por exemplo /Users/…/Google Drive/ARIA).")
+            if path.resolve() == self.folder.resolve() or self.folder.resolve() in path.resolve().parents:
+                raise ValueError("A pasta das cópias não pode ficar dentro da pasta de dados.")
+            if not os.access(path, os.W_OK):
+                raise ValueError("Não consigo escrever nessa pasta.")
+            folder = str(path)
+        with locked(self.folder, "config", wait=SHORT_WAIT):
+            path = self.folder / "config.json"
+            cfg = load_json(path, {})
+            cfg["backup_folder"] = folder or None
+            save_json(path, cfg)
+        self.log("backup_folder_set", on=bool(folder))
+        return self.backup_settings()
+
+    def backup(self, moment=None):
+        """One backup now: the data folder, zipped, without the keys or the lock and temporary files."""
+        import zipfile
+        folder = str(self.config().get("backup_folder") or "")
+        if not folder or not Path(folder).is_dir():
+            raise ValueError("Escolhe primeiro a pasta das cópias de segurança (Oficina).")
+        moment = moment or datetime.now()
+        target = Path(folder) / f"{BACKUP_PREFIX}{moment:%Y-%m-%d-%H%M%S}.zip"
+        partial = target.with_suffix(".zip.part")
+        with zipfile.ZipFile(partial, "w", zipfile.ZIP_DEFLATED) as archive:
+            for path in sorted(self.folder.rglob("*")):
+                relative = path.relative_to(self.folder)
+                if (not path.is_file() or relative.parts[0] == "secrets"
+                        or any(part.startswith(".") for part in relative.parts)):
+                    continue
+                archive.write(path, Path("data") / relative)
+        partial.replace(target)  # nothing older is deleted: backups are only ever added
+        self.log("backup_made", bytes=target.stat().st_size)
+        return self.backup_settings()
+
+    def auto_backup(self):
+        """At a read: one backup a day, if a folder was chosen; a failure goes to the notice board, never stops the read."""
+        settings = self.backup_settings()
+        if not settings["folder"]:
+            return None
+        last = settings["last"]
+        if last and datetime.fromisoformat(last["at"]).astimezone().date() == date.today():
+            return None
+        try:
+            return self.backup()
+        except Exception as exc:
+            self.notify(f"copia-{date.today().isoformat()}", f"A cópia de segurança de hoje falhou: {' '.join(str(exc).split())[:200]}",
+                        None, "bad", "dashboard")
+            return None
+
+    @staticmethod
+    @staticmethod
+    def owner_index(profiles):
+        """owner's email → the properties it owns (test properties never have a real owner)."""
+        index = {}
+        for ref, profile in profiles.items():
+            email = str((profile.get("property") or {}).get("owner_email") or "").strip().casefold()
+            if email and not profile.get("test"):
+                index.setdefault(email, []).append(ref)
+        return index
+
+    @staticmethod
+    def owner_route(item, owners):
+        """The property an owner's email belongs to (its reference in the subject when they own several), or None."""
+        if item.get("test"):
+            return None
+        senders = {address.casefold() for address in addresses(item.get("from") or [])}
+        refs = next((owners[email] for email in senders if email in owners), None)
+        if not refs:
+            return None
+        return next((ref for ref in refs if has_token(item.get("subject", ""), ref)), refs[0])
+
+    def take_owner_email(self, ref, data, item, profile, account):
+        """One email from the owner, into the owner's queue with its conversation's history."""
+        email = next(address for address in addresses(item.get("from") or [])
+                     if address.casefold() in {str(profile["property"].get("owner_email") or "").casefold()})
+        item.update(prepare(item, "follow_up", email.casefold(), profile, account), kind="owner")
+        talk = data.setdefault("owner_conversations", {}).setdefault(email.casefold(), {"sent_message_ids": [],
+                                                                                         "thread_ids": []})
+        item["history"] = list(talk.get("history") or [])
+        self.append_history(talk, "cliente", item["customer"].get("message"), contact_day(item), item.get("date"))
+        if item["customer"].get("name"):
+            talk["name"] = item["customer"]["name"]
+        if item.get("thread_id") and item["thread_id"] not in talk["thread_ids"]:
+            talk["thread_ids"].append(item["thread_id"])
+        item.update(id=message_key(item), reply_text="", send_reply=False, reply_status="pending")
+        data["emails"].append(item)
+
+    def adopt_owner(self, ref, data, email):
+        """What was taken for a customer's but is the owner's (their email set after it came in): their queue items,
+        their conversation and their row in Contactos move to the owner's side. Nothing is lost."""
+        email = email.casefold()
+        moved = False
+        for item in data["emails"]:
+            if ((item.get("recipient") or {}).get("email") or "").casefold() == email and item.get("kind") in ("lead", "follow_up"):
+                item["kind"] = "owner"
+                moved = True
+        if email in data.get("conversations", {}):
+            talk = data["conversations"].pop(email)
+            kept = data.setdefault("owner_conversations", {}).setdefault(email, {"sent_message_ids": [], "thread_ids": []})
+            for key in ("sent_message_ids", "thread_ids"):
+                kept[key] = list(dict.fromkeys(kept.get(key, []) + talk.get(key, [])))
+            kept["history"] = sorted(kept.get("history", []) + talk.get("history", []),
+                                     key=lambda turn: str(turn.get("ts") or turn.get("at") or ""))[-HISTORY_LIMIT:]
+            kept.setdefault("name", talk.get("name") or "")
+            moved = True
+        contacts = load_contacts(self.folder)
+        if (email, ref) in contacts:
+            del contacts[(email, ref)]
+            save_contacts(self.folder, contacts)
+        return moved
+
+    def set_owner(self, property_ref, email, name=""):
+        """02/10, Proprietários: a property's owner (email and name), set or changed there; the same owner may have several
+        properties. An empty email takes the owner off. What came in from them as a customer moves to their side."""
+        email = " ".join(str(email or "").split())
+        name = " ".join(str(name or "").split())[:100]
+        if email and (len(email) > 200 or not EMAIL.fullmatch(email)):
+            raise ValueError("O email do proprietário tem de ser um endereço de email.")
+        with locked(self.folder, wait=SHORT_WAIT):
+            profiles = self.profiles()
+            ref = self.pick(profiles, property_ref)
+            if not ref or profiles[ref].get("test"):
+                raise ValueError("Escolhe um imóvel (o de teste não tem proprietário).")
+            if email.casefold() == self.config()["account"].casefold():
+                raise ValueError("O email do proprietário não pode ser o desta conta.")
+            path = property_folder(self.folder, ref) / "profile.json"
+            profile = load_json(path, None)
+            profile["property"].update(owner_email=email or None, owner_name=name or None)
+            save_json(path, profile)
+            if email:
+                data = self.load(ref)
+                if self.adopt_owner(ref, data, email):
+                    self.save(data, ref)
+            self.log("owner_set", reference=ref, owner=bool(email))
+            return ref
+
+    def write_to_owner(self, property_ref, subject=""):
+        """02/10, «Escrever ao proprietário»: a new email to them, without them writing first — a card of its own, to
+        write by hand or with the AI, then reviewed and sent like a reply."""
+        with locked(self.folder, wait=SHORT_WAIT):
+            profiles = self.profiles()
+            ref = self.pick(profiles, property_ref)
+            prop = profiles[ref]["property"] if ref else {}
+            email = str(prop.get("owner_email") or "").strip()
+            if not email:
+                raise ValueError("Este imóvel ainda não tem o email do proprietário: põe-no primeiro.")
+            data = self.load(ref)
+            talk = (data.get("owner_conversations") or {}).get(email.casefold()) or {}
+            subject = " ".join(str(subject or "").split())[:150] or f"{prop.get('reference')} — {prop.get('description') or ''}".strip(" —")
+            name = prop.get("owner_name") or talk.get("name") or ""
+            key = f"proprietario-{secrets.token_hex(5)}"
+            data["emails"].append({"id": key, "kind": "owner", "outbound": True, "new_subject": subject, "subject": subject,
+                                   "date": now(), "recipient": {"name": name, "email": email},
+                                   "customer": {"name": name, "email": email, "phone": None, "message": None},
+                                   "history": list(talk.get("history") or []), "blocked": None, "warnings": [],
+                                   "reply_text": "", "send_reply": False, "reply_status": "pending"})
+            self.save(data, ref)
+            self.log("owner_write", reference=ref)
+            return {"property_ref": ref, "id": key}
+
+    def owner_prompt_for(self, property_ref, ids, now=None, extra=""):
+        """02/10: the prompt for the owner's emails chosen, and what parsing its answer needs (the emails, the revision)."""
+        with locked(self.folder, wait=SHORT_WAIT):
+            profiles = self.profiles()
+            ref = self.pick(profiles, property_ref)
+            data = self.load(ref)
+            items = [item for item in data["emails"] if item["id"] in set(ids or []) and item.get("kind") == "owner"]
+            if not items:
+                raise ValueError("Escolhe pelo menos um email do proprietário.")
+            report = self.owner_report_text(self.owner_report(ref, profiles[ref], data), date.today().isoformat())
+            prompt = owner_prompt(profiles[ref], load_voice(self.folder), load_knowledge(self.folder / OWNER_FOLDER),
+                                  report, items, now, extra)
+            return ref, prompt, {"emails": items}
+
     def farewell(self, property_ref, item_id):
         """02/10, «Encerrar contacto»: this customer's reply becomes a cordial goodbye (the closing's prompt), which the
         owner reviews and sends; once sent, no more rounds or reminders — without the grey list."""
@@ -1285,6 +1569,32 @@ class MailService:
             self.save(data, ref)
             self.log("farewell_marked", reference=ref, message_id=item_id)
         return ref
+
+    def mark_fields(self, ref, item, data):
+        """02/10: what this email's hidden mark says (mark.py): the property, our nth email to the customer, the kind, the
+        visit and the visit window it names, and their place on the short list in a documents request."""
+        email = recipient_email(item)
+        kind = "farewell" if item.get("farewell") else item.get("kind") or "email"
+        if kind == "owner":
+            talk = (data.get("owner_conversations") or {}).get(email) or {}
+            return {"ref": ref, "n": len(talk.get("sent_message_ids") or []) + 1, "k": "owner"}
+        conversation = data.get("conversations", {}).get(email) or {}
+        stage = conversation.get("stage", 0)
+        aux = item.get("kind") in AUX_KINDS or bool(item.get("answered_directly"))
+        number = stage if aux else max(stage + 1, 3) if item.get("kind") == "visit_proposal" else stage + 1
+        visit = (item.get("visit_slot") or (item.get("visit_done") or {}).get("at")
+                 or (item.get("visit_reminder") or {}).get("at") or (item.get("visit_missed") or {}).get("at"))
+        window = item.get("visit_window") or {}
+        return {"ref": ref, "n": number, "k": kind, "vis": str(visit).replace(" ", "T") if visit else None,
+                "win": f"{window['day']}/{window['start']}-{window['end']}" if window.get("day") else None,
+                "sel": (conversation.get("selection") or {}).get("status") if item.get("kind") == "docs_request" else None}
+
+    def put_mark(self, msg, ref, item, data, key):
+        """02/10: the hidden mark — our own Message-ID (the reply carries it back) and the X-ARIA header (our copy)."""
+        fields = self.mark_fields(ref, item, data)
+        del msg["Message-ID"]
+        msg["Message-ID"] = mark.message_id(fields, key)
+        msg["X-ARIA"] = mark.header(fields, key)
 
     def interaction_notice(self, ref, data, item):
         """02/10, the board: our conclusive 8th email went out with no visit booked (the owner steps in), or the closing."""
@@ -1315,6 +1625,16 @@ class MailService:
         A reminder, a consent request or a visits-closed notice never counts as an interaction and never
         resets last_sent_at: the 2/4-day reminders keep measuring from the last real exchange.
         """
+        if item.get("kind") == "owner":  # 02/10: the owner's conversation: their own, no interaction to count
+            email = ((item.get("recipient") or {}).get("email") or "").casefold()
+            talk = data.setdefault("owner_conversations", {}).setdefault(email, {"sent_message_ids": [], "thread_ids": []})
+            talk["sent_message_ids"].append(item["reply_message_id"])
+            if item.get("thread_id") and item["thread_id"] not in talk["thread_ids"]:
+                talk["thread_ids"].append(item["thread_id"])
+            if item.get("reply_text"):
+                cls.append_history(talk, "nos", item["reply_text"], now()[:10], now())
+            talk["last_sent_at"] = now()
+            return
         # The stage outlives the email in the queue. Kept: address, name, our last subject, IDs, dates,
         # the last text sent (so a reminder can quote it), the visit status, and the last HISTORY_LIMIT
         # turns of the conversation (ours and the customer's), for context in the next prompt.
@@ -1914,7 +2234,7 @@ class MailService:
         template = (style.get("reply_subject") or {}).get("text") or None
 
         def compose(item):
-            subject = subject_of(item.get("kind"), template, profiles[ref]) if ref else None
+            subject = item.get("new_subject") or (subject_of(item.get("kind"), template, profiles[ref]) if ref else None)
             return build_reply(item, account, name, subject)
         return compose
 
@@ -1966,7 +2286,16 @@ class MailService:
                 self.check_recipients(entries, profiles[ref], data["account"])
             # Validate everything before connecting or sending anything.
             compose = self.composer(profiles, ref, data["account"])
-            messages = [(item, *compose(item)) for item in entries]
+            try:
+                key = tag_key(self.folder, data["account"])
+            except Exception:
+                key = None  # 02/10: without the mark's key the email still goes, only without its mark
+            messages = []
+            for item in entries:
+                msg, recipient = compose(item)
+                if key and ref:
+                    self.put_mark(msg, ref, item, data, key)
+                messages.append((item, msg, recipient))
             agenda = load_visits(self.folder, ref) if ref and any(item.get("visit_slot") for item in entries) else None
             if agenda is not None:
                 slots = [item["visit_slot"] for item in entries if item.get("visit_slot")]
@@ -3163,7 +3492,7 @@ class MailService:
             return False
 
     # «A fazer», most urgent first: what goes out to customers today, then the queue, the agenda, the rounds, setup.
-    TODO_ORDER = ("expired", "survey_alert", "visit_reminder", "uncertain", "blocked", "reply", "draft", "accepted", "check", "thanks",
+    TODO_ORDER = ("expired", "survey_alert", "visit_reminder", "uncertain", "blocked", "owner", "reply", "draft", "accepted", "check", "thanks",
                   "intervene", "ready", "brake", "setup")
 
     def survey_report(self, ref, data=None):
@@ -3212,8 +3541,11 @@ class MailService:
                     "Inquéritos com nota má ou sem interesse: ler e responder")
                 uncertain = [item for item in emails if item.get("reply_status") in ("sending", "uncertain")]
                 blocked = [item for item in emails if item.get("blocked")]
+                owner_mail = [item for item in emails if item.get("kind") == "owner"]  # 02/10: the Proprietários tab
+                add("owner", "owners", ref, [name_of(item) for item in owner_mail if item.get("reply_status") in (None, "pending", "draft")],
+                    "Mensagens do proprietário por responder")
                 rest = [item for item in emails if item not in reminders and item not in uncertain and item not in blocked
-                        and item not in surveys]
+                        and item not in surveys and item not in owner_mail]
                 add("visit_reminder", "replies", ref, [name_of(item) for item in reminders], "Lembretes de visita por enviar")
                 add("uncertain", "replies", ref, [name_of(item) for item in uncertain],
                     "Envios com resultado incerto: confirmar no Gmail")
@@ -3329,7 +3661,7 @@ class MailService:
             today_iso = today.isoformat()
             for ref in refs:
                 data = self.load(ref)
-                emails = data["emails"]
+                emails = [item for item in data["emails"] if item.get("kind") != "owner"]  # 02/10: not the owner's
                 status = Counter(item.get("reply_status") or "pending" for item in emails)
                 blocked = sum(1 for item in emails if item.get("blocked"))
                 conversations = data.get("conversations", {})
@@ -3392,7 +3724,7 @@ class MailService:
                 elif event.get("event") == "send" and (event.get("reference") in test_refs
                                                        or str(event.get("message_id")) in test_ids):
                     continue
-                elif event.get("event") == "send" and event.get("status") == "sent":
+                elif event.get("event") == "send" and event.get("status") == "sent" and event.get("kind") != "owner":
                     sent[bucket(event.get("at"))] += 1
                     ref = event.get("reference") or owner.get(str(event.get("message_id")))
                     if ref in per:
@@ -3527,8 +3859,9 @@ class MailService:
                                               "offered": self.pending_visits(ref, today, "visit_offered")},
                                    **{key: profile["property"].get(key) for key in (
                                        "reference", "listing_id", "listing_url", "advertiser", "description",
-                                       "advertised_rent_eur", "owner_email")}, "deal": deal_of(profile)})
+                                       "advertised_rent_eur", "owner_email", "owner_name")}, "deal": deal_of(profile)})
             return {"account": account, "voice": voice, "properties": properties, "ai": self.ai_settings(events),
+                    "portal_sender": portals.merged(self.config().get("portal"))["remetente_pedidos"],  # 02/10
                     "admin": self.config().get("admin") is True,  # 29/09: the Oficina shows only with "admin": true
                     "first_read_days": FIRST_READ_DAYS,
                     "openai_configured": has_openai_api_key(self.folder, account), "api_fuel": self.api_fuel(None, events)}
@@ -3693,6 +4026,10 @@ class MailService:
             if created and not queue.get("last_read_at"):
                 queue["read_from"] = (date.today() - timedelta(days=back)).isoformat()
                 self.save(queue, ref)
+            # 02/10: the owner's email, set or changed: what came in from them as a customer moves to their side now
+            owner = str(fields.get("owner_email") or "").strip()
+            if owner and self.adopt_owner(ref, queue, owner):
+                self.save(queue, ref)
             self.log("property_saved", reference=ref)
             return {"reference": ref, "created": created}
 
@@ -3710,21 +4047,23 @@ class MailService:
                     # The files as the owner wrote them, comments included, for editing in the page; 30/09: the
                     # agency's know-how in three — common, rentals only, sales only
                     "files": {"agency": files(self.folder), "property": files(base) if ref else [],
-                              **{f"agency-{deal}": files(self.folder / deal) for deal in DEALS}}}
+                              **{f"agency-{deal}": files(self.folder / deal) for deal in DEALS},
+                              "owners": files(self.folder / OWNER_FOLDER)}}  # 02/10: for talking to owners
 
     def save_knowledge(self, property_ref, file, text, scope="property"):
         """Writes one knowledge (RAG) file, whole. An empty text leaves the file empty, so it no longer counts."""
         file, text = str(file or "").strip(), str(text or "").replace("\r\n", "\n")
         if not KNOWLEDGE_FILE.fullmatch(file):
             raise ValueError("O nome do ficheiro só pode ter letras, algarismos, _ e -, e acabar em .md.")
-        if scope not in ("property", "agency", *(f"agency-{deal}" for deal in DEALS)):
+        if scope not in ("property", "agency", "owners", *(f"agency-{deal}" for deal in DEALS)):
             raise ValueError("Escolhe onde guardar: neste imóvel ou para todos.")
         with locked(self.folder):
             ref = self.pick(self.profiles(), property_ref) if scope == "property" else None
             if scope == "property" and not ref:
                 raise ValueError("Esta pasta não tem imóveis.")
             # 30/09: the agency's rentals-only or sales-only know-how lives in data/<deal>/knowledge/
-            base = property_folder(self.folder, ref) if ref else self.folder / scope.split("-", 1)[1] if "-" in scope else self.folder
+            base = (property_folder(self.folder, ref) if ref else self.folder / OWNER_FOLDER if scope == "owners"
+                    else self.folder / scope.split("-", 1)[1] if "-" in scope else self.folder)
             # The whole base must stay within its limit, with this file as it will be.
             knowledge([(name, body) for name, body in knowledge_files(base) if name != file] + [(file, text)])
             save_text(base / "knowledge" / file, text if text.endswith("\n") or not text else text + "\n")

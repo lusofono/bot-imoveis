@@ -28,8 +28,10 @@ $('theme-select').addEventListener('change', event => {
 });
 let activeTab = 'dashboard', skinSelector = null;
 // Voz e estilo first (27/09): the settings are «R», reverse, before the Painel's 1st gear, in every theme.
-const TAB_NAMES = {voice: 'Voz e estilo', dashboard: 'Painel', replies: 'Centro de Comunicações', properties: 'Imóveis',
-  contacts: 'Contactos', agenda: 'Visitas'};  // the tab is «Visitas» since 27/09 (id stays agenda)
+// 02/10: in the menu's order (the scooter's drum follows it): Voz e estilo, Painel, Comunicações, Contactos, Visitas,
+// Imóveis, Proprietários
+const TAB_NAMES = {voice: 'Voz e estilo', dashboard: 'Painel', replies: 'Centro de Comunicações', contacts: 'Contactos',
+  agenda: 'Visitas', properties: 'Imóveis', owners: 'Proprietários'};  // the tab is «Visitas» since 27/09 (id stays agenda)
 
 // Skins: a rich theme goes beyond colours. It may bring the words on the page headings, the instruments on
 // each property's panel (from the same signals: see panelSignals), a tab selector of its own and an analog
@@ -394,25 +396,33 @@ function chromeTick(context) {
 }
 
 // 70's Scooter's tab selector: the twist grip of a 70s Italian scooter, with its gear drum in a chrome housing. The
-// six tabs are six gears: the drum slides until the open tab's number sits in the window, and the notches under the
-// handlebar change tab on a click. Like the gearbox and the helm, it repeats the nav for the mouse only (aria-hidden).
+// tabs are gears: the drum slides until the open tab's number sits in the window, and ▲ and ▼ on the black grip move
+// one gear up or down (02/10). Like the gearbox and the helm, it repeats the nav for the mouse only (aria-hidden).
 function twistGrip(box) {
   const tabs = Object.keys(TAB_NAMES), pitch = 30, windowX = 62;
   const gradient = (id, attrs, colours) => svg(attrs.r ? 'radialGradient' : 'linearGradient', {id, ...attrs},
     colours.map(([offset, colour]) => svg('stop', {offset, 'stop-color': colour})));
   const drum = svg('g', {class: 'grip-drum'}, tabs.map((tab, i) =>
     svg('text', {x: windowX + i * pitch, y: 59, class: 'grip-number'}, tab === 'voice' ? 'R' : String(i))));
-  const notches = tabs.map((tab, i) => {
-    const notch = svg('g', {class: 'grip-notch', 'data-tab': tab, transform: `translate(${20 + i * 27} 98)`},
-      svg('circle', {r: 9, class: 'grip-notch-ring'}), svg('text', {y: 0.5, class: 'grip-notch-label'}, tab === 'voice' ? 'R' : String(i)),
-      svg('title', {}, TAB_NAMES[tab]));
-    notch.addEventListener('click', () => showTab(tab));
-    return notch;
-  });
+  // 02/10: the row of notches under the handlebar (R to 6) is gone, for room: ▲ and ▼ on the black grip move one gear
+  // up or down, and the drum turns to the new number
+  const shift = delta => {
+    const next = Math.min(tabs.length - 1, Math.max(0, tabs.indexOf(activeTab) + delta));
+    if (tabs[next] !== activeTab) showTab(tabs[next]);
+  };
+  const gripButton = (y, d, delta, label) => {
+    const button = svg('g', {class: 'grip-button', transform: `translate(141 ${y})`},
+      svg('rect', {x: -27, y: -7.5, width: 54, height: 15, class: 'grip-hit'}), svg('path', {d, class: 'grip-arrow'}),
+      svg('title', {}, label));
+    button.addEventListener('click', () => shift(delta));
+    return button;
+  };
   const grip = svg('g', {class: 'grip-rubber'},
     svg('rect', {x: 112, y: 38, width: 58, height: 30, rx: 11, fill: 'url(#grip-rubber)'}),
     [...Array(9)].map((_, i) => svg('path', {d: `M${119 + i * 5.6} 41v24`, stroke: '#000', 'stroke-opacity': 0.55, 'stroke-width': 1.6})));
-  box.append(svg('svg', {viewBox: '0 0 176 112', class: 'twist-grip'},
+  const buttons = [gripButton(45.5, 'M-5 2.2L0 -2.6L5 2.2', 1, 'Mudança acima'),
+    gripButton(60.5, 'M-5 -2.2L0 2.6L5 -2.2', -1, 'Mudança abaixo')];
+  box.append(svg('svg', {viewBox: '0 0 176 82', class: 'twist-grip'},
     svg('defs', {},
       gradient('grip-chrome', {x1: 0, y1: 0, x2: 0, y2: 1}, [[0, '#fff'], [0.3, '#d6dce0'], [0.52, '#8d969d'], [0.62, '#eef1f3'], [1, '#9aa3aa']]),
       gradient('grip-rubber', {x1: 0, y1: 0, x2: 0, y2: 1}, [[0, '#4a4644'], [0.4, '#1d1b1a'], [1, '#0b0a0a']]),
@@ -425,7 +435,7 @@ function twistGrip(box) {
     svg('rect', {x: 47, y: 42, width: 30, height: 24, rx: 5, class: 'grip-window'}),
     svg('g', {'clip-path': 'url(#grip-window)'}, drum),
     svg('path', {d: 'M62 38.5l-3.2-4h6.4Z', class: 'grip-pointer'}),
-    notches));
+    buttons));
   telltales(box, 'scooter');
   // The drum moves in the SVG's own units (its transform attribute), tweened here: a CSS transform in px went by
   // screen pixels in Safari once the drawing was scaled, and stopped between two numbers (26/09).
@@ -445,7 +455,6 @@ function twistGrip(box) {
   return {update(tab) {
     const index = tabs.indexOf(tab);
     if (index < 0) return;
-    for (const notch of notches) notch.classList.toggle('active', notch.dataset.tab === tab);
     const target = -index * pitch;
     if (current === null || matchMedia('(prefers-reduced-motion: reduce)').matches) place(target);
     else if (current !== index) {
@@ -459,8 +468,9 @@ function twistGrip(box) {
 // 80's RacingCar's tab selector: the open gated gearbox of a GT of the time. Gears 1 to 6 are the six tabs (reverse is
 // only there for the look); the lever goes through neutral like a real one, and a click on a gear changes
 // tab. It repeats the nav for the mouse: the nav itself stays the accessible way (aria-hidden here).
-const GEARS = {dashboard: [71, 29], replies: [71, 103], properties: [106, 29], contacts: [106, 103], agenda: [141, 29],
-  voice: [36, 29]};  // Voz e estilo is reverse (27/09); the 6th slot stays in the gate, for the look
+// 02/10: in the menu's order — Painel, Comunicações, Contactos, Visitas, then Imóveis and Proprietários (the 6th)
+const GEARS = {dashboard: [71, 29], replies: [71, 103], contacts: [106, 29], agenda: [106, 103], properties: [141, 29],
+  owners: [141, 103], voice: [36, 29]};  // Voz e estilo is reverse (27/09)
 function gearbox(box) {
   const neutral = 66, gate = 'M36 66H141M36 66V29M71 29V103M106 29V103M141 29V103';
   const gradient = (id, attrs, colours) => svg(attrs.r ? 'radialGradient' : 'linearGradient', {id, ...attrs},
@@ -469,7 +479,7 @@ function gearbox(box) {
     'stroke-linecap': 'round', ...extra});
   const tabs = Object.keys(GEARS);
   const labels = [...tabs.map((tab, i) => svg('text', {x: GEARS[tab][0], y: GEARS[tab][1] < neutral ? 14 : 120, class: 'gate-label',
-    'data-tab': tab}, tab === 'voice' ? 'R' : String(i + 1))), svg('text', {x: 141, y: 120, class: 'gate-label'}, '6')];
+    'data-tab': tab}, tab === 'voice' ? 'R' : String(i + 1)))];
   const hits = tabs.map(tab => svg('circle', {cx: GEARS[tab][0], cy: GEARS[tab][1], r: 13, fill: 'transparent', class: 'gate-hit',
     'data-tab': tab}, svg('title', {}, TAB_NAMES[tab])));
   for (const node of [...labels, ...hits]) if (node.dataset.tab) node.addEventListener('click', () => showTab(node.dataset.tab));
@@ -522,10 +532,12 @@ const HELM_FLAGS = {  // International Code of Signals, on a 30 × 20 cloth: V (
   dashboard: [['rect', {width: 30, height: 20, fill: '#1f4fa0'}], ['rect', {x: 10, y: 6.67, width: 10, height: 6.66, fill: '#fff'}]],
   replies: [['rect', {width: 30, height: 20, fill: '#c8102e'}], ['rect', {x: 12.5, width: 5, height: 20, fill: '#ffcc00'}],
     ['rect', {y: 7.5, width: 30, height: 5, fill: '#ffcc00'}]],
-  properties: [['rect', {width: 30, height: 20, fill: '#ffcc00'}], ['circle', {cx: 15, cy: 10, r: 5, fill: '#121212'}]],
   contacts: [['rect', {width: 30, height: 20, fill: '#1f4fa0'}], ['rect', {y: 4, width: 30, height: 12, fill: '#fff'}],
     ['rect', {y: 8, width: 30, height: 4, fill: '#c8102e'}]],
   agenda: [['path', {d: 'M0 0H15V20H0Z', fill: '#fff'}], ['path', {d: 'M15 0H30L22 10L30 20H15Z', fill: '#1f4fa0'}]],
+  properties: [['rect', {width: 30, height: 20, fill: '#ffcc00'}], ['circle', {cx: 15, cy: 10, r: 5, fill: '#121212'}]],
+  // 02/10: Proprietários, O (Oscar): red over yellow, on the diagonal; the wheel gets a seventh spoke
+  owners: [['path', {d: 'M0 0H30V20Z', fill: '#c8102e'}], ['path', {d: 'M0 0V20H30Z', fill: '#ffcc00'}]],
 };
 function helm(box) {
   const c = 90, rim = 50, tabs = Object.keys(HELM_FLAGS), step = 360 / tabs.length;
@@ -592,13 +604,22 @@ function boatSensors(box) {
   const drawing = svg('svg', {viewBox: '0 0 200 116', class: 'boat-sensors-drawing', role: 'img', 'aria-label': 'Sensores a bordo'});
   drawing.innerHTML = SAILER;
   for (const sensor of BOAT_SENSORS) {
+    // 02/10: no legend under the boat any more: hovering a circle shows what it read, in a tooltip over the panel
     const dot = svg('g', {class: 'boat-sensor off', 'data-sensor': sensor.key, transform: `translate(${sensor.x} ${sensor.y})`},
-      svg('circle', {r: 7, class: 'boat-sensor-ring'}), svg('circle', {r: 3.2, class: 'boat-sensor-dot'}), svg('title', {}, sensor.label));
+      svg('circle', {r: 9, class: 'boat-sensor-hit'}), svg('circle', {r: 7, class: 'boat-sensor-ring'}),
+      svg('circle', {r: 3.2, class: 'boat-sensor-dot'}));
     dot.addEventListener('click', () => showTab(sensor.tab));
+    dot.addEventListener('mouseenter', () => {
+      tip.replaceChildren(el('strong', {}, sensor.label), el('span', {class: 'boat-sensor-now'}, dot.dataset.text || ''),
+        el('span', {class: 'boat-sensor-go'}, `Clica para ir a ${TAB_NAMES[sensor.tab]}.`));
+      tip.className = 'boat-sensor-tip ' + (dot.dataset.tone || 'off');
+      tip.hidden = false;
+    });
+    dot.addEventListener('mouseleave', () => { tip.hidden = true; });
     drawing.append(dot);
   }
-  box.append(el('div', {class: 'boat-sensors'}, el('p', {class: 'boat-sensors-title'}, 'SENSORES A BORDO'), drawing,
-    el('ul', {class: 'boat-sensors-legend'})));
+  const tip = el('div', {class: 'boat-sensor-tip', 'aria-hidden': 'true', hidden: true});
+  box.append(el('div', {class: 'boat-sensors'}, el('p', {class: 'boat-sensors-title'}, 'SENSORES A BORDO'), drawing, tip));
   updateSkinPanels();
 }
 // What the skins' panels read (27/09): the boat's sensors, the car's warning lights, the scooter's jewels.
@@ -661,13 +682,44 @@ const TELLTALES = {
 };
 const TELLTALE_NAMES = {turn: 'Setas', low: 'Médios', high: 'Máximos', eco: 'ECO', engine: 'Motor', oil: 'Óleo', fuel: 'Gasolina',
   battery: 'Bateria', belt: 'Cinto', door: 'Porta', headlamp: 'Farol', neutral: 'Ponto morto'};
+// 02/10: what each light means, for the hover (the browser's own title came late and only said the reading)
+const TELLTALE_MEANS = {
+  car: {turn: 'Pisca quando há emails de clientes por responder.',
+    low: 'Acesa quando a última leitura do Gmail foi há menos de uma hora.',
+    high: 'Acende quando há visitas marcadas para hoje.',
+    eco: 'Acende quando a IA usa o modelo mais económico.',
+    engine: 'Acende quando há emails bloqueados, que não se podem enviar: tratar à mão.',
+    oil: 'Acende quando o depósito da API de um imóvel está vazio: a API parou nesse imóvel.',
+    fuel: 'Acende quando o depósito da API de um imóvel está na reserva.',
+    battery: 'Acende quando o Gmail não é lido há 24 horas ou mais.',
+    belt: 'Acende quando há rascunhos por rever e enviar.',
+    door: 'Acende quando há envios com resultado incerto: confirma no Gmail antes de repetir.'},
+  scooter: {headlamp: 'Acesa quando o Gmail foi lido nas últimas 24 horas.',
+    oil: 'Acende quando há emails de clientes por responder.',
+    neutral: 'Acende quando há rascunhos por rever e enviar.',
+    fuel: 'Acende quando o depósito da API de um imóvel está na reserva ou vazio.'},
+};
 function telltales(box, kind) {
   const panel = el('div', {class: `telltales telltales-${kind}`, 'data-kind': kind});
+  // 02/10: one explanation for the whole panel, over it (a bubble per light was cut by the sidebar's edge): the light's
+  // name and whether it is on, what it means, what it reads now and where a click goes
+  const tip = el('div', {class: 'telltale-tip', 'aria-hidden': 'true', hidden: true});
+  const explain = button => {
+    const lamp = TELLTALES[kind].find(item => item.key === button.dataset.lamp), lit = button.classList.contains('lit');
+    tip.replaceChildren(el('strong', {}, `${TELLTALE_NAMES[lamp.key]} · ${lit ? 'acesa' : 'apagada'}`),
+      el('span', {}, TELLTALE_MEANS[kind][lamp.key]), el('span', {class: 'telltale-now'}, 'Agora: ' + lamp.text(appStatus())),
+      el('span', {class: 'telltale-go'}, `Clica para ir a ${TAB_NAMES[lamp.tab]}.`));
+    tip.hidden = false;
+  };
   for (const lamp of TELLTALES[kind]) {
     const icon = svg('svg', {viewBox: '0 0 24 24', class: 'telltale-icon', 'aria-hidden': 'true'},
       TELLTALE_ICONS[lamp.icon].map(([tag, attrs, text]) => svg(tag, attrs, text)));
-    panel.append(el('button', {type: 'button', class: `telltale ${lamp.tone}`, 'data-lamp': lamp.key, onclick: () => showTab(lamp.tab)}, icon));
+    panel.append(el('button', {type: 'button', class: `telltale ${lamp.tone}`, 'data-lamp': lamp.key, onclick: () => showTab(lamp.tab),
+      onmouseenter: event => explain(event.currentTarget), onfocus: event => explain(event.currentTarget),
+      onblur: () => { tip.hidden = true; }}, icon));
   }
+  panel.addEventListener('mouseleave', () => { tip.hidden = true; });
+  panel.append(tip);
   box.append(panel);
   updateTelltales();
 }
@@ -681,8 +733,8 @@ function updateTelltales() {
       const lit = !!lamp.on(status);
       button.classList.toggle('lit', lit);
       button.classList.toggle('blink', lit && !!lamp.blink);
-      button.title = `${TELLTALE_NAMES[lamp.key]}: ${lamp.text(status)}`;
-      button.setAttribute('aria-label', button.title + (lit ? ' (aceso)' : ''));
+      // 02/10: the explanation is the panel's own tooltip; no browser title on top of it
+      button.setAttribute('aria-label', `${TELLTALE_NAMES[lamp.key]}: ${lamp.text(status)}` + (lit ? ' (aceso)' : ''));
     }
   }
 }
@@ -699,13 +751,12 @@ function updateBoatSensors() {
     engine: [fuel, fuel === 'red' ? 'um depósito da API vazio' : fuel === 'amber' ? 'depósito na reserva' : 'depósitos da API bem'],
     bow: [visits ? 'blue' : 'off', visits ? `${visits} visita(s) hoje` : 'sem visitas hoje']};
   for (const dot of panel.querySelectorAll('.boat-sensor')) {
-    const [tone, text] = reading[dot.dataset.sensor], sensor = BOAT_SENSORS.find(item => item.key === dot.dataset.sensor);
+    const [tone, text] = reading[dot.dataset.sensor];
     dot.setAttribute('class', 'boat-sensor ' + tone);
-    dot.querySelector('title').textContent = `${sensor.label}: ${text}`;
+    dot.dataset.tone = tone; dot.dataset.text = text;  // 02/10: for the tooltip (the legend is gone)
   }
-  panel.querySelector('.boat-sensors-legend').replaceChildren(...BOAT_SENSORS.map(sensor =>
-    el('li', {class: reading[sensor.key][0], onclick: () => showTab(sensor.tab)},
-      el('span', {class: 'boat-sensor-lamp', 'aria-hidden': 'true'}), el('strong', {}, sensor.label), ' ' + reading[sensor.key][1])));
+  const drawing = panel.querySelector('.boat-sensors-drawing');
+  drawing.setAttribute('aria-label', 'Sensores a bordo: ' + BOAT_SENSORS.map(sensor => `${sensor.label}, ${reading[sensor.key][1]}`).join('; '));
 }
 
 // Emails are untrusted: every value goes in as text, never as HTML.
@@ -806,6 +857,7 @@ function showTab(name) {
   if (name === 'dashboard') { run(loadMetrics); run(loadDigest); }
   if (name === 'voice') run(loadMetrics);  // «O teu espaço» (27/09) lives at the top of the settings now
   if (name === 'contacts') run(loadContacts);
+  if (name === 'owners') { renderOwners(); run(loadOwnersDigest); }
   if (name === 'agenda') renderAgenda();
   // Sends, refills and reads elsewhere change its numbers: the cluster is never shown out of date.
   if (name === 'properties' && settings) renderPropertySlider();
@@ -824,6 +876,68 @@ function showWorkshop() {
   run(async () => renderLab(await call('api/testlab/state', {})));
 }
 
+// 02/10: the portal — what is particular to it (Idealista today): who sends its notices, how its subject names the
+// customer, its listing code and link, its call notices. Changed here if the portal changes its emails, or for another.
+function portalCard(view) {
+  const inputs = Object.fromEntries(Object.keys(view.labels).map(key => [key, el('input', {value: view.fields[key] || '',
+    class: ['nome', 'remetente_pedidos', 'remetente_chamadas', 'link_anuncio_forma'].includes(key) ? '' : 'rule-input',
+    'aria-label': view.labels[key], spellcheck: 'false'})]));
+  const save = (reset, button) => run(async () => {
+    const fields = Object.fromEntries(Object.entries(inputs).map(([key, input]) => [key, input.value]));
+    portalCard(await call('api/portal/save', {fields, reset}));
+    toast(reset ? 'O portal voltou ao de origem.' : 'Portal guardado: a próxima leitura já o usa.');
+  }, button);
+  $('workshop-portal').replaceChildren(
+    el('p', {class: 'eyebrow'}, 'PORTAL · ' + (view.fields.nome || '').toUpperCase()), el('h2', {}, 'De onde vêm os pedidos'),
+    el('p', {class: 'step'}, 'O que é próprio do portal: quem envia os avisos, como o assunto diz o nome do cliente, o código e o '
+      + 'link do anúncio, e os avisos de chamadas. Se o portal mudar os emails, muda-se aqui; as regras são expressões '
+      + 'regulares e são conferidas antes de guardar.'),
+    el('div', {class: 'portal-fields'}, Object.entries(view.labels).map(([key, label]) => el('label', {class: 'field'},
+      label + (view.changed.includes(key) ? ' · alterado' : ''), inputs[key]))),
+    el('div', {class: 'actions'},
+      el('button', {class: 'primary', onclick: event => save(false, event.currentTarget)}, 'Guardar'),
+      view.changed.length ? el('button', {class: 'link', onclick: event => {
+        if (confirm('Repor o portal de origem? As alterações feitas aqui perdem-se.')) save(true, event.currentTarget);
+      }}, 'Repor os de origem') : null));
+}
+
+// 02/10: the backups — the data folder zipped once a day, at the first read, into a folder chosen here (one Google Drive
+// syncs, say); never the keys. «Fazer cópia agora» for one more.
+function backupCard(info) {
+  const folder = el('input', {value: info.folder || '', placeholder: '/Users/…/Google Drive/ARIA-copias', 'aria-label': 'Pasta das cópias'});
+  const size = bytes => bytes < 1048576 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1048576).toFixed(1).replace('.', ',')} MB`;
+  const choose = (path, create, button) => run(async () => {
+    backupCard(await call('api/backup/folder', {folder: path, create}));
+    toast(path ? 'Pasta das cópias guardada.' : 'Sem cópias de segurança.');
+  }, button);
+  // 02/10: Google Drive for desktop, found on this Mac: one click to use (and make) its ARIA-copias folder
+  const drives = (info.drives || []).filter(drive => drive.path !== info.folder);
+  $('workshop-backup').replaceChildren(
+    el('p', {class: 'eyebrow'}, 'CÓPIAS DE SEGURANÇA'), el('h2', {}, 'Cópia diária dos dados'),
+    el('p', {class: 'step'}, 'Uma cópia por dia da pasta de dados (imóveis, conversas, agenda, contactos, conhecimento, voz, '
+      + 'proprietários), na primeira leitura do dia. Nada se apaga: as cópias só se acrescentam (cada uma tem menos de 1 MB). '
+      + 'As chaves do Gmail e da OpenAI não vão. Tem os dados dos clientes: usa uma pasta só tua. Para repor, fecha a ARIA e '
+      + 'descomprime a cópia para a pasta da ARIA.'),
+    drives.length ? el('div', {class: 'actions'}, drives.map(drive => el('button', {class: 'primary',
+      onclick: event => choose(drive.path, true, event.currentTarget)}, `Usar o Google Drive (${drive.account})`)))
+      : !info.folder && el('p', {class: 'muted small'}, 'Para as cópias irem para o Google Drive, instala o «Google Drive para '
+        + 'computador» neste Mac: aparece aqui um botão para o usar. (A palavra-passe do Gmail não dá acesso ao Drive.)'),
+    el('div', {class: 'row'}, folder,
+      // 02/10: the Mac's own folder chooser (opened by the ARIA on this Mac)
+      el('button', {onclick: event => run(async () => {
+        const result = await call('api/backup/choose', {});
+        backupCard(result); toast('Pasta das cópias guardada.');
+      }, event.currentTarget)}, 'Escolher pasta…'),
+      el('button', {onclick: event => choose(folder.value.trim(), false, event.currentTarget)}, 'Guardar'),
+      el('button', {class: info.folder ? 'primary' : '', disabled: !info.folder, onclick: event => run(async () => {
+        const result = await call('api/backup/now', {});
+        backupCard(result); toast(`Cópia feita: ${result.last.file}.`);
+      }, event.currentTarget)}, 'Fazer cópia agora')),
+    el('p', {class: 'muted small'}, info.last
+      ? `Última cópia: ${when(info.last.at)} · ${info.last.file} · ${size(info.last.bytes)} · ${info.count} na pasta.`
+      : info.folder ? 'Ainda sem cópias nesta pasta: a primeira faz-se na próxima leitura, ou agora.' : 'Sem pasta escolhida: não há cópias.'));
+}
+
 function renderWorkshop() {
   $('workshop-link').hidden = !settings?.admin;
   // 30/09: without "admin", the prompts are never shown (with the customers' data in them): only «Copiar»
@@ -831,6 +945,8 @@ function renderWorkshop() {
   if (!settings?.admin) return;
   $('workshop-prompts').replaceChildren(...promptsCard());
   $('workshop-engine').replaceChildren(el('p', {class: 'eyebrow'}, 'MOTOR DE IA · API OPENAI'), engineConsole(), effortRow());
+  run(async () => backupCard(await call('api/backup', {})));
+  run(async () => portalCard(await call('api/portal', {})));
   // Token prices, US$ per 1M tokens as OpenAI writes them: change one, add a model, or put the table's own back
   const models = (settings.ai?.models || []).slice().sort((a, b) => a.id.localeCompare(b.id));
   const price = value => el('input', {type: 'number', min: 0, step: 'any', value: value ?? '', class: 'price-input'});
@@ -947,6 +1063,7 @@ const COMMON_PROMPT_FIELDS = [
   ['later_reply', '5.ª a 7.ª interação: o cliente continua a escrever, sem visita marcada (responde e aguarda por ti)', 5],
   ['conclusive_reply', '8.ª interação: conclusiva (e um aviso para ti intervires)', 5],
   ['closing_reply', 'Fecho, da 9.ª interação em diante: agradece e despede-se até as condições mudarem', 5],
+  ['owner_reply', 'Respostas ao proprietário (separador Proprietários)', 5],
   ['after_visit', 'Pós-visita: instruções do agradecimento', 5],
   ['after_visit_template', 'Pós-visita: conteúdo base (inquérito de 1 a 5 e ficha de visita; os <…> são preenchidos)', 12],
   ['survey_reply', 'Resposta ao inquérito pós-visita', 5],
@@ -1248,7 +1365,11 @@ function lastActivity(email) {
 
 function renderState() {
   $('account').textContent = state.account || '';
-  $('nav-count').textContent = state.properties.reduce((n, q) => n + q.emails.filter(email => !email.round).length, 0);
+  $('nav-count').textContent = state.properties.reduce((n, q) => n + q.emails.filter(email => !email.round && !email.owner).length, 0);
+  // 02/10: the owners' messages have their own tab and count
+  const ownerWaiting = state.properties.reduce((n, q) => n + q.emails.filter(email => email.owner).length, 0);
+  $('owner-count').textContent = String(ownerWaiting); $('owner-count').hidden = !ownerWaiting;
+  if (activeTab === 'owners') renderOwners();
   $('error').hidden = !state.error; $('error').textContent = state.error || '';
   const select = $('queue'), chosen = select.value;
   // Only ATIVO properties; an INATIVO one still shows while it has emails waiting, so none gets lost.
@@ -1265,7 +1386,7 @@ function renderState() {
        ' A próxima traz o que chegou desde então.']
     : queue?.read_from ? [`Ainda por ler: a primeira leitura traz os emails desde ${dayLabel(queue.read_from)}.`] : []));
   // 29/09: a round with one text for all is reviewed and sent in its own panel (Agenda), not card by card here.
-  const emails = sortCards((queue?.emails || []).filter(email => !email.round), queue);
+  const emails = sortCards((queue?.emails || []).filter(email => !email.round && !email.owner), queue);
   const inRound = (queue?.emails || []).length - emails.length;
   $('round-notice').hidden = !inRound;
   $('round-notice').textContent = inRound ? `${inRound} proposta(s) de visita da ronda com texto comum: revê-as e envia-as `
@@ -1467,6 +1588,111 @@ function turnWhen(turn, dates) {
     return moment.toLocaleString('pt-PT', {weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
   }
   return turn.at ? turn.at.slice(8, 10) + '/' + turn.at.slice(5, 7) : '';
+}
+
+// ===== Proprietários (02/10): each property's owner, apart from the customers. One card per message: the conversation,
+// the draft, «Gerar resposta» (the owner's prompt, with the property's state), «Guardar», «Enviar» and «Não precisa de
+// resposta». The property is chosen on top, like in the other tabs; the know-how for owners is at the bottom.
+let ownersKnowledgeShown = false;
+function renderOwners() {
+  const select = $('owners-property');
+  const properties = activeProperties().filter(property => !property.test);
+  fillSelect(select, Object.fromEntries(properties.map(property => [property.reference, property.reference])));
+  const ref = select.value || properties[0]?.reference || '';
+  const property = properties.find(item => item.reference === ref);
+  renderOwnerBox(property, properties);
+  const queue = (state?.properties || []).find(item => item.property_ref === ref);
+  const emails = (queue?.emails || []).filter(email => email.owner);
+  $('owners-emails').replaceChildren(...(emails.length ? emails.map(email => ownerCard(email, ref))
+    : [el('p', {class: 'empty-state'}, el('strong', {}, 'Sem mensagens do proprietário'),
+        property?.owner_email ? 'Quando ele escrever, a mensagem aparece aqui depois de «Ler emails».' : '')]));
+  if (!ownersKnowledgeShown) {
+    ownersKnowledgeShown = true;
+    $('owners-knowledge').replaceChildren(el('p', {class: 'step'}, 'Como a agência fala com proprietários: o tom, o que se '
+      + 'reporta e quando, o que se decide com eles. Vale para todos os imóveis, só nas respostas aos proprietários.'),
+      knowledgeEditor('owners', null));
+  }
+  holdFuelButtons();
+}
+$('owners-property').addEventListener('change', () => { renderOwners(); run(loadOwnersDigest); });
+
+// 02/10: the owner of the property chosen — set or changed here (the same email in several properties is one owner with
+// several) — and «Escrever ao proprietário», a new email without them writing first
+function renderOwnerBox(property, properties) {
+  const box = $('owners-box');
+  if (!property) { box.replaceChildren(el('p', {class: 'muted small'}, 'Sem imóveis.')); return; }
+  const ref = property.reference, email = property.owner_email || '';
+  const name = el('input', {value: property.owner_name || '', placeholder: 'Nome do proprietário', 'aria-label': 'Nome do proprietário'});
+  const address = el('input', {type: 'email', value: email, placeholder: 'email@exemplo.com', 'aria-label': 'Email do proprietário'});
+  const others = email ? properties.filter(item => item.reference !== ref
+    && (item.owner_email || '').toLowerCase() === email.toLowerCase()).map(item => item.reference) : [];
+  const subject = el('input', {placeholder: `Assunto (opcional; por defeito: ${ref} — ${property.description || ''})`, 'aria-label': 'Assunto do email novo'});
+  box.replaceChildren(
+    el('p', {class: 'eyebrow'}, 'PROPRIETÁRIO DE ' + ref),
+    el('div', {class: 'row owner-fields'}, name, address,
+      el('button', {onclick: event => run(async () => {
+        const result = await call('api/owners/set', {property_ref: ref, email: address.value.trim(), name: name.value.trim()});
+        state = result.state; settings = result.settings; renderSettings(); renderState(); renderOwners();
+        toast(address.value.trim() ? 'Proprietário guardado: os emails dele passam a vir para aqui.' : 'Proprietário retirado deste imóvel.');
+      }, event.currentTarget)}, 'Guardar')),
+    el('p', {class: 'muted small'}, email
+      ? (others.length ? `Também é proprietário de ${others.join(', ')}.` : 'As mensagens deste email vêm para aqui, não para as Comunicações.')
+      : 'Sem o email do proprietário, as mensagens dele entram como as de um cliente. O mesmo email pode estar em vários imóveis.'),
+    el('div', {class: 'row owner-write'}, subject,
+      el('button', {class: 'primary', disabled: !email, title: email ? '' : 'Põe primeiro o email do proprietário.',
+        onclick: event => run(async () => {
+          const result = await call('api/owners/write', {property_ref: ref, subject: subject.value.trim()});
+          state = result.state; renderState();
+          toast('Email novo ao proprietário: escreve-o no cartão abaixo, ou com «Gerar resposta», e envia.');
+        }, event.currentTarget)}, 'Escrever ao proprietário')));
+}
+
+function ownerCard(email, ref) {
+  const who = email.customer?.name || email.recipient?.name || 'Proprietário';
+  const draft = el('textarea', {rows: 9, 'aria-label': 'Resposta ao proprietário'}, email.reply_text || '');
+  const turns = email.conversation?.length ? email.conversation
+    : [{who: 'cliente', text: email.customer?.message || email.body_text || '', ts: email.date}];
+  const save = () => call('api/drafts', {property_ref: ref, replies: [{id: email.id, reply_text: draft.value}]});
+  const extra = el('textarea', {rows: 2, 'aria-label': 'O que lhe queres dizer',
+    placeholder: email.outbound ? 'O que lhe queres dizer (opcional): por exemplo, propor baixar a renda 50 €.'
+      : 'Instruções para esta resposta (opcional).'});
+  return el('article', {class: 'card email-card owner-card' + (email.outbound ? ' outbound' : '')},
+    el('div', {class: 'card-head'}, el('div', {class: 'who'}, el('strong', {}, who), el('span', {class: 'muted small'}, email.recipient?.email || '')),
+      el('span', {class: 'tag'}, email.outbound ? 'email novo · ' + (email.new_subject || '') : 'proprietário'),
+      el('span', {class: 'tag' + (email.reply_status === 'draft' ? ' draft' : '')}, STATUS[email.reply_status] || email.reply_status || ''),
+      el('span', {class: 'muted small'}, when(email.date))),
+    (email.warnings || []).map(warning => el('p', {class: 'alert warn'}, warning)),
+    email.reply_error && el('p', {class: 'alert bad'}, email.reply_error),
+    el('div', {class: 'owner-history'}, [...turns].filter(turn => turn.text).reverse().slice(0, 8).map(turn => el('div', {class: 'history-turn ' + (turn.who === 'cliente' ? 'theirs' : 'ours')},
+      el('p', {class: 'muted small'}, turn.who === 'cliente' ? 'Proprietário' : 'Nós', ' · ' + turnWhen(turn)), el('pre', {}, turn.text)))),
+    draft, extra,
+    el('div', {class: 'actions'},
+      el('button', {class: 'needs-fuel', onclick: event => run(async () => {
+        if (draft.value.trim() && draft.value !== (email.reply_text || '')
+            && !confirm('O rascunho tem alterações por guardar, e a resposta nova substitui-as. Continuar?')) return;
+        const result = await call('api/owners/generate', {property_ref: ref, ids: [email.id], extra: extra.value.trim()});
+        state = result.state; applyFuel(result.fuel, ref); renderState();
+        const note = (result.notes || []).find(item => item.id === email.id)?.nota;
+        toast(result.saved ? 'Resposta ao proprietário gerada: revê-a antes de enviar.' + (note ? ` Nota: ${note}` : '')
+          : 'A IA não escreveu a resposta.' + (note ? ` Porquê: ${note}` : ''), result.saved ? 'ok' : 'warn');
+      }, event.currentTarget)}, 'Gerar resposta'),
+      el('button', {onclick: event => run(async () => { state = await save(); renderState(); toast('Rascunho guardado.'); }, event.currentTarget)}, 'Guardar'),
+      el('button', {class: 'primary send-action', onclick: event => run(async () => {
+        if (!draft.value.trim()) throw new Error('Escreve o texto antes de enviar.');
+        state = await save();
+        const check = await call('api/preview', {property_ref: ref, ids: [email.id]});
+        const [reply] = check.replies;
+        if (!confirm(`Enviar ao proprietário, tal como está?\n\nPara: ${reply.to}\nAssunto: ${reply.subject}`)) { renderState(); return; }
+        const result = await call('api/send', {property_ref: ref, preview_token: check.preview_token, confirmed: true});
+        const sent = result.results[0]?.status === 'sent';
+        if (sent) playSound('send');
+        state = await call('api/state'); renderState();
+        toast(sent ? `Enviado para ${reply.to}.` : 'Não saiu: vê o aviso no próprio cartão antes de repetir.', sent ? 'ok' : 'bad');
+      }, event.currentTarget)}, 'Enviar'),
+      el('button', {class: 'link', onclick: event => run(async () => {
+        if (!confirm('Esta mensagem do proprietário não precisa de resposta? Sai da lista; o Gmail não muda.')) return;
+        state = await call('api/dismiss', {property_ref: ref, ids: [email.id]}); renderState();
+      }, event.currentTarget)}, 'Não precisa de resposta')));
 }
 
 function conversationTurns(turns, current, dates) {
@@ -2431,11 +2657,19 @@ function sendAll(view) {
 
 // The notepad: one page per property, the one picked in the ponto de situação (27/09: no tabs). The text is kept on
 // leaving it (no button); a page sent, or maybe sent, stays as it went.
-function renderNotepad(view) {
-  const box = $('digest-notepad'), pages = view?.properties || [];
-  if (!pages.length) { box.replaceChildren(); return; }
-  if (!pages.some(page => page.property_ref === notepadProperty)) notepadProperty = pages[0].property_ref;
-  const page = pages.find(item => item.property_ref === notepadProperty);
+// 02/10: the same notepad in Proprietários too (place: its box and the property chosen there); after a change, both
+// places are drawn again.
+function renderNotepad(view, place = null) {
+  const box = place?.box || $('digest-notepad'), pages = view?.properties || [];
+  const redraw = next => { renderDigest(next); if (activeTab === 'owners') renderOwnersDigest(next); };
+  if (place) {
+    const own = pages.find(item => item.property_ref === place.ref);
+    if (!own) { box.replaceChildren(); return; }
+  } else {
+    if (!pages.length) { box.replaceChildren(); return; }
+    if (!pages.some(page => page.property_ref === notepadProperty)) notepadProperty = pages[0].property_ref;
+  }
+  const page = pages.find(item => item.property_ref === (place ? place.ref : notepadProperty));
   const ref = page.property_ref, recipient = view.recipient, status = page.reply_status;
   const editable = status === 'draft' || status === 'error';
   const text = el('textarea', {class: 'notepad-paper', rows: 18, spellcheck: 'true', readonly: !editable,
@@ -2459,7 +2693,7 @@ function renderNotepad(view) {
       await save();
       const result = await call('api/digest/send', {property_ref: ref, to, confirmed: true});
       if (result.status === 'sent') playSound('send');
-      renderDigest(await call('api/digest'));
+      redraw(await call('api/digest'));
       toast(result.status === 'sent' ? 'Ponto de situação enviado.'
         : 'Envio incerto: verifica Enviados no Gmail antes de repetir.', result.status === 'sent' ? 'ok' : 'warn');
     }, event.currentTarget)}, label);
@@ -2485,11 +2719,14 @@ function renderNotepad(view) {
       }}, 'Copiar'),
       editable && el('button', {class: 'link', onclick: event => run(async () => {
         if (page.edited && !confirm('O texto volta a ser escrito com os números de agora e perdes o que alteraste. Continuar?')) return;
-        renderDigest(await call('api/digest/refresh', {property_ref: ref})); toast('Texto atualizado com a situação de agora.');
+        redraw(await call('api/digest/refresh', {property_ref: ref})); toast('Texto atualizado com a situação de agora.');
       }, event.currentTarget)}, 'Atualizar com a situação de agora'))));
 }
 
 async function loadDigest() { renderDigest(await call('api/digest')); }
+// 02/10: Proprietários shows the ponto de situação of the property chosen there (it stays in the Painel too)
+function renderOwnersDigest(view) { renderNotepad(view, {box: $('owners-digest'), ref: $('owners-property').value}); }
+async function loadOwnersDigest() { renderOwnersDigest(await call('api/digest')); }
 
 // What a past round looked like: who it went to, and where each one stands now (booked and when, declined,
 // still an unsent draft, or sent and awaiting a reply) — otherwise a sent round leaves no trace to check.
@@ -3106,7 +3343,7 @@ function propertySwitcher(select) {
   SWITCHERS.push(render);
   render();
 }
-for (const id of ['queue', 'agenda-property', 'fichas-property']) propertySwitcher($(id));
+for (const id of ['queue', 'agenda-property', 'fichas-property', 'owners-property']) propertySwitcher($(id));
 
 function renderSettings() {
   SWITCHERS.forEach(render => render());  // the descriptions come with the settings
@@ -3123,7 +3360,7 @@ function renderSettings() {
         el('summary', {}, title), knowledgeEditor(scope, null))));
   if (!$('f-first-read').value) $('f-first-read').value = settings.first_read_days || 45;
   renderPropertySlider();
-  if (!$('f-sender').value) $('f-sender').value = settings.properties[0]?.sender || 'reply@idealista.pt';
+  if (!$('f-sender').value) $('f-sender').value = settings.properties[0]?.sender || settings.portal_sender || 'reply@idealista.pt';
   $('generate-api').title = settings.openai_configured ? '' : 'Sem chave OpenAI configurada: o clique explica como.';
   $('api-hint').hidden = !!settings.openai_configured;
   $('api-hint').textContent = 'Sem chave OpenAI configurada ainda: corre mac/openai_key.command no terminal.';

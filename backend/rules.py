@@ -8,6 +8,7 @@ import base64
 import copy
 import re
 from urllib.parse import urlsplit
+from . import portals
 
 REFERENCE = re.compile(r"[A-Za-z0-9_-]{1,64}")
 EMAIL = re.compile(r"[^@\s<>(),;:\"\[\]]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+")
@@ -16,14 +17,46 @@ PHONE = re.compile(r"\+?\d[\d .()-]{7,}\d")
 # +351, or a number written with its country code (+… or 00…). Dates, prices and references do not match.
 MESSAGE_PHONE = re.compile(r"(?<![\d+])(?:(?:\+|00)351[\s.-]?)?9[1236](?:[\s.-]?\d){7}(?!\d)"
                            r"|(?<![\d+])(?:\+|00)[1-9]\d{0,2}(?:[\s.-]?\d){6,12}(?!\d)")
-LISTING = re.compile(r"Código do anúncio:\s*(\d+)")
-SUBJECT_NAME = re.compile(r"\bde (?:teste de )?(.+?) sobre o teu imóvel")  # 29/09: «Mensagem de teste de X…» too
 QUOTE = re.compile(r"^(>|(Em|On|No dia) .+(escreveu|wrote):?$|_{10,}$|-{3,} ?(Original Message|Mensagem original))")
 KNOWLEDGE_LIMIT = 30000
 COMMENT = re.compile(r"<!--.*?-->", re.S)
 # The subject of a reply to a portal lead, until the owner writes another one in voice.json.
 SUBJECT_DEFAULT = "{imovel}"
-IDEALISTA_LINK = re.compile(r"https://(?:www\.)?idealista\.pt/(?:imovel/)?(\d+)/?(?:[?#].*)?")
+# 02/10: what is particular to the portal (its senders, how its subject names the customer, its listing code and link,
+# its call notices) lives in portals.py, changeable in the Oficina: apply_portal sets these from it.
+PORTAL, LISTING, SUBJECT_NAME, IDEALISTA_LINK, CALL = {}, None, None, None, {}
+
+
+def apply_portal(changes=None):
+    """The portal as the Oficina left it (config.json "portal"), into the rules the reading uses."""
+    global PORTAL, LISTING, SUBJECT_NAME, IDEALISTA_LINK, CALL
+    PORTAL = portals.merged(changes)
+    LISTING = re.compile(PORTAL["codigo_anuncio"])
+    SUBJECT_NAME = re.compile(PORTAL["assunto_nome"])  # 29/09: «Mensagem de teste de X…» too
+    IDEALISTA_LINK = re.compile(PORTAL["link_anuncio"])
+    CALL = {key: re.compile(PORTAL[key], re.I | re.M) for key in PORTAL if key.startswith(("chamada_", "assunto_chamada"))}
+
+
+def parse_call(item):
+    """02/10: a portal's call notice («Chamada atendida / não respondida de um interessado…»): who called (the phone,
+    digits only), when (the call's own time, from the text: the email can come days later), whether it was answered,
+    how long, and the listing and reference when the notice has them. None for any other email."""
+    senders = {address.casefold() for address in addresses(item.get("from") or [])}
+    if PORTAL["remetente_chamadas"].casefold() not in senders or not CALL["assunto_chamada"].search(item.get("subject") or ""):
+        return None
+    body = str(item.get("body_text") or "")
+    found = {key: CALL[key].search(body) for key in CALL if key != "assunto_chamada"}
+    phone = re.sub(r"\D", "", found["chamada_telefone"].group(1)) if found["chamada_telefone"] else ""
+    when = found["chamada_data"].group(1) if found["chamada_data"] else ""
+    if not phone or not when:
+        return None
+    day, clock = when.split(" ", 1)
+    state = found["chamada_estado"].group(1).strip() if found["chamada_estado"] else ""
+    return {"phone": phone, "at": f"{day[6:10]}-{day[3:5]}-{day[0:2]} {clock}", "state": state,
+            "answered": bool(CALL["chamada_atendida"].search(state)),
+            "seconds": int(found["chamada_duracao"].group(1)) if found["chamada_duracao"] else None,
+            "listing": found["chamada_anuncio"].group(1) if found["chamada_anuncio"] else None,
+            "ref": found["chamada_ref"].group(1) if found["chamada_ref"] else None}
 # The property's photo is the owner's own file: the portal blocks robots, so it is never fetched.
 PHOTO_LIMIT = 3 * 1024 * 1024
 PHOTO_KINDS = {b"\xff\xd8\xff": "jpg", b"\x89PNG\r\n\x1a\n": "png"}
@@ -293,7 +326,7 @@ def clean_property(fields):
         if clean["listing_id"] and clean["listing_id"] != idealista[1]:
             raise ValueError("O código do anúncio não corresponde ao link.")
         clean["listing_id"] = idealista[1]
-        clean["listing_url"] = f"https://www.idealista.pt/imovel/{idealista[1]}/"
+        clean["listing_url"] = PORTAL["link_anuncio_forma"].replace("{codigo}", idealista[1])
     rent = parse_rent(fields.get("advertised_rent_eur"))
     if rent is not None and not 0 <= rent <= 1_000_000:
         raise ValueError("Renda inválida.")
@@ -519,3 +552,6 @@ def check_slot(value, windows, slot, booked):
                 raise ValueError(f"A hora {time} de {day} já está marcada para outra pessoa.")
             return window
     raise ValueError(f"A hora «{value}» não está em nenhum intervalo proposto (de {slot} em {slot} minutos).")
+
+
+apply_portal()  # 02/10: the defaults until the Oficina's changes are read (MailService.config)

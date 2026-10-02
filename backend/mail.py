@@ -228,6 +228,7 @@ def read_messages(account, password, subject_contains, date_from, date_to,
                 "message_id": (msg.get("Message-ID", "") or "").strip(),
                 "in_reply_to": (msg.get("In-Reply-To", "") or "").strip(),
                 "references": (msg.get("References", "") or "").strip(),
+                "aria": (msg.get("X-ARIA", "") or "").strip(),  # 02/10: our hidden mark, in our own sent emails
             }
             if test:
                 item["test"] = True
