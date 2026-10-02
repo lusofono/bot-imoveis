@@ -298,7 +298,7 @@ class Agency:
         self.stack.close()
 
     def gmail(self, account, password, subject, date_from, date_to, mailbox="all", incoming_only=True,
-              accept=None, outgoing=None, accept_outgoing=None):
+              accept=None, outgoing=None, accept_outgoing=None, progress=None):
         found = [item for item in self.inbox if accept is None or accept(item)]
         self.inbox = []
         return found, len(found), "INBOX"

@@ -22,13 +22,15 @@ KNOWLEDGE_RULE = ("Esta base tem dois tipos de conteúdo, os dois obrigatórios:
 
 REPLY_FORMAT = """FORMATO DA RESPOSTA
 Responde só com um bloco JSON, sem mais texto:
-{"respostas": [{"id": "<id do email>", "reply_text": "<email completo: saudação, texto, fecho e assinatura>", "nota": "<opcional: o que o proprietário deve saber>", "visita": "<opcional: AAAA-MM-DD HH:MM, só quando marcas uma hora de visita>", "visita_estado": "<opcional: nao_quer ou outra_data, só se o cliente disser que não quer visitar ou que só pode noutra data>", "ficha": {"trabalho": "<ou null>", "agregado": "<ou null>", "datas": "<ou null>", "disponibilidade": "<ou null>", "empresa": "<ou null>", "animais": "<ou null>", "falta": ["<empresa e/ou animais, só se o cliente os referiu ou deu a entender e ainda faltam dados>"]}}]}
+{"respostas": [{"id": "<id do email>", "reply_text": "<email: saudação, texto e fecho — sem assinatura>", "nota": "<opcional, em português de Portugal: o que o proprietário deve saber>", "visita": "<opcional: AAAA-MM-DD HH:MM, só quando marcas uma hora de visita>", "visita_estado": "<opcional: nao_quer ou outra_data, só se o cliente disser que não quer visitar ou que só pode noutra data>", "ficha": {"trabalho": "<ou null>", "agregado": "<ou null>", "datas": "<ou null>", "disponibilidade": "<ou null>", "empresa": "<ou null>", "animais": "<ou null>", "falta": ["<empresa e/ou animais, só se o cliente os referiu ou deu a entender e ainda faltam dados>"]}}]}
 Um objeto por email, com o id exatamente como aparece acima.
-"reply_text": escreve-o como um email — a saudação, parágrafos curtos separados por uma linha em branco, o fecho e a
-assinatura —, nunca como um bloco de frases seguidas.
+"reply_text": escreve-o como um email — a saudação, parágrafos curtos separados por uma linha em branco e o fecho —,
+nunca como um bloco de frases seguidas. Não escrevas assinatura: o programa acrescenta-a por baixo do fecho.
 "ficha": a ficha do cliente atualizada — a ficha até agora (indicada em cada email) mais o que ele disse nesta
 mensagem, em frases curtas e só com o que ele disse (nunca inventes nem avalies); null no que ainda não se sabe. Se não deves responder a um email
-(por exemplo, uma interação sem prompt configurada), deixa reply_text vazio e explica em nota."""
+(por exemplo, uma interação sem prompt configurada), deixa reply_text vazio e explica em nota.
+"nota" e "ficha" são para o proprietário, não para o cliente: escreve-as sempre em português de Portugal, seja qual for
+a língua do cliente e da resposta (só o reply_text vai na língua do cliente)."""
 
 LISTING_FIELDS = {
     "reference": "referência do anunciante, como aparece no anúncio e nos avisos do portal (ex.: AP_ABC_1), ou null",
@@ -152,8 +154,10 @@ def instructions(profile, voice, visits=None):
         languages.get("one_language_per_reply") and "- Um só idioma por resposta.",
         languages.get("on_unclear_or_unsupported_language")
         and f"- Idioma pouco claro ou não suportado: {languages['on_unclear_or_unsupported_language']}",
-        signature.get("text") and ("- Assinatura, exatamente assim e uma só vez"
-                                   + ("" if signature.get("translate") else ", sem traduzir") + f": {signature['text']}"),
+        # 02/10: the signature is the program's, put under the closing — the AI sometimes left it out
+        signature.get("text") and ("- Não escrevas assinatura nenhuma: termina no fecho (p. ex. «Com os melhores "
+                                   "cumprimentos,»); o programa acrescenta por baixo a assinatura da agência. Ignora "
+                                   "qualquer outra instrução que peça para escrever a assinatura."),
         voice.get("application_instructions") and f"- {voice['application_instructions']}",
     ]
     out += [line for line in extra if line]
@@ -293,7 +297,7 @@ def reply_prompt(queue, ids, extra="", only_extra=False, now=None):
     if extra.strip() and only_extra:
         # 27/09: «Ignorar os emails anteriores»: the owner's points are the whole reply
         parts += ["", "INSTRUÇÕES EXTRA DO PROPRIETÁRIO (para este email, substituem as da interação: escreve só uma resposta "
-                  "curta com estes pontos, pela ordem natural, com a saudação, o fecho e a assinatura da voz; não respondas "
+                  "curta com estes pontos, pela ordem natural, com a saudação e o fecho da voz (sem assinatura); não respondas "
                   "ao que veio antes nem acrescentes perguntas)", extra.strip()]
     elif extra.strip():
         # 27/09: they add to what each email's interaction asks, never replace it (a real reply came back with only them)
@@ -349,7 +353,7 @@ def reply_prompt(queue, ids, extra="", only_extra=False, now=None):
                   f" | data: {email.get('date') or '?'}", f"Cliente: {name}"]
         if email.get("phone_only"):
             parts.append("Sem email do cliente: esta resposta vai por WhatsApp ou SMS. Escreve uma mensagem curta, sem "
-                         "assunto, com a saudação e a assinatura da voz.")
+                         "assunto, com a saudação e o fecho da voz (a assinatura é acrescentada à parte).")
         # 29/09: in the order things happened (a customer's email read late was kept after ours), and whole: a turn
         # was cut at 1000 characters and a long answer lost its end
         history = sorted(email.get("history") or [], key=lambda turn: str(turn.get("ts") or turn.get("at") or ""))
@@ -387,7 +391,7 @@ Responde só com um bloco JSON, sem mais texto:
 {"textos": {"pt": "<o texto comum em português>", "en": "<o mesmo texto em inglês>"}, "resumos": {"<código da língua>": "<resumo curto do texto nessa língua>"}, "clientes": [{"id": "<id do cliente>", "idioma": "<pt ou en>", "lingua": "<código ISO da língua em que ele escreve, ex.: pt, en, de, ur>", "saudacao": "<a saudação da voz para ele, no idioma do texto, com o nome>"}]}
 Um objeto em "clientes" por cliente, com o id exatamente como aparece acima. "resumos" só com as línguas dos clientes
 que não sejam português nem inglês (vazio se não houver nenhuma). Os textos escrevem-se como um email: parágrafos curtos
-separados por uma linha em branco, o fecho e a assinatura."""
+separados por uma linha em branco e o fecho, sem assinatura (o programa acrescenta-a)."""
 
 
 def round_prompt(queue, ids, now=None):
@@ -409,7 +413,7 @@ def round_prompt(queue, ids, now=None):
               "Brasil) e em inglês. Português para quem escreve em português, de Portugal ou do Brasil; inglês para "
               "todos os outros. O inglês é o texto completo e oficial.",
               "- O texto não leva saudação (vai à parte, uma por cliente): começa no que vem logo a seguir à saudação e "
-              "acaba no fecho e na assinatura da voz. Não uses o nome de nenhum cliente nem nada que só valha para um "
+              "acaba no fecho da voz, sem assinatura (o programa acrescenta-a). Não uses o nome de nenhum cliente nem nada que só valha para um "
               "deles (o que disse, a ficha, o que lhe falta).",
               "- Para cada cliente: o idioma do texto que recebe (pt ou en), a língua em que ele escreve e a saudação "
               "da voz no idioma do texto, com o nome dele (sem nome, a da voz para quando falta o nome).",
@@ -465,7 +469,19 @@ def clean_round(common, ids):
     return {"texts": texts, "summaries": summaries, "clients": clients}
 
 
-def round_text(common, key):
+def sign(text, signature):
+    """02/10: the voice's signature, put by the program under the closing — never written by the AI. A copy the AI
+    wrote anyway at the end (any of its lines) is taken off first, so it is never signed twice."""
+    text, signature = str(text or "").rstrip(), str(signature or "").strip()
+    if not text or not signature:
+        return text
+    lines, own = text.splitlines(), {line.strip() for line in signature.splitlines() if line.strip()}
+    while lines and (not lines[-1].strip() or lines[-1].strip() in own):
+        lines.pop()
+    return "\n".join(lines) + "\n" + signature
+
+
+def round_text(common, key, signature=""):
     """One customer's email of the round: their greeting, the common text in their language and, for a language that
     is neither Portuguese nor English, the short summary in it after the English."""
     client = common["clients"][key]
@@ -473,7 +489,9 @@ def round_text(common, key):
     summary = common["summaries"].get(client["lang"]) if client["lang"] not in ("pt", "en") else None
     if summary:
         parts.append("—\n" + summary)
-    return "\n\n".join(part for part in parts if part)
+    text = "\n\n".join(part for part in parts[:2] if part)
+    # the signature under the closing of the official text, then the short summary in the customer's own language
+    return "\n\n".join(part for part in [sign(text, signature), *parts[2:]] if part)
 
 
 def ficha_line(ficha):

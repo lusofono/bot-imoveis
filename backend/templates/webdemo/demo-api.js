@@ -126,6 +126,13 @@
       return {...view(), added: count, direct: 0};
     },
 
+    // 02/10: the page asks first how to split the selection; in the demo, batches of 5
+    'POST api/prompt/plan': body => {
+      const ids = body.ids || [], batches = [];
+      for (let i = 0; i < ids.length; i += 5) batches.push(ids.slice(i, i + 5));
+      return {batches, context_used: 14.8};
+    },
+
     'POST api/prompt/generate': async body => {
       const ids = body.ids || [];
       if (!ids.length) throw new Error('Seleciona os emails.');

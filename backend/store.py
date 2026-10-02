@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import time
 from .rules import DEALS, KNOWLEDGE_LIMIT, REFERENCE, check_profile, check_voice, knowledge
 
 PHOTO_TYPES = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
@@ -49,16 +50,23 @@ def save_json(path, data):
 
 
 @contextmanager
-def locked(folder, name="queue"):
-    """One operation at a time on a data folder. A second one fails at once instead of waiting."""
+def locked(folder, name="queue", wait=0):
+    """One operation at a time on a data folder. A second one fails at once instead of waiting — unless wait (seconds)
+    is given: 02/10, the short ones (reading the queue, saving drafts) wait their turn, so several batches of «Gerar
+    respostas» running at the same time never bump into each other."""
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
     fd = os.open(folder / f".{name}.lock", os.O_CREAT | os.O_RDWR, 0o600)
     with os.fdopen(fd, "a") as stream:
-        try:
-            fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            raise RuntimeError("Já existe uma operação em curso. Tenta novamente.") from None
+        deadline = time.monotonic() + wait
+        while True:
+            try:
+                fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise RuntimeError("Já existe uma operação em curso. Tenta novamente.") from None
+                time.sleep(0.1)
         try:
             yield
         finally:

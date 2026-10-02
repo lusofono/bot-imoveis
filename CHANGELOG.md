@@ -15,6 +15,195 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.94.0 — 02/10/2026
+
+- **Painel → Depósitos: o imóvel de teste também tem o seu depósito, de 3 €**, mostrado no fim e marcado «· TESTE».
+  Enquanto não for enchido com outro valor, o limite é 3 € (`FUEL_TEST_EUR`), contado como nos outros desde o
+  enchimento do depósito antigo comum; «Encher» propõe 3 € e volta a contar do zero. Com o depósito vazio, a API pára
+  no imóvel de teste (clientes de teste, respostas da ARIA, avaliador), como nos outros. O gasto da API no imóvel de
+  teste deixa de contar como «sem imóvel» (os pedidos anteriores a 24/09) e passa a ser do seu depósito; continua fora
+  do resto do Painel.
+
+## α.93.5 — 02/10/2026
+
+- **Comunicações: «Ler emails» (Caixa de correio) sobe para cima da escolha do imóvel**, na largura toda: uma leitura
+  traz os emails de todos os imóveis, seja qual for o escolhido. Só com a API, a coluna que ficava ao lado (a
+  importação do ChatGPT) deixa de ocupar espaço.
+
+## α.93.4 — 02/10/2026
+
+- **Comunicações: o primeiro email de um cliente novo não mostra as respostas rápidas** à direita («Agradecer o email…»,
+  «Pedir que aguarde…», «Perguntar se mantém o interesse», «…recebeu o email anterior», «…os documentos», «telefone ou
+  WhatsApp», «morada e Google Maps»): ainda não há nada nosso a que dar seguimento. O resto do cartão fica igual
+  (acrescentar ao conhecimento, «Atualizar resposta», enviar).
+
+## α.93.3 — 02/10/2026
+
+- **Os emails dos clientes de teste vão com o esforço de raciocínio «Nenhum»**, seja qual for o da Oficina: os
+  clientes novos («Gerar clientes de teste») e as respostas deles («Avançar o teste») não precisam de mais
+  (`TEST_EFFORT` em `testlab.py`; `complete()` aceita o esforço de uma chamada, por cima do da Oficina). As respostas
+  da ARIA aos clientes (também no imóvel de teste), as rondas e o avaliador continuam com o esforço escolhido na
+  Oficina, e a explicação ao lado da escolha passa a dizê-lo.
+
+## α.93.2 — 02/10/2026
+
+- **O que a IA escreve para o proprietário vem sempre em português de Portugal**, seja qual for a língua do cliente:
+  a nota de cada rascunho e a ficha do cliente (o formato da resposta passa a dizê-lo; só o `reply_text` vai na língua
+  do cliente), e os erros e o resumo do avaliador (revisor e rondas de teste). Muda no código (`REPLY_FORMAT` e
+  `evaluation_prompt`), que não fica guardado nos perfis: vale já para as próximas respostas.
+
+## α.93.1 — 02/10/2026
+
+- **Comunicações: as notas da IA sobre os rascunhos saem do passo 2** para um painel próprio logo abaixo dos passos,
+  «Notas da IA sobre os rascunhos», na largura toda e com as notas lado a lado (fica menos alto). Cada nota começa pelo
+  nome do cliente, a negrito; o painel só aparece quando há notas e limpa-se ao mudar de imóvel.
+
+## α.93.0 — 02/10/2026
+
+- **Oficina → Testes: «Descarregar as conversas (.txt)»**, ao lado de «Apagar clientes de teste». Um ficheiro de texto
+  com a história de cada cliente de teste, por número, para ler com calma (antes de apagar, por exemplo):
+  - quem é, quando entrou, como está (ficha, visita marcada, ignorado, inativo, se a história terminou);
+  - o perfil escondido, que a ARIA não conhece;
+  - a conversa com a ARIA, email a email, com a hora local, marcando o que ainda está por responder;
+  - os rascunhos ainda por enviar, a conversa com o consultor (Human contest) e as avaliações, com as notas e os erros.
+  As conversas do imóvel de teste sem cliente correspondente vêm no fim. É feito no computador (`api/testlab/transcript`,
+  só com `"admin": true`) e guardado pelo browser; nada sai para fora.
+- **Comunicações: «Última leitura…» passa para a linha do título «Ler emails», encostada à direita**; a linha do botão
+  fica para o progresso da leitura.
+
+## α.92.2 — 02/10/2026
+
+- **Ronda de visitas: uma linha diz quem recebe o convite e quem fica de fora, e porquê**, por baixo da explicação do
+  cartão — por exemplo «Agora: 5 recebem o convite · 19 com email por responder nas Comunicações (entram depois de lhes
+  responderes) · 2 na lista de ignorados». Conta também quem já tem visita marcada, quem não quer ou só pode noutra
+  data, os inativos e quem tem a proposta da ronda ainda por enviar. Os pedidos novos ainda sem resposta (sem conversa
+  até à primeira resposta) entram nos «por responder». Vem de `api/visits/candidates`, que passa a devolver estas
+  contas em `left_out`.
+
+## α.92.1 — 02/10/2026
+
+- **Visitas: a ronda corre no imóvel escolhido lá em cima.** O cartão «Ronda de visitas» deixa de ter a sua própria
+  lista de imóveis (que podia mostrar outro imóvel que não o de cima) e segue as setas do topo; com «Todos os imóveis»
+  pede para escolher um, e num imóvel com as visitas fechadas diz que não há ronda.
+
+## α.92.0 — 02/10/2026
+
+- **O revisor só corre quando se pede:** um cartão novo entre o passo 2 e o 3, **«Revisor · opcional — Rever com a
+  IA»**, com «Rever os selecionados» (os rascunhos dos emails selecionados). A revisão logo depois de «Gerar
+  respostas» passa a vir desligada (liga-se na Oficina, em «Avaliador»), e os cartões só mostram a caixa do revisor
+  quando há uma revisão.
+
+## α.91.1 — 02/10/2026
+
+- **No imóvel de teste, os botões de envio ficam verdes** («3 Enviar todos» e «Enviar já este por email»), em todos os
+  temas: um envio de teste vê-se logo.
+
+## α.91.0 — 02/10/2026
+
+- **«Ler emails» diz o que está a fazer, à direita do botão, em até três linhas:** «A ligar ao Gmail…», «A ler o email
+  37 de 120», «De: Ana Exemplo», «Nova mensagem sobre…», e por fim «A guardar os emails novos…». (Antes ficava «A
+  trabalhar…» até ao fim: o servidor atende os pedidos da página um de cada vez, e o do progresso esperava pela
+  leitura inteira.)
+- **O «Gerar respostas» em lotes passa a correr mesmo ao mesmo tempo:** os lotes que a página envia juntos ficavam em
+  fila no servidor. O progresso da leitura e o «Gerar respostas» passam ao lado dessa fila (as gravações continuam a
+  esperar a vez).
+
+## α.90.3 — 02/10/2026
+
+- **O aviso «IMÓVEL DE TESTE…» passa para a linha do título das Comunicações, à direita** de «Uma boa resposta começa
+  aqui.» (estava numa faixa por cima de tudo).
+
+## α.90.2 — 02/10/2026
+
+- **Os avisos da plataforma de testes começam por «TEST!»** («TEST! Mensagem de teste de … sobre o teu imóvel…»),
+  para se distinguirem logo na caixa de correio.
+
+## α.90.1 — 02/10/2026
+
+- **O imóvel de teste em roxo, para nunca se testar num imóvel real por engano:** o seletor de imóvel fica com fundo
+  roxo leve quando é ele o escolhido (Comunicações, Visitas, Contactos e Imóveis), e as Comunicações dele ficam todas
+  num roxo muito leve, com «IMÓVEL DE TESTE — o que se faz aqui só chega a clientes de teste» no topo. O roxo mistura-se
+  com as cores de cada tema.
+
+## α.90.0 — 02/10/2026
+
+- **Esforço de raciocínio «Baixo» por defeito** (Oficina), com Nenhum, Mínimo, Médio, Alto e «O do modelo» à escolha.
+- **Saem da escolha do motor os modelos antigos e caros (gpt-4o, gpt-4.1) e os acima de 3 € por 100 interações
+  (gpt-6-astra):** continuam na tabela dos preços (as contas antigas ficam certas), com «Esconder» / «Mostrar» para
+  cada modelo. O avaliador passa ao gpt-6-sol por defeito, o mais forte dos que ficam.
+- **Enquanto «1 Ler emails» trabalha, o «2 Gerar respostas» fica desligado**, e **o botão mostra o que está a ler**:
+  «A ligar ao Gmail…», «A ler 37 de 120 · Ana Exemplo · «Nova mensagem…»», «A guardar os emails novos…».
+- Testes: os 5 que misturam o dia local com o de UTC são saltados entre a meia-noite e a uma (só aí falhavam).
+
+## α.89.0 — 02/10/2026
+
+- **Esforço de raciocínio (Oficina, por baixo do motor):** não enviávamos nenhum, e um modelo que raciocina (gpt-5.x,
+  gpt-6) usava o seu, pensando antes de cada lote — mais lento, e esses tokens pagam-se. Passa a ir **«Nenhum» por
+  defeito** (as respostas são curtas e o prompt tem as regras todas), com Mínimo, Baixo, Médio, Alto ou «O do modelo»
+  à escolha. Só os modelos que o aceitam o recebem; se a OpenAI o recusar, o pedido repete-se sem ele. Os registos
+  guardam os tokens de raciocínio, para se ver a diferença.
+- **Testes & Debug: a «Última ronda» da avaliação abre e fecha**, fechada no início.
+
+## α.88.1 — 02/10/2026
+
+- **Oficina, Testes & Debug: os três passos pela ordem em que se fazem, numerados** — 1 o Human contest («1 Guardar»),
+  2 os clientes de teste («2 Gerar clientes de teste»), 3 uma ronda («3 Avançar o teste») — e a consola mais legível:
+  letra maior, legendas sem maiúsculas espaçadas e mais espaço entre linhas.
+
+## α.88.0 — 02/10/2026
+
+- **«Gerar respostas» mostra os rascunhos à medida que ficam prontos:** a página divide a seleção em lotes (com os
+  limites da Oficina), pede até 4 ao mesmo tempo e redesenha os cartões assim que cada lote chega — o último antes do
+  primeiro, se for mais rápido —, com «10 de 20 rascunhos prontos…». As operações curtas (a fila, os rascunhos)
+  esperam a vez até 10 segundos, em vez de falharem com «já existe uma operação em curso».
+- **A assinatura passa a ser posta pelo programa, não pela IA:** a IA escreve até ao fecho («Com os melhores
+  cumprimentos,») e a página acrescenta por baixo a assinatura da Voz e estilo, sempre igual (havia respostas sem
+  ela); uma cópia que a IA escreva na mesma é tirada antes, para nunca ficar duas vezes. A assinatura pode ter **várias
+  linhas** (até 8). Também no texto comum da ronda.
+- **O número de cada email («3 / 20») passa para o canto superior esquerdo, a cinzento.**
+
+## α.87.0 — 02/10/2026
+
+- **«Gerar respostas» muito mais rápido com muitos emails:** as chamadas à IA são feitas ao mesmo tempo (até 4), em
+  vez de uma a seguir à outra — 20 emails, em 4 chamadas de cerca de 30 segundos, levavam mais de dois minutos; agora
+  perto de 40 segundos. Os rascunhos continuam a ser guardados um lote de cada vez. Se uma chamada falhar, as outras
+  ficam guardadas e o aviso diz quantas falharam. O revisor faz o mesmo.
+- **Cada email das Comunicações mostra no canto a sua posição**, «3 / 20», pela ordem escolhida em «Ordenar».
+
+## α.86.6 — 02/10/2026
+
+- **«Ler emails» deixava de fora os emails chegados entre a meia-noite e a uma da manhã** (hora de Lisboa): pedia ao
+  Gmail os emails até ao dia de hoje em UTC, mas o Gmail conta os dias na hora de Lisboa, e os já datados do dia
+  seguinte não vinham (20 clientes de teste enviados às 00:14 não entraram). A leitura passa a pedir até ao dia
+  seguinte, com um dia de folga; os identificadores de cada email impedem que algum entre duas vezes.
+
+## α.86.5 — 02/10/2026
+
+- **No imóvel de teste, o repouso dos passos 1 e 2 é de 1 minuto** (nos outros, 5), para as rondas de teste andarem
+  depressa.
+- **O repouso do passo 2 («Gerar respostas») é de cada imóvel:** ao mudar de imóvel, o 2 fica livre se lá ainda não se
+  gerou; ao voltar, o repouso continua até acabar. O do passo 1 é o mesmo para todos, porque uma leitura do Gmail traz
+  os emails de todos os imóveis de uma vez.
+
+## α.86.4 — 01/10/2026
+
+- **Os passos 1, 2 e 3 das Comunicações estão sempre à vista** (o 2 aparecia e desaparecia conforme a última leitura).
+  Só o 1 («Ler emails do Gmail») e o 2 («Gerar respostas») ficam em repouso depois de usados, agora **5 minutos**
+  (eram 10), com o aspeto verde de passo feito; o 3 («Enviar todos») segue as aprovações.
+- Correção: a mudança anunciada na α.82.1 para o passo 2 nunca tinha sido aplicada.
+
+## α.86.3 — 01/10/2026
+
+- **O cartão já respondido no Gmail deixa de alternar entre cinzento e normal ao fazer scroll:** fica sempre a
+  cinzento — a conversa, o cabeçalho e os avisos —, menos o rascunho, onde se escreve, que mantém as cores.
+
+## α.86.2 — 01/10/2026
+
+- **Na conversa de cada email, as nossas mensagens a cinzento e as dos clientes no fundo do tema**: o cinzento (fundo
+  e texto) é uma mistura das cores do próprio tema — mais claro num tema claro, mais escuro num escuro —, com o texto
+  a pelo menos 4,7:1 de contraste em todos os temas; as dos clientes ficam com o fundo e o texto do tema (antes, todas
+  num «papel claro»). A mensagem por responder mantém a sua barra de cor.
+
 ## α.86.1 — 30/09/2026
 
 - **Um email já respondido diretamente no Gmail fica em cinzento** e deixa de vir selecionado (não entra no «Enviar
@@ -127,8 +316,8 @@ O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
   quando lhe devemos resposta há mais de 48 h (era laranja) — assim, toda verde é mesmo bom e toda vermelha mesmo mau.
   **Metade vazia = incógnito** (ainda não sabemos nada: um pedido novo); quem desistiu ou foi ignorado fica toda preta.
 - **«Ordenar»: nova opção «Por nome (A–Z)»**, pelo nome do cliente (ou o email, sem nome), também nos nomes da tabela.
-- **O passo 2 («Gerar respostas») aparece sempre que há emails na fila**, e não só depois de uma leitura recente: o
-  passo 3 já não aparece sozinho.
+- ~~O passo 2 («Gerar respostas») aparece sempre que há emails na fila~~ — **não chegou a ser aplicado** (o comando
+  que o fazia não correu); feito a sério na α.86.4.
 
 ## α.82.0 — 29/09/2026
 

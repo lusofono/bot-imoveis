@@ -749,6 +749,9 @@ button.pipeline-name:hover{background:none;color:var(--accent);text-decoration:u
 /* the two cards share the row's three tracks (subgrid): their tops take the taller one's height, so the buttons 2 and 3
    sit on one line, with the same letter sizes (PASSO 03 is a card like PASSO 02, not a bar any more) */
 .steps-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:auto auto auto;column-gap:14px;margin:14px 0}
+/* 02/10: with the reviewer between 2 and 3, a narrower middle column */
+.steps-row:has(#review-step){grid-template-columns:minmax(0,1fr) minmax(220px,.7fr) minmax(0,1fr)}
+.steps-row:has(#import-step:not([hidden])):has(#review-step){grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
 .steps-row>.step-card{margin:0;grid-row:1 / span 3;display:grid;grid-template-rows:subgrid;row-gap:0;align-content:start}
 .steps-row .step-top>:last-child{margin-bottom:0}
 .steps-row .step-action{margin-top:14px;padding-top:0;border-top:0}
@@ -756,10 +759,18 @@ button.pipeline-name:hover{background:none;color:var(--accent);text-decoration:u
 @media(max-width:900px){.steps-row{grid-template-columns:minmax(0,1fr);grid-template-rows:none;row-gap:14px}
   .steps-row>.step-card{grid-row:auto;grid-template-rows:none}}
 body.api-only .reply-layout>.batch-column{grid-template-columns:minmax(0,1fr)}
+/* 02/10: «Ler emails» went above the property; with the API only, this column (the ChatGPT import) is empty */
+body.api-only .reply-layout>.batch-column{display:none}
+#tab-replies>.read-card{margin:0 0 18px}
 .step-num{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;flex:none;font-size:16px;
   font-weight:800;line-height:1;background:var(--accent);color:var(--accent-text)}
 button.primary .step-num{background:var(--accent-text);color:var(--accent)}
 #preview-box:not(:empty){margin:0 0 18px}
+/* 02/10: the AI's notes on the drafts, under the steps: the full width, the notes side by side (less tall) */
+.notes-panel{padding:18px 24px}
+.notes-panel .eyebrow{margin-bottom:12px}
+.notes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:10px}
+.notes-grid .alert{margin:0}
 .property-metrics{margin:18px 0}
 /* The trip computer first, above the instruments, in one tight line: title, distance, consumption, save, reading (26/09) */
 .cluster .trip-computer{flex-wrap:wrap;align-items:center;gap:6px 14px;margin:4px 0 14px;padding:7px 14px}
@@ -912,7 +923,6 @@ button.step-done::after{content:"✓  " attr(data-done);font-size:14px;font-weig
 #workshop-lab button:hover:not(:disabled){background:#00f0ff22;box-shadow:0 0 18px #00f0ff55;transform:translateY(-1px)}
 #workshop-lab button.primary{color:#05070f;border:0;background:linear-gradient(100deg,var(--lab-cyan),#7a5cff 55%,var(--lab-magenta));
   background-size:200% 100%;box-shadow:0 0 18px #00f0ff66,0 0 36px #ff2bd644;text-shadow:none;animation:lab-charge 4s ease-in-out infinite}
-#workshop-lab button.primary::before{content:"⚡";margin-right:2px}
 #workshop-lab button.primary:hover:not(:disabled){box-shadow:0 0 26px #00f0ffaa,0 0 50px #ff2bd677}
 @keyframes lab-charge{50%{background-position:100% 0}}
 #workshop-lab button.link.danger{background:none;border:1px dashed #ff3b6b88;color:#ff5c85;box-shadow:none;padding:8px 14px}
@@ -935,7 +945,6 @@ button.step-done::after{content:"✓  " attr(data-done);font-size:14px;font-weig
 #workshop-lab .client-list::-webkit-scrollbar-thumb{background:linear-gradient(var(--lab-cyan),var(--lab-magenta));border-radius:4px}
 
 #workshop-lab .lab-advance{flex-wrap:wrap;border-color:#ff2bd655;box-shadow:inset 0 1px 0 #ff2bd62b,0 0 18px #ff2bd614}
-#workshop-lab .lab-advance button.primary::before{content:"▶ "}
 #workshop-lab .lab-advance .muted{flex:1 1 280px;color:var(--lab-dim);white-space:normal}
 #workshop-lab .lab-log{margin:12px 0 0;max-height:180px;background:#02040ae6;border:1px solid var(--lab-line);color:var(--lab-lime);
   font-size:11px;text-shadow:0 0 6px #9dff3a55}
@@ -997,12 +1006,71 @@ body:not(.admin) .prompt-view{display:none!important}
 :is(#property-slider,.property-switcher) .slider-title strong{font-size:21px}
 .read-card h2{margin-bottom:4px}
 .read-card .read-actions{align-items:center;margin-top:10px}
-.read-card .read-actions #last-read{margin:0 0 0 auto;text-align:right}
+/* 02/10: «Última leitura…» on the title's line, justified right (it wraps under the title on a narrow card) */
+.read-card .read-title{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 16px}
+.read-card .read-title h2{margin-right:auto}
+.read-card .read-title #last-read{margin:0 0 0 auto;text-align:right}
 /* 30/09: the Painel's property tiles, apart from the numbers above and «A fazer» below (they sat glued to both) */
 #dashboard-properties{margin:22px 0}
 /* 30/09: the agency's know-how in three groups that open */
 .knowledge-group{border:1px solid var(--line);border-radius:12px;padding:6px 16px;margin:10px 0}
 .knowledge-group>summary{font-weight:600;padding:8px 0}
-/* 30/09: an email already answered straight in Gmail — greyed out, not ticked; it comes back to full colour on hover */
-.email-card.answered-direct{opacity:.55;filter:grayscale(.85);transition:opacity .2s,filter .2s}
-.email-card.answered-direct:hover,.email-card.answered-direct:focus-within{opacity:1;filter:none}
+/* 30/09: an email already answered straight in Gmail — greyed out, not ticked. 01/10: always, whatever the mouse or
+   the cursor do (it flickered as the page scrolled under the mouse); only the draft, where one writes, keeps its colour */
+.email-card.answered-direct>:not(.draft-box,.review-note){opacity:.55;filter:grayscale(.85)}
+/* 01/10: in the conversation, ours greyed — background and text a mix of the theme's own text and card colours, so the
+   grey is lighter in a light theme and darker in a dark one — and the customers' on the theme's background, to stand
+   out. The doubled class outranks the «light paper» rule above and the rich themes' pre rules. */
+:root .email-card.email-card .history-turn.theirs pre{background:var(--card);color:var(--text);
+  border-color:color-mix(in srgb,var(--text) 16%,var(--card))}
+:root .email-card.email-card .history-turn.ours pre{background:color-mix(in srgb,var(--text) 8%,var(--card));
+  color:color-mix(in srgb,var(--text) 85%,var(--card));  /* 4.7:1 or more in every theme (AgentVal the lowest) */border-color:color-mix(in srgb,var(--text) 14%,var(--card));
+  border-left-color:color-mix(in srgb,var(--text) 30%,var(--card))}
+:root .email-card.email-card .history-turn.current pre{border-left-color:var(--accent)}
+/* 02/10: each email's place in the queue, «3 / 20», small in the card's top-right corner */
+.email-card{position:relative}
+.card-position{position:absolute;top:6px;left:14px;font-size:10px;font-weight:700;letter-spacing:.06em;
+  color:color-mix(in srgb,var(--text) 45%,var(--card));  /* 02/10: top-left, grey */
+  font-variant-numeric:tabular-nums;pointer-events:none}
+/* 02/10: the lab console easier to read — larger text, labels in plain case, more room between lines — and its three
+   steps numbered like the Comunicações' (1 Human contest, 2 the customers, 3 a round) */
+#workshop-lab .step{font-size:13.5px;line-height:1.75;color:#dbe7f3}
+#workshop-lab label{font-size:12.5px;letter-spacing:.02em;text-transform:none;color:#dbe7f3}
+#workshop-lab label.check{font-size:13px}
+#workshop-lab .lab-advance .muted{font-size:13px;line-height:1.6;color:#c9d9ea}
+#workshop-lab button{font-size:12.5px;letter-spacing:.08em}
+#workshop-lab .lab-row{padding:14px 16px;gap:16px}
+#workshop-lab .step-num{display:inline-grid;place-items:center;width:22px;height:22px;margin-right:8px;border-radius:50%;
+  border:1.5px solid currentColor;font:700 12px/1 ui-monospace,monospace;letter-spacing:0}
+#workshop-lab button.primary .step-num{background:#05070f;color:var(--lab-cyan);border-color:#05070f}
+/* 02/10: the reasoning effort, under the engine's buttons; the lab's «Última ronda» opens and closes */
+.effort-row{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.effort-row .muted{flex:1 1 280px}
+#workshop-lab .lab-eval-last>summary{cursor:pointer;list-style:none}
+#workshop-lab .lab-eval-last>summary::before{content:"▸ ";color:var(--lab-magenta)}
+#workshop-lab .lab-eval-last[open]>summary::before{content:"▾ "}
+/* 02/10: what the read is doing, beside the button, in up to three lines (step; who; subject), cut if too long */
+.read-progress{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 260px;margin:0;font-size:12.5px;line-height:1.45;
+  color:var(--text)}
+.read-progress>*{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.read-progress span{color:var(--muted)}
+/* 02/10: the test property in purple — light on its switchers (Comunicações, Visitas, Contactos, Imóveis) and very
+   light on the whole of its Comunicações, with a line on top — so nothing is tried on a real property by mistake.
+   Mixed with each theme's own colours: light in a light theme, dark in a dark one. */
+/* the rich themes paint the switcher with a stronger rule (leather, gelcoat…): the purple wins over them */
+:root .property-slider.property-slider.test-property{background:color-mix(in srgb,#8b5cf6 16%,var(--card));
+  border-color:color-mix(in srgb,#8b5cf6 45%,var(--line))}
+#tab-replies.test-mode{background:color-mix(in srgb,#8b5cf6 7%,var(--bg));margin:-18px -18px 0;padding:18px;border-radius:20px;
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,#8b5cf6 30%,transparent)}
+/* the line «IMÓVEL DE TESTE…» on the title's line, on the right (02/10) */
+#tab-replies .page-heading>div{flex:1;min-width:0}
+#tab-replies .title-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 20px}
+#tab-replies .title-row h1{margin-right:auto}
+.test-badge{padding:8px 14px;border-radius:10px;font-size:11px;font-weight:700;line-height:1.4;letter-spacing:.14em;
+  color:color-mix(in srgb,#7c3aed 80%,var(--text));background:color-mix(in srgb,#8b5cf6 18%,var(--card))}
+/* 02/10: in the test property's Comunicações, the sending buttons («3 Enviar todos», «Enviar já este por email») in
+   green — a test send, at a glance. The id outranks every theme's own send button (hazard frames and the like). */
+:root #tab-replies.test-mode button.send-action{background:#2e9e5b;border-color:#2e9e5b;color:#fff;box-shadow:0 0 0 3px #2e9e5b33}
+:root #tab-replies.test-mode button.send-action:hover:not(:disabled){background:#25844b;border-color:#25844b}
+:root #tab-replies.test-mode button.send-action .step-num{color:#2e9e5b}
+:root #tab-replies.test-mode button.send-action::before,:root #tab-replies.test-mode button.send-action::after{display:none}

@@ -11,6 +11,7 @@ import secrets
 import signal
 import subprocess
 import threading
+from concurrent.futures import ThreadPoolExecutor
 import time
 import tomllib
 from datetime import datetime
@@ -23,7 +24,7 @@ from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse, R
 from starlette.routing import Route
 from . import APP_NAME
 from .ai import (listing_prompt, parse_fichas, parse_listing, parse_replies, parse_round, parse_visits, reply_prompt,
-                 round_prompt, short_id)
+                 round_prompt, short_id, sign)
 from .openai_client import complete, context_of, estimate_cost_usd, estimate_tokens
 from .rules import phone_in
 from .secrets import openai_api_key
@@ -32,6 +33,23 @@ from . import testlab
 
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
 COOKIE = "bot_mail_web"
+PARALLEL_CALLS = 4  # 02/10: calls to the AI at the same time, in «Gerar respostas» and the reviewer
+
+
+def run_parallel(call, items):
+    """call(item) for every item, up to PARALLEL_CALLS at a time, in the items' order; an error is returned in its
+    place, never raised, so one failed call never loses the others."""
+    def safe(item):
+        try:
+            return call(item)
+        except Exception as exc:  # given back to the caller, who decides
+            return exc
+    if len(items) <= 1:
+        return [safe(item) for item in items]
+    with ThreadPoolExecutor(max_workers=min(PARALLEL_CALLS, len(items))) as pool:
+        return list(pool.map(safe, items))
+
+
 def plan_batches(current, ids, extra, only_extra, model, limits):
     """29/09: the selection in calls that keep within the Oficina's limits: at most batch_emails emails, and a prompt of
     at most context_share % of the model's context (estimated before sending). An email too big alone goes alone.
@@ -128,6 +146,8 @@ def web_app(folder, token):
         # Shared by "paste" (the human's copy from ChatGPT) and "generate" (the OpenAI API): same parsing,
         # same safety checks, same drafts-only save. Only where the text comes from differs.
         replies, notes = parse_replies(text, current)
+        signature = service.voice_signature()  # 02/10: the program signs, under the AI's closing
+        replies = [{**reply, "reply_text": sign(reply["reply_text"], signature)} for reply in replies]
         visits = parse_visits(text, current)
         fichas = parse_fichas(text, current) if current["property_ref"] else []
         saved = 0
@@ -152,12 +172,22 @@ def web_app(folder, token):
         totals = {"saved": 0, "notes": [], "visits": 0, "fichas": 0, "prompts": []}
         usage_total = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
         cost_total = 0.0
-        batches, biggest = plan_batches(queue(ref), ids, extra, only_extra, model, service.call_limits(cfg))
-        for batch in batches:
-            service.require_fuel(ref)
+        snapshot = queue(ref)
+        batches, biggest = plan_batches(snapshot, ids, extra, only_extra, model, service.call_limits(cfg))
+        service.require_fuel(ref)
+        # 02/10: the calls at the same time (up to PARALLEL_CALLS), not one after the other: the AI writing is what
+        # takes long (20 emails, 4 calls of ~30 s, took two minutes); the drafts are still saved one batch at a time
+        moment = datetime.now().astimezone()
+        prompts = [reply_prompt(snapshot, batch, extra, only_extra, now=moment) for batch in batches]
+        outcomes = run_parallel(lambda prompt_text: complete(key, model, prompt_text), prompts)
+        if all(isinstance(outcome, Exception) for outcome in outcomes):
+            raise outcomes[0]  # nothing written: the error goes to the owner like any other
+        failed = [str(outcome) for outcome in outcomes if isinstance(outcome, Exception)]
+        for prompt_text, outcome in zip(prompts, outcomes):
+            if isinstance(outcome, Exception):
+                continue
+            answer, usage = outcome
             current = queue(ref)  # fresh each time: the previous batch's drafts changed its revision
-            prompt_text = reply_prompt(current, batch, extra, only_extra, now=datetime.now().astimezone())
-            answer, usage = complete(key, model, prompt_text)  # raises OpenAIError, shown to the owner like any other
             # Tokens only: never the prompt or the answer, same rule as every other log entry.
             cost = estimate_cost_usd(model, **{k: usage[k] for k in ("prompt_tokens", "completion_tokens")})
             cost_total += cost
@@ -178,7 +208,17 @@ def web_app(folder, token):
                 review_error = str(exc)
         return {**totals, "model": model, "state": state(), "tokens": usage_total, "cost_usd": round(cost_total, 6),
                 "fuel": service.api_fuel(ref), "calls": len(batches), "context_used": biggest,
-                "reviewed": reviewed, "review_error": review_error}
+                "reviewed": reviewed, "review_error": review_error,
+                "generation_error": f"{len(failed)} de {len(batches)} chamadas falharam: {failed[0]}" if failed else None}
+
+    def generate_plan(body):
+        # 02/10: the selection in batches (within the Oficina's limits), for the page to send each as its own call and
+        # show its drafts as soon as they are ready — the last before the first, if it comes back first
+        ref = queue(body.get("property_ref"))["property_ref"]
+        cfg = service.config()
+        batches, biggest = plan_batches(queue(ref), ids_of(body), str(body.get("extra") or ""), False, service.model(cfg),
+                                        service.call_limits(cfg))
+        return {"batches": batches, "context_used": biggest}
 
     def drafts(body):
         current = queue(body.get("property_ref"))
@@ -406,7 +446,14 @@ def web_app(folder, token):
     # file lock. Other processes (MCP, terminal) still meet the file lock.
     serial = threading.Lock()
 
+    # 02/10: two run beside the queue — the read's progress (it only reads a dict) and «Gerar respostas» (its long part
+    # is the AI writing; its saves wait their turn on the file lock): otherwise the progress waited for the whole read,
+    # and the page's batches, sent together, ran one after the other anyway
+    concurrent = set()
+
     def one_at_a_time(handler, body):
+        if handler in concurrent:
+            return handler(body)
         with serial:
             return handler(body)
 
@@ -492,7 +539,8 @@ def web_app(folder, token):
         return {**result, "knowledge": service.knowledge(ref), "state": state()}
 
     handlers = {"state": ("GET", lambda body: state()), "read": ("POST", read), "prompt": ("POST", prompt),
-                "prompt/generate": ("POST", generate),
+                "prompt/generate": ("POST", generate), "prompt/plan": ("POST", generate_plan),
+                "read/progress": ("GET", lambda body: dict(service.reading)),
                 "paste": ("POST", paste), "drafts": ("POST", drafts), "preview": ("POST", preview),
                 "send": ("POST", send), "dismiss": ("POST", dismiss),
                 "metrics": ("POST", lambda body: service.metrics(
@@ -505,6 +553,8 @@ def web_app(folder, token):
                 "property/extract": ("POST", lambda body: service.extract_listing(body.get("text"), body.get("listing_url"))),
                 "ai/model": ("POST", lambda body: service.set_model(str(body.get("model") or ""))),
                 "ai/price": ("POST", ai_price),
+                "ai/hidden": ("POST", lambda body: (admin(), service.set_hidden(str(body.get("model") or ""), body.get("hidden") is True))[1]),
+                "ai/effort": ("POST", lambda body: (admin(), service.set_effort(str(body.get("effort") or "")))[1]),
                 "ai/reviewer": ("POST", lambda body: (admin(), service.set_reviewer(str(body.get("model") or ""),
                                                                                   body.get("auto") is True))[1]),
                 "review": ("POST", lambda body: {**service.review_drafts(body.get("property_ref") or None, ids_of(body)),
@@ -519,6 +569,8 @@ def web_app(folder, token):
                 "testlab/contest": ("POST", lab_contest), "testlab/clients": ("POST", lab_clients),
                 "testlab/consultant": ("POST", lambda body: (admin(), testlab.send_to_consultant(service))[1]),
                 "testlab/wipe": ("POST", lambda body: (admin(), testlab.wipe(service))[1]),
+                "testlab/transcript": ("POST", lambda body: (admin(), testlab.transcript(
+                    service, datetime.now().astimezone().isoformat(timespec="seconds")))[1]),
                 "testlab/advance": ("POST", lambda body: (admin(), testlab.advance(
                     service, datetime.now().astimezone().isoformat(timespec="seconds")))[1]),
                 "property/active": ("POST", property_active),
@@ -551,6 +603,7 @@ def web_app(folder, token):
                 "digest/refresh": ("POST", lambda body: service.refresh_digest(body.get("property_ref") or None)),
                 "knowledge": ("POST", lambda body: service.knowledge(body.get("property_ref") or None)),
                 "knowledge/note": ("POST", note), "knowledge/save": ("POST", knowledge_save)}
+    concurrent.update({handlers["read/progress"][1], handlers["prompt/generate"][1]})
     routes = ([Route("/", page), Route("/photo/{ref}", photo), Route("/contactos.csv", contacts_csv)]
               + [Route(f"/{name}", asset(name)) for name in ASSETS]
               + [Route(f"/api/{name}", api(handler), methods=[method]) for name, (method, handler) in handlers.items()])

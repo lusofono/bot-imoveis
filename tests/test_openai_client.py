@@ -25,7 +25,7 @@ def test_complete_returns_the_message_text_and_usage_and_asks_for_json():
     with patch("backend.openai_client.urllib.request.urlopen", return_value=response(reply)) as urlopen:
         text, usage = complete("sk-test", "gpt-4o", "o prompt")
     assert text == '{"respostas": []}'
-    assert usage == {"prompt_tokens": 120, "completion_tokens": 30, "total_tokens": 150}
+    assert usage == {"prompt_tokens": 120, "completion_tokens": 30, "total_tokens": 150, "reasoning_tokens": 0}
     request = urlopen.call_args.args[0]
     assert request.get_header("Authorization") == "Bearer sk-test"
     body = json.loads(request.data)
@@ -45,7 +45,7 @@ def test_complete_defaults_usage_to_zero_when_missing():
     with patch("backend.openai_client.urllib.request.urlopen",
               return_value=response({"choices": [{"message": {"content": "{}"}}]})):
         _, usage = complete("sk-test", "gpt-4o", "prompt")
-    assert usage == {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+    assert usage == {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "reasoning_tokens": 0}
 
 
 def test_estimate_cost_uses_the_model_rate_or_falls_back():
@@ -85,3 +85,35 @@ def test_check_key_hits_the_models_endpoint_only_get_no_body():
         check_key("sk-test")
     request = urlopen.call_args.args[0]
     assert request.full_url.endswith("/v1/models") and request.data is None and request.get_method() == "GET"
+
+
+
+def test_a_reasoning_model_gets_the_effort_and_a_refusal_of_it_is_tried_again_without():
+    from backend.openai_client import OpenAIError, apply_effort
+    reply = {"choices": [{"message": {"content": "{}"}}],
+             "usage": {"prompt_tokens": 10, "completion_tokens": 5, "completion_tokens_details": {"reasoning_tokens": 3}}}
+    apply_effort(None)  # nothing chosen: «low» by default (02/10)
+    with patch("backend.openai_client.urllib.request.urlopen", return_value=response(reply)) as urlopen:
+        _, usage = complete("sk-test", "gpt-6-luna", "prompt")
+        assert json.loads(urlopen.call_args.args[0].data)["reasoning_effort"] == "low" and usage["reasoning_tokens"] == 3
+        complete("sk-test", "gpt-4o", "prompt")  # a model without it never gets it
+        assert "reasoning_effort" not in json.loads(urlopen.call_args.args[0].data)
+    apply_effort("")  # «o do modelo»: never sent
+    with patch("backend.openai_client.urllib.request.urlopen", return_value=response(reply)) as urlopen:
+        complete("sk-test", "gpt-6-luna", "prompt")
+        assert "reasoning_effort" not in json.loads(urlopen.call_args.args[0].data)
+    apply_effort("low")
+    calls = []
+
+    def refuse_once(url, key, data=None, timeout=30):
+        calls.append(dict(data))
+        if "reasoning_effort" in data:
+            raise OpenAIError("A OpenAI devolveu um erro (400): Unsupported value for reasoning_effort")
+        return reply
+    with patch("backend.openai_client._request", side_effect=refuse_once):
+        complete("sk-test", "gpt-6-luna", "prompt")
+    assert calls[0]["reasoning_effort"] == "low" and "reasoning_effort" not in calls[1]
+    with patch("backend.openai_client.urllib.request.urlopen", return_value=response(reply)) as urlopen:
+        complete("sk-test", "gpt-6-luna", "prompt", effort="none")  # 02/10: one call's own, over the Oficina's
+        assert json.loads(urlopen.call_args.args[0].data)["reasoning_effort"] == "none"
+    apply_effort(None)

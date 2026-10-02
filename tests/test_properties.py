@@ -6,6 +6,7 @@ from backend.cli import main
 from backend.rules import check_voice, clean_property
 from backend.service import MailService
 from backend.store import load_contacts, save_json
+from conftest import midnight_sensitive  # noqa: E402 (02/10: skipped between 00:00 and 01:00 local)
 
 ROOT = Path(__file__).resolve().parent.parent
 TEMPLATES = ROOT / "backend" / "templates"
@@ -73,7 +74,7 @@ def test_lead_is_extracted_into_its_property_queue_and_answered_at_reply_to(serv
                                  "message": "Bom dia, gostaria de visitar o imóvel.\nPode ser ao fim da tarde?"}
     assert (email["recipient"]["email"], email["blocked"], email["interaction"], email["warnings"]) == (
         CUSTOMER, None, 1, [])
-    for expected in ("Equipa APalace Imobiliária", "situação profissional", "Obrigado pelo seu contacto.", REF):
+    for expected in ("Não escrevas assinatura nenhuma", "situação profissional", "Obrigado pelo seu contacto.", REF):
         assert expected in queue["instructions"]
     assert (service.folder / "properties" / REF / "queue.json").exists() and not service.path.exists()
 
@@ -291,6 +292,7 @@ def test_ambiguous_or_impossible_rent_is_refused(rent):
         clean_property({"reference": REF, "description": "T2", "advertised_rent_eur": rent})
 
 
+@midnight_sensitive
 def test_dashboard_carries_first_names_only_never_contacts(service):
     read(service, [lead("1"), lead("2", reply_to=(), body_email="")])
     with patch("backend.service.has_app_password", return_value=False):

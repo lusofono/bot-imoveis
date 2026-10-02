@@ -57,7 +57,8 @@ def test_the_common_text_becomes_every_draft_with_its_greeting_and_goes_out_to_a
     assert drafts["a@example.com"].startswith("Cara Ana,\n\n🏠 Imóvel") and "Wir schlagen" not in drafts["a@example.com"]
     # English is the complete, official text; the short summary in their own language comes after it.
     assert drafts["b@example.com"].startswith("Dear Bruno,\n\n🏠 Property")
-    assert drafts["b@example.com"].endswith("Kind regards,\n\n—\nWir schlagen einen Besichtigungstermin vor.")
+    # 02/10: the program signs under the closing, before the summary in the customer's own language
+    assert drafts["b@example.com"].endswith("Kind regards,\nEquipa APalace Imobiliária\n\n—\nWir schlagen einen Besichtigungstermin vor.")
 
     # Edited in the page: the new English text reaches its customer's draft.
     common = load_visits(service.folder, REF)["windows"][-1]["common"]

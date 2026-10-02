@@ -720,6 +720,15 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 
+// 02/10: a text the page made, saved by the browser as a file (nothing leaves the computer)
+function downloadText(filename, text) {
+  const link = el('a', {href: URL.createObjectURL(new Blob([text], {type: 'text/plain;charset=utf-8'})), download: filename});
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+}
+
 // 29/09: while api/send runs (one email or a whole round), the sending banner stays up and leaving the page asks first
 let sendingNow = 0;
 function sendingBanner(delta) {
@@ -759,7 +768,8 @@ async function run(action, button) {
   catch (error) { toast(error.message, 'bad'); }
   // data-hold: something else keeps it off (an empty API tank), data-lock: a step's 10 minutes (27/09): finishing a
   // click must not switch it back on.
-  finally { if (button) { button.disabled = button.dataset.hold === '1' || button.dataset.lock === '1'; button.replaceChildren(...original); } }
+  finally { if (button) { button.disabled = button.dataset.hold === '1' || button.dataset.lock === '1' || button.dataset.busy === '1';
+    button.replaceChildren(...original); } }
 }
 
 async function copyText(text, done, fallbackBox) {
@@ -810,7 +820,7 @@ function renderWorkshop() {
   document.body.classList.toggle('admin', !!settings?.admin);
   if (!settings?.admin) return;
   $('workshop-prompts').replaceChildren(...promptsCard());
-  $('workshop-engine').replaceChildren(el('p', {class: 'eyebrow'}, 'MOTOR DE IA · API OPENAI'), engineConsole());
+  $('workshop-engine').replaceChildren(el('p', {class: 'eyebrow'}, 'MOTOR DE IA · API OPENAI'), engineConsole(), effortRow());
   // Token prices, US$ per 1M tokens as OpenAI writes them: change one, add a model, or put the table's own back
   const models = (settings.ai?.models || []).slice().sort((a, b) => a.id.localeCompare(b.id));
   const price = value => el('input', {type: 'number', min: 0, step: 'any', value: value ?? '', class: 'price-input'});
@@ -822,7 +832,8 @@ function renderWorkshop() {
       title: model.context_known ? '' : 'Por confirmar: vale 128.000 até indicares o que a OpenAI anuncia para este modelo.'});
     return el('tr', {},
       el('td', {}, model.id, model.builtin ? '' : el('span', {class: 'tag'}, 'da Oficina'),
-        model.edited && model.builtin ? el('span', {class: 'tag draft'}, 'alterado') : ''),
+        model.edited && model.builtin ? el('span', {class: 'tag draft'}, 'alterado') : '',
+        model.hidden ? el('span', {class: 'tag warn'}, 'fora da escolha') : ''),
       el('td', {}, input), el('td', {}, output),
       el('td', {}, context, model.context_known ? '' : el('span', {class: 'tag warn'}, 'por confirmar')),
       el('td', {}, el('button', {type: 'button', onclick: event => run(async () => {
@@ -831,6 +842,11 @@ function renderWorkshop() {
         if (Number(context.value) !== model.context_tokens) apply(await call('api/ai/context', {model: model.id, tokens: context.value}));
         toast(`${model.id} guardado: vale para todas as estimativas e chamadas a partir de agora.`);
       }, event.currentTarget)}, 'Guardar'),
+      // 02/10: off the list on offer (kept here, for the old costs) or back on it
+      el('button', {type: 'button', class: 'link', onclick: event => run(async () => {
+        apply(await call('api/ai/hidden', {model: model.id, hidden: !model.hidden}));
+        toast(model.hidden ? `${model.id} volta a poder escolher-se no motor.` : `${model.id} saiu da escolha do motor.`);
+      }, event.currentTarget)}, model.hidden ? 'Mostrar' : 'Esconder'),
       model.edited && el('button', {type: 'button', class: 'link', onclick: event => run(async () => {
         apply(await call('api/ai/price', {model: model.id, reset: true}));
         toast(model.builtin ? `${model.id}: de volta ao preço da tabela.` : `${model.id} saiu da lista.`);
@@ -872,10 +888,30 @@ function limitsSection() {
     reviewerSection());
 }
 
+// 02/10: how much the model reasons before writing — «nenhum» by default (short replies, every rule in the prompt):
+// faster and cheaper. Only the models that take it (gpt-5.x, gpt-6) get it.
+const EFFORT_LABELS = {none: 'Nenhum (o mais rápido)', minimal: 'Mínimo', low: 'Baixo (por defeito)', medium: 'Médio', high: 'Alto',
+  '': 'O do modelo'};
+function effortRow() {
+  const effort = el('select', {'aria-label': 'Esforço de raciocínio'}, Object.entries(EFFORT_LABELS).map(([value, label]) =>
+    el('option', {value}, label)));
+  effort.value = settings.ai?.reasoning_effort ?? 'low';
+  return el('div', {class: 'row effort-row'},
+    el('label', {}, 'Esforço de raciocínio', effort),
+    el('span', {class: 'muted small'}, 'Quanto o modelo pensa antes de escrever (só gpt-5.x e gpt-6; os outros não o têm). '
+      + '«Baixo» chega para estas respostas; «Nenhum» é ainda mais rápido e barato, «Médio» e «Alto» só se for preciso. '
+      + 'Vale para as respostas aos clientes (também no imóvel de teste), as rondas e o avaliador; os emails dos clientes '
+      + 'de teste vão sempre com «Nenhum».'),
+    el('button', {type: 'button', onclick: event => run(async () => {
+      settings.ai = await call('api/ai/effort', {effort: effort.value});
+      renderWorkshop(); toast(`Esforço de raciocínio: ${EFFORT_LABELS[effort.value]}.`);
+    }, event.currentTarget)}, 'Guardar'));
+}
+
 // 30/09: the evaluator — its model (stronger than the one that writes) and whether it reviews the real drafts by itself
 function reviewerSection() {
   const reviewer = settings.ai?.reviewer || {model: 'gpt-4o', auto: true};
-  const model = el('select', {'aria-label': 'Modelo do avaliador'}, (settings.ai?.models || []).map(item =>
+  const model = el('select', {'aria-label': 'Modelo do avaliador'}, (settings.ai?.models || []).filter(item => !item.hidden).map(item =>
     el('option', {value: item.id}, item.id)));
   model.value = reviewer.model;
   const auto = el('input', {type: 'checkbox', checked: reviewer.auto});
@@ -966,7 +1002,9 @@ function labEvaluation(evaluation) {
           both && el('td', {}, cell(evaluation.waited?.consultant))),
         el('tr', {}, el('td', {}, 'Respostas avaliadas'), el('td', {}, evaluation.aria?.count ?? 0),
           both && el('td', {}, evaluation.consultant?.count ?? 0)))),
-    evaluation.last?.length ? el('div', {class: 'lab-eval-last'}, el('p', {class: 'lab-eval-title'}, 'ÚLTIMA RONDA'),
+    // 02/10: the last round's marks and mistakes, closed to begin with (it is a lot)
+    evaluation.last?.length ? el('details', {class: 'lab-eval-last'}, el('summary', {class: 'lab-eval-title'},
+      `ÚLTIMA RONDA (${evaluation.last.length})`),
       evaluation.last.map(item => el('div', {class: 'lab-eval-item'},
         el('span', {}, `${item.name} · ${item.side === 'aria' ? 'ARIA' : 'consultor'} · ${decimal(item.score)}/10`),
         item.errors?.length ? el('ul', {}, item.errors.map(error => el('li', {}, error)))
@@ -989,7 +1027,27 @@ function renderLab(lab) {
       ? `Imóvel de teste: ${lab.property_ref}. Cada cliente é inventado pela IA; o aviso dele sai mesmo pelo Gmail, desta conta `
         + 'para ela própria, com o cliente no Reply-To (um endereço +cdN desta conta). Depois, «Ler emails» nas Comunicações traz-os.'
       : 'Ainda não há imóvel de teste (um profile.json com "test": true).'),
-    // 29/09: «Avançar o teste» — one round, by hand: the customers answer (the ARIA and the consultant), new ones come in
+    // 02/10: in the order they are done — 1 the Human contest, 2 the customers, 3 a round —, each button numbered
+    lab.property_ref && el('div', {class: 'row lab-row'},
+      el('label', {class: 'check'}, contestOn, ' Human contest: cada aviso vai também, numa cópia à parte, para o consultor'),
+      contestEmail,
+      el('button', {type: 'button', onclick: event => run(async () => {
+        renderLab(await call('api/testlab/contest', settingsNow()));
+        toast('Guardado.' + (contestOn.checked ? ' Human contest ligado.' : ''));
+      }, event.currentTarget)}, el('span', {class: 'step-num', 'aria-hidden': 'true'}, '1'), 'Guardar'),
+      lab.contest?.on && lab.clients?.some(client => !client.consultant) && el('button', {type: 'button', onclick: event => run(async () => {
+        const result = await call('api/testlab/consultant', {});
+        renderLab(result); toast(`${result.sent} cópia(s) enviadas ao consultor.`);
+      }, event.currentTarget)}, `Enviar ao consultor os que faltam (${lab.clients.filter(client => !client.consultant).length})`)),
+    lab.property_ref && el('div', {class: 'row lab-row'},
+      el('label', {}, 'Clientes novos', count),
+      el('label', {}, 'Clientes novos por ronda (%)', newPercent),
+      el('button', {type: 'button', class: 'primary needs-fuel', 'data-ref': lab.property_ref, onclick: event => run(async () => {
+        const result = await call('api/testlab/clients', {count: Number(count.value),
+          contest: settingsNow()});
+        applyFuel(result.fuel, lab.property_ref); renderLab(result);
+        toast(`${result.created.length} cliente(s) de teste enviados: ${result.created.join(', ')}. Lê os emails nas Comunicações.`);
+      }, event.currentTarget)}, el('span', {class: 'step-num', 'aria-hidden': 'true'}, '2'), 'Gerar clientes de teste')),
     lab.property_ref && el('div', {class: 'row lab-row lab-advance'},
       el('button', {type: 'button', class: 'primary needs-fuel', 'data-ref': lab.property_ref, onclick: event => run(async () => {
         const result = await call('api/testlab/advance', {});
@@ -1005,38 +1063,24 @@ function renderLab(lab) {
           + (result.new.length ? ` · novos: ${result.new.join(', ')}` : ''));
         renderLab(result);
         toast(`Ronda de teste: ${said}. Lê os emails nas Comunicações.`);
-      }, event.currentTarget)}, 'Avançar o teste'),
+      }, event.currentTarget)}, el('span', {class: 'step-num', 'aria-hidden': 'true'}, '3'), 'Avançar o teste'),
       el('span', {class: 'muted small'}, 'Os clientes com um email nosso por responder respondem (à ARIA e, com o Human contest, '
-        + 'ao consultor) ou ficam calados; entram os clientes novos da percentagem abaixo.')),
+        + 'ao consultor) ou ficam calados; entram os clientes novos da percentagem do passo 2.')),
     labLog.length ? el('pre', {class: 'lab-log'}, labLog.slice(0, 12).join('\n')) : null,
     labEvaluation(lab.evaluation),
-    // 29/09: one line to generate (how many, the share per round, the button), one for the Human contest
-    lab.property_ref && el('div', {class: 'row lab-row'},
-      el('label', {}, 'Clientes novos', count),
-      el('label', {}, 'Clientes novos por ronda (%)', newPercent),
-      el('button', {type: 'button', class: 'primary needs-fuel', 'data-ref': lab.property_ref, onclick: event => run(async () => {
-        const result = await call('api/testlab/clients', {count: Number(count.value),
-          contest: settingsNow()});
-        applyFuel(result.fuel, lab.property_ref); renderLab(result);
-        toast(`${result.created.length} cliente(s) de teste enviados: ${result.created.join(', ')}. Lê os emails nas Comunicações.`);
-      }, event.currentTarget)}, 'Gerar clientes de teste')),
-    lab.property_ref && el('div', {class: 'row lab-row'},
-      el('label', {class: 'check'}, contestOn, ' Human contest: cada aviso vai também, numa cópia à parte, para o consultor'),
-      contestEmail,
-      el('button', {type: 'button', onclick: event => run(async () => {
-        renderLab(await call('api/testlab/contest', settingsNow()));
-        toast('Guardado.' + (contestOn.checked ? ' Human contest ligado.' : ''));
-      }, event.currentTarget)}, 'Guardar'),
-      lab.contest?.on && lab.clients?.some(client => !client.consultant) && el('button', {type: 'button', onclick: event => run(async () => {
-        const result = await call('api/testlab/consultant', {});
-        renderLab(result); toast(`${result.sent} cópia(s) enviadas ao consultor.`);
-      }, event.currentTarget)}, `Enviar ao consultor os que faltam (${lab.clients.filter(client => !client.consultant).length})`)),
     lab.clients?.length ? el('div', {class: 'client-list'}, lab.clients.slice().reverse().map(client => el('div', {class: 'client-row'},
       el('span', {}, `${client.number}. ${client.name}`), el('span', {class: 'tag'}, client.language || '?'),
       lab.contest?.on && el('span', {class: 'tag' + (client.consultant ? ' draft' : '')}, client.consultant ? 'consultor ✓' : 'sem cópia'),
       client.ended ? el('span', {class: 'tag'}, 'terminou') : client.rounds ? el('span', {class: 'tag draft'}, `${client.rounds} resp.`) : null,
       el('span', {class: 'muted small'}, client.address)))) : el('p', {class: 'muted small'}, 'Ainda sem clientes de teste.'),
-    lab.property_ref && lab.clients?.length && el('div', {class: 'actions'}, el('button', {type: 'button', class: 'link danger',
+    lab.property_ref && lab.clients?.length && el('div', {class: 'actions'},
+      // 02/10: every test customer's whole story in one text file, to read at leisure (before a wipe, say)
+      el('button', {type: 'button', onclick: event => run(async () => {
+        const result = await call('api/testlab/transcript', {});
+        downloadText(result.filename, result.text);
+        toast(`Conversas de ${result.clients} clientes de teste descarregadas: ${result.filename}.`);
+      }, event.currentTarget)}, 'Descarregar as conversas (.txt)'),
+      el('button', {type: 'button', class: 'link danger',
       onclick: event => run(async () => {
         if (!confirm(`Apagar os ${lab.clients.length} clientes de teste e tudo do ${lab.property_ref} (fila, conversas, agenda e `
             + 'contactos), para começar de novo? Os emails ficam no Gmail, mas a página nunca mais os lê.')) return;
@@ -1122,6 +1166,13 @@ function currentQueue() {
 }
 function queueRef() { return currentQueue()?.property_ref ?? null; }
 function selectedIds() { return [...document.querySelectorAll('.pick:checked')].map(box => box.dataset.id); }
+// 02/10: the AI's notes on the drafts, in their own panel under the steps (the full width, side by side); the name
+// first, to find the card; the panel hides without any
+function showNotes(notes = []) {
+  $('notes').replaceChildren(...notes.map(note => el('p', {class: 'alert warn'}, el('strong', {}, nameOf(note.id)), ' — ', note.nota)));
+  $('notes-panel').hidden = !notes.length;
+}
+
 function nameOf(id) {
   const email = (currentQueue()?.emails || []).find(item => item.id === id) || {};
   return (email.customer || {}).name || id;
@@ -1213,6 +1264,10 @@ function renderState() {
     el('p', {class: 'step'}, 'Já respondidos, pela página ou no teu Gmail. Ficam aqui até haver visita marcada ou até os retirares; «Escrever mais» abre um rascunho na conversa do cliente.'),
     ...active.map(activeCard)] : []));
   renderPipeline(queue);  // after the cards: its names go to them
+  // 02/10: the test property's Comunicações on a light purple page, to be sure nothing is tried on a real one
+  const testing = !!(settings?.properties || []).find(item => item.reference === queue?.property_ref)?.test;
+  $('tab-replies').classList.toggle('test-mode', testing);
+  $('test-badge').hidden = !testing;  // on the title's line, on the right
   $('instructions').textContent = queue?.instructions || '';
   preview = null; $('preview-box').replaceChildren();
   // 29/09: «3 Enviar todos» follows the approvals of the selected emails (refreshSendButton, from updateSelection)
@@ -1224,21 +1279,34 @@ function renderState() {
   updateSkinPanels();
 }
 
-// 27/09: the steps in turn. PASSO 02 shows once the Gmail was read (in this page, or in the last 10 minutes), and «1 Ler
-// emails do Gmail» rests for 10 minutes after each read; PASSO 03 shows once «2 Gerar respostas» was pressed (or in the
-// last 10 minutes), or when drafts are already waiting, and «2» rests for 10 minutes too (no second bill for one batch).
-// The read's time is the server's (last_read_at); the batch's, this browser's.
-const STEP_REST_MS = 10 * 60 * 1000;
+// The steps 1, 2 and 3 are always in view (01/10). «1 Ler emails do Gmail» and «2 Gerar respostas» rest for 5 minutes
+// after each use (no second read nor a second bill for one batch); «3 Enviar todos» follows the approvals. The read's
+// time is the server's (last_read_at); the batch's, this browser's.
+const STEP_REST_MS = 5 * 60 * 1000;  // 01/10: 5 minutes (was 10)
+const TEST_REST_MS = 60 * 1000;  // 02/10: the test property, 1 minute: its rounds go fast
+function stepRest() {
+  return (settings?.properties || []).find(property => property.reference === queueRef())?.test ? TEST_REST_MS : STEP_REST_MS;
+}
 const stepsDone = {read: false, generated: false};
-function generatedAt() { try { return Number(localStorage.getItem('aria-generated-at')) || 0; } catch { return 0; } }
+// 02/10: «2 Gerar respostas» rests per property: another property has its own counter (one read of the Gmail, «1»,
+// brings every property's emails at once, so that one stays the same for all)
+function generatedTimes() {
+  try { return JSON.parse(localStorage.getItem('aria-generated-at-by-property') || '{}') || {}; } catch { return {}; }
+}
+function generatedAt() { return Number(generatedTimes()[queueRef() || ''] || 0); }
+function markGenerated() {
+  try {
+    localStorage.setItem('aria-generated-at-by-property', JSON.stringify({...generatedTimes(), [queueRef() || '']: Date.now()}));
+  } catch { /* Storage may be unavailable. */ }
+}
 function restButton(button, since, what, done) {
-  const until = since + STEP_REST_MS, resting = Date.now() < until;
+  const until = since + stepRest(), resting = Date.now() < until;
   button.dataset.lock = resting ? '1' : '';
   // 29/09: resting reads as a step done (green, «✓ Emails lidos»), not as a switched-off button; a class, so a click's
   // own label coming back (run) never undoes it
   button.dataset.done = done;
   button.classList.toggle('step-done', resting && button.dataset.hold !== '1');
-  button.disabled = resting || button.dataset.hold === '1';
+  button.disabled = resting || button.dataset.hold === '1' || button.dataset.busy === '1';
   const hhmm = moment => new Date(moment).toLocaleTimeString('pt-PT', {hour: '2-digit', minute: '2-digit'});
   if (resting) button.title = `${what} às ${hhmm(since)}: volta a estar disponível às ${hhmm(until)}.`;
   else if (button.title.includes('volta a estar disponível')) button.title = '';
@@ -1248,11 +1316,11 @@ function updateSteps() {
   const lastRead = Math.max(0, ...(state.properties || []).map(queue => Date.parse(queue.last_read_at || '') || 0));
   const reading = restButton($('read'), lastRead, 'Leitura feita', 'Emails lidos');
   const generating = restButton($('generate-api'), generatedAt(), 'Respostas geradas', 'Respostas geradas');
-  const drafts = (currentQueue()?.emails || []).some(email => email.reply_status === 'draft');
-  $('prepare-step').hidden = !(stepsDone.read || reading);
-  $('send-step').hidden = !(stepsDone.generated || generating || drafts);
+  // 01/10: steps 1, 2 and 3 always in view (the 2nd no longer comes and goes); only 1 and 2 rest, 5 minutes after use
+  $('prepare-step').hidden = false;
+  $('send-step').hidden = false;
 }
-setInterval(() => { if (state.properties) updateSteps(); }, 30000);
+setInterval(() => { if (state.properties) updateSteps(); }, 15000);  // 02/10: often enough for the test's 1 minute
 
 // 27/09: where each customer of the property stands, one column each (the furthest they got), a name per line;
 // «Desistiu» (declined the visit) greyed at the end. Under the table, only counted, the many that would make it long:
@@ -1389,7 +1457,9 @@ function turnWhen(turn, dates) {
 
 function conversationTurns(turns, current, dates) {
   const newest = [...turns].reverse();
-  return newest.map((turn, index) => el('div', {class: 'history-turn' + (current?.has(turn) ? ' current' : '')},
+  // 01/10: «ours» or «theirs», so ours can be greyed and theirs stand out on the theme's own background
+  return newest.map((turn, index) => el('div', {class: 'history-turn ' + (turn.who === 'cliente' ? 'theirs' : 'ours')
+      + (current?.has(turn) ? ' current' : '')},
     el('p', {class: 'muted small'}, turn.who === 'cliente' ? 'Cliente' : 'Nós', ' · ' + turnWhen(turn, dates),
       current?.has(turn) ? ' · por responder' : '',
       index === 0 && turn.who !== 'cliente' ? ' · a nossa última resposta, ainda sem resposta do cliente' : '',
@@ -1467,7 +1537,7 @@ function generationUsage(result) {
   return `${tokens.toLocaleString('pt-PT')} tokens · ${costText(result.cost_usd)}`;
 }
 
-function card(email) {
+function card(email, index, list) {
   const customer = email.customer || {}, sender = (email.from || [])[0] || {};
   const saved = email.reply_text || '';
   const writable = !email.blocked || email.phone_only;  // 27/09: no email, but a phone: written for WhatsApp or SMS
@@ -1595,9 +1665,13 @@ function card(email) {
       toast(`${ignoreTarget.name || ignoreTarget.email} passou para a blacklist deste imóvel.`);
     }, event.currentTarget)}, 'Ignorar sempre / Blacklist'));
   const approve = reviewBar(email, draft);  // 29/09: «Aprovar» in the card's top corner
+  // 02/10: «3 / 20» in the card's corner, to know where one is in a long queue (in the order chosen in «Ordenar»)
+  const position = list?.length > 1 && el('span', {class: 'card-position', 'aria-label': `Email ${index + 1} de ${list.length}`},
+    `${index + 1} / ${list.length}`);
   const reviewer = reviewNote(email, draft, saved);  // 30/09: the reviewer's marks and warnings, under the draft
   // 30/09: already answered straight in Gmail: greyed out and not ticked (it stays, for something to add)
   const article = el('article', {class: 'card email-card' + (email.blocked ? ' blocked' : '') + (email.answered_direct ? ' answered-direct' : '')},
+    position,
     el('div', {class: 'card-head'},
       el('label', {class: 'who'}, el('input', {type: 'checkbox', class: 'pick', 'data-id': email.id,
         checked: !email.blocked && !email.answered_direct, disabled: !!email.blocked}),
@@ -1646,12 +1720,16 @@ function card(email) {
     el('div', {class: 'draft-box'}, draft, el('div', {class: 'draft-tools'}, draftCopy, saveIcon)),
     reviewer);
   // 27/09: in the order of the work — a fact for the knowledge (open), the reply from the API, then sending it.
+  // 02/10: a new customer's first email has no use for the quick replies (thanks, wait, still interested, the email
+  // before, the documents…): nothing of ours yet to follow up on
+  const firstEmail = email.interaction === 1
+    && ![...(email.conversation || []), ...(email.history || [])].some(turn => turn.who === 'nos');
   const actions = el('aside', {class: 'card email-actions', 'aria-label': 'O que fazer com este email'},
     email.consent_suggested && el('button', {class: 'primary', onclick: event => run(async () => {
       state = await call('api/consent/confirm', {property_ref: queueRef(), id: email.id});
       renderState(); toast('Consentimento confirmado e registado em contactos.csv.');
     }, event.currentTarget)}, 'Confirmar consentimento (RGPD)'),
-    generateOne && quickReplies(noteField),
+    generateOne && !firstEmail && quickReplies(noteField),
     noteField,
     generateOne && el('div', {class: 'email-generate'},
       generateOne),
@@ -1825,14 +1903,11 @@ function reviewNote(email, draft, saved) {
       toast(result.reviewed ? 'Revisto: vê a nota e os avisos por baixo do rascunho.' : 'O revisor não devolveu nada: tenta outra vez.');
     }, event.currentTarget)}, review ? 'Rever outra vez' : 'Rever com a IA');
     box.hidden = !draft.value.trim();
-    if (tooShort) {
+    // 02/10: nothing until a review was asked for (the reviewer runs only when the owner decides)
+    if (!review || tooShort) { box.hidden = true; return; }
+    if (!fresh) {
       box.className = 'review-note muted';
-      box.replaceChildren(el('span', {class: 'small'}, 'Rascunho demasiado curto para rever.'));
-      return;
-    }
-    if (!review || !fresh) {
-      box.className = 'review-note muted';
-      box.replaceChildren(el('span', {class: 'small'}, review ? 'Revisão de outra versão do texto.' : 'Ainda sem revisão.'), ask);
+      box.replaceChildren(el('span', {class: 'small'}, 'Revisão de outra versão do texto.'), ask);
       return;
     }
     const level = review.score >= 8 ? 'ok' : review.score >= 6 ? 'warn' : 'bad';
@@ -2365,20 +2440,44 @@ function roundSummaryContent(data) {
 
 // One click, all of a property's active clients: skips the per-client picking in Imóveis → Visitas for
 // the common case (everyone eligible gets the same day and window). Fine control still lives there.
-let roundPanelProperty = null;
+// 02/10: who this round reaches now, and who stays out and why (5 of 20 was a surprise). Those still waiting for our
+// answer include the new requests, which have no conversation until the first reply goes out; those whose only
+// email waiting is our visit proposal (a round prepared, not sent) are counted apart.
+function roundCounts(data) {
+  const by = {};
+  for (const customer of data.customers || []) by[customer.state] = (by[customer.state] || 0) + 1;
+  const out = data.left_out || {};
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+  return [
+    [by.ok || 0, n => plural(n, 'recebe o convite', 'recebem o convite')],
+    [out.proposal, n => `${n} com a proposta de visita ainda por enviar`],
+    [(by.pending || 0) - (out.proposal || 0) + (out.new || 0),
+      n => `${n} com email por responder nas Comunicações (entram depois de lhes responderes)`],
+    [by.booked, n => `${n} já com visita marcada`],
+    [by.nao_quer, n => plural(n, 'não quer visitar', 'não querem visitar')],
+    [by.outra_data, n => plural(n, 'só pode noutra data', 'só podem noutra data')],
+    [out.ignored, n => `${n} na lista de ignorados`],
+    [out.inactive, n => plural(n, 'inativo', 'inativos') + ' (dois emails nossos sem resposta)']]
+    .filter(([n], index) => index === 0 || n).map(([n, text]) => text(n)).join(' · ');
+}
+
+// 02/10: the property is the one chosen at the top of Visitas (the switcher), not a menu of its own down here.
+let roundPanelProperty = null;  // the property the panel was drawn for: renderAgenda redraws it when the top one changes
 function renderVisitsRound() {
   const box = $('visits-round-panel');
-  const properties = activeProperties().filter(property => !property.visits?.closed_at);
+  const ref = $('agenda-property').value;
+  roundPanelProperty = ref;
+  const property = activeProperties().find(item => item.reference === ref);
   const card = (...body) => box.replaceChildren(el('article', {class: 'card'},
     el('p', {class: 'eyebrow'}, 'RONDA DE VISITAS'), el('h2', {}, 'Avisa os clientes ativos'), ...body));
-  if (!properties.length) {
-    card(el('p', {class: 'muted small'}, 'Sem imóveis com visitas em aberto.'));
+  if (!property) {
+    card(el('p', {class: 'muted small'}, 'Escolhe o imóvel lá em cima, nas setas: a ronda é de um imóvel de cada vez.'));
     return;
   }
-  if (!properties.some(property => property.reference === roundPanelProperty)) roundPanelProperty = properties[0].reference;
-  const propertySelect = el('select', {'aria-label': 'Imóvel'}, properties.map(property =>
-    el('option', {value: property.reference}, property.reference || property.description || 'Imóvel')));
-  propertySelect.value = roundPanelProperty;
+  if (property.visits?.closed_at) {
+    card(el('p', {class: 'muted small'}, `As visitas de ${ref} estão fechadas: não há ronda.`));
+    return;
+  }
   const slot = settings.voice.visits?.slot_minutes || 30;
   const day = el('input', {type: 'date', 'aria-label': 'Dia das visitas'});
   const start = el('input', {type: 'time', value: '17:00', step: slot * 60, 'aria-label': 'Hora de início'});
@@ -2397,7 +2496,7 @@ function renderVisitsRound() {
   const roundActions = el('span', {class: 'round-actions'});
   const startButton = el('button', {class: 'primary', onclick: event => run(async () => {
     if (!day.value) throw new Error('Escolhe o dia das visitas.');
-    const ref = propertySelect.value, common = !individual.checked;
+    const common = !individual.checked;
     const data = await call('api/visits/candidates', {property_ref: ref});
     const emails = data.customers.filter(customer => customer.state === 'ok').map(customer => customer.email);
     if (!emails.length) throw new Error('Não há clientes elegíveis agora (por responder, já convidados ou recusaram).');
@@ -2421,18 +2520,20 @@ function renderVisitsRound() {
   individual.addEventListener('change', () => { startButton.replaceChildren(...startLabel()); });
   const summaryBox = el('div', {class: 'round-summary'});
   const commonBox = el('div', {class: 'round-common'});
+  const counts = el('p', {class: 'muted small round-counts'});
   const loadSummary = () => run(async () => {
-    const data = await call('api/visits/round-summary', {property_ref: propertySelect.value});
+    counts.textContent = 'Agora: ' + roundCounts(await call('api/visits/candidates', {property_ref: ref})) + '.';
+    const data = await call('api/visits/round-summary', {property_ref: ref});
     summaryBox.replaceChildren(...roundSummaryContent(data));
-    renderRoundCommon(commonBox, await call('api/visits/round', {property_ref: propertySelect.value}), loadSummary, roundActions);
+    renderRoundCommon(commonBox, await call('api/visits/round', {property_ref: ref}), loadSummary, roundActions);
   });
-  propertySelect.addEventListener('change', () => { roundPanelProperty = propertySelect.value; loadSummary(); });
   card(
     el('p', {class: 'step'},
       'Um email a cada cliente ativo deste imóvel, a propor o dia e o intervalo e a perguntar a hora que lhe dá mais '
       + 'jeito dentro dele. O mesmo texto para todos (em português para quem escreve em português, em inglês para os '
       + 'outros), que revês e envias aqui mesmo; individualizado, fica um por cliente na fila das Comunicações.'),
-    el('div', {class: 'row'}, propertySelect, dateStepper(day), timeStepper(start, slot), timeStepper(end, slot)),
+    counts,
+    el('div', {class: 'row'}, dateStepper(day), timeStepper(start, slot), timeStepper(end, slot)),
     note,
     el('label', {class: 'check'}, individual, ' Individualizar: uma resposta por cliente, nas Comunicações'),
     el('div', {class: 'actions'}, startButton, roundActions),
@@ -2861,7 +2962,7 @@ function engineConsole() {
       el('div', {class: 'engine-head'},
         el('span', {class: 'engine-title'}, 'AI ENGINE'),
         el('span', {class: 'engine-status'}, el('i', {}), apiOnly() ? 'MODO: SÓ API' : 'MODO: COPIAR/COLAR + API')),
-      el('div', {class: 'engine-grid'}, (current.models || []).slice()
+      el('div', {class: 'engine-grid'}, (current.models || []).filter(model => !model.hidden)  // 02/10: on offer only
         .sort((a, b) => (ENGINE_MODES[a.id]?.power ?? 9) - (ENGINE_MODES[b.id]?.power ?? 9)
           || a.input_usd_per_1m - b.input_usd_per_1m).map(button)),  // weakest and cheapest first
       // 27/09: what the «/ 100 interações» stands on, as readouts: the sample, the margin and the exchange rate
@@ -2910,6 +3011,7 @@ function propertySwitcher(select) {
     const option = options[index];
     if (!option) return box.replaceChildren(el('span', {class: 'muted small'}, 'Sem imóveis.'));
     const ref = option.value, property = (settings?.properties || []).find(item => item.reference === ref);
+    box.classList.toggle('test-property', !!property?.test);  // 02/10: the test property, in light purple
     const inactive = property?.active === false || /inativo/i.test(option.textContent);
     box.replaceChildren(...el('div', {},
       many && el('button', {type: 'button', class: 'slider-arrow prev', 'aria-label': 'Imóvel anterior', onclick: () => go(index - 1)}, '‹'),
@@ -3404,6 +3506,7 @@ function renderAgenda() {
   }));
   if (!week.length) box.replaceChildren(el('p', {class: 'empty-state filofax-none'}, 'Todos os dias estão em blackout. Liga um dia em «Dias».'));
   fitAgenda();
+  if ($('agenda-property').value !== roundPanelProperty) renderVisitsRound();  // 02/10: the round follows the property on top
   const clock = new Date(), minutesNow = clock.getHours() * 60 + clock.getMinutes();
   const target = all.length ? Math.min(...all.map(entry => entry.start))
     : agendaWeekOffset === 0 && minutesNow >= from && minutesNow < to ? minutesNow : from;
@@ -3548,6 +3651,7 @@ function renderPropertySlider() {
   let index = properties.findIndex(property => property.reference === propertyRef);
   if (index < 0) { index = 0; propertyRef = properties[0].reference; }
   const property = properties[index], many = properties.length > 1;
+  $('property-slider').classList.toggle('test-property', !!property?.test);  // 02/10: the test property, in light purple
   // Through el(), which drops a false child: replaceChildren itself would print it as the text "false".
   $('property-slider').replaceChildren(...el('div', {},
     many && el('button', {class: 'slider-arrow prev', 'aria-label': 'Imóvel anterior', onclick: () => stepProperty(-1)}, '‹'),
@@ -3857,13 +3961,15 @@ function renderWallet(usage, capacity = 0) {
 }
 
 function renderFuelOverview(metrics) {
-  const rows = metrics.properties.filter(item => item.property_ref && item.api_fuel).map(item => {
+  // 02/10: the test property's tank too (3 € unless filled otherwise), last and marked as the test one
+  const tanks = [...metrics.properties, ...(metrics.test_tanks || []).map(item => ({...item, test: true}))];
+  const rows = tanks.filter(item => item.property_ref && item.api_fuel).map(item => {
     // 27/09: what was spent and what is left are the gauge's hovers now, one per half; only an empty tank (the API off
     // here) still says so in words. The pump, or a click on the tank's half, changes the limit right here.
     const fuel = item.api_fuel, ref = item.property_ref;
     const fill = button => fillTank(ref, fuel.capacity_eur, loadMetrics, button);
-    return el('div', {class: 'fuel-row'},
-      tankGauge(fuel, item.openai_usage, 'painel:fuel:' + ref, ref, 'small', () => fill()),
+    return el('div', {class: 'fuel-row' + (item.test ? ' test-tank' : '')},
+      tankGauge(fuel, item.openai_usage, 'painel:fuel:' + ref, item.test ? `${ref} · TESTE` : ref, 'small', () => fill()),
       el('div', {class: 'fuel-side'},
         fuel.empty && el('p', {class: 'fuel-status bad'},
           'Vazio: a API está desligada neste imóvel.' + (apiOnly() ? '' : ' O copiar/colar continua.')),
@@ -4199,7 +4305,8 @@ function renderVoice() {
     selects[key].addEventListener('change', updateHint); updateHint();
     return el('label', {class: 'field'}, label, selects[key], hint);
   };
-  const signature = el('input', {value: settings.voice.signature || ''});
+  // 02/10: the program puts it under every AI draft's closing; one or more lines (a bigger signature)
+  const signature = el('textarea', {rows: 3, placeholder: 'ex.: Equipa APalace Imobiliária\nTel. … · www.…'}, settings.voice.signature || '');
   const senderName = el('input', {value: settings.voice.sender_name || '', placeholder: 'vazio: só o endereço de email'});
   const replySubject = el('input', {value: settings.voice.reply_subject || ''});
   const visits = settings.voice.visits || {};
@@ -4222,7 +4329,8 @@ function renderVoice() {
   // 29/09: it moved to the Oficina, with the token prices (renderWorkshop)
   $('voice-form').replaceChildren(el('p', {class: 'eyebrow'}, 'VOZ ', kind('voice')),
     choice('greeting', 'Saudação'), choice('languages', 'Idiomas'), choice('closing', 'Fecho'),
-    el('label', {class: 'field'}, 'Assinatura (sempre igual, sem tradução)', signature),
+    el('label', {class: 'field'}, 'Assinatura: o programa põe-na por baixo do fecho de cada resposta da IA, sempre igual e sem '
+      + 'tradução (pode ter várias linhas, até 8)', signature),
     el('label', {class: 'field'}, 'Nome do remetente, ao lado do endereço', senderName),
     el('label', {class: 'field'},
       'Assunto das respostas a pedidos do portal ({imovel} e {referencia}). Nas respostas do próprio cliente mantém-se o assunto dele.',
@@ -4264,7 +4372,7 @@ function renderVoice() {
 }
 
 document.querySelectorAll('[data-tab]').forEach(button => button.addEventListener('click', () => showTab(button.dataset.tab)));
-$('queue').addEventListener('change', renderState);
+$('queue').addEventListener('change', () => { showNotes([]); renderState(); });  // 02/10: the notes were about the other property
 $('workshop-link').addEventListener('click', showWorkshop);
 $('card-sort').value = cardSort();
 $('card-sort').addEventListener('change', event => {
@@ -4273,13 +4381,34 @@ $('card-sort').addEventListener('change', event => {
   renderState();
 });
 $('emails').addEventListener('change', updateSelection);
-$('read').addEventListener('click', event => run(async () => {
-  state = await call('api/read', {}); stepsDone.read = true; renderState();
+// 02/10: while the Gmail is being read, «2 Gerar respostas» stays off (it would write for emails still coming in)
+$('read').addEventListener('click', event => {
+  const button = event.currentTarget;
+  // 02/10: what the read is doing, on the button itself, asked every half second while it lasts
+  // in up to three lines beside the button: the step, how far, and the email being read now
+  const box = $('read-progress');
+  const shown = progress => progress.stage === 'connect' ? [el('strong', {}, 'A ligar ao Gmail…')]
+    : progress.stage === 'read' ? [el('strong', {}, `A ler o email ${progress.number} de ${progress.total}`),
+      progress.sender && el('span', {}, `De: ${progress.sender}`), progress.subject && el('span', {}, `«${progress.subject}»`)]
+    : progress.stage === 'save' ? [el('strong', {}, 'A guardar os emails novos e a ver as respostas do Gmail…')] : null;
+  box.hidden = false; box.replaceChildren(el('strong', {}, 'A começar…'));
+  const poll = setInterval(async () => {
+    try {
+      const response = await fetch('api/read/progress', {headers: {'X-Bot-Mail-Token': TOKEN}});
+      const lines = shown(await response.json());
+      if (lines) box.replaceChildren(...lines.filter(Boolean));
+    } catch { /* only the lines: the read goes on */ }
+  }, 500);
+  return run(async () => {
+  $('generate-api').dataset.busy = '1'; $('generate-api').disabled = true;
+  try { state = await call('api/read', {}); } finally { $('generate-api').dataset.busy = ''; clearInterval(poll); }
+  stepsDone.read = true; renderState();
   if (state.added) playSound('read');
   // Replies written straight in Gmail (found in All Mail or Sent) answer their emails here too.
   const direct = state.direct ? ` ${state.direct} resposta(s) tua(s) enviada(s) diretamente do Gmail registada(s).` : '';
   toast((state.added ? `${state.added} email(s) novo(s).` : 'Leitura concluída: nada de novo.') + direct);
-}, event.currentTarget));
+  }, button).finally(() => { clearInterval(poll); box.hidden = true; box.replaceChildren(); });
+});
 $('build-prompt').addEventListener('click', event => run(async () => {
   const ids = selectedIds();
   if (!ids.length) throw new Error('Seleciona pelo menos um email.');
@@ -4310,37 +4439,60 @@ $('gpt-paste').addEventListener('click', event => run(async () => {
   if (!text.trim()) throw new Error('Cola primeiro a resposta do ChatGPT.');
   const result = await call('api/paste', {property_ref: queueRef(), text});
   state = result.state; keepSteps(renderState);
-  $('notes').replaceChildren(...result.notes.map(note => el('p', {class: 'alert warn'}, `Nota do ChatGPT sobre ${nameOf(note.id)}: ${note.nota}`)));
+  showNotes(result.notes);
   $('gpt-answer').value = '';
   toast(`${result.saved} rascunho(s) guardado(s)` + (result.visits ? ` e ${result.visits} marcação(ões) de visita` : '')
     + '. Revê-os antes de enviar.');
 }, event.currentTarget));
+// 02/10: the batches as their own calls, up to 4 at a time, each one's drafts shown as soon as it comes back (the last
+// before the first, if it is quicker) — no waiting for all of them
 $('generate-api').addEventListener('click', event => run(async () => {
-  const ids = selectedIds();
+  const ids = selectedIds(), ref = queueRef(), extra = $('extra').value;
   if (!ids.length) throw new Error('Seleciona pelo menos um email.');
-  const result = await call('api/prompt/generate', {property_ref: queueRef(), ids, extra: $('extra').value});
+  const {batches, context_used: contextUsed} = await call('api/prompt/plan', {property_ref: ref, ids, extra});
   stepsDone.generated = true;
-  try { localStorage.setItem('aria-generated-at', String(Date.now())); } catch { /* Storage may be unavailable. */ }
-  state = result.state; keepSteps(renderState); applyFuel(result.fuel, queueRef());
-  $('notes').replaceChildren(...result.notes.map(note => el('p', {class: 'alert warn'}, `Nota sobre ${nameOf(note.id)}: ${note.nota}`)));
+  markGenerated();
+  const totals = {saved: 0, visits: 0, reviewed: 0, cost: 0, tokens: 0, notes: [], prompts: [], errors: [], model: ''};
+  let next = 0, done = 0;
+  const one = async () => {
+    while (next < batches.length) {
+      const batch = batches[next++];
+      try {
+        const result = await call('api/prompt/generate', {property_ref: ref, ids: batch, extra});
+        totals.saved += result.saved; totals.visits += result.visits || 0; totals.reviewed += result.reviewed || 0;
+        totals.cost += result.cost_usd || 0; totals.model = result.model || totals.model;
+        totals.tokens += (result.tokens?.prompt_tokens || 0) + (result.tokens?.completion_tokens || 0);
+        totals.notes.push(...(result.notes || [])); totals.prompts.push(...(result.prompts || []));
+        if (result.review_error) totals.errors.push(`revisão: ${result.review_error}`);
+        if (result.generation_error) totals.errors.push(result.generation_error);
+        applyFuel(result.fuel, ref);
+      } catch (error) { totals.errors.push(error.message); }
+      done += batch.length;
+      // what is ready so far, at once (always the state as it is now: batches come back in any order)
+      state = await call('api/state'); keepSteps(renderState);
+      if (done < ids.length) toast(`${done} de ${ids.length} rascunho(s) prontos… os outros continuam a ser escritos.`);
+    }
+  };
+  await Promise.all(Array.from({length: Math.min(4, batches.length)}, one));
+  showNotes(totals.notes);
   markStep('prepare-step', true); markStep('import-step', true);  // this one button does the work of both
-  $('sent-prompt').textContent = (result.prompts || []).join('\n\n════════ lote seguinte ════════\n\n');
-  $('sent-prompt-box').hidden = !result.prompts?.length;
-  const tokens = (result.tokens?.prompt_tokens || 0) + (result.tokens?.completion_tokens || 0);
-  const summary = `${result.saved} rascunho(s) gerado(s) com ${result.model || 'a API'}`
-    + (result.visits ? ` e ${result.visits} marcação(ões) de visita` : '')
-    + (tokens ? ` (${generationUsage(result)}${result.prompts?.length > 1 ? `, ${result.prompts.length} chamadas` : ''}`
-      + (result.context_used != null ? `; a maior usou ${String(result.context_used).replace('.', ',')}% do contexto` : '') + ')' : '') + '.';
-  toast(summary + (result.reviewed ? ` O revisor leu ${result.reviewed}: vê as notas por baixo de cada rascunho.` : '')
-    + (result.review_error ? ` (A revisão falhou: ${result.review_error})` : '') + ' Revê-os antes de enviar.',
-    result.review_error ? 'warn' : 'ok');
+  $('sent-prompt').textContent = totals.prompts.join('\n\n════════ lote seguinte ════════\n\n');
+  $('sent-prompt-box').hidden = !totals.prompts.length;
+  const cost = totals.cost ? ` · ${costText(totals.cost)}` : '';
+  toast(`${totals.saved} rascunho(s) gerado(s) com ${totals.model || 'a API'}`
+    + (totals.visits ? ` e ${totals.visits} marcação(ões) de visita` : '')
+    + (totals.tokens ? ` (${totals.tokens.toLocaleString('pt-PT')} tokens${cost}, ${batches.length} chamada(s); a maior usou `
+      + `${String(contextUsed).replace('.', ',')}% do contexto)` : '') + '.'
+    + (totals.reviewed ? ` O revisor leu ${totals.reviewed}.` : '')
+    + (totals.errors.length ? ` Atenção: ${totals.errors.join(' · ')}` : '') + ' Revê-os antes de enviar.',
+    totals.errors.length ? 'warn' : 'ok');
 }, event.currentTarget));
 $('paste').addEventListener('click', event => run(async () => {
   const text = $('answer').value;
   if (!text.trim()) throw new Error('Cola primeiro a resposta do ChatGPT.');
   const result = await call('api/paste', {property_ref: queueRef(), text});
   state = result.state; keepSteps(renderState);
-  $('notes').replaceChildren(...result.notes.map(note => el('p', {class: 'alert warn'}, `Nota do ChatGPT sobre ${nameOf(note.id)}: ${note.nota}`)));
+  showNotes(result.notes);
   $('answer').value = '';
   const summary = `${result.saved} rascunho(s) guardado(s)` + (result.visits ? ` e ${result.visits} marcação(ões) de visita` : '') + '.';
   $('import-status').hidden = false;
@@ -4350,6 +4502,18 @@ $('paste').addEventListener('click', event => run(async () => {
 }, event.currentTarget));
 $('answer').addEventListener('input', () => { $('import-status').hidden = true; markStep('import-step', false); });
 $('preview').addEventListener('click', event => run(sendApproved, event.currentTarget).then(refreshSendButton));
+// 02/10: «Rever os selecionados» — the reviewer, only when the owner asks; the marks show under each draft
+$('review-run').addEventListener('click', event => run(async () => {
+  const ids = selectedIds().filter(id => {
+    const email = (currentQueue()?.emails || []).find(item => item.id === id);
+    return String(email?.reply_text || '').trim().length >= 40;
+  });
+  if (!ids.length) throw new Error('Nenhum dos emails selecionados tem um rascunho para rever (gera-os primeiro, no passo 2).');
+  const result = await call('api/review', {property_ref: queueRef(), ids});
+  applyFuel(result.fuel, queueRef()); state = result.state; keepSteps(renderState);
+  toast(result.reviewed ? `O revisor leu ${result.reviewed} rascunho(s): vê a nota e os avisos por baixo de cada um.`
+    : 'O revisor não devolveu nada: tenta outra vez.', result.reviewed ? 'ok' : 'warn');
+}, event.currentTarget));
 $('listing-prompt').addEventListener('click', event => run(async () => {
   const {prompt} = await call('api/property/prompt', {listing_url: $('listing-url').value});
   $('listing-prompt-text').textContent = prompt;

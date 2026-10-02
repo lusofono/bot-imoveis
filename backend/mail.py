@@ -138,7 +138,7 @@ def meta_from_fetch(meta: bytes):
     }
 
 def read_messages(account, password, subject_contains, date_from, date_to,
-                  mailbox="all", incoming_only=True, accept=None, outgoing=None, accept_outgoing=None):
+                  mailbox="all", incoming_only=True, accept=None, outgoing=None, accept_outgoing=None, progress=None):
     """Messages between two dates, as dicts: (messages, number scanned, mailbox).
 
     Headers first; accept(item) decides on them, so mail that is not ours never has its text fetched.
@@ -168,7 +168,7 @@ def read_messages(account, password, subject_contains, date_from, date_to,
             raise GmailReadError("Erro na pesquisa IMAP.")
         uids = data[0].split() if data and data[0] else []
 
-        for uid in uids:
+        for number, uid in enumerate(uids, 1):
             status, fetched = mail.uid(
                 "fetch", uid, "(BODY.PEEK[HEADER] BODYSTRUCTURE X-GM-THRID X-GM-MSGID)"
             )
@@ -193,6 +193,9 @@ def read_messages(account, password, subject_contains, date_from, date_to,
             msg = BytesParser(policy=policy.default).parsebytes(raw)
             subject = decode_mime(msg.get("Subject"))
             from_list = parse_addresses(msg.get_all("From", []))
+            if progress:
+                # 02/10: what is being read now, for the page («A ler 37 de 120 · Ana Exemplo · «Nova mensagem…»»)
+                progress(number, len(uids), (from_list[0].get("name") or from_list[0].get("email")) if from_list else "", subject)
             # 29/09: the test platform's emails leave from this same account (Gmail keeps no other sender) with the
             # X-ARIA-Teste header: they are read as incoming mail, never as the owner's own
             test = msg.get(TEST_HEADER) == "1"  # the consultant's copy («consultor») stays the owner's own mail

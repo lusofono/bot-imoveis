@@ -5,6 +5,7 @@ import pytest
 from backend.ai import parse_visits, reply_prompt
 from backend.store import load_visits
 from test_properties import REF, SMTP, draft_and_send, lead, read, service  # noqa: F401 (service is a fixture)
+from conftest import midnight_sensitive  # noqa: E402 (02/10: skipped between 00:00 and 01:00 local)
 
 DAY = (date.today() + timedelta(days=1)).isoformat()
 
@@ -18,6 +19,7 @@ def item(service, key):
     return next(e for e in service.pending()["properties"][0]["emails"] if e["id"] == key)
 
 
+@midnight_sensitive
 def test_each_read_can_look_further_back(service):
     with patch("backend.service.app_password", return_value="fake"), patch(
             "backend.service.read_messages", return_value=([], 0, "INBOX")) as fetch:
@@ -101,6 +103,29 @@ def test_the_round_summary_shows_who_it_went_to_and_where_each_one_stands(servic
                                          "reason": "já tem visita marcada", "visit_at": f"{DAY} 17:30"}
     # B's own proposal is still an unsent draft: candidates() still sees it as "tem um email por responder".
     assert by_email["b@example.com"]["state"] == "pending"
+
+
+def test_the_round_card_counts_who_is_left_out(service):
+    # 02/10: the round reached 5 of 20 test customers without saying why: the ignored, the inactive and the new
+    # requests (no conversation until our first reply) are not in the list, so they come as counts of their own.
+    for key, email in (("1", "a@example.com"), ("2", "b@example.com"), ("3", "c@example.com")):
+        read(service, [customer(key, email)])
+        draft_and_send(service, key, "Olá.")
+    service.set_ignored(REF, "b@example.com")
+    queue = service.load(REF)
+    queue["conversations"]["c@example.com"]["inactive"] = True
+    service.save(queue, REF)
+    read(service, [customer("4", "d@example.com")])  # a new request, still unanswered
+
+    result = service.visit_candidates()
+    assert {c["email"]: c["state"] for c in result["customers"]} == {"a@example.com": "ok"}
+    assert result["left_out"] == {"ignored": 1, "inactive": 1, "new": 1, "proposal": 0}
+
+    # A round prepared and not sent: A waits for our proposal, not for an answer to something they wrote.
+    service.propose_visits(REF, DAY, "17:00", "19:00", ["a@example.com"], common=True)
+    result = service.visit_candidates()
+    assert {c["email"]: c["state"] for c in result["customers"]} == {"a@example.com": "pending"}
+    assert result["left_out"]["proposal"] == 1
 
 
 def test_an_ignored_contact_is_never_a_candidate_and_new_messages_are_dropped(service):

@@ -7,6 +7,7 @@ from starlette.testclient import TestClient
 from backend.ai import parse_replies, short_id
 from backend.api import DISPLAY_VERSION, web_app
 from test_properties import CUSTOMER, REF, SMTP, draft_and_send, lead, read, service  # noqa: F401 (service is a fixture)
+from conftest import midnight_sensitive  # noqa: E402 (02/10: skipped between 00:00 and 01:00 local)
 
 TOKEN = "test-token"
 
@@ -65,9 +66,10 @@ def test_the_page_is_served_as_its_own_files(page):
     assert "'Atualizar resposta'" in script.text and "Enviar só este" not in script.text and "Enviar individual" not in script.text
     assert "'Atualizar resposta'), lastGeneration[email.id] && el('small', {class: 'button-sub'}" in script.text.replace("\n      ", " ")
     assert "el('span', {class: 'kind button-badge'}, 'API · '" in script.text and "'Resposta ', el('span'" not in script.text
-    # 27/09: the steps in turn — PASSO 02 after a read, PASSO 03 after «2» (or with drafts waiting); «1» and «2» rest 10 minutes.
+    # 01/10: the steps 1, 2 and 3 always in view; «1» and «2» rest 5 minutes after use.
     assert "'Ignorar os emails anteriores'" in script.text and "only_extra: fact.only" in script.text
-    assert "const STEP_REST_MS = 10 * 60 * 1000;" in script.text and "$('send-step').hidden = !(stepsDone.generated || generating || drafts);" in script.text
+    assert "const STEP_REST_MS = 5 * 60 * 1000;" in script.text and "$('prepare-step').hidden = false;" in script.text
+    assert "$('send-step').hidden = false;" in script.text
     assert "copyButton(turn.text, 'Copiar esta mensagem')" in script.text and "'Copiar o email')" in script.text
     assert "Porquê, nas palavras dela" in script.text  # with no draft, the AI's note is shown (27/09)
     assert "button.replaceChildren(...original)" in script.text  # a clicked button gets its number and icon back
@@ -191,14 +193,15 @@ def test_copy_paste_flow_drafts_previews_and_sends(service, page):
     status, result = call("/api/prompt", {"property_ref": REF, "ids": ["1"], "extra": "Sê breve."})
     prompt = result["prompt"]
     for expected in (email["short_id"], "Bom dia, gostaria de visitar o imóvel.", "Sê breve.",
-                     "Equipa APalace Imobiliária", '"respostas"'):
+                     "Não escrevas assinatura nenhuma", '"respostas"'):
         assert expected in prompt
+    assert "Equipa APalace Imobiliária" not in prompt  # 02/10: the program signs, not the AI
     assert CUSTOMER not in prompt and "900 000 001" not in prompt  # the model does not need them
     answer = ("Aqui estão:\n```json\n" + json.dumps({"respostas": [{"id": email["short_id"],
               "reply_text": "Cara Ana,\n\nObrigado pelo contacto.", "nota": "Confirma a data da visita."}]}) + "\n```")
     status, pasted = call("/api/paste", {"property_ref": REF, "text": answer})
     assert status == 200 and pasted["saved"] == 1 and pasted["notes"][0]["nota"] == "Confirma a data da visita."
-    assert pasted["state"]["properties"][0]["emails"][0]["reply_text"].startswith("Cara Ana")
+    assert pasted["state"]["properties"][0]["emails"][0]["reply_text"] == "Cara Ana,\n\nObrigado pelo contacto.\nEquipa APalace Imobiliária"
     status, preview = call("/api/preview", {"property_ref": REF, "ids": ["1"]})
     assert preview["replies"][0]["to"] == CUSTOMER
     status, refused = call("/api/send", {"property_ref": REF, "preview_token": preview["preview_token"]})
@@ -274,7 +277,7 @@ def test_voice_is_edited_on_the_page(service, page):
                                            "signature": "Equipa Teste"})
     assert settings["voice"]["greeting"]["selected"] == "cordial" and settings["voice"]["signature"] == "Equipa Teste"
     status, state = call("/api/state")
-    assert "Equipa Teste" in state["properties"][0]["instructions"]
+    assert "Não escrevas assinatura nenhuma" in state["properties"][0]["instructions"]  # 02/10: the program signs
 
 
 def test_starting_the_page_again_never_stops_another_program(tmp_path):
@@ -334,6 +337,7 @@ def test_the_owner_adds_knowledge_while_reviewing_replies(service, page):
     assert not (service.folder / "fora").exists()
 
 
+@midnight_sensitive
 def test_visits_and_knowledge_are_edited_on_the_page(service, page):
     from datetime import date, timedelta
     _, call = page
@@ -507,9 +511,12 @@ def test_only_api_mode_the_model_choice_and_batches_of_five(service, page):
                                                                    "gpt-6-astra"]
     status, error = call("/api/ai/model", {"model": "gpt-9"})
     assert status == 400 and "Modelo desconhecido" in error["error"]
-    status, ai = call("/api/ai/model", {"model": "gpt-4o"})
+    # 02/10: old and dear (gpt-4o, gpt-4.1) or above 3 € per 100 interactions (gpt-6-astra): listed, but not on offer
+    assert {model["id"] for model in settings["ai"]["models"] if model["hidden"]} == {"gpt-4o", "gpt-4.1", "gpt-6-astra"}
+    assert call("/api/ai/model", {"model": "gpt-4o"})[0] == 400
+    status, ai = call("/api/ai/model", {"model": "gpt-6-sol"})
     config = json.loads((service.folder / "config.json").read_text())
-    assert ai["model"] == "gpt-4o" and config["openai_model"] == "gpt-4o" and config["account"] == "owner@example.com"
+    assert ai["model"] == "gpt-6-sol" and config["openai_model"] == "gpt-6-sol" and config["account"] == "owner@example.com"
     config["ai_mode"] = "copy_paste"  # the way back, written in the docs: the page shows the ChatGPT again
     (service.folder / "config.json").write_text(json.dumps(config))
     assert call("/api/settings")[1]["ai"]["mode"] == "copy_paste"
@@ -527,7 +534,7 @@ def test_only_api_mode_the_model_choice_and_batches_of_five(service, page):
         status, generated = call("/api/prompt/generate", {"property_ref": REF, "ids": ids})
     assert status == 200 and complete.call_count == 2 and generated["saved"] == 7  # 5 + 2
     assert generated["tokens"] == {"prompt_tokens": 20, "completion_tokens": 10, "total_tokens": 30}
-    assert complete.call_args.args[1] == "gpt-4o"
+    assert complete.call_args.args[1] == "gpt-6-sol"
 
 
 def test_a_listing_is_extracted_from_its_pasted_text(service, page):

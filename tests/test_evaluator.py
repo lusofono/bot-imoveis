@@ -45,7 +45,7 @@ def test_the_reviewer_marks_the_real_drafts_while_their_text_is_the_one_read(ser
     with patch("backend.service.complete", return_value=(marks(["1"], 6, ["não responde à pergunta da hora"]), USAGE)) as ai, \
             patch("backend.service.openai_api_key", return_value="k"):
         result = service.review_drafts(REF, ["1"])
-    assert result["reviewed"] == 1 and ai.call_args.args[1] == "gpt-4o"  # the evaluator's model, stronger by default
+    assert result["reviewed"] == 1 and ai.call_args.args[1] == "gpt-6-sol"  # the evaluator's model, stronger by default
     assert "A visita pode ser ao fim da tarde." in ai.call_args.args[2] and "Bom dia, gostaria de visitar o imóvel." in ai.call_args.args[2]
     [email] = queue_of(service, REF)["emails"]
     assert email["review"]["score"] == 6 and email["review"]["errors"] == ["não responde à pergunta da hora"]
@@ -62,6 +62,8 @@ def test_generating_reviews_the_new_drafts_when_the_reviewer_is_on(service):
     from backend.ai import short_id
     from backend.api import web_app
     client = TestClient(web_app(service.folder, "t"), base_url="http://127.0.0.1:8765")
+    assert service.reviewer_settings()["auto"] is False  # 02/10: off by default, the owner runs it when he wants
+    service.set_reviewer("gpt-6-sol", True)
     read(service, [lead("1")])
     draft = json.dumps({"respostas": [{"id": short_id("1"), "reply_text": "Cara Ana, agradecemos o seu contacto. A visita pode ser ao fim da tarde."}]})
     with patch("backend.api.complete", return_value=(draft, USAGE)), patch("backend.api.openai_api_key", return_value="k"), \
@@ -95,7 +97,7 @@ def test_a_round_marks_the_aria_and_the_consultant_before_the_customers_answer(s
             patch("backend.testlab.smtplib.SMTP_SSL", SMTP):
         result = testlab.advance(service, "2026-09-30T10:00:00+01:00", type("Never", (), {"random": lambda self: .99})())
     judged = ai.call_args_list[0].args
-    assert judged[1] == "gpt-4o" and '"agregado": "casal"' in judged[2].replace("'", '"') and "Bom dia! Tem animais?" in judged[2]
+    assert judged[1] == "gpt-6-sol" and '"agregado": "casal"' in judged[2].replace("'", '"') and "Bom dia! Tem animais?" in judged[2]
     assert result["evaluated"] == 2
     report = result["evaluation"]
     assert report["aria"]["score"] == 7 and report["consultant"]["score"] == 7
@@ -110,3 +112,39 @@ def test_a_draft_too_short_is_never_reviewed(service):
         assert service.review_drafts(REF, ["1"]) == {"reviewed": 0, "cost_usd": 0.0}
     ai.assert_not_called()
     assert "SÓ o texto da «Resposta a avaliar»" in evaluation_prompt("x", [{"id": "a", "reply": "r"}])
+
+
+def test_the_calls_go_at_the_same_time_in_order_and_one_error_never_loses_the_others():
+    import threading
+    import time
+    from backend.api import run_parallel
+    seen = set()
+
+    def call(item):
+        seen.add(threading.get_ident())
+        time.sleep(0.05)
+        if item == "erro":
+            raise ValueError("falhou")
+        return item.upper()
+
+    started = time.monotonic()
+    outcomes = run_parallel(call, ["a", "erro", "c", "d"])
+    assert outcomes[0] == "A" and isinstance(outcomes[1], ValueError) and outcomes[2:] == ["C", "D"]
+    assert time.monotonic() - started < 0.15 and len(seen) > 1  # together, not 4 × 50 ms one after the other
+
+
+
+def test_the_program_signs_under_the_closing_never_twice():
+    from backend.ai import sign
+    assert sign("Cara Ana,\n\nObrigado.\n\nCom os melhores cumprimentos,", "Equipa X\nTel. 900") == \
+        "Cara Ana,\n\nObrigado.\n\nCom os melhores cumprimentos,\nEquipa X\nTel. 900"
+    # the AI signed anyway: its copy goes, the voice's stays
+    assert sign("Olá.\n\nCumprimentos,\nEquipa X\n", "Equipa X\nTel. 900").endswith("Cumprimentos,\nEquipa X\nTel. 900")
+    assert sign("", "Equipa X") == "" and sign("Olá.", "") == "Olá."
+
+
+def test_the_owners_parts_come_in_portuguese_whatever_the_customers_language():
+    # 02/10: the note and the file (for the owner) in pt-PT; only the reply in the customer's language
+    from backend.ai import REPLY_FORMAT
+    assert "em português de Portugal, seja qual for\na língua do cliente" in REPLY_FORMAT
+    assert "português de Portugal, seja qual for a língua da conversa" in evaluation_prompt("", [])

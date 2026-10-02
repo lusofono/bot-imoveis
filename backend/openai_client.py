@@ -61,9 +61,19 @@ def apply_prices(overrides):
             continue  # a broken entry never stops the page: the table's own price stays
 
 
+# 02/10: kept in the table (old costs stay right) but not offered: old and dear (gpt-4o, gpt-4.1), or above 3 € per
+# 100 interactions (gpt-6-astra). The Oficina can show them again (config.json "hidden_models").
+HIDDEN_DEFAULT = ("gpt-4o", "gpt-4.1", "gpt-6-astra")
+HIDDEN = {"models": set(HIDDEN_DEFAULT)}
+
+
+def apply_hidden(hidden):
+    HIDDEN["models"] = set(HIDDEN_DEFAULT if hidden is None else hidden)
+
+
 def models():
-    """The models on offer now: the table's, with the Oficina's own."""
-    return tuple(PRICE_PER_1K_USD)
+    """The models on offer now: the table's, with the Oficina's own, less the hidden ones."""
+    return tuple(model for model in PRICE_PER_1K_USD if model not in HIDDEN["models"])
 
 
 def estimate_cost_usd(model, prompt_tokens, completion_tokens):
@@ -108,11 +118,30 @@ def check_key(key, timeout=15):
     _request(MODELS_URL, key, data=None, timeout=timeout)
 
 
-def complete(key, model, prompt, timeout=90, json_mode=True):
+# 02/10: how much the model reasons before writing (Oficina; config.json "reasoning_effort"). Without it, a reasoning
+# model (gpt-5.x, gpt-6) used its own default and thought before every batch: slower, and those tokens are paid.
+# "none" by default: the replies are short and the prompt carries every rule. Only the models that take it get it.
+EFFORTS = ("none", "minimal", "low", "medium", "high")
+EFFORT_DEFAULT = "low"  # 02/10: the owner's choice — «low» is enough for these replies
+REASONING = {"effort": EFFORT_DEFAULT}
+
+
+def apply_effort(effort):
+    """The Oficina's choice; "" (or anything else) leaves each model its own default."""
+    REASONING["effort"] = effort if effort in EFFORTS else (EFFORT_DEFAULT if effort is None else "")
+
+
+def takes_effort(model):
+    return str(model).startswith(("gpt-5", "gpt-6", "o1", "o3", "o4"))
+
+
+def complete(key, model, prompt, timeout=90, json_mode=True, effort=None):
     """One completion: the prompt already carries every instruction, so a single user message is enough.
 
     json_mode: True for drafting replies (parsed back into structured drafts); False for a read-only
     summary the owner just reads, where forcing JSON would only get in the way.
+
+    effort: this call's reasoning effort, over the Oficina's (02/10: the test customers' emails go with "none").
 
     Returns (text, usage): usage is {"prompt_tokens", "completion_tokens", "total_tokens"} exactly as
     OpenAI billed it — always exact, unlike the €/$ estimate built from it later.
@@ -120,7 +149,16 @@ def complete(key, model, prompt, timeout=90, json_mode=True):
     data = {"model": model, "messages": [{"role": "user", "content": prompt}]}
     if json_mode:
         data["response_format"] = {"type": "json_object"}
-    body = _request(API_URL, key, data=data, timeout=timeout)
+    effort = REASONING["effort"] if effort is None else effort
+    if effort and takes_effort(model):
+        data["reasoning_effort"] = effort
+    try:
+        body = _request(API_URL, key, data=data, timeout=timeout)
+    except OpenAIError as exc:
+        if "reasoning_effort" not in data or "reasoning" not in str(exc).lower():
+            raise
+        data.pop("reasoning_effort")  # a model (or value) that does not take it: once more, with its own default
+        body = _request(API_URL, key, data=data, timeout=timeout)
     try:
         text = body["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError):
@@ -129,4 +167,6 @@ def complete(key, model, prompt, timeout=90, json_mode=True):
         raise OpenAIError("A OpenAI devolveu uma resposta vazia.")
     usage = body.get("usage") or {}
     return text, {"prompt_tokens": usage.get("prompt_tokens", 0), "completion_tokens": usage.get("completion_tokens", 0),
-                 "total_tokens": usage.get("total_tokens", 0)}
+                 "total_tokens": usage.get("total_tokens", 0),
+                 # 02/10: the hidden reasoning, part of the completion tokens (paid), to see what the effort changes
+                 "reasoning_tokens": ((usage.get("completion_tokens_details") or {}).get("reasoning_tokens") or 0)}

@@ -23,8 +23,9 @@ from .ai import (AFTER_VISIT_RULE, AFTER_VISIT_TEMPLATE, BOOKED_REPLY_RULE, DOCS
 from .configure import STARTER, example_profile
 from .evaluator import evaluation_prompt, parse_evaluations, text_hash
 from .mail import build_digest, build_reply, read_messages
-from .openai_client import (BUILTIN_CONTEXT, BUILTIN_PRICES, CONTEXT_FALLBACK, MODEL_DEFAULT, PRICE_PER_1K_USD,
-                            apply_context, apply_prices, complete, context_of, estimate_cost_usd, models)
+from .openai_client import (BUILTIN_CONTEXT, BUILTIN_PRICES, CONTEXT_FALLBACK, EFFORTS, MODEL_DEFAULT, PRICE_PER_1K_USD,
+                            REASONING, apply_context, apply_effort, apply_hidden, apply_prices, complete, context_of,
+                            estimate_cost_usd, models, HIDDEN)
 from .rules import (DAY, DEALS, EMAIL, KNOWLEDGE_FILE, deal_of, RGPD_STATES, SUBJECT_DEFAULT, VISIT_SLOT_DEFAULT, VISIT_STATES,
                     DOCUMENTS, FICHA_FIELDS, SELECTION_STATES, build_profile, check_profile, clean_ficha, documents_summary, draft_checks,
                     ficha_summary, merge_ficha,
@@ -64,9 +65,11 @@ INTERACTION_MARGIN = 0.20  # 27/09: the safety margin on the average cost of an 
 USD_PER_EUR, USD_PER_EUR_DATE = 1.1382, "2026-09-27"
 # Dashboard chart: period in days → days per bar (90 days per day would be 90 unreadable bars).
 CHART_PERIODS = {3: 1, 7: 1, 14: 1, 30: 1, 90: 7}
+SHORT_WAIT = 10  # 02/10: seconds a short operation (the queue, the drafts) waits its turn instead of failing at once
 ADDITION_MIN_TEXT = 20  # 30/09: an «acrescento» with less text than this goes when the customer writes again
 REVIEW_MIN_TEXT = 40  # 30/09: a draft shorter than this is not reviewed (a mark on 3 letters means nothing)
-CONTEXT_SHARE, BATCH_EMAILS = 50, 5  # 29/09: one call's limits by default (Oficina): % of the model's context, emails
+CONTEXT_SHARE, BATCH_EMAILS = 50, 5
+HIDDEN_DEFAULT_OF = lambda cfg: cfg["hidden_models"] if "hidden_models" in cfg else ("gpt-4o", "gpt-4.1", "gpt-6-astra")  # 29/09: one call's limits by default (Oficina): % of the model's context, emails
 
 VIEW_FIELDS = ("id", "kind", "date", "subject", "customer", "recipient", "blocked", "body_text", "body_truncated",
                "reply_text", "reply_status", "reply_error", "reply_message_id", "visit_window", "visit_slot",
@@ -102,6 +105,7 @@ IGNORE_KINDS = ("black", "grey")
 # from tokens; for this assistant 1 € = 1 US$, by the owner's choice (24/09): no rate, no conversion shown.
 # data/api_fuel.json was the one shared tank before: a property not filled since keeps its size and fill time.
 FUEL_DEFAULT_EUR = 5.0
+FUEL_TEST_EUR = 3.0  # 02/10: the test property's tank, unless the owner fills it with another amount
 FUEL_RESERVE = 0.15  # below this share of the tank, the reserve lamp lights up
 # Each property's reply-time limit, in hours: the top (H) of its temperature dial, set on the page like the
 # tank's size. Past it, the dial is overheated. 24 h until the owner sets another one.
@@ -260,6 +264,7 @@ class MailService:
     """
     def __init__(self, folder):
         self.folder = Path(folder).resolve()
+        self.reading = {}  # 02/10: the read in progress (stage, number of total, sender, subject); empty when none
         self.path = self.folder / "queue.json"
 
     def config(self):
@@ -267,6 +272,8 @@ class MailService:
         cfg = load_json(self.folder / "config.json", {})
         apply_prices(cfg.get("token_prices"))  # 29/09: the Oficina's token prices, for every estimate from here
         apply_context(cfg.get("model_context"))
+        apply_effort(cfg.get("reasoning_effort"))  # 02/10: how much the model reasons (Oficina)
+        apply_hidden(cfg.get("hidden_models"))  # 02/10: the models not offered (old and dear, or above 3 €)
         account = cfg.get("account", "")
         if not account or "@" not in account or any(c in account for c in "\r\n"):
             raise ValueError("Configura uma conta válida antes de usar.")
@@ -290,6 +297,7 @@ class MailService:
         """The one model for everything (replies, agenda, analysis, listings); an unknown one reads as the default."""
         cfg = cfg if cfg is not None else load_json(self.folder / "config.json", {})
         apply_prices(cfg.get("token_prices"))
+        apply_hidden(cfg.get("hidden_models"))
         model = cfg.get("openai_model")
         return model if model in models() else MODEL_DEFAULT
 
@@ -329,14 +337,17 @@ class MailService:
         token_prices = cfg.get("token_prices") or {}
         apply_prices(token_prices)
         apply_context(cfg.get("model_context"))
+        apply_hidden(cfg.get("hidden_models"))
         basis = self.interaction_cost(events)
         return {"mode": self.ai_mode(), "model": self.model(), "cost_basis": basis, "limits": self.call_limits(cfg),
                 "reviewer": self.reviewer_settings(cfg),
+                "reasoning_effort": cfg["reasoning_effort"] if "reasoning_effort" in cfg else "low",
                 "models": [{"id": model, "input_usd_per_1m": round(rates[0] * 1000, 4), "output_usd_per_1m": round(rates[1] * 1000, 4),
                             "per_100_usd": basis["per_100_usd"].get(model), "per_100_eur": basis["per_100_eur"].get(model),
                             "builtin": model in BUILTIN_PRICES, "edited": model in token_prices,
                             "context_tokens": context_of(model),
-                            "context_known": model in BUILTIN_CONTEXT or model in (cfg.get("model_context") or {})}
+                            "context_known": model in BUILTIN_CONTEXT or model in (cfg.get("model_context") or {}),
+                            "hidden": model in HIDDEN["models"]}
                            for model, rates in PRICE_PER_1K_USD.items()]}
 
     def call_limits(self, cfg=None):
@@ -345,14 +356,20 @@ class MailService:
         limits = (cfg if cfg is not None else load_json(self.folder / "config.json", {})).get("call_limits") or {}
         return {"context_share": limits.get("context_share", CONTEXT_SHARE), "batch_emails": limits.get("batch_emails", BATCH_EMAILS)}
 
+    def voice_signature(self):
+        """02/10: the signature the program puts under every AI draft (Voz e estilo), one or more lines."""
+        return str(((load_json(self.folder / "voice.json", {}).get("style") or {}).get("signature") or {}).get("text") or "")
+
     def reviewer_settings(self, cfg=None):
-        """30/09, Oficina: the evaluator's model (stronger than the one that writes: gpt-4o by default) and whether it
-        reviews the real drafts by itself after «Gerar respostas» (on by default)."""
+        """30/09, Oficina: the evaluator's model (stronger than the one that writes) and whether it reviews the real
+        drafts by itself after «Gerar respostas» (02/10: off by default — the owner runs it with «Rever os selecionados»)."""
         cfg = cfg if cfg is not None else load_json(self.folder / "config.json", {})
         reviewer = cfg.get("reviewer") or {}
         model = reviewer.get("model")
-        return {"model": model if model in models() else ("gpt-4o" if "gpt-4o" in models() else self.model(cfg)),
-                "auto": reviewer.get("auto", True) is not False}
+        # 02/10: gpt-6-sol by default, the strongest of those on offer (gpt-4o left the list)
+        return {"model": model if model in models() else next((m for m in ("gpt-6-sol", "gpt-5.6-terra", "gpt-4o")
+                                                               if m in models()), self.model(cfg)),
+                "auto": reviewer.get("auto") is True}  # 02/10: only when the owner asks, unless switched on
 
     def set_reviewer(self, model, auto):
         self.model()  # the Oficina's models too
@@ -380,8 +397,10 @@ class MailService:
         model = self.reviewer_settings(cfg)["model"]
         key = openai_api_key(self.folder, cfg["account"])
         found, cost = {}, 0.0
-        for start in range(0, len(chosen), 5):
-            batch = chosen[start:start + 5]
+        moment = datetime.now().astimezone()
+        batches = [chosen[start:start + 5] for start in range(0, len(chosen), 5)]
+        prompts = []
+        for batch in batches:
             items = []
             for email in batch:
                 turns = sorted(email.get("history") or [], key=lambda turn: str(turn.get("ts") or turn.get("at") or ""))
@@ -389,14 +408,22 @@ class MailService:
                 if message and not any(turn.get("text") == message for turn in turns):
                     turns.append({"who": "cliente", "text": message})
                 items.append({"id": email["id"], "turns": turns, "reply": email["reply_text"]})
-            answer, usage = complete(key, model, evaluation_prompt(current["instructions"], items, hidden=False,
-                                                                   now=datetime.now().astimezone()))
+            prompts.append(evaluation_prompt(current["instructions"], items, hidden=False, now=moment))
+        # 02/10: the reviews at the same time, as the replies themselves (api.run_parallel)
+        from .api import run_parallel
+        outcomes = run_parallel(lambda prompt_text: complete(key, model, prompt_text), prompts)
+        if outcomes and all(isinstance(outcome, Exception) for outcome in outcomes):
+            raise outcomes[0]
+        for batch, outcome in zip(batches, outcomes):
+            if isinstance(outcome, Exception):
+                continue
+            answer, usage = outcome
             part = estimate_cost_usd(model, usage.get("prompt_tokens"), usage.get("completion_tokens"))
             cost += part
             self.log("openai_usage", model=model, **usage, reference=ref, cost_usd=round(part, 6), purpose="review")
             found.update(parse_evaluations(answer, [email["id"] for email in batch]))
         texts = {email["id"]: email["reply_text"] for email in chosen}
-        with locked(self.folder):
+        with locked(self.folder, wait=SHORT_WAIT):
             data = self.load(ref)
             for item in data["emails"]:
                 review = found.get(item["id"])
@@ -406,6 +433,34 @@ class MailService:
             self.save(data, ref)
         self.log("drafts_reviewed", reference=ref, count=len(found))
         return {"reviewed": len(found), "cost_usd": round(cost, 6)}
+
+    def set_hidden(self, model, hidden):
+        """02/10, Oficina: take a model off the list on offer (it keeps its price, for the old costs), or put it back."""
+        self.model()
+        if model not in PRICE_PER_1K_USD:
+            raise ValueError("Modelo desconhecido.")
+        with locked(self.folder):
+            cfg = load_json(self.folder / "config.json", {})
+            current = set(HIDDEN_DEFAULT_OF(cfg))
+            current = current | {model} if hidden else current - {model}
+            if hidden and model in (cfg.get("openai_model"), (cfg.get("reviewer") or {}).get("model")):
+                raise ValueError("É o motor (ou o avaliador) em uso: escolhe outro antes de o tirar da lista.")
+            cfg["hidden_models"] = sorted(current)
+            save_json(self.folder / "config.json", cfg)
+            self.log("model_hidden", model=model, hidden=bool(hidden))
+        return self.ai_settings()
+
+    def set_effort(self, effort):
+        """02/10, Oficina: the reasoning effort for every call (none, minimal, low, medium, high), or "" for each model's own."""
+        if effort not in ("", *EFFORTS):
+            raise ValueError("Esforço inválido: nenhum, mínimo, baixo, médio, alto ou o do modelo.")
+        with locked(self.folder):
+            cfg = load_json(self.folder / "config.json", {})
+            cfg["reasoning_effort"] = effort
+            save_json(self.folder / "config.json", cfg)
+            self.log("reasoning_effort_set", effort=effort or "modelo")
+        apply_effort(effort)
+        return self.ai_settings()
 
     def set_call_limits(self, context_share, batch_emails):
         if (isinstance(context_share, bool) or not isinstance(context_share, int) or not 10 <= context_share <= 90
@@ -421,7 +476,8 @@ class MailService:
     def set_context(self, model, tokens):
         """A model's context window, in tokens, as OpenAI announces it; 0 puts the default back."""
         model = " ".join(str(model or "").split())
-        if model not in models():
+        self.model()  # the Oficina's models too
+        if model not in PRICE_PER_1K_USD:  # hidden ones included: their numbers stay right
             raise ValueError("Modelo desconhecido.")
         if isinstance(tokens, bool) or not isinstance(tokens, int) or not (tokens == 0 or 4000 <= tokens <= 10_000_000):
             raise ValueError("O contexto é um número de tokens, de 4.000 a 10.000.000 (0 para o valor de partida).")
@@ -638,7 +694,7 @@ class MailService:
         return result
 
     def pending(self, property_ref=None):
-        with locked(self.folder):
+        with locked(self.folder, wait=SHORT_WAIT):
             profiles = self.profiles()
             if not profiles:
                 self.pick(profiles, property_ref)
@@ -656,6 +712,14 @@ class MailService:
         days (terminal, MCP): reach back at least that far this time, in every property."""
         if days is not None and (isinstance(days, bool) or not isinstance(days, int) or not 1 <= days <= 365):
             raise ValueError("Indica os dias para trás: um número de 1 a 365.")
+        self.reading.clear()
+        self.reading.update(stage="connect")  # 02/10: what the read is doing, for the page (api read/progress)
+        try:
+            return self.read_now(days)
+        finally:
+            self.reading.clear()
+
+    def read_now(self, days):
         with locked(self.folder):
             cfg = self.config()
             profiles = self.profiles()
@@ -721,9 +785,15 @@ class MailService:
             messages, scanned, mailbox = read_messages(
                 cfg["account"], app_password(self.folder, cfg["account"]),
                 "" if profiles else cfg.get("subject_contains", ""), start.isoformat(),
-                datetime.now(timezone.utc).date().isoformat(),
+                # 02/10: up to tomorrow (UTC), with a day to spare — Gmail's IMAP counts days in the account's own time
+                # zone, so between 00:00 and 01:00 in Lisbon «today in UTC» left out the emails already dated the next
+                # day (20 test notices sent at 00:14 never came in). The IDs keep a wider window from importing twice.
+                (datetime.now(timezone.utc).date() + timedelta(days=1)).isoformat(),
                 mailbox=cfg.get("mailbox", "all"), incoming_only=bool(profiles) or cfg.get("incoming_only", True),
-                accept=accept, outgoing=outgoing, accept_outgoing=accept_outgoing)
+                accept=accept, outgoing=outgoing, accept_outgoing=accept_outgoing,
+                progress=lambda number, total, sender, subject: self.reading.update(
+                    stage="read", number=number, total=total, sender=str(sender)[:60], subject=str(subject)[:90]))
+            self.reading.update(stage="save")
             added, ambiguous, contacts, received = dict.fromkeys(refs, 0), 0, [], {}
             for item in messages:
                 ref, kind, customer = route(item, profiles, queues) if profiles else (None, "general", None)
@@ -988,7 +1058,7 @@ class MailService:
         """Saves drafts in a batch; visits: the visit time or the visit status the assistant marked per email;
         fichas: the customer's file as the assistant updated it, kept at once (like a visit status)."""
         visits, fichas = visits or [], fichas or []
-        with locked(self.folder):
+        with locked(self.folder, wait=SHORT_WAIT):
             ref = self.pick(self.profiles(), property_ref)
             data = self.load(ref)
             self.check_revision(data, expected_revision)
@@ -1911,7 +1981,22 @@ class MailService:
                 raise ValueError("As visitas só existem com imóveis.")
             if load_visits(self.folder, ref).get("closed_at"):
                 raise ValueError("Este imóvel já tem as visitas fechadas.")
-            return {"property_ref": ref, "customers": self.candidates(ref, self.load(ref))}
+            data = self.load(ref)
+            # 02/10: who is not in the list at all, for the round card's line (5 of 20 was a surprise): the ignored,
+            # the inactive and the new requests still unanswered (no conversation until our first reply goes out)
+            # Of those «por responder», the ones whose only email waiting is a visit proposal of ours (a round
+            # prepared and not sent yet) are told apart: they are not waiting for an answer to what they wrote.
+            conversations = data.get("conversations", {})
+            address = lambda item: ((item.get("recipient") or {}).get("email") or "").casefold()
+            waiting = {address(item) for item in data["emails"]} - {""}
+            proposals = {address(item) for item in data["emails"] if item.get("kind") == "visit_proposal"}
+            others = {address(item) for item in data["emails"] if item.get("kind") != "visit_proposal"}
+            customers = self.candidates(ref, data)
+            left_out = {"ignored": sum(1 for c in conversations.values() if c.get("ignored")),
+                        "inactive": sum(1 for c in conversations.values() if c.get("inactive") and not c.get("ignored")),
+                        "new": len(waiting - set(conversations)),
+                        "proposal": sum(1 for c in customers if c["state"] == "pending" and c["email"] in proposals - others)}
+            return {"property_ref": ref, "customers": customers, "left_out": left_out}
 
     def visit_round_summary(self, property_ref=None, window_id=None):
         """Who a visit round went to, and where each one stands now: booked (and when), declined, or still
@@ -1956,7 +2041,12 @@ class MailService:
         fill (1 € = 1 US$). A property never filled keeps the old shared tank (data/api_fuel.json), with its
         own spending; with neither, no limit, as before tanks existed. Spent is an estimate, like the cost.
         ref None: the folder without properties, whose tank is data/api_fuel.json and counts every call."""
-        tank = (load_panel(self.folder, ref) if ref else {}).get("tank") or load_json(self.folder / "api_fuel.json", None)
+        own = (load_panel(self.folder, ref) if ref else {}).get("tank")
+        tank = own or load_json(self.folder / "api_fuel.json", None)
+        if not own and ref and self.is_test(ref):
+            # 02/10: the test property is capped too, at 3 €, until it is filled with another amount; counted, like the
+            # others, from the old shared tank's fill (with none, from the first call)
+            tank = {"capacity_eur": FUEL_TEST_EUR, "filled_at": (tank or {}).get("filled_at") or ""}
         if not tank:
             return {"configured": False, "capacity_eur": FUEL_DEFAULT_EUR, "spent_eur": 0, "remaining_eur": None,
                     "reserve": False, "empty": False, "filled_at": None}
@@ -1971,7 +2061,8 @@ class MailService:
 
     def fill_fuel(self, property_ref=None, capacity_eur=None):
         """Fills a property's tank: from now on the API may spend up to capacity_eur there again (estimated)."""
-        capacity = number_in(FUEL_DEFAULT_EUR if capacity_eur in (None, "") else capacity_eur, (0.5, 1000),
+        default = FUEL_TEST_EUR if property_ref and self.is_test(property_ref) else FUEL_DEFAULT_EUR
+        capacity = number_in(default if capacity_eur in (None, "") else capacity_eur, (0.5, 1000),
                              "O depósito vai de 0,50 € a 1000 €.", digits=2)
         tank = {"capacity_eur": capacity, "filled_at": now()}
         with locked(self.folder):
@@ -1984,6 +2075,10 @@ class MailService:
                 save_json(self.folder / "api_fuel.json", tank)
             self.log("fuel_filled", reference=ref, capacity_eur=tank["capacity_eur"])
         return self.api_fuel(ref)
+
+    def is_test(self, ref):
+        """The test property (profile "test", 29/09)."""
+        return bool(load_json(self.folder / "properties" / ref / "profile.json", {}).get("test"))
 
     def panel(self, ref):
         """How a property's instrument panel reads: its reply-time limit (the H of the temperature dial), and
@@ -2382,7 +2477,8 @@ class MailService:
                 raise ValueError("Verifica primeiro no Gmail o envio com resultado incerto.")
             common = clean_round(common, [item["id"] for item in items])
             for item in items:
-                item.update(reply_text=round_text(common, item["id"]), send_reply=False, reply_status="draft")
+                item.update(reply_text=round_text(common, item["id"], self.voice_signature()), send_reply=False,
+                            reply_status="draft")
             data.pop("send_preview", None)
             agenda = load_visits(self.folder, ref)
             window = next((w for w in agenda["windows"] if w["id"] == window_id), None)
@@ -3102,6 +3198,8 @@ class MailService:
             openai_month, month_start = Counter(), (today - timedelta(days=29)).isoformat()
             per = {ref: {"requests": Counter(), "sent": Counter(), "waited": [], "period": Counter(),
                          "all_time": Counter()} for ref in refs}
+            # 02/10: the test property's API cost, for its own tank in Depósitos (it was counted as unattributed)
+            tests = {ref: {"period": Counter(), "all_time": Counter()} for ref in sorted(test_refs & set(profiles))}
             for event in events:
                 if event.get("event") == "read" and isinstance(event.get("received"), dict):
                     arrived.update({key: day for key, day in event["received"].items() if str(key) not in test_ids})
@@ -3140,6 +3238,10 @@ class MailService:
                         per[event["reference"]]["all_time"].update(usage)
                         if in_period:
                             per[event["reference"]]["period"].update(usage)
+                    elif event.get("reference") in tests:
+                        tests[event["reference"]]["all_time"].update(usage)
+                        if in_period:
+                            tests[event["reference"]]["period"].update(usage)
                     else:
                         unattributed.update(usage)
             merged = {key: day for key, day in {**derived, **arrived}.items() if str(key) not in test_ids}
@@ -3174,6 +3276,10 @@ class MailService:
                                      "month": usage_of(openai_month),
                                      "unattributed": usage_of(unattributed)},
                     "api_fuel": self.api_fuel(None, events),
+                    # 02/10: the test property's tank, apart from the properties (it never counts in the Painel)
+                    "test_tanks": [{"property_ref": ref, "api_fuel": self.api_fuel(ref, events),
+                                    "openai_usage": {"period": usage_of(mine["period"]), "all_time": usage_of(mine["all_time"])}}
+                                   for ref, mine in tests.items()],
                     "setup": {"account": bool(account), "app_password": has_app_password(self.folder, account),
                               "voice": self.voice_ready(), "properties": len(profiles),
                               "openai_key": has_openai_api_key(self.folder, account)}}
@@ -3265,9 +3371,11 @@ class MailService:
                 if choices.get(key) not in (style.get(key) or {}).get("options", {}):
                     raise ValueError(f"Opção inválida: {key}.")
                 style[key].update(selected=choices[key], status="configured")
-            signature = " ".join(str(choices.get("signature") or "").split())
-            if not signature or len(signature) > 200:
-                raise ValueError("A assinatura é obrigatória (até 200 caracteres).")
+            # 02/10: one or more lines (a bigger signature), each tidied; the program puts it under every AI draft
+            signature = "\n".join(" ".join(line.split()) for line in str(choices.get("signature") or "").splitlines()
+                                  if line.strip())
+            if not signature or len(signature) > 600 or signature.count("\n") > 7:
+                raise ValueError("A assinatura é obrigatória (até 600 caracteres e 8 linhas).")
             style["signature"].update(text=signature, status="configured")
             # Both go into the headers: one line only, never a newline the page could smuggle in.
             name = " ".join(str(choices.get("sender_name") or "").split())

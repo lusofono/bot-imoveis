@@ -98,17 +98,18 @@ def test_generating_clients_sends_each_notice_and_a_copy_for_the_consultant(serv
     with pytest.raises(ValueError, match="desta conta"):
         testlab.set_contest(service, True, ACCOUNT)
     SMTP.sent = []
-    with patch("backend.testlab.complete", return_value=(json.dumps(invented), {"prompt_tokens": 100, "completion_tokens": 50})), \
+    with patch("backend.testlab.complete", return_value=(json.dumps(invented), {"prompt_tokens": 100, "completion_tokens": 50})) as ai, \
             patch("backend.testlab.openai_api_key", return_value="k"), patch("backend.testlab.app_password", return_value="p"), \
             patch("backend.testlab.smtplib.SMTP_SSL", SMTP):
         result = testlab.generate_clients(service, 2, "2026-09-29T12:00:00+01:00")
+    assert ai.call_args.kwargs["effort"] == "none"  # 02/10: the test customers need no reasoning
     assert result["created"] == ["Sergii Sviatokha", "Ana Teste"]
     ours = [msg for msg in SMTP.sent if msg["To"] == ACCOUNT]
     copies = [msg for msg in SMTP.sent if msg["To"] == "consultor@example.com"]
     assert len(ours) == len(copies) == 2
     assert {msg["X-ARIA-Teste"] for msg in ours} == {"1"} and {msg["X-ARIA-Teste"] for msg in copies} == {"consultor"}
     assert ours[0]["Reply-To"] == "Sergii Sviatokha <owner+cd1@example.com>" and ours[1]["Reply-To"].endswith("<owner+cd2@example.com>")
-    assert ours[0]["Subject"] == f"Mensagem de teste de Sergii Sviatokha sobre o teu imóvel, com ref: {TEST_REF}"
+    assert ours[0]["Subject"] == f"TEST! Mensagem de teste de Sergii Sviatokha sobre o teu imóvel, com ref: {TEST_REF}"
     assert copies[0]["Subject"].startswith("[consultor] ")
     # The hidden profile stays in the lab's file, never in what the page gets.
     assert "segredos" not in json.dumps(result)
@@ -172,6 +173,57 @@ def test_wiping_starts_the_test_property_over_and_never_reuses_an_address(servic
     assert testlab.load_lab(service.folder)["next_number"] == 2
 
 
+def test_the_conversations_come_out_as_one_text_file_with_the_hidden_profile_and_the_marks(service):
+    # 02/10: «Descarregar as conversas», to read the whole test at leisure (before a wipe, say)
+    with_test_property(service)
+    read(service, [marked_notice("t1")])
+    lab = testlab.load_lab(service.folder)
+    lab["clients"] = [{"number": 1, "name": "Sergii Sviatokha", "language": "uk", "address": "owner+cd1@example.com",
+                       "message": "Ainda está disponível?", "profile": {"agregado": "dois adultos", "segredos": "um gato"},
+                       "created_at": "2026-10-02T10:00:00+01:00"},
+                      {"number": 2, "name": "Ana Nova", "address": "owner+cd2@example.com",
+                       "message": "Olá, posso visitar?", "created_at": "2026-10-02T10:05:00+01:00"}]
+    lab["evaluations"] = [{"at": "2026-10-02T11:00:00+01:00", "number": 1, "name": "Sergii Sviatokha", "side": "aria",
+                           "notes": {"factos": 9, "voz": 7}, "score": 8.0, "errors": ["esqueceu a linha 🏠"],
+                           "summary": "Boa, mas sem a linha."}]
+    testlab.save_lab(service.folder, lab)
+    draft_and_send_to(service, "t1", TEST_REF)
+    ours = service.load(TEST_REF)["conversations"]["owner+cd1@example.com"]["sent_message_ids"][-1]
+    read(service, [{"gmail_message_id": "t2", "from": [{"email": ACCOUNT}], "test": True,
+                    "reply_to": [{"name": "Sergii", "email": "owner+cd1@example.com"}], "in_reply_to": ours,
+                    "subject": "Re: resposta", "body_text": "Somos dois adultos e um gato."}])
+
+    result = testlab.transcript(service, "2026-10-02T12:00:00+01:00")
+    assert result["filename"] == f"teste-{TEST_REF}-2026-10-02.txt" and result["clients"] == 2
+    text = result["text"]
+    assert "1. Sergii Sviatokha · uk · owner+cd1@example.com" in text
+    assert "Perfil escondido (o que a ARIA não sabe):\n  agregado: dois adultos\n  segredos: um gato" in text
+    assert "ARIA\nOlá." in text  # our reply, in order after their first message
+    assert "CLIENTE — por responder, na fila das Comunicações\nSomos dois adultos e um gato." in text
+    assert "ARIA: 8.0 / 10 (factos 9 · voz 7) — Boa, mas sem a linha.\n    · esqueceu a linha 🏠" in text
+    # a customer still without our first reply: their portal message, and the state says so
+    assert "2. Ana Nova · owner+cd2@example.com" in text and "ainda sem resposta nossa" in text
+    assert "Olá, posso visitar?" in text
+    assert text.index("1. Sergii") < text.index("2. Ana Nova")
+
+
+def test_the_test_property_has_a_tank_of_its_own_of_3_euros_in_the_painel(service):
+    # 02/10: its API cost goes to its own tank (3 € unless filled otherwise), shown apart in Depósitos
+    with_test_property(service)
+    service.log("openai_usage", model="gpt-6-luna", prompt_tokens=10, completion_tokens=5, reference=TEST_REF, cost_usd=1.0)
+    fuel = service.api_fuel(TEST_REF)
+    assert (fuel["configured"], fuel["capacity_eur"], fuel["remaining_eur"]) == (True, 3.0, 2.0)
+    metrics = service.metrics()
+    assert TEST_REF not in [item["property_ref"] for item in metrics["properties"]]
+    [tank] = metrics["test_tanks"]
+    assert tank["property_ref"] == TEST_REF and tank["api_fuel"]["remaining_eur"] == 2.0
+    assert tank["openai_usage"]["all_time"]["calls"] == 1 and metrics["openai_usage"]["unattributed"]["calls"] == 0
+    assert service.fill_fuel(TEST_REF)["remaining_eur"] == 3.0  # filled: 3 € again, from zero
+    service.log("openai_usage", model="gpt-6-luna", prompt_tokens=10, completion_tokens=5, reference=TEST_REF, cost_usd=3.5)
+    with pytest.raises(ValueError, match="depósito da API de AP_teste1 está vazio"):
+        service.require_fuel(TEST_REF)
+
+
 class Never:
     """A random source that never adds the fractional extra customer."""
     def random(self):
@@ -205,6 +257,8 @@ def test_a_round_answers_the_aria_and_the_consultant_in_character_and_only_once(
             patch("backend.testlab.smtplib.SMTP_SSL", SMTP):
         result = testlab.advance(service, "2026-09-29T18:00:00+01:00", Never())
         prompt = ai.call_args.args[2]
+        assert ai.call_args.kwargs["effort"] == "none"  # their answers: no reasoning
+        assert "effort" not in ai.call_args_list[0].kwargs  # the evaluator: the Oficina's effort
         again = testlab.advance(service, "2026-09-29T18:05:00+01:00", Never())
     assert (result["aria"], result["consultant"], result["silent"], result["new"]) == (["Sergii Sviatokha"], ["Sergii Sviatokha"], [], [])
     assert "Olá, pode dizer-nos quantas pessoas são?" in prompt and "Bom dia, quantos são?" in prompt and '"agregado": "casal"' in prompt

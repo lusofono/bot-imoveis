@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timedelta, timezone
 import pytest
 from test_properties import draft_and_send, lead, read, service  # noqa: F401 (service is a fixture)
+from conftest import midnight_sensitive  # noqa: E402 (02/10: skipped between 00:00 and 01:00 local)
 
 
 def log_event(service, days_ago, **fields):
@@ -20,6 +21,7 @@ def requests_by_day(service, days=14):
     return {day["day"]: day["requests"] for day in service.metrics(days)["by_day"] if day["requests"]}
 
 
+@midnight_sensitive
 def test_a_request_still_counts_after_it_is_answered_and_leaves_the_queue(service):
     read(service, [lead("1")])
     today = service.metrics()["by_day"][-1]["day"]
@@ -71,6 +73,7 @@ def test_no_openai_usage_yet_is_all_zeros(service):
     assert usage["period"] == usage["all_time"] == {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0, "cost_usd": 0}
 
 
+@midnight_sensitive
 def test_each_property_gets_its_own_numbers_and_old_events_are_attributed(service):
     from test_properties import REF
     from backend.store import save_json

@@ -73,18 +73,22 @@
   </section>
 
   <section id="tab-replies" hidden>
-    <div class="page-heading"><div><p class="eyebrow" data-word="replies.eyebrow">COMUNICAÇÃO</p><h1 data-word="replies.title">Uma boa resposta começa aqui.</h1><p class="step">Prepara em lote. Revê cada conversa. Envia quando estiver tudo certo.</p></div></div>
+    <div class="page-heading"><div><p class="eyebrow" data-word="replies.eyebrow">COMUNICAÇÃO</p><div class="title-row"><h1 data-word="replies.title">Uma boa resposta começa aqui.</h1><span id="test-badge" class="test-badge" hidden>IMÓVEL DE TESTE — o que se faz aqui só chega a clientes de teste</span></div><p class="step">Prepara em lote. Revê cada conversa. Envia quando estiver tudo certo.</p></div></div>
     <!-- The steps bar (Selecionar · Preparar · Rever e enviar) left on 27/09: each card says its own step. -->
     <!-- 27/09, evening: on top, «Ler emails» (2/3) beside «Gerar respostas» (1/3); below, each email with its actions -->
     <!-- 27/09: the property first and apart, as in the other tabs (propertySwitcher draws over this row); then «Ler
          emails»: its title, the last read, and below them the button, as in steps 2 and 3 -->
-    <div class="queue-row"><label class="muted">Imóvel <select id="queue"></select></label></div>
-    <div class="reply-layout"><aside class="batch-column" aria-label="Ler e preparar"><article class="card read-card" id="read-step">
-      <p class="eyebrow">CAIXA DE CORREIO</p><h2>Ler emails</h2>
-      <!-- 30/09: the last read on the button's line, on the right: one line less -->
+    <!-- 02/10: «Ler emails» above the property: one read brings every property's emails, whichever is chosen -->
+    <article class="card read-card" id="read-step">
+      <p class="eyebrow">CAIXA DE CORREIO</p>
+      <!-- 02/10: the last read on the title's line, on the right; the button's line is for the read's progress -->
+      <div class="read-title"><h2>Ler emails</h2><p id="last-read" class="muted small"></p></div>
       <div class="actions read-actions"><button id="read" class="primary"><span class="step-num" aria-hidden="true">1</span>Ler emails do Gmail</button>
-        <p id="last-read" class="muted small"></p></div>
-    </article><article class="card copy-only" id="import-step"><p class="eyebrow">PASSO 03</p><h2>Importar respostas <span class="kind kind-copy">Copiar/colar</span></h2>
+        <!-- 02/10: what the read is doing, beside the button, while it works -->
+        <p id="read-progress" class="read-progress" aria-live="polite" hidden></p></div>
+    </article>
+    <div class="queue-row"><label class="muted">Imóvel <select id="queue"></select></label></div>
+    <div class="reply-layout"><aside class="batch-column" aria-label="Importar respostas"><article class="card copy-only" id="import-step"><p class="eyebrow">PASSO 03</p><h2>Importar respostas <span class="kind kind-copy">Copiar/colar</span></h2>
     <textarea id="answer" aria-label="Resposta do ChatGPT" rows="6" placeholder="Cola aqui a resposta completa do ChatGPT (o bloco JSON)"></textarea>
     <div class="actions"><button id="paste" class="primary">Guardar rascunhos</button></div>
     <p id="import-status" class="alert ok" hidden></p>
@@ -117,8 +121,14 @@
           <textarea id="gpt-answer" aria-label="Resposta do ChatGPT" rows="5" placeholder="Cola aqui a resposta do ChatGPT (o bloco JSON)"></textarea>
           <div class="actions"><button id="gpt-paste" type="button" class="primary">Guardar rascunhos</button></div>
         </details>
-        <details id="sent-prompt-box" class="api-only-show prompt-view" hidden><summary class="muted small">Ver o que foi enviado à IA</summary><pre id="sent-prompt"></pre></details>
-        <div id="notes"></div></div>
+        <details id="sent-prompt-box" class="api-only-show prompt-view" hidden><summary class="muted small">Ver o que foi enviado à IA</summary><pre id="sent-prompt"></pre></details></div>
+    </article>
+    <!-- 02/10: the reviewer only when asked for, between 2 and 3 -->
+    <article class="card step-card review-step" id="review-step">
+      <div class="step-top"><p class="eyebrow">REVISOR · OPCIONAL</p><h2>Rever com a IA</h2>
+        <p class="step">Só quando quiseres: um segundo modelo dá nota aos rascunhos dos emails selecionados e aponta os erros, por baixo de cada um.</p></div>
+      <div class="step-action"><div class="actions"><button id="review-run" class="needs-fuel">Rever os selecionados</button></div></div>
+      <div class="step-extra"></div>
     </article>
     <article class="card step-card" id="send-step">
       <div class="step-top"><p class="eyebrow" id="send-step-label">PASSO 04</p><h2>Rever e enviar</h2>
@@ -127,6 +137,10 @@
       <div class="step-extra"></div>
     </article>
     </div>
+    <!-- 02/10: the AI's notes on the drafts, out of step 2: a panel of their own under the steps, the full width, the
+         notes side by side so it is less tall; hidden without any -->
+    <section class="card notes-panel" id="notes-panel" hidden><p class="eyebrow">NOTAS DA IA SOBRE OS RASCUNHOS</p>
+      <div id="notes" class="notes-grid"></div></section>
     <div id="preview-box"></div>
     <!-- 29/09: the order of the cards (and of the names in each column of the table above), kept in this browser -->
     <div class="row card-sort"><label>Ordenar <select id="card-sort" aria-label="Ordenar os emails">

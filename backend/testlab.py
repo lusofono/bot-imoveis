@@ -23,11 +23,12 @@ from .ai import extract_json, now_line
 from .evaluator import averages, evaluation_prompt, parse_evaluations
 from .mail import TEST_HEADER, connect, find_all_mailbox, parse_addresses
 from .openai_client import complete, estimate_cost_usd
-from .rules import EMAIL, QUOTE
+from .rules import EMAIL, QUOTE, VISIT_STATES, ficha_summary
 from .secrets import app_password, openai_api_key
-from .store import load_contacts, load_json, locked, save_contacts, save_json, save_visits
+from .store import load_contacts, load_json, load_visits, locked, save_contacts, save_json, save_visits
 
 MAX_NEW = 20  # customers per click
+TEST_EFFORT = "none"  # 02/10: the reasoning effort of the test customers' emails (the evaluator keeps the Oficina's)
 NEW_PERCENT = 10  # 29/09: the new customers per round of «Avançar o teste», as a share of those already in; editable
 LANGUAGES = "cerca de metade em português de Portugal, alguns em português do Brasil, um quarto em inglês e um ou outro " \
             "noutra língua (francês, alemão, italiano, ucraniano, urdu…)"
@@ -69,7 +70,8 @@ def notice(account, ref, profile, client, to=None, consultant=False):
     msg["From"] = formataddr(("idealista (teste)", account))
     msg["To"] = to or account
     msg["Reply-To"] = formataddr((client["name"], client["address"]))
-    subject = f"Mensagem de teste de {client['name']} sobre o teu imóvel, com ref: {ref}"
+    # 02/10: «TEST!» first, to tell the test emails apart at a glance in the inbox
+    subject = f"TEST! Mensagem de teste de {client['name']} sobre o teu imóvel, com ref: {ref}"
     msg["Subject"] = ("[consultor] " if consultant else "") + subject
     msg["Date"] = formatdate(localtime=True)
     msg["Message-ID"] = make_msgid(domain="gmail.com")
@@ -190,7 +192,8 @@ def generate_clients(service, count, now):
         lab = load_lab(service.folder)
         remember_test(service.folder, lab, ref)
         prompt = clients_prompt(profile, profile.get("_knowledge") or [], count, [c["name"] for c in lab["clients"]])
-        answer, usage = complete(openai_api_key(service.folder, account), model, prompt)
+        # 02/10: the test customers' emails need no reasoning: «none», whatever the Oficina's effort
+        answer, usage = complete(openai_api_key(service.folder, account), model, prompt, effort=TEST_EFFORT)
         cost = estimate_cost_usd(model, usage.get("prompt_tokens"), usage.get("completion_tokens"))
         service.log("openai_usage", model=model, **usage, reference=ref, cost_usd=round(cost, 6))
         found = extract_json(answer)
@@ -251,6 +254,121 @@ def wipe(service):
         save_lab(service.folder, lab)
     service.log("testlab_wiped", reference=ref, clients=removed, conversations=conversations)
     return {**lab_view(service), "removed": removed}
+
+
+# ===== «Descarregar as conversas» (02/10): every test customer's whole story in one text file, to read at leisure —
+# before a wipe, say. Who they are (and their hidden profile, which the ARIA never sees), where they stand, each email
+# both ways in order, what is still waiting in the queue, the consultant's side and the evaluator's marks. =====
+
+RULE = "=" * 72
+
+
+def local_time(value):
+    """«02/10 01:16», in the computer's own time zone; the text as it came when it is no date."""
+    moment = aware_time(value)
+    if not moment:
+        return str(value or "")
+    if len(str(value)) == 10:  # a day without the time
+        return moment.strftime("%d/%m")
+    return (moment.astimezone() if moment.tzinfo else moment).strftime("%d/%m %H:%M")
+
+
+def story_turns(turns, us="ARIA", waiting=()):
+    """waiting: the customer's texts still unanswered in the queue (they are in the conversation from the read on)."""
+    lines = []
+    for turn in turns:
+        text = own_text(turn.get("text")) or str(turn.get("text") or "").strip()
+        who = "CLIENTE" if turn.get("who") == "cliente" else us
+        if who == "CLIENTE" and text and text in waiting:
+            who += " — por responder, na fila das Comunicações"
+        lines += ["", f"[{local_time(turn.get('ts') or turn.get('at'))}] {who}", text or "(vazio)"]
+    return lines
+
+
+def transcript(service, now):
+    """The test property's conversations as text: {"filename", "text", "clients"}."""
+    ref, profile = test_property(service)
+    with locked(service.folder):
+        data = service.load(ref)
+        slots = load_visits(service.folder, ref)["slots"]
+    lab = load_lab(service.folder)
+    conversations = data.get("conversations") or {}
+    address = lambda item: ((item.get("recipient") or {}).get("email") or "").casefold()
+    marks = {}
+    for mark in lab.get("evaluations") or []:
+        marks.setdefault(mark.get("number"), []).append(mark)
+    prop = profile.get("property") or {}
+    stamp = local_time(now)
+    lines = [f"ARIA — conversas do teste · {ref} · {prop.get('description') or ''}".rstrip(" ·"),
+             f"Descarregado a {stamp} · {len(lab['clients'])} cliente(s) de teste · horas locais", ""]
+
+    def story(email, conversation, client=None):
+        part = [RULE]
+        title = f"{client['number']}. {client['name']}" if client else (conversation.get("name") or email)
+        part.append(title + (f" · {client.get('language')}" if client and client.get("language") else "")
+                    + f" · {email}")
+        state = []
+        if client and client.get("created_at"):
+            state.append(f"entrou a {local_time(client['created_at'])}")
+        if conversation:
+            ficha = ficha_summary(conversation.get("ficha"))
+            state.append("ficha completa" if ficha["complete"] else "ficha: falta " + ", ".join(ficha["falta"]))
+        booked = [slot["at"] for slot in slots if slot.get("customer") == email]
+        if booked:
+            state.append("visita marcada: " + ", ".join(booked))
+        if conversation.get("visit") in VISIT_STATES:
+            state.append(VISIT_STATES[conversation["visit"]])
+        if conversation.get("ignored"):
+            state.append("na lista de ignorados" + (f" ({conversation['ignored_reason']})"
+                                                    if conversation.get("ignored_reason") else ""))
+        if conversation.get("inactive"):
+            state.append("inativo")
+        if client and client.get("ended"):
+            state.append("a história dele terminou")
+        if not conversation:
+            state.append("ainda sem resposta nossa")
+        part.append("Estado: " + "; ".join(state))
+        if client and client.get("profile"):
+            part += ["", "Perfil escondido (o que a ARIA não sabe):"]
+            part += [f"  {key}: {value}" for key, value in client["profile"].items() if str(value).strip()]
+        part += ["", "--- CONVERSA COM A ARIA (a mais antiga primeiro)"]
+        turns = conversation.get("history") or []
+        if not turns and client and client.get("message"):
+            turns = [{"who": "cliente", "text": client["message"], "ts": client.get("created_at")}]
+        queued = sorted((item for item in data["emails"] if address(item) == email), key=lambda item: item.get("date") or "")
+        waiting = {own_text(item.get("body_text")) or str(item.get("body_text") or "").strip()
+                   for item in queued if item.get("kind") != "visit_proposal"} - {""}
+        part += story_turns(turns, waiting=waiting) if turns else ["(nenhuma)"]
+        for item in queued:
+            if str(item.get("reply_text") or "").strip():
+                label = "proposta de visita" if item.get("kind") == "visit_proposal" else "resposta"
+                part += ["", f"[rascunho por enviar] ARIA — {label}", item["reply_text"].strip()]
+        if client and client.get("consultant_history"):
+            part += ["", "--- CONVERSA COM O CONSULTOR (Human contest)"]
+            part += story_turns([{"who": "cliente", "text": client.get("message"), "ts": client.get("created_at")}]
+                                + client["consultant_history"], us="CONSULTOR")
+        if client and marks.get(client["number"]):
+            part += ["", "--- AVALIAÇÕES"]
+            for mark in sorted(marks[client["number"]], key=lambda mark: mark.get("at") or ""):
+                who = "ARIA" if mark.get("side") == "aria" else "consultor"
+                notes = " · ".join(f"{key} {value:g}" for key, value in (mark.get("notes") or {}).items())
+                part.append(f"[{local_time(mark.get('at'))}] {who}: {mark.get('score')} / 10 ({notes})"
+                            + (f" — {mark['summary']}" if mark.get("summary") else ""))
+                part += [f"    · {error}" for error in mark.get("errors") or []]
+        return part + [""]
+
+    known = set()
+    for client in sorted(lab["clients"], key=lambda client: client["number"]):
+        email = client["address"].casefold()
+        known.add(email)
+        lines += story(email, conversations.get(email) or {}, client)
+    others = [email for email in sorted(conversations) if email not in known]
+    if others:
+        lines += [RULE, "OUTRAS CONVERSAS DESTE IMÓVEL (sem cliente de teste correspondente)", ""]
+        for email in others:
+            lines += story(email, conversations[email])
+    day = (aware_time(now) or datetime.now()).strftime("%Y-%m-%d")
+    return {"filename": f"teste-{ref}-{day}.txt", "text": "\n".join(lines).rstrip() + "\n", "clients": len(lab["clients"])}
 
 
 # ===== «Avançar o teste» (29/09): one round, by hand. Each test customer whose latest word is ours answers in character —
@@ -417,7 +535,8 @@ def advance(service, now, rng=random):
             except Exception as exc:  # the round goes on: only the marks are missing this time
                 evaluation_error = str(exc)
         if tasks:
-            answer, usage = complete(openai_api_key(service.folder, account), model, advance_prompt(profile, tasks))
+            answer, usage = complete(openai_api_key(service.folder, account), model, advance_prompt(profile, tasks),
+                                     effort=TEST_EFFORT)
             cost += estimate_cost_usd(model, usage.get("prompt_tokens"), usage.get("completion_tokens"))
             service.log("openai_usage", model=model, **usage, reference=ref, cost_usd=round(cost, 6))
             found = extract_json(answer)
