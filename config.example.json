@@ -1,7 +1,0 @@
-{
-  "account": "",
-  "subject_contains": "",
-  "mailbox": "all",
-  "lookback_days": 2,
-  "incoming_only": true
-}

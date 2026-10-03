@@ -8,6 +8,8 @@ __pycache__/
 .env
 .env.*
 !.env.example
+# The data folder (account, voice, properties, queues, logs) never goes to Git.
+/data/
 **/queue.json
 **/state.json
 **/config.json
@@ -20,3 +22,6 @@ __pycache__/
 
 # Real per-property profiles (account, listing, address) stay local.
 **/properties/*/
+
+# The static demo (bot-mail webdemo dist/<pasta>): built files, never in Git.
+/dist/

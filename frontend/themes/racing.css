@@ -1,0 +1,394 @@
+/* 80's RacingCar (theme id "racing") — an 80s Italian GT cockpit: carbon fibre where it races, figured walnut where it tours, black
+   leather with rosso stitching, chrome and brushed aluminium; switches for buttons, a gated gearbox for the
+   tabs, an analog dash clock and the full instrument cluster. Everything is under :root[data-theme="racing"]:
+   the page draws the same elements in every theme, and app.js (SKINS.racing) adds this skin's words,
+   instruments and gearbox. The textures are drawn here, in SVG and gradients: nothing is loaded from outside.
+   A yacht or a grand-luxury skin is a sibling of this file, with its own materials in the same slots. */
+
+/* Colours and materials */
+:root[data-theme="racing"]{color-scheme:dark;--bg:#0a0a0c;--card:#121214;--text:#f4f1ec;--muted:#aca79f;--line:#2a2a2e;
+  --accent:#e8140c;--accent-text:#fff;--accent-soft:#3a0e0b;--ok:#3ddc84;--ok-bg:#0f2a1c;--warn:#ffc400;--warn-bg:#2e2506;
+  --bad:#ff4d5e;--bad-bg:#35121a;--shadow:0 18px 44px #000a;--halo:#e1060030;--sidebar:#2a1208;--topbar:#0b0b0df2;
+  --surface-start:#17171a;--surface-end:#0e0e10;--input:#0b0b0d;--input1:#08080a;--quote:#141417;--control:#1c1c20;
+  --control1:#1a1a1e;--control-border:#3a3a41;--control-border1:#3a3a41;--control-border2:#3a3a41;--hover:#2a1714;
+  --hover-border:#ff5a4a;--placeholder:#86868d;--nav-muted:#d2b08c;--breadcrumb:#6c6c73;--selected-start:#3a0c09;
+  --selected-end:#1a0e0d;--selected-border:#8a1a12;--highlight-start:#3a0c09;--highlight-end:#140c0c;
+  --highlight-border:#8a1a12;--brand-start:#e8140c;--brand-end:#5a0400;--avatar:#1a1a1d;--avatar-text:#f3e6d0;
+  --tag-text:#d6d3cf;--quote-text:#e4e1dc;--quote-border:#e8140c;--cover-start:#3a0c09;--cover-mid:#17171a;
+  --cover-end:#2e2506;--cover-text:#ffc400;--chart-secondary:#ffc400;--metric-line:#5a1510;--empty-border:#3a3a41;
+  --success-border:#1f5a3a;--success-border1:#1f5a3a;--error-border:#7a2030;--warning-border:#6b5410;
+  --accent-hover:#ff3b2f;--glow-soft:#e8140c14;--glow-soft1:#e8140c1c;--accent-tint:#e8140c1f;--glow:#e8140c55;
+  --brand-border:#e8140c80;
+  --giallo:#f6c700;--amber:#ffb000;--cream:#f3e6d0;--tan:#d9bf9f;--stitch:#d2291e8c;
+  --din:"DIN Alternate","DIN Condensed","Bahnschrift","D-DIN",ui-sans-serif,system-ui,sans-serif;
+  --display:"Avenir Next Condensed","Futura","Helvetica Neue",ui-sans-serif,system-ui,sans-serif;
+  --lcd:ui-monospace,SFMono-Regular,Menlo,monospace;
+  --alu:linear-gradient(180deg,#eef0f2,#bcc0c6 48%,#d6d9dc 52%,#a2a7ad);
+  --chrome:linear-gradient(180deg,#fdfdfd,#c3c6cb 30%,#7b8087 50%,#d6d9dd 70%,#8b9097);
+  --wood:linear-gradient(180deg,#ffffff1f,#ffffff05 28%,#0000 60%,#00000066),url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='396'%3E%3Cdefs%3E %3Cpattern id='s' width='420' height='12' patternUnits='userSpaceOnUse'%3E%3Crect width='420' height='12' fill='%23311409'/%3E %3Crect y='1' width='420' height='3' fill='%2352250f'/%3E%3Crect y='5' width='420' height='1' fill='%23180802'/%3E %3Crect y='8' width='420' height='2' fill='%233f1b0b'/%3E%3C/pattern%3E %3Cfilter id='w' x='-10%25' y='-10%25' width='120%25' height='120%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.006 .02' numOctaves='4' seed='3' stitchTiles='stitch' result='t'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='t' scale='74' xChannelSelector='R' yChannelSelector='G'/%3E%3C/filter%3E%3C/defs%3E %3Crect x='-60' y='-60' width='540' height='516' fill='url(%23s)' filter='url(%23w)'/%3E%3C/svg%3E");
+  --leather:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='turbulence' baseFrequency='.62' numOctaves='2' seed='3' stitchTiles='stitch'/%3E %3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 -1.6 .9'/%3E%3C/filter%3E %3Crect width='220' height='220' filter='url(%23n)' opacity='.07'/%3E%3C/svg%3E"),linear-gradient(160deg,#1c1c1f,#101012);
+  --carbon:linear-gradient(27deg,#151517 5px,#0000 5px) 0 5px/20px 20px,linear-gradient(207deg,#151517 5px,#0000 5px) 10px 0/20px 20px,linear-gradient(27deg,#1f1f22 5px,#0000 5px) 0 10px/20px 20px,linear-gradient(207deg,#1f1f22 5px,#0000 5px) 10px 5px/20px 20px,linear-gradient(90deg,#19191b 10px,#0000 10px) 0 0/20px 20px,linear-gradient(#1b1b1d 25%,#171719 25% 50%,#0000 50% 75%,#212124 75%) 0 0/20px 20px,#131315;
+  scrollbar-color:#8f0a05 #0b0b0d}
+:root[data-theme="racing"] ::selection{background:#e8140c;color:#fff}
+:root[data-theme="racing"] body{background:radial-gradient(ellipse at 85% 0%,#e1060020,#0000 45%),linear-gradient(27deg,#0d0d0f 4px,#0000 4px) 0 4px/16px 16px,linear-gradient(207deg,#0d0d0f 4px,#0000 4px) 8px 0/16px 16px,linear-gradient(27deg,#151517 4px,#0000 4px) 0 8px/16px 16px,linear-gradient(207deg,#151517 4px,#0000 4px) 8px 4px/16px 16px,linear-gradient(90deg,#111113 8px,#0000 8px) 0 0/16px 16px,linear-gradient(#131315 25%,#0f0f11 25% 50%,#0000 50% 75%,#18181a 75%) 0 0/16px 16px,#0c0c0e}
+:root[data-theme="racing"] a{color:#ffd23f}
+:root[data-theme="racing"] :focus-visible{outline-color:var(--amber)}
+
+/* Type: condensed italic headings, DIN on instruments and switch legends, LCD digits for counts */
+:root[data-theme="racing"] h1{font-family:var(--display);font-style:italic;font-weight:700;letter-spacing:-.3px}
+:root[data-theme="racing"] h2{font-family:var(--display);font-weight:600;letter-spacing:0}
+:root[data-theme="racing"] .eyebrow{display:block;width:fit-content;height:fit-content;justify-self:start;align-self:start;padding:2px 15px;margin-bottom:12px;border-radius:3px;color:#1c1c1c;
+  font:800 10px/1.6 var(--din);letter-spacing:2.2px;text-shadow:0 1px 0 #ffffff8c;
+  background:radial-gradient(circle at 6px 50%,#6b6f75 1.1px,#0000 1.7px),radial-gradient(circle at calc(100% - 6px) 50%,#6b6f75 1.1px,#0000 1.7px),var(--alu);
+  box-shadow:inset 0 1px 0 #ffffffb3,inset 0 -1px 0 #0000004d,0 1px 3px #000c}
+:root[data-theme="racing"] .ignore-list.black .eyebrow{color:#a50c05}
+:root[data-theme="racing"] .ignore-list.grey .eyebrow{color:#3a3d42}
+
+/* The sidebar is the walnut fascia, with a chrome edge */
+:root[data-theme="racing"] .sidebar{background:var(--wood);border-right:3px solid;border-image:var(--chrome) 1;
+  box-shadow:4px 0 26px #000d;color:var(--cream)}
+:root[data-theme="racing"] .brand-mark{width:44px;height:44px;border:0;border-radius:50%;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cdefs%3E%3ClinearGradient id='w' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%239a5429'/%3E%3Cstop offset='.5' stop-color='%234a200b'/%3E%3Cstop offset='1' stop-color='%2386451d'/%3E%3C/linearGradient%3E%3ClinearGradient id='m' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23f6f7f8'/%3E%3Cstop offset='1' stop-color='%238a8f96'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='20' cy='20' r='17' fill='none' stroke='%230b0b0c' stroke-width='6.5'/%3E%3Ccircle cx='20' cy='20' r='17' fill='none' stroke='url(%23w)' stroke-width='4.6'/%3E%3Cpath d='M20 20 4.6 17.4M20 20l15.4-2.6M20 20v16' stroke='url(%23m)' stroke-width='3.2' stroke-linecap='round'/%3E%3Ccircle cx='20' cy='20' r='8' fill='%23101012' stroke='url(%23m)' stroke-width='1.6'/%3E%3C/svg%3E") center/contain no-repeat;
+  color:var(--giallo);font-size:13px;box-shadow:none;text-shadow:0 0 4px #000}
+:root[data-theme="racing"] .brand .brand-name{font-family:var(--display);font-style:italic;color:#fff;text-shadow:0 1px 2px #000a}
+:root[data-theme="racing"] .brand .brand-name span,:root[data-theme="racing"] .brand-by,:root[data-theme="racing"] .app-build{color:var(--tan)}
+:root[data-theme="racing"] .app-version{padding:1px 14px;border:0;border-radius:3px;color:#161616;font:700 10px/1.7 var(--din);letter-spacing:1px;
+  background:radial-gradient(circle at 5px 50%,#5d6166 1px,#0000 1.6px),radial-gradient(circle at calc(100% - 5px) 50%,#5d6166 1px,#0000 1.6px),var(--alu);
+  box-shadow:inset 0 1px 0 #ffffffa6,0 1px 2px #000b}
+:root[data-theme="racing"] .nav-label{color:var(--tan)}
+:root[data-theme="racing"] .sidebar-note{color:var(--cream)}
+:root[data-theme="racing"] .sidebar-note p{color:var(--tan)}
+:root[data-theme="racing"] .status-dot,:root[data-theme="racing"] .checks .dot{background:#3ddc84;box-shadow:0 0 8px #3ddc84}
+:root[data-theme="racing"] .checks .dot.missing{background:#ffb000;box-shadow:0 0 8px #ffb000}
+:root[data-theme="racing"] .account-card{border-top-color:#0000005c}
+:root[data-theme="racing"] .account-card .muted{color:var(--tan)}
+:root[data-theme="racing"] .avatar{background:radial-gradient(circle at 35% 30%,#3a3a3e,#0c0c0d 70%);box-shadow:0 0 0 2px #b9bdc3,0 0 0 3px #1b1b1d;border-radius:50%}
+
+/* Tabs are gears: the number on a small knob, lit red when engaged */
+:root[data-theme="racing"] .tab{gap:12px;padding:10px 12px;border-radius:10px;color:#ecdcc4;font:600 14px/1.3 var(--din);letter-spacing:.3px}
+:root[data-theme="racing"] .tab>span:first-child{display:none}
+:root[data-theme="racing"] .tab::before{content:attr(data-gear);flex:none;display:grid;place-items:center;width:26px;height:26px;
+  border-radius:50%;color:#f4f1ec;font:700 13px/1 var(--din);background:radial-gradient(circle at 35% 30%,#3c3c40,#0c0c0d 70%);
+  box-shadow:0 0 0 2px #b9bdc3,0 0 0 3px #2a2a2c,0 2px 5px #000c}
+:root[data-theme="racing"] .tab:hover{background:#0000003d;border-color:#00000047}
+:root[data-theme="racing"] .tab.active{background:linear-gradient(90deg,#0000006b,#0000001a);border-color:#0000005c;color:#fff;box-shadow:inset 0 1px 0 #ffffff14}
+:root[data-theme="racing"] .tab.active::before{background:radial-gradient(circle at 35% 30%,#ff7a6f,#e8140c 45%,#7d0904);
+  box-shadow:0 0 0 2px #eceef1,0 0 0 3px #2a2a2c,0 0 14px #ff2a1a99}
+:root[data-theme="racing"] .nav-count{background:#050506;color:var(--amber);font:700 10px/1.5 var(--lcd);box-shadow:inset 0 1px 3px #000,0 0 0 1px #5a4a2a;
+  margin-left:3px;padding:0 5px;align-self:flex-start;transform:translateY(-7px)}
+/* 26/09: the count is a superscript on the tab's name («Comunicações¹⁶»), not pushed to the far side */
+
+/* The gated gearbox (drawn by app.js): brushed aluminium, a black gate, a walnut knob */
+:root[data-theme="racing"] .skin-selector{display:block;margin:22px 4px 0}
+:root[data-theme="racing"] .gearbox{display:block;width:100%;height:auto;filter:drop-shadow(0 8px 14px #000b)}
+:root[data-theme="racing"] .gate-hit,:root[data-theme="racing"] .gate-label[data-tab]{cursor:pointer}
+:root[data-theme="racing"] .gate-label{fill:#2c2f34;font:800 12px/1 var(--din);text-anchor:middle;dominant-baseline:central}
+:root[data-theme="racing"] .gate-label.active{fill:#d4120a}
+:root[data-theme="racing"] .gate-label[data-tab]:hover{fill:#7d0904}
+@media(max-height:840px){:root[data-theme="racing"] .skin-selector{display:none}}
+
+/* Top bar: a thin tricolore, then red; the shift lights rev while the page works */
+:root[data-theme="racing"] .topbar{position:relative;z-index:0;overflow:hidden;background:linear-gradient(180deg,#141416f5,#0b0b0df2);border-bottom:1px solid #000}
+:root[data-theme="racing"] .topbar::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;pointer-events:none;
+  background:linear-gradient(90deg,#009246 0 72px,#f4f5f0 72px 144px,#ce2b37 144px 216px,#e8140c 216px);box-shadow:0 1px 8px #e8140c40}
+:root[data-theme="racing"] #busy{display:inline-flex;align-items:center;gap:10px;color:var(--amber);font:700 10px/1 var(--din);letter-spacing:1.4px;text-transform:uppercase}
+:root[data-theme="racing"] .shift-lights{display:inline-flex;gap:3px;padding:4px 6px;border-radius:5px;background:#050506;box-shadow:inset 0 1px 3px #000,0 0 0 1px #2a2a2e}
+:root[data-theme="racing"] .shift-lights i{width:7px;height:7px;border-radius:50%;background:#1f1f22;animation:racing-rev 1.2s infinite}
+:root[data-theme="racing"] .shift-lights i:nth-child(-n+4){--led:#3ddc84}
+:root[data-theme="racing"] .shift-lights i:nth-child(n+5):nth-child(-n+7){--led:#ffb000}
+:root[data-theme="racing"] .shift-lights i:nth-child(n+8){--led:#ff2d43}
+:root[data-theme="racing"] .shift-lights i:nth-child(2){animation-delay:.06s}
+:root[data-theme="racing"] .shift-lights i:nth-child(3){animation-delay:.12s}
+:root[data-theme="racing"] .shift-lights i:nth-child(4){animation-delay:.18s}
+:root[data-theme="racing"] .shift-lights i:nth-child(5){animation-delay:.24s}
+:root[data-theme="racing"] .shift-lights i:nth-child(6){animation-delay:.3s}
+:root[data-theme="racing"] .shift-lights i:nth-child(7){animation-delay:.36s}
+:root[data-theme="racing"] .shift-lights i:nth-child(8){animation-delay:.42s}
+:root[data-theme="racing"] .shift-lights i:nth-child(9){animation-delay:.48s}
+:root[data-theme="racing"] .shift-lights i:nth-child(10){animation-delay:.54s}
+@keyframes racing-rev{0%,100%{background:#1f1f22;box-shadow:none}25%,60%{background:var(--led);box-shadow:0 0 7px var(--led)}}
+
+/* Surfaces: leather cards with rosso stitching; carbon for the instruments */
+:root[data-theme="racing"] .card{position:relative;background:var(--leather);border:1px solid #050506;box-shadow:inset 0 1px 0 #ffffff0d,0 14px 34px #000b}
+:root[data-theme="racing"] .card::after{content:"";position:absolute;inset:7px;border:1px dashed var(--stitch);border-radius:11px;pointer-events:none}
+:root[data-theme="racing"] .metric{background:var(--carbon);border:1px solid #050506;box-shadow:inset 0 1px 0 #ffffff12,0 10px 26px #000a}
+:root[data-theme="racing"] .metric:first-child{background:linear-gradient(120deg,#3a0c09e0,#140c0ce0),var(--carbon)}
+:root[data-theme="racing"] .metric .value{display:inline-block;min-width:3ch;padding:0 12px;border-radius:6px;background:#040405;
+  font-family:var(--lcd);text-shadow:0 0 14px currentColor;box-shadow:inset 0 2px 8px #000,0 1px 0 #ffffff14}
+:root[data-theme="racing"] .metric:not(.ok):not(.warn):not(.bad) .value{color:var(--giallo)}
+:root[data-theme="racing"] .metric:after{top:16px;right:16px;width:9px;height:9px;border-radius:50%;background:#2a2d31;box-shadow:inset 0 1px 2px #000}
+:root[data-theme="racing"] .metric:first-child:after{background:#ff2d43;box-shadow:0 0 10px #ff2d43}
+:root[data-theme="racing"] .metric.ok:after{background:#3ddc84;box-shadow:0 0 10px #3ddc84}
+:root[data-theme="racing"] .metric.warn:after{background:#ffb000;box-shadow:0 0 10px #ffb000}
+:root[data-theme="racing"] .metric.bad:after{background:#ff2d43;box-shadow:0 0 10px #ff2d43}
+
+/* Switchgear. Buttons: black rubberised switches that press in. Primary: the red engine-start button in a
+   chrome ring. Anything that sends an email: a guarded switch, with the yellow-and-black hazard frame. */
+:root[data-theme="racing"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link){
+  border:1px solid #040405;border-radius:8px;color:#ecebe8;font-family:var(--din);letter-spacing:.4px;
+  background:linear-gradient(180deg,#2e2e33,#17171a 55%,#101012);
+  box-shadow:inset 0 1px 0 #ffffff21,inset 0 -2px 0 #00000080,0 2px 0 #000,0 4px 10px #0009;
+  transition:background .15s,box-shadow .15s,transform .08s,filter .15s}
+:root[data-theme="racing"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link):hover{
+  background:linear-gradient(180deg,#3a3a40,#1e1e22 55%,#141417);border-color:#040405}
+:root[data-theme="racing"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link):active{
+  transform:translateY(2px);box-shadow:inset 0 2px 6px #000c,0 0 0 #000}
+:root[data-theme="racing"] :is(button,.button).primary{padding-inline:22px;border:1px solid #3d0402;border-radius:999px;color:#fff;
+  font-weight:700;letter-spacing:.6px;text-shadow:0 1px 1px #0008;
+  background:radial-gradient(120% 140% at 50% 0%,#ff5b4d 0%,#e8140c 42%,#9a0a04 100%);
+  box-shadow:inset 0 1px 0 #ffffff66,inset 0 -3px 6px #00000059,0 0 0 2px #1b1b1d,0 0 0 3.5px #b9bdc3,0 0 0 4.5px #3a3a3e,0 4px 14px #e8140c40,0 6px 12px #000a}
+:root[data-theme="racing"] :is(button,.button).primary:hover{filter:brightness(1.1);background:radial-gradient(120% 140% at 50% 0%,#ff6e61 0%,#f01b10 42%,#a30b05 100%);border-color:#3d0402;
+  box-shadow:inset 0 1px 0 #ffffff66,inset 0 -3px 6px #00000059,0 0 0 2px #1b1b1d,0 0 0 3.5px #d9dce0,0 0 0 4.5px #3a3a3e,0 0 24px #ff2a1a73,0 6px 12px #000a}
+:root[data-theme="racing"] :is(button,.button).primary:active{transform:translateY(1px) scale(.985)}
+:root[data-theme="racing"] :is(button,.button).send-action{padding-inline:18px;border:3px solid #0000;border-radius:10px;color:#fff;
+  font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;text-shadow:0 1px 1px #0009;
+  background:linear-gradient(180deg,#ff3b2f,#b90d06) padding-box,repeating-linear-gradient(-45deg,#ffc400 0 7px,#141414 7px 14px) border-box;
+  box-shadow:0 2px 0 #000,0 6px 14px #0009}
+:root[data-theme="racing"] :is(button,.button).send-action:hover{filter:brightness(1.12);border-color:#0000;
+  background:linear-gradient(180deg,#ff5245,#c80f07) padding-box,repeating-linear-gradient(-45deg,#ffd000 0 7px,#141414 7px 14px) border-box}
+:root[data-theme="racing"] :is(button,.button):disabled{filter:grayscale(.85) brightness(.7);opacity:.6;transform:none;box-shadow:inset 0 1px 0 #ffffff0d,0 1px 0 #000}
+:root[data-theme="racing"] button.link{color:var(--giallo);font-family:var(--din);letter-spacing:.3px}
+:root[data-theme="racing"] button.link:hover{color:#ffe066;text-decoration:underline;text-underline-offset:4px}
+:root[data-theme="racing"] .link.danger{color:#ff7468}
+:root[data-theme="racing"] .segmented{border:1px solid #000;border-radius:10px;background:#050506;box-shadow:inset 0 2px 5px #000,0 1px 0 #ffffff12}
+:root[data-theme="racing"] .segmented button{border-radius:7px;color:#a19ea4;font-family:var(--din);letter-spacing:.4px}
+:root[data-theme="racing"] .segmented button.active{color:#fff;background:linear-gradient(180deg,#ff3b2f,#b90d06);box-shadow:inset 0 1px 0 #ffffff59,0 1px 3px #000}
+
+/* Checkboxes are chrome toggle switches; selects wear a knurled knob; fields are recessed, textareas stitched */
+:root[data-theme="racing"] input[type=checkbox]{-webkit-appearance:none;appearance:none;position:relative;width:38px;height:20px;padding:0;
+  border:1px solid #000;border-radius:10px;cursor:pointer;background:linear-gradient(#050506,#1c1c1f);
+  box-shadow:inset 0 2px 4px #000d,0 1px 0 #ffffff17;transition:background .2s,box-shadow .2s}
+:root[data-theme="racing"] input[type=checkbox]::before{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#fff,#c9ccd1 35%,#6d7178 75%,#3d4045);box-shadow:0 1px 2px #000;transition:transform .2s}
+:root[data-theme="racing"] input[type=checkbox]:checked{background:linear-gradient(#7a0d07,#e8140c);box-shadow:inset 0 2px 4px #0008,0 0 10px #e8140c59}
+:root[data-theme="racing"] input[type=checkbox]:checked::before{transform:translateX(18px)}
+:root[data-theme="racing"] input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
+:root[data-theme="racing"] select{-webkit-appearance:none;appearance:none;padding-right:40px;border:1px solid #000;color:var(--text);font-family:var(--din);
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3CradialGradient id='k' cx='.35' cy='.3' r='.8'%3E%3Cstop offset='0' stop-color='%23fdfdfd'/%3E%3Cstop offset='.45' stop-color='%23a3a8ae'/%3E%3Cstop offset='1' stop-color='%233b3e43'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='12' cy='12' r='11.5' fill='%23050506'/%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='%238a8f96' stroke-width='2.4' stroke-dasharray='1.05 1.05'/%3E%3Ccircle cx='12' cy='12' r='7.6' fill='url(%23k)'/%3E%3Cpath d='M12 5.6v4.2' stroke='%23e8140c' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 8px center/22px 22px,linear-gradient(180deg,#1f1f23,#0d0d0f);box-shadow:inset 0 1px 0 #ffffff14,0 1px 3px #000a}
+:root[data-theme="racing"] :is(input:not([type=checkbox],[type=radio]),textarea){border:1px solid #000;background-color:#0b0b0d;box-shadow:inset 0 2px 7px #000e,0 1px 0 #ffffff12}
+:root[data-theme="racing"] textarea{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='turbulence' baseFrequency='.62' numOctaves='2' seed='3' stitchTiles='stitch'/%3E %3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 -1.6 .9'/%3E%3C/filter%3E %3Crect width='220' height='220' filter='url(%23n)' opacity='.07'/%3E%3C/svg%3E");outline:1px dashed #d2291e59;outline-offset:-7px}
+:root[data-theme="racing"] :is(input,textarea,select):focus{border-color:#000;outline:2px solid var(--amber);outline-offset:2px}
+/* The text that goes out — reply drafts, the daily digest and the send preview — is on light paper in black ink:
+   easier to read and to proof than light text on the dark cockpit */
+:root[data-theme="racing"] :is(.email-card textarea,#digest-panel textarea,#preview-box pre){border:1px solid #cdbb9c;
+  background:#f7f1e3;color:#111;caret-color:#111;box-shadow:inset 0 1px 4px #0000002e}
+:root[data-theme="racing"] :is(.email-card textarea,#digest-panel textarea)::placeholder{color:#6f6453}
+:root[data-theme="racing"] .tag{border-color:#2c2c30;background:#050506;color:var(--tag-text);font:700 10px/1.4 var(--din);letter-spacing:.8px;text-transform:uppercase;box-shadow:inset 0 1px 2px #000}
+:root[data-theme="racing"] .tag.draft{color:#3ddc84;border-color:#1f5a3a}
+:root[data-theme="racing"] .tag.visit{color:var(--giallo);border-color:#6b5410}
+:root[data-theme="racing"] .alert{border-left:3px solid currentColor}
+
+/* Painel: an analog dash clock, the calendar on a carbon panel */
+:root[data-theme="racing"] .retro-widget{background:var(--carbon);border:1px solid #000;box-shadow:inset 0 1px 0 #ffffff12,0 0 0 1px #2a2a2e,0 10px 24px #000b}
+:root[data-theme="racing"] .retro-clock{min-width:96px;gap:6px}
+:root[data-theme="racing"] .clock-analog{display:block;width:84px;height:84px}
+:root[data-theme="racing"] .clock-analog svg{display:block;width:100%;height:100%;filter:drop-shadow(0 4px 8px #000c)}
+:root[data-theme="racing"] .retro-clock #clock-time{display:none}
+:root[data-theme="racing"] .retro-date{color:var(--amber);font-family:var(--din)}
+:root[data-theme="racing"] .clock-bezel{fill:#8d9299}
+:root[data-theme="racing"] .clock-face{fill:#0d0d0f}
+:root[data-theme="racing"] .clock-tick{stroke:#d9dde2}
+:root[data-theme="racing"] .clock-numeral{fill:#f1f3f5;font:700 10px/1 var(--din)}
+:root[data-theme="racing"] .clock-hand line{stroke:#f4f1ec}
+:root[data-theme="racing"] .clock-hand .second{stroke:#ff5a1f}
+:root[data-theme="racing"] .clock-cap{fill:#ff5a1f}
+:root[data-theme="racing"] .cal-cell.has-visit:after{background:var(--giallo);box-shadow:0 0 4px var(--giallo)}
+:root[data-theme="racing"] .retro-cal-month{color:var(--amber);font-family:var(--din)}
+
+/* Respostas: the four steps are gears, 1.ª to 4.ª */
+:root[data-theme="racing"] .workflow{counter-reset:gear;border-color:#000;background:#0a0a0c;box-shadow:inset 0 2px 6px #000,0 1px 0 #ffffff0f}
+:root[data-theme="racing"] .workflow li{counter-increment:gear}
+:root[data-theme="racing"] .workflow li+li{border-left-color:#1d1d20}
+:root[data-theme="racing"] .workflow a{align-items:center;font:600 13px/1.4 var(--din);letter-spacing:.3px}
+:root[data-theme="racing"] .workflow .num{font-size:0}
+:root[data-theme="racing"] .workflow .num::before{content:counter(gear) "ª";display:inline-grid;place-items:center;width:32px;height:24px;border-radius:5px;
+  background:#050506;color:var(--amber);font:700 13px/1 var(--din);box-shadow:inset 0 1px 3px #000,0 0 0 1px #2c2c30}
+:root[data-theme="racing"] .workflow li.done{background:linear-gradient(180deg,#0f2a1c,#0a1d13)}
+
+/* Imóveis: the slider's arrows are carbon paddle shifters, − and + */
+:root[data-theme="racing"] .property-slider{background:var(--leather);border-color:#050506;box-shadow:0 10px 26px #000a}
+:root[data-theme="racing"] .slider-arrow{position:relative;width:46px;height:66px;min-height:66px;border:1px solid #000;border-radius:12px 12px 24px 24px;
+  color:#0000;font-size:0;background:var(--carbon);box-shadow:inset 0 1px 0 #ffffff1f,inset 0 -10px 14px #0009,0 5px 12px #000b}
+:root[data-theme="racing"] .slider-arrow::after{content:"−";position:absolute;inset:0;display:grid;place-items:center;color:#f4f1ec;font:700 24px/1 var(--din)}
+:root[data-theme="racing"] .slider-arrow.next::after{content:"+"}
+:root[data-theme="racing"] .slider-arrow:hover{border-color:#e8140c;box-shadow:inset 0 1px 0 #ffffff1f,inset 0 -10px 14px #0009,0 0 14px #e8140c55}
+:root[data-theme="racing"] .slider-arrow:active{transform:translateY(2px)}
+:root[data-theme="racing"] .slider-dots .muted{padding:3px 8px;border-radius:4px;background:#050506;color:var(--amber);font:700 12px/1 var(--lcd);box-shadow:inset 0 1px 3px #000}
+
+/* The instrument cluster: a carbon binnacle with a hood shadow */
+:root[data-theme="racing"] .cluster{color:#e9ecef;border:1px solid #000;background:radial-gradient(ellipse at 50% 0%,#23262c,#0000 70%),var(--carbon);
+  box-shadow:inset 0 1px 0 #ffffff14,0 18px 40px #000c}
+:root[data-theme="racing"] .cluster::after{inset:0;border:0;border-radius:16px;box-shadow:inset 0 46px 40px -34px #000e,inset 0 0 0 1px #ffffff0a}
+:root[data-theme="racing"] .cluster-gauges{align-items:center;gap:clamp(6px,1.4vw,24px)}
+:root[data-theme="racing"] .gauge svg{filter:drop-shadow(0 10px 18px #000b)}
+:root[data-theme="racing"] .gauge-big svg{width:clamp(168px,16vw,250px)}
+:root[data-theme="racing"] .gauge-small svg{width:clamp(118px,10.5vw,166px)}
+:root[data-theme="racing"] .gauge-mini svg{width:clamp(92px,7.6vw,124px)}
+:root[data-theme="racing"] .gauge figcaption{font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:#aab1b9;font-family:var(--din)}
+:root[data-theme="racing"] .gauge-bezel{display:inline}
+:root[data-theme="racing"] .gauge-face{fill:#14161a;stroke:none}
+:root[data-theme="racing"] .gauge-yellow .gauge-face{fill:var(--gauge-yellow)}
+:root[data-theme="racing"] .gauge-tick{stroke:#e9ecef;stroke-width:1.2}
+:root[data-theme="racing"] .gauge-tick:not(.major),:root[data-theme="racing"] .gauge-number:not(.end){display:inline}
+:root[data-theme="racing"] .gauge-tick.major{stroke-width:2.8}
+:root[data-theme="racing"] .gauge-yellow .gauge-tick{stroke:#141414}
+:root[data-theme="racing"] .gauge-number{fill:#f1f3f5;font:700 14px/1 var(--din)}
+:root[data-theme="racing"] .gauge-yellow .gauge-number{fill:#141414}
+:root[data-theme="racing"] .gauge-unit{fill:#8b929a;font:700 9px/1 var(--din);letter-spacing:1.6px}
+:root[data-theme="racing"] .gauge-yellow .gauge-unit{fill:#4a3f00}
+:root[data-theme="racing"] .gauge-icon{display:inline;color:#d9dde2;stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round}
+:root[data-theme="racing"] .gauge-yellow .gauge-icon{color:#141414}
+:root[data-theme="racing"] .gauge-red{stroke:var(--gauge-red);stroke-width:8;opacity:1}
+:root[data-theme="racing"] .gauge-readout-box{fill:#050607;stroke:#2c3036}
+:root[data-theme="racing"] .gauge-readout{fill:#ffb347;font:600 12px/1 var(--lcd)}
+:root[data-theme="racing"] .gauge-alert .gauge-readout{fill:#ff3b30;animation:racing-blink 1s steps(2,start) infinite}
+@keyframes racing-blink{to{visibility:hidden}}
+:root[data-theme="racing"] .gauge-needle{transition-duration:1.4s;transition-timing-function:cubic-bezier(.2,1.3,.4,1)}
+:root[data-theme="racing"] .gauge-needle path{fill:var(--gauge-orange)}
+:root[data-theme="racing"] .gauge-yellow .gauge-needle path{fill:var(--gauge-red)}
+:root[data-theme="racing"] .gauge-cap{fill:#1b1d21;stroke:#6b6f75;stroke-width:2}
+:root[data-theme="racing"] .gauge-setting{color:#aab1b9;font-family:var(--din);letter-spacing:.3px}
+:root[data-theme="racing"] .gauge-setting input{border:1px solid #2c3036;background:#050506;color:var(--amber);font:700 12px/1 var(--lcd);box-shadow:inset 0 1px 3px #000}
+:root[data-theme="racing"] .cluster .muted{color:#9aa3ad}
+:root[data-theme="racing"] .trip-computer{border:1px solid #2c3036;border-radius:8px;background:#050607;color:#aab1b9;
+  font:600 12px/1.4 var(--din);letter-spacing:.4px;box-shadow:inset 0 2px 8px #000,0 1px 0 #ffffff0f}
+:root[data-theme="racing"] .trip-title{color:var(--amber);font:800 10px/1 var(--din);letter-spacing:2px}
+:root[data-theme="racing"] .trip-computer input{border:1px solid #2c3036;background:#000;color:var(--amber);font:700 12px/1 var(--lcd);box-shadow:inset 0 1px 3px #000}
+:root[data-theme="racing"] .trip-reading{color:#ffb347;font-family:var(--lcd);text-shadow:0 0 8px #ffb34766}
+:root[data-theme="racing"] .odometer-digits{gap:2px;padding:3px;border:1px solid #2c3036;border-radius:4px;background:#050607;box-shadow:inset 0 2px 6px #000}
+:root[data-theme="racing"] .odometer-digits .lead{display:grid}
+:root[data-theme="racing"] .odometer-digits span{display:grid;place-items:center;width:19px;height:27px;border-radius:2px;color:#f1f3f5;
+  font:600 16px/1 var(--lcd);background:linear-gradient(#2a2d32,#0d0e10 50%,#2a2d32)}
+:root[data-theme="racing"] .odometer-label{font:700 9px/1.4 var(--din);letter-spacing:1.4px;text-transform:uppercase;color:#aab1b9}
+
+/* Warning lamps: dark until lit; the four with a car equivalent show its symbol */
+:root[data-theme="racing"] .lamp{gap:8px;padding:6px 12px;border-color:#2c3036;background:#08090b;color:#6f767e;font:700 10px/1.2 var(--din);letter-spacing:1.2px;text-transform:uppercase}
+:root[data-theme="racing"] .lamp strong{color:#8b929a}
+:root[data-theme="racing"] .lamp-bulb{width:10px;height:10px;background:#2a2d31;box-shadow:inset 0 1px 2px #000}
+:root[data-theme="racing"] .lamp.on,:root[data-theme="racing"] .lamp.on strong{color:#fff}
+:root[data-theme="racing"] .lamp.on.lamp-red .lamp-bulb{background:#ff2d43;box-shadow:0 0 10px #ff2d43}
+:root[data-theme="racing"] .lamp.on.lamp-amber .lamp-bulb{background:#ffb000;box-shadow:0 0 10px #ffb000}
+:root[data-theme="racing"] .lamp.on.lamp-green .lamp-bulb{background:#3ddc84;box-shadow:0 0 10px #3ddc84}
+:root[data-theme="racing"] .lamp.on.lamp-grey .lamp-bulb{background:#d3d7dc;box-shadow:0 0 8px #d3d7dc}
+:root[data-theme="racing"] .lamp[class*="lamp-icon-"] .lamp-bulb{width:18px;height:18px;border-radius:0;background:none;box-shadow:none;color:#3a3e44}
+:root[data-theme="racing"] .lamp[class*="lamp-icon-"] .lamp-bulb::before{content:"";display:block;width:100%;height:100%;background:currentColor;
+  -webkit-mask:var(--icon) center/contain no-repeat;mask:var(--icon) center/contain no-repeat}
+:root[data-theme="racing"] .lamp.on[class*="lamp-icon-"] .lamp-bulb{background:none;box-shadow:none;filter:drop-shadow(0 0 5px currentColor)}
+:root[data-theme="racing"] .lamp.on.lamp-red[class*="lamp-icon-"] .lamp-bulb{color:#ff2d43}
+:root[data-theme="racing"] .lamp.on.lamp-amber[class*="lamp-icon-"] .lamp-bulb{color:#ffb000}
+:root[data-theme="racing"] .lamp-icon-heat{--icon:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v10M12 6h3M12 9h3'/%3E%3Ccircle cx='12' cy='15.6' r='2.6' fill='black'/%3E %3Cpath d='M3 20.6c1.5-1.2 3-1.2 4.5 0s3 1.2 4.5 0 3-1.2 4.5 0 3 1.2 4.5 0'/%3E%3C/svg%3E")}
+:root[data-theme="racing"] .lamp-icon-fuel{--icon:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 20V5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v15M3.5 20h12'/%3E %3Crect x='7' y='6.5' width='5' height='4' fill='black'/%3E%3Cpath d='M14 9h1.5l2.5 2.5V17a1.4 1.4 0 0 1-2.8 0v-3H14'/%3E%3C/svg%3E")}
+:root[data-theme="racing"] .lamp-icon-engine{--icon:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M3 10h2V8h2.5V6.5H11V5h4v1.5h1.5L18.5 9H21v7h-2.5l-2 2H9l-2-2H5v-2H3z'/%3E%3C/svg%3E")}
+:root[data-theme="racing"] .lamp-icon-blocked{--icon:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='6.2'/%3E%3Cpath d='M12 9v3.6M12 15.3h.01'/%3E %3Cpath d='M4.8 6.4a9 9 0 0 0 0 11.2M19.2 6.4a9 9 0 0 1 0 11.2'/%3E%3C/svg%3E")}
+:root[data-theme="racing"] .cluster-chart{border-top-color:#23262c}
+/* 28/09: the chart's pair, red and blue, in the dashboard and in each property's cluster (yellow and orange could not be
+   told apart by a colour-blind reader), validated against the dark card; bars, legend and tooltip use it */
+:root[data-theme="racing"]{--chart-requests:#e8140c;--chart-sent:#2f86d6}
+:root[data-theme="racing"] .cluster .chart .bar-label{fill:#8b929a}
+:root[data-theme="racing"] .cluster-note{color:#8b929a}
+
+/* Agenda: a leather-bound logbook with cream pages */
+:root[data-theme="racing"] .filofax{border:6px solid #0d0b09;background:#1a1410;box-shadow:0 0 0 1px #000,inset 0 0 0 1px #3a2a1d,0 16px 40px #000c}
+:root[data-theme="racing"] .filofax-page{border-color:#cdbb9c;background-color:#efe3cc;color:#2b2117;
+  --agenda-rule:#bba47e;--agenda-paper:#efe3cc}
+:root[data-theme="racing"] .filofax-page.today{background-color:#f8eac8}
+:root[data-theme="racing"] .filofax-page .muted,:root[data-theme="racing"] .filofax-weekday{color:#7a6a55}
+:root[data-theme="racing"] .filofax-head{border-bottom-color:#2b2117}
+:root[data-theme="racing"] .filofax-page.today .filofax-weekday{color:#b00d06}
+:root[data-theme="racing"] .filofax-page:before{background-image:radial-gradient(circle,#8a7a62 1.6px,#0000 1.8px)}
+
+/* Messages: the toast is a dash display with its lamp; an empty inbox gets the chequered flag */
+:root[data-theme="racing"] #toast{padding-left:46px;border:1px solid #2c3036;border-radius:10px;background:#060607;color:#9ff5c3;
+  font:600 13px/1.5 var(--din);letter-spacing:.3px;box-shadow:0 0 0 3px #111,0 0 0 4px #4a4d52,0 16px 44px #000e}
+:root[data-theme="racing"] #toast::before{content:"";position:absolute;left:18px;top:50%;width:12px;height:12px;margin-top:-6px;border-radius:50%;
+  background:#3ddc84;box-shadow:0 0 10px #3ddc84}
+:root[data-theme="racing"] #toast.warn{color:var(--giallo)}
+:root[data-theme="racing"] #toast.warn::before{background:#ffb000;box-shadow:0 0 10px #ffb000}
+:root[data-theme="racing"] #toast.bad{color:#ff7468}
+:root[data-theme="racing"] #toast.bad::before{background:#ff2d43;box-shadow:0 0 10px #ff2d43}
+:root[data-theme="racing"] .empty-state{border-color:#3a3a41;background:#0a0a0c80}
+:root[data-theme="racing"] .empty-state strong::before{content:"";display:block;width:46px;height:30px;margin:0 auto 12px;border-radius:3px;
+  background:conic-gradient(#f4f4f4 25%,#111 0 50%,#f4f4f4 0 75%,#111 0) 0 0/11.5px 10px;transform:perspective(80px) rotateY(-18deg) skewY(-4deg);box-shadow:0 3px 8px #000c}
+
+/* Phone: the fascia becomes the top strip; four dials in two rows */
+@media(max-width:760px){
+  :root[data-theme="racing"] .sidebar{border-right:0;border-bottom:3px solid;border-image:var(--chrome) 1}
+  :root[data-theme="racing"] .tab{justify-content:center;padding:10px 6px;font-size:11px}
+  :root[data-theme="racing"] .tab::before,:root[data-theme="racing"] .skin-selector{display:none}
+  :root[data-theme="racing"] .tab.active{box-shadow:inset 0 -3px 0 var(--accent)}
+  :root[data-theme="racing"] .cluster-gauges{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));justify-items:center}
+  :root[data-theme="racing"] .gauge-big,:root[data-theme="racing"] .gauge-small{order:0;flex-basis:auto}
+  :root[data-theme="racing"] .gauge-tach{order:-2}
+  :root[data-theme="racing"] .gauge-speedo{order:-1}
+  :root[data-theme="racing"] .gauge svg,:root[data-theme="racing"] .gauge-big svg,:root[data-theme="racing"] .gauge-small svg{width:100%;max-width:170px}
+  :root[data-theme="racing"] .gauge-mini svg{width:100%;max-width:130px}
+  :root[data-theme="racing"] .gauge-petrol{grid-column:1/-1}
+}
+@media(prefers-reduced-motion:reduce){:root[data-theme="racing"] .shift-lights i,:root[data-theme="racing"] .gauge-alert .gauge-readout{animation:none}}
+
+/* A red 80s GT (F40-style wedge, big rear wing, NACA ducts, five-spoke wheels — no badge, no name) flashes across the
+   top bar behind its text now and then, the way the sloop sails in 90's Boat. Pure design: transform only, clipped
+   by the bar, first pass soon after the page opens, and gone with "reduce motion" */
+/* 29/09: em pausa, a pedido — o veículo já não passa no cabeçalho, só no rodapé. Para voltar, tira este comentário.
+:root[data-theme="racing"] .topbar::before{content:"";position:absolute;left:0;bottom:3px;width:150px;height:35px;z-index:-1;
+  pointer-events:none;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 152 36'%3E %3Cdefs%3E%3ClinearGradient id='b' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23ff2a1c'/%3E%3Cstop offset='.55' stop-color='%23d40000'/%3E%3Cstop offset='1' stop-color='%238e0000'/%3E%3C/linearGradient%3E %3ClinearGradient id='s' x1='0' y1='0' x2='1' y2='0'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.55'/%3E%3Cstop offset='1' stop-color='%23fff' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E %3Cpath d='M120 13H150M122 19H146M118 25H142' stroke='url%28%23s%29' stroke-width='1.3' stroke-linecap='round'/%3E %3Cellipse cx='60' cy='31.5' rx='56' ry='2.6' fill='%23000' opacity='.45'/%3E %3Cpath d='M3 25.5L4.5 21.2Q9 18.6 22 17.4L40 15.6L51 8.6Q59 7.4 68 7.8L79 11.4L103 13.2H110L113.5 17.5L113 25.5H102.8A8.6 8.6 0 0 0 85.6 25.5H32.6A8.6 8.6 0 0 0 15.4 25.5Z' fill='url%28%23b%29'/%3E %3Cpath d='M41.4 15.4L51.6 9.4Q59 8.4 66.8 8.8L72 14.6Z' fill='%23141414'/%3E %3Cpath d='M52.4 10.2L55 14.8M66 9.3L69.8 14.4' stroke='%23d40000' stroke-width='.9'/%3E %3Cpath d='M96 12.9V7.6M106 13V7.6' stroke='%231a1a1a' stroke-width='1.6'/%3E %3Cpath d='M93 5.4H112.5L113.5 8.2H92.4Z' fill='%23d40000'/%3E%3Cpath d='M93 5.4H112.5' stroke='%23ff5a4a' stroke-width='.6'/%3E %3Cpath d='M58 18.4L66 17.6L64.6 20.2L58.8 20.6Z' fill='%235a0000'/%3E %3Cpath d='M4.2 22.6H11' stroke='%235a0000' stroke-width='.8'/%3E%3Crect x='6' y='19.8' width='3.6' height='1.2' rx='.5' fill='%23ffb000'/%3E %3Ccircle cx='111.6' cy='19' r='1.3' fill='%23ff3b30'/%3E%3Ccircle cx='111.6' cy='22.2' r='1.3' fill='%23ff3b30'/%3E %3Cpath d='M4 25.6H113' stroke='%233a0000' stroke-width='.8'/%3E %3Ccircle cx='24' cy='26.2' r='6.8' fill='%23111'/%3E%3Ccircle cx='24' cy='26.2' r='4.3' fill='%23c9ccd1'/%3E %3Ccircle cx='94.2' cy='26.2' r='6.8' fill='%23111'/%3E%3Ccircle cx='94.2' cy='26.2' r='4.3' fill='%23c9ccd1'/%3E %3Cpath d='M24 22.3V26.2M20.3 25L24 26.2M21.7 29.4L24 26.2M26.3 29.4L24 26.2M27.7 25L24 26.2M94.2 22.3V26.2M90.5 25L94.2 26.2M91.9 29.4L94.2 26.2M96.5 29.4L94.2 26.2M97.9 25L94.2 26.2' stroke='%238a8f96' stroke-width='.9'/%3E %3Ccircle cx='24' cy='26.2' r='1' fill='%23555'/%3E%3Ccircle cx='94.2' cy='26.2' r='1' fill='%23555'/%3E %3C/svg%3E") no-repeat center/contain;
+  transform:translateX(100vw);animation:racing-pass 30s linear -25s infinite} */
+@keyframes racing-pass{0%,84%{transform:translateX(100vw);animation-timing-function:cubic-bezier(.45,0,.75,.55)}
+  100%{transform:translateX(-180px)}}
+@media(prefers-reduced-motion:reduce){:root[data-theme="racing"] .topbar::before{display:none}}
+
+/* The street at the foot of the window, the way the sea runs under 90's Boat: an Italian old town in 2D — ochre,
+   terracotta and pink houses with green shutters, an arcade, a bell tower, a duomo and cypresses — over a
+   sampietrini pavement, the kerb and the asphalt with its dashed centre line. The road runs fast and the town
+   slowly (parallax). Behind everything; still with "reduce motion" */
+:root[data-theme="racing"] body::before{content:"";position:fixed;left:0;right:0;bottom:0;height:96px;z-index:-1;pointer-events:none;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='30' viewBox='0 0 60 30'%3E %3Crect width='60' height='7' fill='%236f675d'/%3E %3Cpath d='M0 3.5H60M6 0V3.5M18 0V3.5M30 0V3.5M42 0V3.5M54 0V3.5M12 3.5V7M24 3.5V7M36 3.5V7M48 3.5V7M0 3.5V7' stroke='%23575048' stroke-width='.7'/%3E %3Crect y='7' width='60' height='2.2' fill='%23a39a8e'/%3E %3Crect y='9.2' width='60' height='20.8' fill='%2327272b'/%3E %3Crect x='0' y='18.4' width='30' height='1.8' rx='.6' fill='%23e7e0d1'/%3E %3C/svg%3E") 0 100%/60px 30px repeat-x,url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='480' height='66' viewBox='0 0 480 66'%3E %3Cg opacity='.82'%3E %3Cpath d='M0 22H70V66H0Z' fill='%23b8844a'/%3E%3Cpath d='M-2 22H72L70 19H0Z' fill='%238c3b24'/%3E %3Cg fill='%232a1d17'%3E%3Crect x='8' y='28' width='7' height='10'/%3E%3Crect x='31' y='28' width='7' height='10'/%3E%3Crect x='54' y='28' width='7' height='10'/%3E %3Crect x='8' y='45' width='7' height='10'/%3E%3Crect x='54' y='45' width='7' height='10'/%3E%3Cpath d='M29 66V50A6 6 0 0 1 41 50V66Z'/%3E%3C/g%3E %3Cg fill='%233f5a3a'%3E%3Crect x='5' y='28' width='3' height='10'/%3E%3Crect x='15' y='28' width='3' height='10'/%3E%3Crect x='28' y='28' width='3' height='10'/%3E%3Crect x='38' y='28' width='3' height='10'/%3E%3Crect x='51' y='28' width='3' height='10'/%3E%3Crect x='61' y='28' width='3' height='10'/%3E%3C/g%3E %3Cpath d='M76 10H94V66H76Z' fill='%23c9a66b'/%3E%3Cpath d='M74 10L85 1L96 10Z' fill='%238c3b24'/%3E%3Cpath d='M80 14V22A5 5 0 0 1 90 22V14Z' fill='%232a1d17'/%3E %3Crect x='82' y='34' width='6' height='8' fill='%232a1d17'/%3E%3Cpath d='M76 26H94M76 44H94' stroke='%23a8854f' stroke-width='1.2'/%3E %3Cpath d='M100 28H180V66H100Z' fill='%23a5563a'/%3E%3Cpath d='M98 28H182L180 25H100Z' fill='%237d3320'/%3E %3Cg fill='%232a1d17'%3E%3Cpath d='M106 66V54A8 8 0 0 1 122 54V66Z'/%3E%3Cpath d='M132 66V54A8 8 0 0 1 148 54V66Z'/%3E%3Cpath d='M158 66V54A8 8 0 0 1 174 54V66Z'/%3E %3Crect x='110' y='33' width='7' height='9'/%3E%3Crect x='137' y='33' width='7' height='9'/%3E%3Crect x='164' y='33' width='7' height='9'/%3E%3C/g%3E %3Cellipse cx='188' cy='44' rx='4' ry='20' fill='%2323331f'/%3E%3Cellipse cx='197' cy='48' rx='3.5' ry='16' fill='%232c3f27'/%3E %3Cpath d='M206 18H276V66H206Z' fill='%23d6b77a'/%3E%3Cpath d='M204 18H278L276 15H206Z' fill='%238c3b24'/%3E %3Cg fill='%232a1d17'%3E%3Crect x='214' y='24' width='7' height='10'/%3E%3Crect x='238' y='24' width='7' height='10'/%3E%3Crect x='262' y='24' width='7' height='10'/%3E %3Crect x='214' y='41' width='7' height='10'/%3E%3Crect x='238' y='41' width='7' height='10'/%3E%3Crect x='262' y='41' width='7' height='10'/%3E%3C/g%3E %3Cpath d='M210 52H272M210 52V56M222 52V56M234 52V56M246 52V56M258 52V56M272 52V56' stroke='%233a2a20' stroke-width='1.1'/%3E %3Cpath d='M286 40H344V66H286Z' fill='%23c29a63'/%3E%3Cpath d='M292 40A23 23 0 0 1 338 40Z' fill='%239c4a2c'/%3E%3Cpath d='M310 17H320V22H310Z' fill='%23c9a66b'/%3E %3Cpath d='M315 12V17' stroke='%23c9a66b' stroke-width='2'/%3E%3Cg fill='%232a1d17'%3E%3Cpath d='M296 66V56A5 5 0 0 1 306 56V66Z'/%3E%3Cpath d='M310 66V54A5 5 0 0 1 320 54V66Z'/%3E%3Cpath d='M324 66V56A5 5 0 0 1 334 56V66Z'/%3E%3C/g%3E %3Cpath d='M350 24H420V66H350Z' fill='%23b77a6a'/%3E%3Cpath d='M348 24H422L420 21H350Z' fill='%237d3320'/%3E %3Cg fill='%232a1d17'%3E%3Crect x='358' y='30' width='7' height='10'/%3E%3Crect x='382' y='30' width='7' height='10'/%3E%3Crect x='406' y='30' width='7' height='10'/%3E %3Crect x='358' y='47' width='7' height='10'/%3E%3Crect x='406' y='47' width='7' height='10'/%3E%3Cpath d='M380 66V52A6 6 0 0 1 392 52V66Z'/%3E%3C/g%3E %3Cg fill='%233f5a3a'%3E%3Crect x='355' y='30' width='3' height='10'/%3E%3Crect x='365' y='30' width='3' height='10'/%3E%3Crect x='403' y='30' width='3' height='10'/%3E%3Crect x='413' y='30' width='3' height='10'/%3E%3C/g%3E %3Cellipse cx='428' cy='46' rx='4' ry='18' fill='%2323331f'/%3E %3Cpath d='M436 30H480V66H436Z' fill='%238e4a2f'/%3E%3Cpath d='M434 30H482L480 27H436Z' fill='%236e2c1a'/%3E %3Cg fill='%232a1d17'%3E%3Crect x='444' y='36' width='7' height='9'/%3E%3Crect x='464' y='36' width='7' height='9'/%3E%3Crect x='454' y='51' width='8' height='15'/%3E%3C/g%3E %3C/g%3E%3C/svg%3E") 0 calc(100% - 30px)/480px 66px repeat-x;
+  animation:racing-road 40s linear infinite}
+@keyframes racing-road{to{background-position:-2400px 100%,-480px calc(100% - 30px)}}
+:root[data-theme="racing"] main{padding-bottom:120px}
+@media(prefers-reduced-motion:reduce){:root[data-theme="racing"] body::before{animation:none}}
+/* Agenda: the day heads stay on top while the hours scroll, so they carry the paper's colour */
+:root[data-theme="racing"] .filofax-page{--page-bg:#efe3cc}:root[data-theme="racing"] .filofax-page.today{--page-bg:#f8eac8}
+
+/* …and once the red car has left the top bar on the left, it comes back along the street at the foot of the window,
+   turned round, driving right — the same 30 s cycle as the top pass, so one follows the other */
+:root[data-theme="racing"] .workspace::after{content:"";position:fixed;left:0;bottom:2px;width:104px;height:25px;z-index:-1;
+  pointer-events:none;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 152 36'%3E %3Cdefs%3E%3ClinearGradient id='b' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23ff2a1c'/%3E%3Cstop offset='.55' stop-color='%23d40000'/%3E%3Cstop offset='1' stop-color='%238e0000'/%3E%3C/linearGradient%3E %3ClinearGradient id='s' x1='0' y1='0' x2='1' y2='0'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.55'/%3E%3Cstop offset='1' stop-color='%23fff' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E %3Cpath d='M120 13H150M122 19H146M118 25H142' stroke='url%28%23s%29' stroke-width='1.3' stroke-linecap='round'/%3E %3Cellipse cx='60' cy='31.5' rx='56' ry='2.6' fill='%23000' opacity='.45'/%3E %3Cpath d='M3 25.5L4.5 21.2Q9 18.6 22 17.4L40 15.6L51 8.6Q59 7.4 68 7.8L79 11.4L103 13.2H110L113.5 17.5L113 25.5H102.8A8.6 8.6 0 0 0 85.6 25.5H32.6A8.6 8.6 0 0 0 15.4 25.5Z' fill='url%28%23b%29'/%3E %3Cpath d='M41.4 15.4L51.6 9.4Q59 8.4 66.8 8.8L72 14.6Z' fill='%23141414'/%3E %3Cpath d='M52.4 10.2L55 14.8M66 9.3L69.8 14.4' stroke='%23d40000' stroke-width='.9'/%3E %3Cpath d='M96 12.9V7.6M106 13V7.6' stroke='%231a1a1a' stroke-width='1.6'/%3E %3Cpath d='M93 5.4H112.5L113.5 8.2H92.4Z' fill='%23d40000'/%3E%3Cpath d='M93 5.4H112.5' stroke='%23ff5a4a' stroke-width='.6'/%3E %3Cpath d='M58 18.4L66 17.6L64.6 20.2L58.8 20.6Z' fill='%235a0000'/%3E %3Cpath d='M4.2 22.6H11' stroke='%235a0000' stroke-width='.8'/%3E%3Crect x='6' y='19.8' width='3.6' height='1.2' rx='.5' fill='%23ffb000'/%3E %3Ccircle cx='111.6' cy='19' r='1.3' fill='%23ff3b30'/%3E%3Ccircle cx='111.6' cy='22.2' r='1.3' fill='%23ff3b30'/%3E %3Cpath d='M4 25.6H113' stroke='%233a0000' stroke-width='.8'/%3E %3Ccircle cx='24' cy='26.2' r='6.8' fill='%23111'/%3E%3Ccircle cx='24' cy='26.2' r='4.3' fill='%23c9ccd1'/%3E %3Ccircle cx='94.2' cy='26.2' r='6.8' fill='%23111'/%3E%3Ccircle cx='94.2' cy='26.2' r='4.3' fill='%23c9ccd1'/%3E %3Cpath d='M24 22.3V26.2M20.3 25L24 26.2M21.7 29.4L24 26.2M26.3 29.4L24 26.2M27.7 25L24 26.2M94.2 22.3V26.2M90.5 25L94.2 26.2M91.9 29.4L94.2 26.2M96.5 29.4L94.2 26.2M97.9 25L94.2 26.2' stroke='%238a8f96' stroke-width='.9'/%3E %3Ccircle cx='24' cy='26.2' r='1' fill='%23555'/%3E%3Ccircle cx='94.2' cy='26.2' r='1' fill='%23555'/%3E %3C/svg%3E") no-repeat center/contain;transform:translateX(-140px) scaleX(-1);
+  animation:racing-return 30s linear -25s infinite}
+@keyframes racing-return{0%{transform:translateX(-140px) scaleX(-1);animation-timing-function:cubic-bezier(.3,.3,.6,1)}
+  20%,100%{transform:translateX(calc(100vw + 20px)) scaleX(-1)}}
+@media(prefers-reduced-motion:reduce){:root[data-theme="racing"] .workspace::after{display:none}}
+
+/* The Sons switch (26/09): at the right of the top bar, as in the boat, with a speaker that says off (crossed out) or
+   on (sound waves); rosso, like a lit switch on the dash, when on. app.js shows it only in a skin with sounds. */
+:root[data-theme="racing"] .sound-toggle{margin-left:auto;min-height:32px;padding:4px 12px 4px 9px;gap:7px;font-size:11px;
+  letter-spacing:.6px;text-transform:uppercase}
+:root[data-theme="racing"] .sound-toggle::before{content:"";width:16px;height:16px;flex:none;background:currentColor;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 9.5h3.5L12 5.5v13l-4.5-4H4Z'/%3E%3Cpath d='M16 9.5l5 5M21 9.5l-5 5'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 9.5h3.5L12 5.5v13l-4.5-4H4Z'/%3E%3Cpath d='M16 9.5l5 5M21 9.5l-5 5'/%3E%3C/svg%3E") center/contain no-repeat}
+:root[data-theme="racing"] .sound-toggle[aria-pressed="true"]{color:#fff;border-color:#5a0400;text-shadow:0 1px 1px #0008;
+  background:linear-gradient(180deg,#ff3b2f,#a30d06);box-shadow:0 0 14px #e8140c55}
+:root[data-theme="racing"] .sound-toggle[aria-pressed="true"]::before{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 9.5h3.5L12 5.5v13l-4.5-4H4Z'/%3E%3Cpath d='M15.5 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 9.5h3.5L12 5.5v13l-4.5-4H4Z'/%3E%3Cpath d='M15.5 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11'/%3E%3C/svg%3E")}
+:root[data-theme="racing"] .sound-toggle:not([hidden])+.theme-control{margin-left:0}
+@media(max-width:760px){:root[data-theme="racing"] .sound-toggle{padding:4px 8px;font-size:0;gap:0}}
+:root[data-theme="racing"] :is(button,.button).shortlist-toggle.on{background:linear-gradient(180deg,#ff3b2f,#a30d06);color:#fff;border-color:#5a0400}
+/* The chrome strip between «R» (Voz e estilo) and the gears (27/09) */
+:root[data-theme="racing"] nav .tab:is([data-tab="voice"],[data-tab="agenda"])::after{height:3px;border-radius:2px;background:linear-gradient(90deg,#0000,#8d969d 18%,#fff 50%,#8d969d 82%,#0000);box-shadow:0 1px 1px #0004}
+/* The page ends 40 px above the street (96 px) (27/09) */
+:root[data-theme="racing"] main{padding-bottom:136px}
+@media(max-width:760px){:root[data-theme="racing"] main{padding-bottom:136px}}
+
+/* Warning lights under the gearbox (27/09): a black binnacle strip; each telltale dark until it has a reason, then lit
+   in its own colour with a glow (the turn signals blink) */
+:root[data-theme="racing"] .telltales{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:14px 4px 0;padding:10px;border-radius:12px;
+  background:#050506;box-shadow:inset 0 2px 8px #000,0 0 0 1px #2a2a2e,0 1px 0 #ffffff12}
+:root[data-theme="racing"] .telltales button.telltale.telltale{display:grid;place-items:center;width:auto;height:30px;min-height:0;padding:0;border:0;border-radius:6px;
+  background:#0d0d10;box-shadow:inset 0 1px 3px #000;cursor:pointer;transform:none;animation:none}
+:root[data-theme="racing"] .telltale-icon{width:21px;height:21px;fill:none;stroke:#2a2a30;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+:root[data-theme="racing"] .telltale-icon .fill{fill:#2a2a30;stroke:none}
+:root[data-theme="racing"] .telltale-text{font:900 8px/1 system-ui,sans-serif;text-anchor:middle}
+:root[data-theme="racing"] .telltale.lit.green .telltale-icon{stroke:#3ddc84;filter:drop-shadow(0 0 3px #3ddc84)}:root[data-theme="racing"] .telltale.lit.green .fill{fill:#3ddc84}
+:root[data-theme="racing"] .telltale.lit.amber .telltale-icon{stroke:#ffb000;filter:drop-shadow(0 0 3px #ffb000)}:root[data-theme="racing"] .telltale.lit.amber .fill{fill:#ffb000}
+:root[data-theme="racing"] .telltale.lit.red .telltale-icon{stroke:#ff3b30;filter:drop-shadow(0 0 3px #ff3b30)}:root[data-theme="racing"] .telltale.lit.red .fill{fill:#ff3b30}
+:root[data-theme="racing"] .telltale.lit.blue .telltale-icon{stroke:#3b8bff;filter:drop-shadow(0 0 3px #3b8bff)}:root[data-theme="racing"] .telltale.lit.blue .fill{fill:#3b8bff}
+:root[data-theme="racing"] .telltale.blink .telltale-icon{animation:racing-telltale-blink 1s steps(2,start) infinite}
+@keyframes racing-telltale-blink{to{visibility:hidden}}
+@media(prefers-reduced-motion:reduce){:root[data-theme="racing"] .telltale.blink .telltale-icon{animation:none}}

@@ -1,0 +1,477 @@
+import json
+from pathlib import Path
+from unittest.mock import patch
+import pytest
+from backend.cli import main
+from backend.rules import check_voice, clean_property
+from backend.service import MailService
+from backend.store import load_contacts, save_json
+from conftest import midnight_sensitive  # noqa: E402 (02/10: skipped between 00:00 and 01:00 local)
+
+ROOT = Path(__file__).resolve().parent.parent
+TEMPLATES = ROOT / "backend" / "templates"
+REF = "REF_IMOVEL"
+IDEALISTA = {"name": "idealista", "email": "reply@idealista.pt"}
+CUSTOMER = "ana.exemplo@example.com"
+
+
+@pytest.fixture
+def service(tmp_path):
+    save_json(tmp_path / "config.json", {"account": "owner@example.com", "lookback_days": 2})
+    profile = json.loads((TEMPLATES / "profile.example.json").read_text(encoding="utf-8"))
+    save_json(tmp_path / "properties" / REF / "profile.json", profile)
+    voice = json.loads((TEMPLATES / "voice.example.json").read_text(encoding="utf-8"))
+    # Explicit choices, so the tests do not depend on the owner's current voice.
+    for key, choice in (("greeting", "formal"), ("languages", "pt_en_fr"), ("closing", "cordial")):
+        voice["style"][key]["selected"] = choice
+    save_json(tmp_path / "voice.json", voice)
+    return MailService(tmp_path)
+
+
+def lead(key, reply_to=(CUSTOMER,), ref=REF, listing="00000000", body_email=CUSTOMER, sender=IDEALISTA):
+    """A portal notice as read_messages returns it (fictitious customer)."""
+    body = "\n".join(["Tens uma nova mensagem que aguarda resposta", "Ana Exemplo", "900 000 001", body_email,
+                      "Bom dia, gostaria de visitar o imóvel.", "Pode ser ao fim da tarde?",
+                      f"Ref. {ref} | Anunciante", f"Código do anúncio: {listing}", "1.000 €",
+                      "Se fores contactado por chat, tenta responder por chat."])
+    return {"gmail_message_id": key, "thread_id": f"t{key}", "message_id": f"<{key}@portal.example>",
+            "from": [sender], "reply_to": [{"name": "", "email": address} for address in reply_to],
+            "subject": f"🤩 Nova mensagem (com perfil) de Ana Exemplo sobre o teu imóvel, com ref: {ref} | Anunciante",
+            "body_text": body, "body_truncated": False}
+
+
+def read(service, messages):
+    with patch("backend.service.app_password", return_value="fake"), patch(
+            "backend.service.read_messages", return_value=(messages, len(messages), "INBOX")):
+        return service.read()
+
+
+class SMTP:
+    sent = []
+    def __init__(self, *args, **kwargs): pass
+    def __enter__(self): return self
+    def __exit__(self, *args): pass
+    def login(self, *args): pass
+    def send_message(self, msg):
+        self.sent.append(msg)
+        return {}
+
+
+def draft_and_send(service, key, text="Olá, Ana."):
+    service.drafts([{"id": key, "reply_text": text}], service.pending()["properties"][0]["revision"])
+    preview = service.preview([key])
+    SMTP.sent = []
+    with patch("backend.service.app_password", return_value="fake"), patch("backend.service.smtplib.SMTP_SSL", SMTP):
+        return service.send(preview["preview_token"], True)
+
+
+def test_lead_is_extracted_into_its_property_queue_and_answered_at_reply_to(service):
+    unrelated = {"gmail_message_id": "x", "from": [{"email": "news@example.com"}], "subject": f"Promo {REF}"}
+    queue = read(service, [lead("1"), unrelated])["properties"][0]
+    assert (queue["property_ref"], queue["added"]) == (REF, 1)
+    [email] = queue["emails"]
+    assert email["customer"] == {"name": "Ana Exemplo", "email": CUSTOMER, "phone": "900 000 001",
+                                 "message": "Bom dia, gostaria de visitar o imóvel.\nPode ser ao fim da tarde?"}
+    assert (email["recipient"]["email"], email["blocked"], email["interaction"], email["warnings"]) == (
+        CUSTOMER, None, 1, [])
+    for expected in ("Não escrevas assinatura nenhuma", "situação profissional", "Obrigado pelo seu contacto.", REF):
+        assert expected in queue["instructions"]
+    assert (service.folder / "properties" / REF / "queue.json").exists() and not service.path.exists()
+
+    assert draft_and_send(service, "1")["remaining"] == 0
+    assert SMTP.sent[0]["To"] == CUSTOMER and SMTP.sent[0]["In-Reply-To"] == "<1@portal.example>"
+    # The customer never saw the portal's subject, written for the owner; by default they get the property.
+    assert SMTP.sent[0]["Subject"] == "Apartamento T3 na Rua Exemplo, Localidade"
+    assert SMTP.sent[0]["From"] == "owner@example.com"
+    conversation = service.load(REF)["conversations"][CUSTOMER]
+    assert conversation["stage"] == 1 and conversation["thread_ids"] == ["t1"]
+
+    # Same customer again through the portal, and a direct answer to our email: one card, the 2nd interaction,
+    # that answers both at once (merged, 25/09) — never two replies to the same person.
+    answer = {"gmail_message_id": "3", "from": [{"name": "Ana Exemplo", "email": CUSTOMER}],
+              "in_reply_to": str(SMTP.sent[0]["Message-ID"]), "subject": "Re: Nova mensagem",
+              "body_text": "Sou enfermeira.\n\nOn Thu, 17 Sep 2026, Owner <owner@example.com> wrote:\n> Olá, Ana."}
+    [merged] = read(service, [lead("2"), answer])["properties"][0]["emails"]
+    assert (merged["id"], merged["merged_ids"], merged["interaction"]) == ("2", ["3"], 2)
+    assert (merged["kind"], merged["recipient"]["email"]) == ("follow_up", CUSTOMER)
+    assert "Pode ser ao fim da tarde?" in merged["customer"]["message"] and "Sou enfermeira." in merged["customer"]["message"]
+    assert not any("outro email pendente" in warning for warning in merged["warnings"])
+    # It carries the prior exchange: what we sent before these messages.
+    # The portal notice that started it is in the history too, before our reply (26/09).
+    expected_history = [{"who": "cliente", "text": "Bom dia, gostaria de visitar o imóvel.\nPode ser ao fim da tarde?",
+                         "at": merged["history"][0]["at"]},
+                        {"who": "nos", "text": "Olá, Ana.", "at": merged["history"][1]["at"]}]
+    untimed = lambda turns: [{key: value for key, value in turn.items() if key != "ts"} for turn in turns]  # noqa: E731
+    assert untimed(merged["history"]) == expected_history
+    # Read again: neither email comes back on its own.
+    assert [e["id"] for e in read(service, [lead("2"), answer])["properties"][0]["emails"]] == ["2"]
+    # A brand-new customer (first message ever) starts with no history.
+    novo = lead("9", reply_to=("novo@example.com",), body_email="novo@example.com")
+    new_email = next(e for e in read(service, [novo])["properties"][0]["emails"] if e["id"] == "9")
+    assert new_email["history"] == []
+
+
+def test_history_reaches_the_prompt_and_is_capped(service):
+    from backend.ai import reply_prompt
+    from backend.service import HISTORY_LIMIT
+    read(service, [lead("1")])
+    draft_and_send(service, "1", "Primeira resposta.")
+    last = service.load(REF)["conversations"][CUSTOMER]["sent_message_ids"][-1]
+    follow_up = {"gmail_message_id": "2", "from": [{"name": "Ana Exemplo", "email": CUSTOMER}],
+                "in_reply_to": last, "subject": "Re: Nova mensagem", "body_text": "Sou enfermeira."}
+    queue = read(service, [follow_up])["properties"][0]
+    prompt = reply_prompt(queue, ["2"])
+    assert "Histórico desta conversa" in prompt and "Nós: Primeira resposta." in prompt
+    assert "Mensagem nova:" in prompt and "Sou enfermeira." in prompt
+
+    # More turns than the cap: only the most recent HISTORY_LIMIT survive, oldest dropped first.
+    data = service.load(REF)
+    data["conversations"][CUSTOMER]["history"] = [{"who": "nos", "text": f"turno {n}", "at": "2026-01-01"}
+                                                   for n in range(HISTORY_LIMIT + 5)]
+    service.save(data, REF)
+    service.append_history(data["conversations"][CUSTOMER], "cliente", "mais um", "2026-01-02")
+    assert len(data["conversations"][CUSTOMER]["history"]) == HISTORY_LIMIT
+    assert data["conversations"][CUSTOMER]["history"][0]["text"] == "turno 6"
+    assert data["conversations"][CUSTOMER]["history"][-1]["text"] == "mais um"
+
+
+def test_sender_name_and_subject_come_from_the_voice(service):
+    service.save_voice({"greeting": "formal", "languages": "pt_en_fr", "closing": "cordial",
+                        "signature": "Equipa Teste", "sender_name": "APalace Imobiliária",
+                        "reply_subject": "Arrendamento: {imovel} ({referencia})"})
+    read(service, [lead("1")])
+    draft_and_send(service, "1")
+    assert SMTP.sent[0]["From"] == "APalace Imobiliária <owner@example.com>"
+    assert SMTP.sent[0]["Subject"] == "Arrendamento: Apartamento T3 na Rua Exemplo, Localidade (REF_IMOVEL)"
+
+    # A direct answer from the customer keeps their own subject, so the conversation stays together.
+    answer = {"gmail_message_id": "2", "from": [{"name": "Ana Exemplo", "email": CUSTOMER}],
+              "in_reply_to": str(SMTP.sent[0]["Message-ID"]), "subject": "Re: Arrendamento: Apartamento T3",
+              "body_text": "Posso visitar sábado?"}
+    read(service, [answer])
+    draft_and_send(service, "2", "Claro, Ana.")
+    assert SMTP.sent[0]["Subject"] == "Re: Arrendamento: Apartamento T3"
+
+    # An empty subject falls back to the property, never to the portal's own subject.
+    service.save_voice({"greeting": "formal", "languages": "pt_en_fr", "closing": "cordial",
+                        "signature": "Equipa Teste", "sender_name": "", "reply_subject": ""})
+    read(service, [lead("3")])
+    draft_and_send(service, "3")
+    assert SMTP.sent[0]["Subject"] == "Apartamento T3 na Rua Exemplo, Localidade"
+    assert SMTP.sent[0]["From"] == "owner@example.com"
+
+
+def test_preview_without_a_draft_says_which_step_is_missing(service):
+    read(service, [lead("1")])
+    with pytest.raises(ValueError, match="ainda sem rascunho \\(Ana Exemplo\\).*passos 02 e 03"):
+        service.preview(["1"])
+
+
+def test_language_option_adds_an_english_translation_below_portuguese_english_spanish(service):
+    service.save_voice({"greeting": "formal", "languages": "multilingual_en_backup", "closing": "cordial",
+                        "signature": "Equipa Teste"})
+    instructions = read(service, [lead("1")])["properties"][0]["instructions"]
+    assert "não for" in instructions and "português, inglês nem espanhol" in instructions
+    assert "tradução completa em inglês" in instructions
+
+
+@pytest.mark.parametrize("reply_to, notice", [
+    ((), "não tem Reply-To"),
+    (("a@example.com", "b@example.com"), "não identifica um único"),
+])  # a Reply-To that is the portal's or our own address gives way to the notice's email since 27/09 (test below)
+def test_missing_or_invalid_reply_to_blocks_sending_until_dismissed(service, reply_to, notice):
+    queue = read(service, [lead("1", reply_to=reply_to, body_email="" if not reply_to else CUSTOMER)])["properties"][0]
+    [email] = queue["emails"]
+    assert notice in email["blocked"] and email["recipient"] is None and email["interaction"] is None
+    service.drafts([{"id": "1", "reply_text": "Olá"}], queue["revision"])
+    with pytest.raises(ValueError, match="bloqueado"):
+        service.preview(["1"])
+    revision = service.pending()["properties"][0]["revision"]
+    assert service.dismiss(["1"], revision)["dismissed"] == 1
+    assert read(service, [lead("1", reply_to=reply_to, body_email="" if not reply_to else CUSTOMER)])["properties"][0]["added"] == 0
+    assert service.load(REF)["conversations"] == {}
+
+
+def test_headers_decide_which_texts_are_downloaded(service):
+    read(service, [lead("1")])
+    with patch("backend.service.app_password", return_value="fake"), patch(
+            "backend.service.read_messages", return_value=([], 0, "INBOX")) as fetch:
+        service.read()
+    accept = fetch.call_args.kwargs["accept"]
+    unrelated = {"gmail_message_id": "9", "from": [{"email": "news@example.com"}], "subject": "Promo"}
+    assert (accept(lead("1")), accept(lead("2")), accept(unrelated)) == (False, True, False)
+
+
+def test_only_the_exact_reference_from_the_portal_sender_counts(service):
+    messages = [lead("1", ref=REF + "2"), lead("2", sender={"name": "idealista", "email": "outro@idealista.pt"}),
+                lead("3", sender={"name": "Outro nome", "email": "reply@idealista.pt"})]
+    assert [e["id"] for e in read(service, messages)["properties"][0]["emails"]] == ["3"]
+
+
+def test_conflicting_identifiers_are_warnings_for_manual_review(service):
+    [email] = read(service, [lead("1", listing="99999999", body_email="outra@example.com")])["properties"][0]["emails"]
+    assert email["recipient"]["email"] == CUSTOMER
+    assert any("99999999" in w for w in email["warnings"]) and any("outra@example.com" in w for w in email["warnings"])
+
+
+def test_follow_up_from_another_address_is_blocked(service):
+    read(service, [lead("1")])
+    draft_and_send(service, "1")
+    stranger = {"gmail_message_id": "2", "thread_id": "t1", "from": [{"email": "familiar@example.com"}],
+                "subject": "Re: Nova mensagem", "body_text": "Olá"}
+    [email] = read(service, [stranger])["properties"][0]["emails"]
+    assert (email["kind"], email["recipient"]) == ("follow_up", None) and "ambígua" in email["blocked"]
+
+
+def test_voice_comes_from_the_json_and_is_required(service, capsys):
+    voice = json.loads((service.folder / "voice.json").read_text(encoding="utf-8"))
+    voice["style"]["greeting"]["selected"] = "cordial"
+    save_json(service.folder / "voice.json", voice)
+    text = service.pending()["properties"][0]["instructions"]
+    assert "Olá, {customer_name}." in text and "Exmo." not in text
+    voice["style"]["greeting"]["selected"] = None
+    voice["style"]["signature"]["text"] = ""
+    save_json(service.folder / "voice.json", voice)
+    with pytest.raises(ValueError, match="falta: saudação, assinatura"):
+        service.pending()
+    # Without the voice the local MCP does not start either.
+    assert main(["--instance", str(service.folder), "stdio"]) == 1
+    assert "Configura a voz" in capsys.readouterr().err
+
+
+def test_the_published_voice_is_complete():
+    # The published example must pass the same validation the MCP and the page run at start.
+    voice = json.loads((TEMPLATES / "voice.example.json").read_text(encoding="utf-8"))
+    assert check_voice(voice)["style"]["signature"]["text"]
+
+
+def test_several_properties_need_property_ref(service):
+    profile = json.loads((service.folder / "properties" / REF / "profile.json").read_text(encoding="utf-8"))
+    profile["property"]["reference"] = profile["match"]["subject_property_reference_equals"] = "OUTRO"
+    save_json(service.folder / "properties" / "OUTRO" / "profile.json", profile)
+    result = read(service, [lead("1"), lead("2", ref="OUTRO")])
+    assert {queue["property_ref"]: queue["added"] for queue in result["properties"]} == {REF: 1, "OUTRO": 1}
+    with pytest.raises(ValueError, match="property_ref"):
+        service.drafts([{"id": "1", "reply_text": "x"}], 1)
+    revision = service.pending(REF)["properties"][0]["revision"]
+    assert service.drafts([{"id": "1", "reply_text": "x"}], revision, REF)["saved"] == 1
+    with pytest.raises(ValueError, match="property_ref"):
+        service.pending("../../secrets")
+
+
+def test_property_folder_without_profiles_refuses_instead_of_reading_everything(tmp_path, capsys):
+    # Profiles are not in Git: a fresh clone without them must not import the whole mailbox.
+    save_json(tmp_path / "config.json", {"account": "owner@example.com"})
+    save_json(tmp_path / "voice.json", json.loads((TEMPLATES / "voice.example.json").read_text(encoding="utf-8")))
+    with patch("backend.service.read_messages") as fetch, pytest.raises(ValueError, match="Copia os perfis"):
+        MailService(tmp_path).read()
+    fetch.assert_not_called()
+    assert main(["--instance", str(tmp_path), "stdio"]) == 1
+    assert "Copia os perfis" in capsys.readouterr().err
+
+
+def test_profile_of_another_account_is_rejected(service):
+    save_json(service.folder / "config.json", {"account": "other@example.com"})
+    with pytest.raises(ValueError, match="outra conta"):
+        service.pending()
+
+
+@pytest.mark.parametrize("rent, euros", [
+    ("1.500 €", 1500), ("1500", 1500), (1500, 1500), (850.5, 850.5), ("850.00", 850), ("850,50 €", 850.5),
+    ("1,200", 1200), ("1.200,50", 1200.5), ("1,200.50", 1200.5), ("1 500 €/mês", 1500),
+    (None, None), ("sob consulta", None),
+])
+def test_rent_in_portuguese_or_english_notation(rent, euros):
+    fields = clean_property({"reference": REF, "description": "T2", "advertised_rent_eur": rent})
+    assert fields["advertised_rent_eur"] == euros
+
+
+@pytest.mark.parametrize("rent", ["1500 € + 50 € de condomínio", "12.34.56", "1,234.567", "1.500.000", True])
+def test_ambiguous_or_impossible_rent_is_refused(rent):
+    with pytest.raises(ValueError, match="Renda"):
+        clean_property({"reference": REF, "description": "T2", "advertised_rent_eur": rent})
+
+
+@midnight_sensitive
+def test_dashboard_carries_first_names_only_never_contacts(service):
+    read(service, [lead("1"), lead("2", reply_to=(), body_email="")])
+    with patch("backend.service.has_app_password", return_value=False):
+        metrics = service.metrics()
+    assert metrics["totals"] == {"pending": 2, "drafts": 0, "blocked": 1, "attention": 0, "answered": 0, "customers": 0}
+    assert metrics["setup"] == {"account": True, "app_password": False, "voice": True, "properties": 1,
+                                "openai_key": False}
+    assert [item["pending"] for item in metrics["properties"]] == [2]
+    # 27/09: what is behind the queue numbers, for their hover: first name, date, kind, status, blocked; nothing else.
+    queue = metrics["properties"][0]["queue"]
+    assert [(item["name"], item["kind"], item["status"], item["blocked"]) for item in queue] == [
+        ("Ana", "lead", "pending", False), ("Ana", "lead", "pending", True)]
+    assert all(set(item) == {"name", "date", "kind", "status", "blocked"} for item in queue)
+    text = json.dumps(metrics, ensure_ascii=False)
+    for private in (CUSTOMER, "900 000 001", "Ana Exemplo"):
+        assert private not in text
+
+    draft_and_send(service, "1")
+    with patch("backend.service.has_app_password", return_value=True):
+        after = service.metrics()
+    assert after["totals"]["answered"] == 1 and after["totals"]["pending"] == 1
+    assert after["by_day"][-1]["sent"] == 1  # the send was logged today
+    # The one exception (22/09): who was answered, by first name, for the hover of «Respostas enviadas».
+    today = after["by_day"][-1]["day"]
+    assert after["properties"][0]["answered_customers"] == [
+        {"name": "Ana", "first_contact": today, "last_reply": today, "interactions": 1}]
+    text = json.dumps(after, ensure_ascii=False)
+    for private in (CUSTOMER, "900 000 001", "Ana Exemplo"):
+        assert private not in text
+
+
+def test_the_agency_knowhow_reaches_every_property(service):
+    (service.folder / "knowledge").mkdir()
+    (service.folder / "knowledge" / "know-how.md").write_text(
+        "# Know-how\n\n## Animais\n- Pergunta que animal é, o tamanho e quantos são.\n", encoding="utf-8")
+    profile = json.loads((service.folder / "properties" / REF / "profile.json").read_text(encoding="utf-8"))
+    profile["property"]["reference"] = profile["match"]["subject_property_reference_equals"] = "OUTRO"
+    save_json(service.folder / "properties" / "OUTRO" / "profile.json", profile)
+    queues = service.pending()["properties"]
+    assert len(queues) == 2 and all("Pergunta que animal é, o tamanho" in q["instructions"] for q in queues)
+    # Runtime only: saving the voice never writes the know-how into voice.json.
+    service.save_voice({"greeting": "formal", "languages": "pt_en_fr", "closing": "cordial", "signature": "Equipa"})
+    assert "_knowledge" not in json.loads((service.folder / "voice.json").read_text(encoding="utf-8"))
+
+
+@pytest.mark.parametrize("url", ["https://www.idealista.pt/12345678", "https://www.idealista.pt/imovel/12345678/",
+                                 "https://idealista.pt/imovel/12345678?xtmc=1"])
+def test_idealista_links_have_one_form_and_bring_the_listing_code(url):
+    fields = clean_property({"reference": REF, "description": "T2", "listing_url": url})
+    assert (fields["listing_url"], fields["listing_id"]) == ("https://www.idealista.pt/imovel/12345678/", "12345678")
+
+
+def test_a_listing_code_that_contradicts_the_link_is_refused():
+    with pytest.raises(ValueError, match="não corresponde"):
+        clean_property({"reference": REF, "description": "T2", "listing_id": "1",
+                        "listing_url": "https://www.idealista.pt/imovel/12345678/"})
+
+
+def test_notes_never_push_the_knowledge_past_its_limit(service):
+    base = service.folder / "properties" / REF / "knowledge"
+    base.mkdir()
+    (base / "grande.md").write_text("# Grande\n- " + "x" * 29980 + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="limite"):
+        service.add_note(REF, "Mais uma informação útil.")
+    assert not (base / "notas.md").exists()
+
+
+def test_an_inactive_property_leaves_the_menus_but_keeps_everything(service):
+    assert service.settings()["properties"][0]["active"] is True
+    assert service.pending()["properties"][0]["inactive"] is False
+    service.set_property_active(REF, False)
+    profile_path = service.folder / "properties" / REF / "profile.json"
+    assert json.loads(profile_path.read_text(encoding="utf-8"))["active"] is False
+    assert service.settings()["properties"][0]["active"] is False  # Imóveis still lists it
+    assert service.contacts()["inactive"] == [REF]
+    # Nothing else changes: its emails are still read into its queue, which says it is inactive.
+    read(service, [lead("1")])
+    queue = service.pending()["properties"][0]
+    assert queue["inactive"] is True and len(queue["emails"]) == 1
+    service.set_property_active(REF, True)
+    assert "active" not in json.loads(profile_path.read_text(encoding="utf-8"))  # active is the default
+    assert service.contacts()["inactive"] == []
+
+
+def test_the_active_switch_refuses_unknown_properties_and_values(service):
+    with pytest.raises(ValueError, match="desconhecido"):
+        service.set_property_active("OUTRO", False)
+    with pytest.raises(ValueError, match="ativo ou inativo"):
+        service.set_property_active(REF, "não")
+
+
+def test_a_new_property_starts_active_even_from_an_inactive_template(service):
+    service.set_property_active(REF, False)
+    service.save_property({"reference": "NOVO", "description": "Apartamento T2 na Rua Exemplo",
+                           "sender": "reply@idealista.pt"})
+    active = {item["reference"]: item["active"] for item in service.settings()["properties"]}
+    assert active == {REF: False, "NOVO": True}
+
+
+def test_without_reply_to_the_email_in_the_body_is_the_recipient_and_the_owner_can_change_it(service):
+    [email] = read(service, [lead("1", reply_to=())])["properties"][0]["emails"]
+    assert email["blocked"] is None and email["recipient"]["email"] == CUSTOMER and email["recipient_editable"]
+    # 27/09: common on Idealista — the email in the notice is used, with no warning.
+    assert not any(w.startswith("Sem Reply-To") for w in email["warnings"])
+    assert load_contacts(service.folder)[(CUSTOMER, REF)]["nome"] == "Ana Exemplo"
+
+    # Neither a Reply-To nor an email in the body: blocked, until the owner types who it goes to.
+    [_, other] = read(service, [lead("2", reply_to=(), body_email="")])["properties"][0]["emails"]
+    assert other["blocked"] and other["recipient"] is None and other["recipient_editable"]
+    with pytest.raises(ValueError, match="portal ou teu"):
+        service.set_recipient(REF, "2", "reply@idealista.pt")
+    with pytest.raises(ValueError, match="email válido"):
+        service.set_recipient(REF, "2", "nao-e-email")
+    service.set_recipient(REF, "2", "rui.exemplo@example.com")
+    fixed = next(e for e in service.pending()["properties"][0]["emails"] if e["id"] == "2")
+    assert fixed["blocked"] is None and fixed["recipient"]["email"] == "rui.exemplo@example.com"
+    assert "Destinatário indicado à mão: rui.exemplo@example.com." in fixed["warnings"]
+    assert ("rui.exemplo@example.com", REF) in load_contacts(service.folder)
+    with pytest.raises(ValueError, match="não permite"):
+        read(service, [lead("3")])
+        service.set_recipient(REF, "3", "outro@example.com")  # a valid Reply-To stays as it came
+
+
+def test_a_notice_blocked_before_the_fix_is_repaired_on_the_next_read(service):
+    read(service, [lead("1", reply_to=())])
+    data = service.load(REF)
+    [item] = data["emails"]
+    notice = json.loads((service.folder / "properties" / REF / "profile.json").read_text())["reply"]["missing_reply_to_notice"]
+    item.update(recipient=None, blocked=notice, warnings=[], customer={**item["customer"], "email": None})  # as before 26/09
+    service.save(data, REF)
+    read(service, [])
+    [item] = service.pending()["properties"][0]["emails"]
+    assert item["blocked"] is None and item["recipient"]["email"] == CUSTOMER
+
+
+def test_desde_sempre_starts_the_chart_at_the_first_day_with_data(service):
+    from datetime import datetime, timedelta, timezone
+    read(service, [lead("1")])
+    with patch("backend.service.has_app_password", return_value=False):
+        today_only = service.metrics("all")
+    assert (today_only["period_days"], today_only["bucket_days"], len(today_only["by_day"])) == (1, 1, 1)
+    old = (datetime.now(timezone.utc).date() - timedelta(days=45)).isoformat()
+    with open(service.folder / "logs" / "events.jsonl", "a", encoding="utf-8") as stream:
+        stream.write(json.dumps({"at": old + "T10:00:00+00:00", "event": "read", "received": {"velho": old}}) + "\n")
+    with patch("backend.service.has_app_password", return_value=False):
+        longer = service.metrics("all")
+    # 46 days: one bar per week, from that first day
+    assert (longer["period_days"], longer["bucket_days"], len(longer["by_day"])) == (46, 7, 7)
+    assert longer["by_day"][0]["day"] == old and longer["by_day"][0]["requests"] == 1
+    with pytest.raises(ValueError, match="Período"):
+        service.metrics(3000)
+
+
+def test_a_phone_the_customer_wrote_is_found_for_whatsapp_and_dates_or_prices_are_not():
+    # 27/09: the WhatsApp button's number, when the portal notice had none.
+    from backend.rules import phone_in
+    assert phone_in("Cumprimentos,\nRui Exemplo\n912 345 678") == "912 345 678"
+    assert phone_in("liga-me para o +351 931234567, obrigado") == "+351 931234567"
+    assert phone_in("o meu número inglês é +44 7700 900123") == "+44 7700 900123"
+    assert phone_in("visita a 25/09/2026 às 18:17, renda de 1.000 € e 3500€ de rendimentos, ref. 123456789") == ""
+
+
+def test_a_reply_to_that_is_the_portals_own_address_gives_way_to_the_email_in_the_notice(service):
+    # 27/09: Idealista sometimes puts its own address in Reply-To; the customer's email in the notice's body is used.
+    for key, own, body in (("1", "reply@idealista.pt", CUSTOMER), ("2", "owner@example.com", "rui.exemplo@example.com")):
+        read(service, [lead(key, reply_to=(own,), body_email=body)])
+        [email] = [item for item in service.pending()["properties"][0]["emails"] if item["id"] == key]
+        assert email["blocked"] is None and email["recipient"]["email"] == body
+        assert not any("Reply-To" in warning for warning in email["warnings"])
+
+
+def test_a_notice_with_no_email_but_a_phone_gets_a_reply_for_whatsapp_or_sms_never_an_email(service):
+    # 27/09: blocked for the email, but written all the same, to go by WhatsApp or SMS.
+    from backend.ai import reply_prompt
+    queue = read(service, [lead("1", reply_to=(), body_email="")])["properties"][0]
+    [email] = service.pending()["properties"][0]["emails"]
+    assert email["blocked"] and email["phone_only"] is True
+    prompt = reply_prompt(service.pending()["properties"][0], ["1"])
+    assert "vai por WhatsApp ou SMS" in prompt
+    service.drafts([{"id": "1", "reply_text": "Olá Ana"}], queue["revision"])
+    with pytest.raises(ValueError, match="bloqueado"):
+        service.preview(["1"])  # never by email

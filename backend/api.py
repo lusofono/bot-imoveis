@@ -1,0 +1,720 @@
+"""The local page: the workflow without MCP, where ChatGPT is reached by copy and paste — or, optionally,
+by the OpenAI API, as an alternative that skips the copy/paste but still only produces drafts.
+
+It runs on 127.0.0.1 only. Each start creates a random token that the browser gets once from the
+printed link and then keeps in an HttpOnly cookie; every API call repeats it in a header, so no other
+site can read the queue or send. The page itself is in frontend/ and only talks to this API.
+The hosted mode (a login on a server) is paused; it returns with AWS.
+"""
+import os
+import secrets
+import signal
+import subprocess
+import threading
+from concurrent.futures import ThreadPoolExecutor
+import time
+import tomllib
+from datetime import datetime
+from pathlib import Path
+from urllib.parse import urlsplit
+from starlette.applications import Starlette
+from starlette.concurrency import run_in_threadpool
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
+from starlette.routing import Route
+from . import APP_NAME
+from .ai import (listing_prompt, parse_fichas, parse_listing, parse_alerts, parse_documents, parse_replies, parse_round, parse_visits, reply_prompt,
+                 round_prompt, short_id, sign)
+from .openai_client import complete, context_of, estimate_cost_usd, estimate_tokens
+from .rules import phone_in
+from .secrets import openai_api_key
+from .service import COMMON_PROMPTS, MailService
+from . import testlab
+
+FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
+COOKIE = "bot_mail_web"
+PARALLEL_CALLS = 4  # 02/10: calls to the AI at the same time, in «Gerar respostas» and the reviewer
+
+
+def run_parallel(call, items):
+    """call(item) for every item, up to PARALLEL_CALLS at a time, in the items' order; an error is returned in its
+    place, never raised, so one failed call never loses the others."""
+    def safe(item):
+        try:
+            return call(item)
+        except Exception as exc:  # given back to the caller, who decides
+            return exc
+    if len(items) <= 1:
+        return [safe(item) for item in items]
+    with ThreadPoolExecutor(max_workers=min(PARALLEL_CALLS, len(items))) as pool:
+        return list(pool.map(safe, items))
+
+
+def plan_batches(current, ids, extra, only_extra, model, limits):
+    """29/09: the selection in calls that keep within the Oficina's limits: at most batch_emails emails, and a prompt of
+    at most context_share % of the model's context (estimated before sending). An email too big alone goes alone.
+    Returns ([[ids]], the biggest share of the context one call takes, in %)."""
+    budget = context_of(model) * limits["context_share"] / 100
+    batches, biggest = [], 0.0
+    for key in ids:
+        if batches and len(batches[-1]) < limits["batch_emails"] \
+                and estimate_tokens(reply_prompt(current, batches[-1] + [key], extra, only_extra)) <= budget:
+            batches[-1].append(key)
+        else:
+            batches.append([key])
+    for batch in batches:
+        biggest = max(biggest, 100 * estimate_tokens(reply_prompt(current, batch, extra, only_extra)) / context_of(model))
+    return batches, round(biggest, 1)
+# The page's own files. index.html is only served at "/", with the token written into it. A rich theme (a
+# "skin": 80's RacingCar now, more to come) keeps its stylesheet in frontend/themes/, listed once at start.
+ASSETS = {"app.js": "text/javascript", "style.css": "text/css",
+          **{f"themes/{sheet.name}": "text/css" for sheet in sorted((FRONTEND / "themes").glob("*.css"))},
+          # A skin's recorded sounds (26/09: the 70's Scooter's engine, CC0 — see frontend/sounds/CREDITS.md).
+          **{f"sounds/{clip.name}": "audio/mp4" for clip in sorted((FRONTEND / "sounds").glob("*.m4a"))},
+          # The company's logo (27/09), big in the corner of Voz e estilo.
+          **{f"brand/{image.name}": "image/png" for image in sorted((FRONTEND / "brand").glob("*.png"))}}
+HEADERS = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
+# pyproject.toml is the one place the version is written; CHANGELOG.md logs what changed at each one.
+VERSION = tomllib.loads((Path(__file__).resolve().parents[1] / "pyproject.toml").read_text())["project"]["version"]
+# pyproject.toml itself must stay a plain PEP 440 version (setuptools/pip parse it); the "0." that means
+# "not even 1.0 yet" is shown instead as "α." wherever a person reads it, so it reads as alpha at a glance.
+DISPLAY_VERSION = VERSION.replace("0.", "α.", 1) if VERSION.startswith("0.") else VERSION
+
+
+def same(supplied, token):
+    return secrets.compare_digest(str(supplied or "").encode(), str(token or "").encode())
+
+
+def ids_of(body):
+    ids = body.get("ids")
+    if not isinstance(ids, list) or not all(isinstance(value, str) for value in ids):
+        raise ValueError("Seleciona os emails.")
+    return ids
+
+
+def web_app(folder, token):
+    """The page and its API for one data folder; every API call must carry this start's token."""
+    service = MailService(folder)
+    # When this process started running this code — not a compiled build, but the closest thing to one here.
+    build_at = datetime.now().astimezone().strftime("%d/%m %H:%M")  # 27/09: no year, beside the version
+
+    def state():
+        try:
+            data = service.pending()
+        except ValueError as exc:
+            # E.g. no profile yet or an incomplete voice: the settings tabs still work.
+            return {"error": str(exc), "properties": []}
+        queues = data.get("properties") or [{"property_ref": None, "revision": data["revision"], "instructions": "",
+                                             "last_read_at": data.get("last_read_at"), "emails": data["emails"]}]
+        phones = service.phones() if queues and queues[0].get("property_ref") else {}
+        profiles = service.profile_links() if queues and queues[0].get("property_ref") else {}
+        for queue in queues:
+            for email in queue["emails"]:
+                email["short_id"] = short_id(email["id"])
+                # The WhatsApp button's number (26/09): the page only, never in a prompt.
+                address = ((email.get("recipient") or {}).get("email") or (email.get("customer") or {}).get("email") or "").casefold()
+                # 27/09: else one the customer wrote in this message or an earlier one of theirs (never our quoted text)
+                email["whatsapp"] = ((email.get("customer") or {}).get("phone") or phones.get((address, queue.get("property_ref")), "")
+                                     or phone_in((email.get("customer") or {}).get("message"))
+                                     or next((found for turn in reversed(email.get("conversation") or [])
+                                              if turn.get("who") == "cliente" for found in [phone_in(turn.get("text"))] if found), ""))
+                # 27/09: the customer's profile on the portal («Ver perfil»), from this notice or an earlier one
+                email["profile_url"] = email.get("profile_url") or profiles.get((address, queue.get("property_ref")), "")
+        return {"account": data["account"], "error": None, "properties": queues, "owners": data.get("owners")}
+
+    def queue(ref):
+        current = state()
+        if current["error"]:
+            raise ValueError(current["error"])
+        found = next((item for item in current["properties"] if item["property_ref"] == (ref or None)), None)
+        if not found:
+            raise ValueError("Imóvel desconhecido.")
+        return found
+
+    def read(body):
+        result = service.read(body.get("days"))
+        current = state()
+        current["added"] = sum(item.get("added", 0) for item in result.get("properties", [])) or result.get("added", 0)
+        current["direct"] = result.get("direct", 0)
+        return current
+
+    def prompt(body):
+        return {"prompt": reply_prompt(queue(body.get("property_ref")), ids_of(body), str(body.get("extra") or ""),
+                                       now=datetime.now().astimezone())}
+
+    def save_drafts_from(current, text):
+        # Shared by "paste" (the human's copy from ChatGPT) and "generate" (the OpenAI API): same parsing,
+        # same safety checks, same drafts-only save. Only where the text comes from differs.
+        replies, notes = parse_replies(text, current)
+        signature = service.voice_signature()  # 02/10: the program signs, under the AI's closing
+        replies = [{**reply, "reply_text": sign(reply["reply_text"], signature)} for reply in replies]
+        visits = parse_visits(text, current)
+        fichas = parse_fichas(text, current) if current["property_ref"] else []
+        saved = 0
+        if replies or visits or fichas:
+            saved = service.drafts(replies, current["revision"], current["property_ref"], visits, fichas)["saved"]
+        documents = parse_documents(text, current) if current["property_ref"] else []
+        if documents:  # 03/10: what a short-list customer sent, marked as arrived
+            service.mark_documents(current["property_ref"], documents)
+        alerts = parse_alerts(text, current) if current["property_ref"] else []
+        if alerts:  # 02/10: important, dramatic or insulting: on the card and on the notice board
+            service.flag_alerts(current["property_ref"], alerts)
+        return {"saved": saved, "notes": notes, "visits": len(visits), "fichas": len(fichas), "state": state()}
+
+    def owners_generate(body):
+        # 02/10: one call for the owner's emails chosen; the same parsing, signature, drafts-only save and review as the
+        # customers' — nothing goes out without the owner of the page approving it
+        ref, prompt_text, chosen = service.owner_prompt_for(body.get("property_ref") or None, ids_of(body),
+                                                            now=datetime.now().astimezone(), extra=str(body.get("extra") or ""))
+        service.require_fuel(ref)
+        cfg = service.config()
+        model = service.model(cfg)
+        answer, usage = complete(openai_api_key(service.folder, cfg["account"]), model, prompt_text)
+        cost = estimate_cost_usd(model, **{k: usage[k] for k in ("prompt_tokens", "completion_tokens")})
+        service.log("openai_usage", model=model, **usage, reference=ref, cost_usd=round(cost, 6), purpose="owner")
+        replies, notes = parse_replies(answer, chosen)
+        signature = service.voice_signature()
+        replies = [{**reply, "reply_text": sign(reply["reply_text"], signature)} for reply in replies]
+        saved = (service.caixa_drafts(replies) if ref == "_caixa" else service.drafts(replies, queue(ref)["revision"], ref)["saved"]) if replies else 0
+        return {"saved": saved, "notes": notes, "state": state(), "fuel": service.api_fuel(ref), "prompt": prompt_text}
+
+    def paste(body):
+        return save_drafts_from(queue(body.get("property_ref")), str(body.get("text") or ""))
+
+    def generate(body):
+        # «Gerar respostas» (the only path in «Modo: só API»): the same prompt as the copy/paste, answered by the
+        # OpenAI API. Everything after that — parsing, drafts, preview, send — is identical and needs the same
+        # review and confirmation before anything goes out. A big selection goes in several calls (plan_batches),
+        # within the Oficina's limits: past them, answers get worse and a long JSON risks being cut.
+        ref = queue(body.get("property_ref"))["property_ref"]
+        ids, extra = ids_of(body), str(body.get("extra") or "")
+        only_extra = body.get("only_extra") is True and len(ids) == 1  # 27/09: one email, its points only
+        cfg = service.config()
+        key = openai_api_key(service.folder, cfg["account"])
+        model = service.model(cfg)
+        totals = {"saved": 0, "notes": [], "visits": 0, "fichas": 0, "prompts": []}
+        usage_total = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        cost_total = 0.0
+        snapshot = queue(ref)
+        batches, biggest = plan_batches(snapshot, ids, extra, only_extra, model, service.call_limits(cfg))
+        service.require_fuel(ref)
+        # 02/10: the calls at the same time (up to PARALLEL_CALLS), not one after the other: the AI writing is what
+        # takes long (20 emails, 4 calls of ~30 s, took two minutes); the drafts are still saved one batch at a time
+        moment = datetime.now().astimezone()
+        prompts = [reply_prompt(snapshot, batch, extra, only_extra, now=moment) for batch in batches]
+        outcomes = run_parallel(lambda prompt_text: complete(key, model, prompt_text), prompts)
+        if all(isinstance(outcome, Exception) for outcome in outcomes):
+            raise outcomes[0]  # nothing written: the error goes to the owner like any other
+        failed = [str(outcome) for outcome in outcomes if isinstance(outcome, Exception)]
+        for prompt_text, outcome in zip(prompts, outcomes):
+            if isinstance(outcome, Exception):
+                continue
+            answer, usage = outcome
+            current = queue(ref)  # fresh each time: the previous batch's drafts changed its revision
+            # Tokens only: never the prompt or the answer, same rule as every other log entry.
+            cost = estimate_cost_usd(model, **{k: usage[k] for k in ("prompt_tokens", "completion_tokens")})
+            cost_total += cost
+            service.log("openai_usage", model=model, **usage, reference=ref, cost_usd=round(cost, 6))
+            result = save_drafts_from(current, answer)
+            for field in ("saved", "visits", "fichas"):
+                totals[field] += result[field]
+            totals["notes"] += result["notes"]
+            totals["prompts"].append(prompt_text)  # «Ver o que foi enviado à IA», in the page only
+            usage_total = {k: usage_total[k] + (usage.get(k) or 0) for k in usage_total}
+        # 30/09: the reviewer reads the new drafts at once (Oficina: on by default); a failure never loses the drafts
+        reviewed, review_error = 0, None
+        if totals["saved"] and service.reviewer_settings(cfg)["auto"]:
+            try:
+                review = service.review_drafts(ref, ids)
+                reviewed, cost_total = review["reviewed"], cost_total + review["cost_usd"]
+            except Exception as exc:  # the drafts are saved: only the review is missing, and it can be asked again
+                review_error = str(exc)
+        return {**totals, "model": model, "state": state(), "tokens": usage_total, "cost_usd": round(cost_total, 6),
+                "fuel": service.api_fuel(ref), "calls": len(batches), "context_used": biggest,
+                "reviewed": reviewed, "review_error": review_error,
+                "generation_error": f"{len(failed)} de {len(batches)} chamadas falharam: {failed[0]}" if failed else None}
+
+    def generate_plan(body):
+        # 02/10: the selection in batches (within the Oficina's limits), for the page to send each as its own call and
+        # show its drafts as soon as they are ready — the last before the first, if it comes back first
+        ref = queue(body.get("property_ref"))["property_ref"]
+        cfg = service.config()
+        batches, biggest = plan_batches(queue(ref), ids_of(body), str(body.get("extra") or ""), False, service.model(cfg),
+                                        service.call_limits(cfg))
+        return {"batches": batches, "context_used": biggest}
+
+    def drafts(body):
+        current = queue(body.get("property_ref"))
+        replies = body.get("replies")
+        if not isinstance(replies, list) or not all(
+                isinstance(r, dict) and isinstance(r.get("id"), str) and isinstance(r.get("reply_text"), str)
+                for r in replies):
+            raise ValueError("Rascunhos inválidos.")
+        service.drafts([{"id": r["id"], "reply_text": r["reply_text"]} for r in replies],
+                       current["revision"], current["property_ref"])
+        return state()
+
+    def preview(body):
+        return service.preview(ids_of(body), queue(body.get("property_ref"))["property_ref"])
+
+    def send(body):
+        if body.get("confirmed") is not True:
+            raise ValueError("Confirma o envio na página.")
+        return service.send(str(body.get("preview_token") or ""), True, body.get("property_ref") or None)
+
+    def dismiss(body):
+        current = queue(body.get("property_ref"))
+        service.dismiss(ids_of(body), current["revision"], current["property_ref"])
+        return state()
+
+    def voice(body):
+        # 30/09: the prompts are changed only in the Oficina; Voz e estilo keeps the voice's own settings
+        service.save_voice({key: value for key, value in body.items() if key not in COMMON_PROMPTS})
+        return service.settings()
+
+    def property_prompt(body):
+        url = str(body.get("listing_url") or "").strip()
+        if urlsplit(url).scheme != "https" or not urlsplit(url).hostname:
+            raise ValueError("Indica o link do anúncio, começado por https://.")
+        return {"prompt": listing_prompt(url)}
+
+    def property_save(body):
+        return {**service.save_property(body.get("fields") or {}, body.get("first_read_days")),
+                "settings": service.settings()}
+
+    def visit_candidates(body):
+        return service.visit_candidates(body.get("property_ref") or None)
+
+    def visit_analysis_prompt(body):
+        return {"prompt": service.visit_analysis_prompt(body.get("property_ref") or None)}
+
+    def visit_round_summary(body):
+        return service.visit_round_summary(body.get("property_ref") or None)
+
+    def visit_analyze(body):
+        return service.analyze_visits(body.get("property_ref") or None)
+
+    def active_write(body):
+        return {**service.write_more(body.get("property_ref") or None, body.get("email")), "state": state()}
+
+    def active_remove(body):
+        return {**service.remove_active(body.get("property_ref") or None, body.get("email")), "state": state()}
+
+    def visit_check(body):
+        attended = body.get("attended")
+        return {**service.check_visit(body.get("property_ref") or None, body.get("email"),
+                                      attended if attended in (True, False) else None,
+                                      body.get("private_note"), body.get("public_note"), body.get("at")),
+                "settings": service.settings()}
+
+    def visit_thanks(body):
+        return {**service.visit_thanks(body.get("property_ref") or None, body.get("email")), "state": state()}
+
+    def agenda_sync(body):
+        # «Atualizar agenda»: the API reads the conversations and updates the agenda by itself.
+        days = int(body["days"]) if str(body.get("days", "")).isdigit() else body.get("days") or 0
+        return {**service.sync_agenda(body.get("property_ref") or None, days), "settings": service.settings(), "state": state()}
+
+    def visit_propose(body):
+        emails = body.get("emails")
+        if not isinstance(emails, list) or not all(isinstance(email, str) for email in emails):
+            raise ValueError("Escolhe os clientes.")
+        result = service.propose_visits(body.get("property_ref") or None, body.get("day"), body.get("start"),
+                                        body.get("end"), emails, str(body.get("note") or ""), body.get("common") is True)
+        return {**result, "state": state(), "settings": service.settings()}
+
+    # 29/09: a round with one text for everyone, written, reviewed and sent in the round's own panel.
+    def visit_round(body):
+        return service.common_round(body.get("property_ref") or None)
+
+    def round_ids(ref):
+        current = service.common_round(ref)
+        if not current["items"]:
+            raise ValueError("Esta ronda já não tem propostas por enviar.")
+        return current, [item["id"] for item in current["items"]]
+
+    def visit_round_prompt(body):
+        current, ids = round_ids(body.get("property_ref") or None)
+        return {"prompt": round_prompt(queue(current["property_ref"]), ids, now=datetime.now().astimezone())}
+
+    def visit_round_generate(body):
+        current, ids = round_ids(body.get("property_ref") or None)
+        ref = current["property_ref"]
+        service.require_fuel(ref)
+        cfg = service.config()
+        model = service.model(cfg)
+        prompt_text = round_prompt(queue(ref), ids, now=datetime.now().astimezone())
+        answer, usage = complete(openai_api_key(service.folder, cfg["account"]), model, prompt_text)
+        cost = estimate_cost_usd(model, **{k: usage[k] for k in ("prompt_tokens", "completion_tokens")})
+        service.log("openai_usage", model=model, **usage, reference=ref, cost_usd=round(cost, 6))
+        result = service.save_round(ref, current["window_id"], parse_round(answer, queue(ref), ids))
+        return {**result, "state": state(), "cost_usd": round(cost, 6), "fuel": service.api_fuel(ref)}
+
+    def visit_round_paste(body):
+        current, ids = round_ids(body.get("property_ref") or None)
+        ref = current["property_ref"]
+        result = service.save_round(ref, current["window_id"], parse_round(str(body.get("text") or ""), queue(ref), ids))
+        return {**result, "state": state()}
+
+    def visit_round_save(body):
+        result = service.save_round(body.get("property_ref") or None, str(body.get("window_id") or "") or None,
+                                    body.get("common") or {})
+        return {**result, "state": state()}
+
+    def visit_round_individual(body):
+        result = service.individual_round_item(body.get("property_ref") or None, str(body.get("id") or ""))
+        return {**result, "state": state()}
+
+    # 29/09: the Oficina — token prices and the test platform (only with "admin": true in config.json)
+    def admin():
+        if service.config().get("admin") is not True:
+            raise ValueError("A Oficina não está ligada nesta pasta.")
+
+    def ai_price(body):
+        admin()
+        return service.set_price(body.get("model"), body.get("input_usd_per_1m"), body.get("output_usd_per_1m"),
+                                 body.get("reset") is True)
+
+    def lab_state(body):
+        admin()
+        return testlab.lab_view(service)
+
+    def lab_contest(body):
+        admin()
+        percent = body.get("new_percent")
+        return testlab.set_contest(service, body.get("on") is True, body.get("email"),
+                                   int(percent) if str(percent).isdigit() else percent)
+
+    def lab_clients(body):
+        admin()
+        if isinstance(body.get("contest"), dict):  # what is on the screen, saved first (29/09: it was lost otherwise)
+            percent = body["contest"].get("new_percent")
+            testlab.set_contest(service, body["contest"].get("on") is True, body["contest"].get("email"),
+                                int(percent) if str(percent).isdigit() else None)
+        count = body.get("count")
+        return testlab.generate_clients(service, int(count) if str(count or "").isdigit() else count,
+                                        datetime.now().astimezone().isoformat(timespec="seconds"))
+
+    def visits_close(body):
+        result = service.close_visits(body.get("property_ref") or None)
+        return {**result, "state": state(), "settings": service.settings()}
+
+    def consent_request(body):
+        result = service.request_consent(body.get("property_ref") or None)
+        return {**result, "state": state()}
+
+    def consent_confirm(body):
+        message_id = str(body.get("id") or "")
+        if not message_id:
+            raise ValueError("Indica o email.")
+        result = service.confirm_consent(message_id, body.get("property_ref") or None)
+        return {**result, "state": state()}
+
+    def property_prompts(body):
+        admin()  # 30/09: only in the Oficina
+        service.save_prompts(str(body.get("reference") or ""), body.get("prompts") or {})
+        return service.settings()
+
+    def property_active(body):
+        service.set_property_active(str(body.get("reference") or ""), body.get("active"))
+        return {"settings": service.settings(), "state": state()}
+
+    def contact_save(body):
+        return {**service.save_contact(body.get("contact") or {}), **service.contacts()}
+
+    def contact_delete(body):
+        result = service.delete_contact(body.get("email"), body.get("imovel") or None)
+        return {**result, **service.contacts(), "state": state()}
+
+    def contact_ignore(body):
+        result = service.set_ignored(body.get("property_ref") or None, body.get("email"),
+                                     bool(body.get("ignored", True)), str(body.get("reason") or ""),
+                                     body.get("kind") or None)
+        return {**result, "state": state()}
+
+    def fuel_fill(body):
+        return {"fuel": service.fill_fuel(body.get("property_ref") or None, body.get("capacity_eur"))}
+
+    def property_panel(body):
+        return {"panel": service.save_panel(body.get("property_ref") or None, body.get("reply_hours_max"),
+                                            body.get("distance_km"), body.get("l_per_100km"))}
+
+    def selection(action):
+        def handler(body):
+            ref, email = body.get("property_ref") or None, body.get("email")
+            result = {"set": lambda: service.set_selection(ref, email, body.get("status") or None),
+                      "doc": lambda: service.set_document(ref, email, body.get("document"), body.get("received"),
+                                                          body.get("fiador")),
+                      "request": lambda: service.request_documents(ref, email)}[action]()
+            return {**result, **service.contacts(), "state": state()}
+        return handler
+
+    def contacts_ignored(body):
+        return service.ignored_contacts(body.get("property_ref") or None)
+
+    def digest_save(body):
+        service.save_digest_text(body.get("text"), body.get("property_ref") or None)
+        return service.digest_view()
+
+    def digest_send(body):
+        if body.get("confirmed") is not True:
+            raise ValueError("Confirma o envio na página.")
+        return service.send_digest(True, body.get("property_ref") or None, body.get("to") or "me")
+
+    def digest_send_all(body):
+        if body.get("confirmed") is not True:
+            raise ValueError("Confirma o envio na página.")
+        return service.send_digest_all(True)
+
+    # One operation at a time from this page: a second click waits instead of failing on the
+    # file lock. Other processes (MCP, terminal) still meet the file lock.
+    serial = threading.Lock()
+
+    # 02/10: two run beside the queue — the read's progress (it only reads a dict) and «Gerar respostas» (its long part
+    # is the AI writing; its saves wait their turn on the file lock): otherwise the progress waited for the whole read,
+    # and the page's batches, sent together, ran one after the other anyway
+    concurrent = set()
+
+    def one_at_a_time(handler, body):
+        if handler in concurrent:
+            return handler(body)
+        with serial:
+            return handler(body)
+
+    def api(handler):
+        async def endpoint(request):
+            if not token or not same(request.headers.get("x-bot-mail-token"), token):
+                return JSONResponse({"error": "Sessão terminada: volta a abrir a página."}, 403)
+            body = {}
+            if request.method == "POST":
+                try:
+                    body = await request.json()
+                except ValueError:
+                    body = None
+                if not isinstance(body, dict):
+                    return JSONResponse({"error": "Pedido inválido."}, 400)
+            try:
+                return JSONResponse(await run_in_threadpool(one_at_a_time, handler, body))
+            except Exception as exc:  # the owner's own page: show the reason instead of a blank error
+                return JSONResponse({"error": str(exc) or type(exc).__name__}, 400)
+        return endpoint
+
+    async def page(request):
+        supplied = request.query_params.get("t")
+        if supplied is not None:
+            if not same(supplied, token):
+                return PlainTextResponse("Link inválido ou antigo: usa o que o terminal mostrou neste arranque.", 403)
+            response = RedirectResponse("/", 303)  # keeps the token out of the address bar and history
+            response.set_cookie(COOKIE, token, httponly=True, samesite="strict")
+            return response
+        if not same(request.cookies.get(COOKIE), token):
+            return PlainTextResponse("Abre o link mostrado no terminal ao iniciar a página.", 403)
+        nonce = secrets.token_urlsafe(16)
+        text = (FRONTEND / "index.html").read_text(encoding="utf-8")
+        for name, value in (("TOKEN", token), ("NONCE", nonce), ("VERSION", DISPLAY_VERSION), ("BUILD_AT", build_at)):
+            text = text.replace("{{" + name + "}}", value)
+        return HTMLResponse(text, headers={
+            **HEADERS, "Referrer-Policy": "no-referrer",
+            "Content-Security-Policy": f"default-src 'none'; script-src 'nonce-{nonce}'; style-src 'self'; "
+                                       "connect-src 'self'; img-src 'self' data:; form-action 'none'; "
+                                       "frame-ancestors 'none'; base-uri 'self'"})
+
+    def asset(name):
+        async def endpoint(request):
+            return Response((FRONTEND / name).read_bytes(), media_type=ASSETS[name], headers=HEADERS)
+        return endpoint
+
+    async def photo(request):
+        # An <img> cannot send the token header, so the photo asks for the page's cookie instead.
+        if not same(request.cookies.get(COOKIE), token):
+            return PlainTextResponse("Abre o link mostrado no terminal ao iniciar a página.", 403)
+        try:
+            found = await run_in_threadpool(service.photo, request.path_params["ref"])
+        except ValueError:
+            found = None
+        if not found:
+            return PlainTextResponse("Sem fotografia.", 404)
+        return Response(found[0], media_type=found[1], headers=HEADERS)
+
+    async def contacts_csv(request):
+        # A download link cannot send the token header either: the page's cookie is the proof, as for photos.
+        if not same(request.cookies.get(COOKIE), token):
+            return PlainTextResponse("Abre o link mostrado no terminal ao iniciar a página.", 403)
+        try:
+            data = await run_in_threadpool(one_at_a_time, lambda body: service.contacts_csv(), {})
+        except (ValueError, RuntimeError) as exc:
+            return PlainTextResponse(str(exc), 400)
+        return Response(data, media_type="text/csv; charset=utf-8",
+                        headers={**HEADERS, "Content-Disposition": 'attachment; filename="contactos.csv"'})
+
+    def property_photo(body):
+        service.save_photo(str(body.get("reference") or ""), body.get("image"))
+        return service.settings()
+
+    def knowledge_save(body):
+        ref = body.get("property_ref") or None
+        result = service.save_knowledge(ref, body.get("file"), body.get("text"), str(body.get("scope") or "property"),
+                                        body.get("owner") or None)
+        return {**result, "knowledge": service.knowledge(ref, body.get("owner") or None), "state": state()}
+
+    def note(body):
+        ref = body.get("property_ref") or None
+        result = service.add_note(ref, body.get("text"), str(body.get("scope") or "property"))
+        # The page shows the new knowledge at once, and the next prompt already carries it.
+        return {**result, "knowledge": service.knowledge(ref), "state": state()}
+
+    handlers = {"state": ("GET", lambda body: state()), "read": ("POST", read), "prompt": ("POST", prompt),
+                "prompt/generate": ("POST", generate), "prompt/plan": ("POST", generate_plan),
+                "read/progress": ("GET", lambda body: dict(service.reading)),
+                "paste": ("POST", paste), "drafts": ("POST", drafts), "preview": ("POST", preview),
+                "send": ("POST", send), "dismiss": ("POST", dismiss),
+                "metrics": ("POST", lambda body: service.metrics(
+                    "all" if body.get("days") == "all" else int(body.get("days") or 14))),
+                "settings": ("GET", lambda body: service.settings()), "voice": ("POST", voice),
+                "property/prompt": ("POST", property_prompt),
+                "property/parse": ("POST", lambda body: {"fields": parse_listing(str(body.get("text") or ""))}),
+                "property/save": ("POST", property_save), "property/prompts": ("POST", property_prompts),
+                "property/photo": ("POST", property_photo), "property/panel": ("POST", property_panel),
+                "property/extract": ("POST", lambda body: service.extract_listing(body.get("text"), body.get("listing_url"))),
+                "ai/model": ("POST", lambda body: service.set_model(str(body.get("model") or ""))),
+                "ai/price": ("POST", ai_price),
+                "ai/hidden": ("POST", lambda body: (admin(), service.set_hidden(str(body.get("model") or ""), body.get("hidden") is True))[1]),
+                "ai/effort": ("POST", lambda body: (admin(), service.set_effort(str(body.get("effort") or "")))[1]),
+                "ai/reviewer": ("POST", lambda body: (admin(), service.set_reviewer(str(body.get("model") or ""),
+                                                                                  body.get("auto") is True))[1]),
+                "review": ("POST", lambda body: {**service.review_drafts(body.get("property_ref") or None, ids_of(body)),
+                                                 "state": state(), "fuel": service.api_fuel(body.get("property_ref") or None)}),
+                "prompts/common": ("POST", lambda body: (admin(), service.save_common_prompts(body.get("prompts") or {}),
+                                                         service.settings())[2]),
+                "ai/context": ("POST", lambda body: (admin(), service.set_context(
+                    body.get("model"), int(body["tokens"]) if str(body.get("tokens", "")).isdigit() else body.get("tokens")))[1]),
+                "ai/limits": ("POST", lambda body: (admin(), service.set_call_limits(*(
+                    int(body[key]) if str(body.get(key, "")).isdigit() else body.get(key)
+                    for key in ("context_share", "batch_emails"))))[1]), "testlab/state": ("POST", lab_state),
+                "testlab/contest": ("POST", lab_contest), "testlab/clients": ("POST", lab_clients),
+                "testlab/consultant": ("POST", lambda body: (admin(), testlab.send_to_consultant(service))[1]),
+                "testlab/wipe": ("POST", lambda body: (admin(), testlab.wipe(service))[1]),
+                "testlab/transcript": ("POST", lambda body: (admin(), testlab.transcript(
+                    service, datetime.now().astimezone().isoformat(timespec="seconds")))[1]),
+                "testlab/advance": ("POST", lambda body: (admin(), testlab.advance(
+                    service, datetime.now().astimezone().isoformat(timespec="seconds")))[1]),
+                "property/active": ("POST", property_active),
+                "visits/candidates": ("POST", visit_candidates), "visits/propose": ("POST", visit_propose),
+                "visits/round": ("POST", visit_round), "visits/round-prompt": ("POST", visit_round_prompt),
+                "visits/round-generate": ("POST", visit_round_generate), "visits/round-paste": ("POST", visit_round_paste),
+                "visits/round-save": ("POST", visit_round_save), "visits/round-individual": ("POST", visit_round_individual),
+                "visits/analysis-prompt": ("POST", visit_analysis_prompt), "visits/analyze": ("POST", visit_analyze),
+                "visits/round-summary": ("POST", visit_round_summary), "visits/close": ("POST", visits_close),
+                "agenda/sync": ("POST", agenda_sync), "visits/check": ("POST", visit_check), "visits/thanks": ("POST", visit_thanks),
+                "active/write": ("POST", active_write), "active/remove": ("POST", active_remove),
+                "recipient": ("POST", lambda body: {**service.set_recipient(body.get("property_ref") or None, str(body.get("id") or ""),
+                                                                            body.get("email")), "state": state()}),
+                "consent/request": ("POST", consent_request), "consent/confirm": ("POST", consent_confirm),
+                "contacts": ("GET", lambda body: service.contacts()),
+                "contacts/save": ("POST", contact_save), "contacts/delete": ("POST", contact_delete),
+                "contacts/ignore": ("POST", contact_ignore),
+                "selection/set": ("POST", selection("set")), "selection/doc": ("POST", selection("doc")),
+                "selection/request": ("POST", selection("request")),
+                "contacts/purge": ("POST", lambda body: {**service.purge_expired(), **service.contacts(), "state": state()}),
+                "fichas/fill": ("POST", lambda body: {**service.fill_fichas(body.get("property_ref") or None),
+                                                      **service.contacts()}),
+                "fichas/import": ("POST", lambda body: {**service.import_profile(body.get("property_ref") or None,
+                                                                                 body.get("email"), body.get("text")),
+                                                        **service.contacts()}), "contacts/ignored": ("POST", contacts_ignored),
+                "fuel/fill": ("POST", fuel_fill),
+                "digest": ("GET", lambda body: service.digest_view()), "todo": ("GET", lambda body: service.todo()),
+                # 02/10: the portal's call notices (Contactos), and a search N days back
+                "calls": ("POST", lambda body: service.calls_view()),
+                "calls/scan": ("POST", lambda body: service.scan_calls(
+                    int(body["days"]) if str(body.get("days", "")).isdigit() else body.get("days"))),
+                # 02/10: the portal's senders and rules (Oficina)
+                "portal": ("POST", lambda body: (admin(), service.portal_view())[1]),
+                "portal/save": ("POST", lambda body: (admin(), service.save_portal(body.get("fields") or {},
+                                                                                   body.get("reset") is True))[1]),
+                # 02/10: the backups (Oficina): where they go, and one now
+                "backup": ("POST", lambda body: (admin(), service.backup_settings())[1]),
+                "backup/folder": ("POST", lambda body: (admin(), service.set_backup_folder(body.get("folder"),
+                                                                                         body.get("create") is True))[1]),
+                "backup/now": ("POST", lambda body: (admin(), service.backup())[1]),
+                # 02/10: the Mac's folder chooser (it stays open while the owner picks: never holds the other calls)
+                "backup/choose": ("POST", lambda body: (admin(), service.set_backup_folder(service.choose_folder()))[1]),
+                # 02/10: the Proprietários tab: the owner's emails answered with a prompt of their own (API)
+                "owners/generate": ("POST", owners_generate),
+                "owners/set": ("POST", lambda body: (service.set_owner(body.get("property_ref") or None, body.get("email"),
+                                                                       body.get("name")), {"state": state(), "settings": service.settings()})[1]),
+                "owners/write": ("POST", lambda body: {**service.write_to_owner(body.get("property_ref") or None, body.get("subject"),
+                                                                                body.get("owner")), "state": state()}),
+                # 03/10: «Reconstruir a partir do Gmail»: read N days back twice, propose what is missing, apply what is ticked
+                "rebuild/scan": ("POST", lambda body: service.rebuild_scan(body.get("property_ref") or None,
+                                                                         int(body["days"]) if str(body.get("days", "")).isdigit() else body.get("days"))),
+                "rebuild/apply": ("POST", lambda body: {"done": service.rebuild_apply(body.get("property_ref") or None, body.get("ids") or []),
+                                                        "state": state(), "settings": service.settings()}),
+                # 03/10: the customer's context (notes, our WhatsApp and SMS, their calls)
+                "context/add": ("POST", lambda body: (service.add_context(body.get("property_ref") or None, body.get("email"),
+                                                                          body.get("text"), str(body.get("source") or "manual")),
+                                                      {"state": state()})[1]),
+                "context/delete": ("POST", lambda body: (service.delete_context(body.get("property_ref") or None, body.get("email"),
+                                                                                body.get("id") or None), {"state": state()})[1]),
+                # 03/10: the owners' list, and the inbox of the owners with no property
+                "owners/add": ("POST", lambda body: (service.add_owner(body.get("email"), body.get("name")), {"state": state()})[1]),
+                "owners/drafts": ("POST", lambda body: (service.caixa_drafts(body.get("replies")), {"state": state()})[1]),
+                "owners/preview": ("POST", lambda body: service.caixa_preview(str(body.get("id") or ""))),
+                "owners/send": ("POST", lambda body: {**service.caixa_send(str(body.get("id") or ""), str(body.get("check") or ""),
+                                                                           body.get("confirmed")), "state": state()}),
+                "owners/dismiss": ("POST", lambda body: (service.caixa_dismiss(str(body.get("id") or "")), {"state": state()})[1]),
+                # 02/10: «Encerrar contacto»: the reply becomes a cordial goodbye; once sent, no rounds or reminders
+                "contact/farewell": ("POST", lambda body: (service.farewell(body.get("property_ref") or None,
+                                                                            str(body.get("id") or "")), {"state": state()})[1]),
+                # 02/10: the notice board (Painel): the system's important messages for the owner
+                "notices": ("GET", lambda body: service.notices()),
+                "notices/update": ("POST", lambda body: service.update_notices(
+                    body.get("ids") if isinstance(body.get("ids"), list) else None, body.get("action"))),
+                "digest/save": ("POST", digest_save), "digest/send": ("POST", digest_send),
+                "digest/send-all": ("POST", digest_send_all),
+                "digest/refresh": ("POST", lambda body: service.refresh_digest(body.get("property_ref") or None)),
+                "knowledge": ("POST", lambda body: service.knowledge(body.get("property_ref") or None, body.get("owner") or None)),
+                "knowledge/note": ("POST", note), "knowledge/save": ("POST", knowledge_save)}
+    concurrent.update({handlers["read/progress"][1], handlers["prompt/generate"][1], handlers["backup/choose"][1]})
+    routes = ([Route("/", page), Route("/photo/{ref}", photo), Route("/contactos.csv", contacts_csv)]
+              + [Route(f"/{name}", asset(name)) for name in ASSETS]
+              + [Route(f"/api/{name}", api(handler), methods=[method]) for name, (method, handler) in handlers.items()])
+    app = Starlette(routes=routes)
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
+    return app
+
+
+def ours(pid):
+    """Whether a process is this page (and not something else that happens to be running)."""
+    command = subprocess.run(["ps", "-o", "command=", "-p", str(pid)], capture_output=True, text=True).stdout
+    return "main.py" in command or ("backend.cli" in command or "bot-mail" in command) and " web" in command
+
+
+def stop_previous(folder):
+    """A page left running for this folder is stopped first, so starting it again always just works."""
+    try:
+        pid = int((Path(folder) / ".page.pid").read_text().strip())
+    except (OSError, ValueError):
+        return
+    if pid == os.getpid() or not ours(pid):
+        return  # gone already, or the number now belongs to another program: never touch it
+    os.kill(pid, signal.SIGTERM)
+    for _ in range(40):  # up to 10 s for the old page to close
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return
+        time.sleep(0.25)
+
+
+def serve(folder, port=8765, open_browser=True):
+    """Starts the page on 127.0.0.1 with a new token and opens the browser at the one link that works."""
+    import uvicorn
+    import webbrowser
+    stop_previous(folder)
+    (Path(folder) / ".page.pid").write_text(str(os.getpid()))
+    token = secrets.token_urlsafe(24)
+    url = f"http://127.0.0.1:{port}/?t={token}"
+    print(f"{APP_NAME} v{DISPLAY_VERSION}: {url}\nO link muda a cada arranque. Ctrl+C para parar.", flush=True)
+    if open_browser:
+        threading.Timer(1.0, webbrowser.open, [url]).start()
+    uvicorn.run(web_app(folder, token), host="127.0.0.1", port=port, access_log=False, log_level="warning")

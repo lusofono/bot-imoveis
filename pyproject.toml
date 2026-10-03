@@ -4,19 +4,23 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bot-mail"
-version = "0.1.0"
-description = "Personal Gmail workflow through MCP, one JSON queue per replica"
+version = "0.109.0"
+description = "Local Gmail workflow for property leads: a page and an MCP over the same calls, one queue per property"
 requires-python = ">=3.11"
-dependencies = ["mcp==1.30.0"]
+dependencies = ["mcp==1.30.0", "starlette>=0.40,<2", "uvicorn>=0.30"]
+# The OpenAI path (backend/openai_client.py) uses only the standard library (urllib): no new dependency.
 
 [project.optional-dependencies]
 test = ["pytest>=8,<10", "httpx>=0.28,<1"]
 
 [project.scripts]
-bot-mail = "bot_mail.cli:main"
+bot-mail = "backend.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["bot_mail*"]
+include = ["backend*"]
+
+[tool.setuptools.package-data]
+backend = ["templates/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

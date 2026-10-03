@@ -1,0 +1,460 @@
+/* 90's Boat (theme id "boat") — the helm of a 90s luxury motor yacht: glossy cream gelcoat everywhere, polished
+   chrome on every edge, varnished teak only where the helm frames something (the engaged tab, the screens, the
+   builder's plate), and blue marine screens for the numbers. Signal flags mark the tabs. Everything is under
+   :root[data-theme="boat"]: the page draws the same elements in every theme, and this file dresses them.
+   The drawings (teak, porthole, flags, anchor) are SVG inside the CSS: nothing is loaded from outside. The fonts
+   are the ones macOS already has (Didot, Copperplate, Avenir Next, Snell Roundhand), with fallbacks elsewhere. */
+
+/* Colours and materials */
+:root[data-theme="boat"]{color-scheme:light;--bg:#faf7f1;--card:#ffffff;--text:#13233a;--muted:#566476;--line:#e4ddcf;
+  --accent:#0e5a8a;--accent-text:#fff;--accent-soft:#dcebf5;--ok:#1b7a55;--ok-bg:#e4f4ec;--warn:#8a5a00;--warn-bg:#fff3d6;
+  --bad:#b3261e;--bad-bg:#fdecea;--shadow:0 12px 30px #1b2a3a14;--halo:#cfe9f6;--sidebar:#f6f1e7;--topbar:#e9f5fbf0;
+  --surface-start:#fff;--surface-end:#faf6ee;--input:#fff;--input1:#fdfcf9;--quote:#f3f7fa;--control:#fbf8f2;
+  --control1:#f6f1e7;--control-border:#cfc5b2;--control-border1:#d6cdbb;--control-border2:#d6cdbb;--hover:#f1ebdf;
+  --hover-border:#0e5a8a;--placeholder:#6b7785;--nav-muted:#7a8896;--breadcrumb:#9aa6b2;--selected-start:#e9f3f9;
+  --selected-end:#f6f1e7;--selected-border:#b9d3e4;--highlight-start:#fffdf8;--highlight-end:#f1e9d8;
+  --highlight-border:#d9ccb2;--brand-start:#e9f3f9;--brand-end:#f6f1e7;--avatar:#e6eef5;--avatar-text:#0e3a5f;
+  --tag-text:#2c4a68;--quote-text:#22384f;--quote-border:#7fa7c4;--cover-start:#cfe8f3;--cover-mid:#f6f1e7;
+  --cover-end:#e7d6b9;--cover-text:#0e5a8a;--chart-secondary:#c2185b;--metric-line:#d9ccb2;--empty-border:#cfc5b2;
+  --success-border:#a9d8c1;--success-border1:#a9d8c1;--error-border:#e7a9a4;--warning-border:#e2c27a;
+  --accent-hover:#0b4a72;--glow-soft:#0e5a8a0d;--glow-soft1:#0e5a8a12;--accent-tint:#0e5a8a14;--glow:#0e5a8a33;
+  --brand-border:#0e5a8a40;
+  --navy:#0f2a47;--brass-text:#7a5528;--ink-blue:#d9f6ff;--glow-blue:#5fd4ff;
+  --heading:#0f2a47;--pennant:#0f2a47;--pennant-text:#fff;cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cg fill='none' stroke-linecap='round' stroke-linejoin='round'%3E %3Cg stroke='%23fff' stroke-width='4.2'%3E%3Ccircle cx='14' cy='5' r='2.6'/%3E%3Cpath d='M14 7.6V25M9 11.5h10M5 17c1.4 5 4.8 8 9 8.5c4.2-.5 7.6-3.5 9-8.5'/%3E%3C/g%3E %3Cg stroke='%230f2a47' stroke-width='2'%3E%3Ccircle cx='14' cy='5' r='2.6'/%3E%3Cpath d='M14 7.6V25M9 11.5h10M5 17c1.4 5 4.8 8 9 8.5c4.2-.5 7.6-3.5 9-8.5'/%3E%3C/g%3E %3C/g%3E%3C/svg%3E") 14 3,auto;
+  --display:"Didot","Bodoni 72","Bodoni MT","Libre Bodoni",Georgia,"Times New Roman",serif;
+  --plaque:"Copperplate","Copperplate Gothic Light","Engravers MT",Optima,Candara,ui-serif,serif;
+  --ui:"Avenir Next","Avenir","Futura","Helvetica Neue",ui-sans-serif,system-ui,sans-serif;
+  --script:"Snell Roundhand","Savoye LET","Apple Chancery","Brush Script MT","Segoe Script",cursive;
+  --lcd:ui-monospace,SFMono-Regular,Menlo,monospace;
+  --gelcoat:linear-gradient(180deg,#fffefb,#f8f3ea 58%,#f0e9dc);
+  --chrome:linear-gradient(180deg,#fff,#dfe3e7 18%,#9ea5ad 46%,#f3f5f7 58%,#c3c9cf 78%,#8b929a);
+  --chrome-rail:linear-gradient(90deg,#5f666e,#b3b9bf 20%,#fff 42%,#e9ecef 52%,#8d949c 76%,#5b6269);
+  --screen:radial-gradient(130% 120% at 25% 0%,#1a639a,#0b4a7a 38%,#06294a 76%,#041a2f);
+  --wood:linear-gradient(100deg,#0000 0 30%,#ffffff24 36%,#0000 44%),linear-gradient(180deg,#ffffff4a,#ffffff12 24%,#0000 52%,#00000026),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='182'%3E%3Cdefs%3E %3Cpattern id='s' width='600' height='14' patternUnits='userSpaceOnUse'%3E %3Crect width='600' height='14' fill='%238c3b13'/%3E%3Crect y='1' width='600' height='4' fill='%23a9531f'/%3E %3Crect y='6' width='600' height='1' fill='%235f240a'/%3E%3Crect y='9' width='600' height='2' fill='%23bb652b'/%3E %3Crect y='12' width='600' height='1' fill='%23702d0d'/%3E%3C/pattern%3E %3Cfilter id='w' filterUnits='userSpaceOnUse' x='0' y='0' width='600' height='182'%3E %3CfeTurbulence type='fractalNoise' baseFrequency='.005 .033' numOctaves='4' seed='7' stitchTiles='stitch' result='t'/%3E %3CfeDisplacementMap in='SourceGraphic' in2='t' scale='60' xChannelSelector='R' yChannelSelector='G'/%3E%3C/filter%3E%3C/defs%3E %3Crect x='-60' y='-56' width='720' height='294' fill='url(%23s)' filter='url(%23w)'/%3E%3C/svg%3E"),#8c3b13;
+  scrollbar-color:#aeb5bd #f1ebdf}
+:root[data-theme="boat"] ::selection{background:#bfe6f7;color:#0f2a47}
+:root[data-theme="boat"] body{background:radial-gradient(ellipse at 92% -14%,#dcedf6,#0000 38%) fixed,radial-gradient(ellipse at 4% 110%,#f3eadb,#0000 38%) fixed,var(--bg)}
+:root[data-theme="boat"] a{color:var(--accent)}
+:root[data-theme="boat"] :focus-visible{outline-color:#1f8ad0}
+
+/* Type: Didot for the page titles, as in a yacht brochure; Copperplate on plates and pennants; Avenir Next elsewhere */
+:root[data-theme="boat"] h1{font-family:var(--display);font-weight:400;letter-spacing:-.4px;color:var(--heading)}
+:root[data-theme="boat"] h2{font-family:var(--ui);font-weight:600;letter-spacing:-.1px;color:var(--heading)}
+:root[data-theme="boat"] .eyebrow{display:block;width:fit-content;height:fit-content;justify-self:start;align-self:start;margin-bottom:12px;
+  padding:3px 24px 3px 12px;color:var(--pennant-text);background:var(--pennant);font:700 10px/1.6 var(--plaque);letter-spacing:2.4px;
+  clip-path:polygon(0 0,100% 0,calc(100% - 9px) 50%,100% 100%,0 100%)}
+:root[data-theme="boat"] .ignore-list.black .eyebrow{color:#fff;background:#9b1c1c}
+:root[data-theme="boat"] .ignore-list.grey .eyebrow{color:#fff;background:#5b6673}
+
+/* The sidebar is the helm's cream gelcoat, with a polished chrome grab rail along its edge */
+:root[data-theme="boat"] .sidebar{background:linear-gradient(90deg,#fffdf9,#f5efe3 70%,#ede5d5);border-right:1px solid #ddd3c1;
+  box-shadow:10px 0 30px #1b2a3a12}
+:root[data-theme="boat"] .sidebar::before{content:"";position:absolute;top:24px;bottom:24px;right:2px;width:15px;border-radius:4px;pointer-events:none;
+  background:linear-gradient(90deg,#6f767e,#fff 45%,#9aa1a9) top/15px 16px no-repeat,
+    linear-gradient(90deg,#6f767e,#fff 45%,#9aa1a9) bottom/15px 16px no-repeat}
+:root[data-theme="boat"] .sidebar::after{content:"";position:absolute;top:30px;bottom:30px;right:4px;width:11px;border-radius:6px;pointer-events:none;
+  background:var(--chrome-rail);box-shadow:-2px 2px 6px #0f2a4733,-1px 0 0 #ffffffb3}
+:root[data-theme="boat"] .brand-mark{width:44px;height:44px;border:0;border-radius:50%;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cdefs%3E %3ClinearGradient id='m' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ffffff'/%3E %3Cstop offset='.35' stop-color='%23c3c9cf'/%3E%3Cstop offset='.55' stop-color='%237f868e'/%3E%3Cstop offset='.75' stop-color='%23e9ecef'/%3E %3Cstop offset='1' stop-color='%238d949c'/%3E%3C/linearGradient%3E %3CradialGradient id='g' cx='.35' cy='.3' r='.85'%3E%3Cstop offset='0' stop-color='%23bfeaff'/%3E %3Cstop offset='.45' stop-color='%232f86c0'/%3E%3Cstop offset='1' stop-color='%230a3558'/%3E%3C/radialGradient%3E%3C/defs%3E %3Ccircle cx='20' cy='20' r='19' fill='url(%23m)'/%3E%3Ccircle cx='20' cy='20' r='19' fill='none' stroke='%236f767e' stroke-width='.8'/%3E %3Cg fill='%23f4f6f8' stroke='%236f767e' stroke-width='.6'%3E%3Ccircle cx='20' cy='4.6' r='1.5'/%3E%3Ccircle cx='33.3' cy='12.3' r='1.5'/%3E %3Ccircle cx='33.3' cy='27.7' r='1.5'/%3E%3Ccircle cx='20' cy='35.4' r='1.5'/%3E%3Ccircle cx='6.7' cy='27.7' r='1.5'/%3E %3Ccircle cx='6.7' cy='12.3' r='1.5'/%3E%3C/g%3E %3Ccircle cx='20' cy='20' r='12.6' fill='%236f767e'/%3E%3Ccircle cx='20' cy='20' r='11.4' fill='url(%23g)'/%3E %3Cpath d='M11.5 16.5a9.5 9.5 0 0 1 9-6.8' fill='none' stroke='%23fff' stroke-opacity='.75' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat;
+  color:#fff;font-size:15px;box-shadow:0 3px 8px #0f2a4733;text-shadow:0 1px 2px #0a2540}
+:root[data-theme="boat"] .brand{padding-inline:6px}
+:root[data-theme="boat"] .brand .brand-name{font-family:var(--script);font-weight:400;font-size:23px;line-height:1.1;letter-spacing:0;white-space:nowrap;color:var(--navy)}
+:root[data-theme="boat"] .brand .brand-name span{display:block;margin-top:5px;font:700 9.5px/1.4 var(--plaque);letter-spacing:3px;
+  text-transform:uppercase;color:var(--brass-text)}
+:root[data-theme="boat"] .brand-by{color:var(--muted);font-family:var(--ui)}
+:root[data-theme="boat"] .app-version{padding:1px 14px;border:0;border-radius:3px;color:#fff3df;font:700 10px/1.7 var(--plaque);letter-spacing:1.2px;
+  background:radial-gradient(circle at 6px 50%,#eef1f4 1.1px,#6f767e 1.7px,#0000 2.2px),
+    radial-gradient(circle at calc(100% - 6px) 50%,#eef1f4 1.1px,#6f767e 1.7px,#0000 2.2px),linear-gradient(#00000047,#00000047),var(--wood);
+  box-shadow:inset 0 1px 0 #ffffff47,0 0 0 1px #5a260b,0 2px 4px #3a1a0633;text-shadow:0 1px 1px #0009}
+:root[data-theme="boat"] .app-build{color:var(--muted)}
+:root[data-theme="boat"] .nav-label{color:#5f6d7b;font:700 9px/1.6 var(--plaque);letter-spacing:2.6px}
+:root[data-theme="boat"] .sidebar-note{color:var(--text)}
+:root[data-theme="boat"] .sidebar-note p{color:var(--muted)}
+:root[data-theme="boat"] .status-dot,:root[data-theme="boat"] .checks .dot{background:#1fbf6a;box-shadow:0 0 0 1.5px #fff,0 0 0 2.5px #b9c0c7,0 0 9px #1fbf6a}
+:root[data-theme="boat"] .checks .dot.missing{background:#f0a400;box-shadow:0 0 0 1.5px #fff,0 0 0 2.5px #b9c0c7,0 0 9px #f0a400}
+:root[data-theme="boat"] .account-card{border-top-color:#e2d9c8}
+:root[data-theme="boat"] .avatar{border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff,#e6eef5 60%,#c9d6e2);color:var(--navy);
+  box-shadow:0 0 0 2px #fff,0 0 0 3px #aeb5bd}
+
+/* Tabs: each flies its signal flag (P, R, I, C, A, V); the engaged one is a varnished teak inlay framed in chrome */
+/* The tabs keep clear of the grab rail (26/09): the engaged one, with its chrome ring, ran under it and hid its count */
+:root[data-theme="boat"] nav{margin-right:12px}
+/* The flag, the icon, the name and the count did not fit in the sidebar (about 210 px for «Comunicações»), so the tab
+   ran under the rail: tighter gaps, a smaller flag, and the count as a bubble on the tab's corner (26/09) */
+:root[data-theme="boat"] .tab .nav-count{position:absolute;top:-7px;right:-6px;margin:0;padding:0 6px;z-index:1}
+:root[data-theme="boat"] .tab{position:relative;gap:8px;padding:9px 10px;border-radius:10px;color:#23384f;font:600 14px/1.3 var(--ui);letter-spacing:.2px}
+:root[data-theme="boat"] .tab>span:first-child{display:none}
+:root[data-theme="boat"] .tab::before{content:"";flex:none;width:22px;height:15px;background:var(--flag) center/contain no-repeat;
+  filter:drop-shadow(0 1px 1.5px #0f2a4740)}
+:root[data-theme="boat"] .tab[data-tab="dashboard"]{--flag:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 20'%3E%3Cdefs%3E%3ClinearGradient id='c' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.28'/%3E%3Cstop offset='.5' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.16'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='30' height='20' fill='%231f4fa0'/%3E%3Crect x='10' y='6.67' width='10' height='6.66' fill='%23fff'/%3E%3Cpath d='M.5 .5H29.5V19.5H.5Z' fill='url(%23c)' stroke='%230b1f3a' stroke-opacity='.45'/%3E%3C/svg%3E")}
+/* Comunicações: back to its signal flag (the mic is gone: the comms tower icon beside it says it, as in every theme) */
+:root[data-theme="boat"] .tab[data-tab="replies"]{--flag:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 20'%3E%3Cdefs%3E%3ClinearGradient id='c' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.28'/%3E%3Cstop offset='.5' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.16'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='30' height='20' fill='%23c8102e'/%3E%3Crect x='12.5' width='5' height='20' fill='%23ffcc00'/%3E%3Crect y='7.5' width='30' height='5' fill='%23ffcc00'/%3E%3Cpath d='M.5 .5H29.5V19.5H.5Z' fill='url(%23c)' stroke='%230b1f3a' stroke-opacity='.45'/%3E%3C/svg%3E")}
+:root[data-theme="boat"] .tab[data-tab="properties"]{--flag:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 20'%3E%3Cdefs%3E%3ClinearGradient id='c' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.28'/%3E%3Cstop offset='.5' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.16'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='30' height='20' fill='%23ffcc00'/%3E%3Ccircle cx='15' cy='10' r='5' fill='%23121212'/%3E%3Cpath d='M.5 .5H29.5V19.5H.5Z' fill='url(%23c)' stroke='%230b1f3a' stroke-opacity='.45'/%3E%3C/svg%3E")}
+:root[data-theme="boat"] .tab[data-tab="contacts"]{--flag:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 20'%3E%3Cdefs%3E%3ClinearGradient id='c' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.28'/%3E%3Cstop offset='.5' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.16'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='30' height='20' fill='%231f4fa0'/%3E%3Crect y='4' width='30' height='12' fill='%23fff'/%3E%3Crect y='8' width='30' height='4' fill='%23c8102e'/%3E%3Cpath d='M.5 .5H29.5V19.5H.5Z' fill='url(%23c)' stroke='%230b1f3a' stroke-opacity='.45'/%3E%3C/svg%3E")}
+:root[data-theme="boat"] .tab[data-tab="agenda"]{--flag:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 20'%3E%3Cdefs%3E%3ClinearGradient id='c' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.28'/%3E%3Cstop offset='.5' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.16'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0 0H15V20H0Z' fill='%23fff'/%3E%3Cpath d='M15 0H30L22 10L30 20H15Z' fill='%231f4fa0'/%3E%3Cpath d='M.5 .5H29L21.4 10L29 19.5H.5Z' fill='url(%23c)' stroke='%230b1f3a' stroke-opacity='.45'/%3E%3C/svg%3E")}
+:root[data-theme="boat"] .tab[data-tab="voice"]{--flag:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 20'%3E%3Cdefs%3E%3ClinearGradient id='c' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.28'/%3E%3Cstop offset='.5' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.16'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='30' height='20' fill='%23fff'/%3E%3Cpath d='M0 0L30 20M30 0L0 20' stroke='%23c8102e' stroke-width='4'/%3E%3Cpath d='M.5 .5H29.5V19.5H.5Z' fill='url(%23c)' stroke='%230b1f3a' stroke-opacity='.45'/%3E%3C/svg%3E")}
+/* 02/10: Proprietários, the signal flag O (Oscar): red over yellow, on the diagonal */
+:root[data-theme="boat"] .tab[data-tab="owners"]{--flag:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 20'%3E%3Cdefs%3E%3ClinearGradient id='c' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='.28'/%3E%3Cstop offset='.5' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='.16'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0 0H30V20Z' fill='%23c8102e'/%3E%3Cpath d='M0 0V20H30Z' fill='%23f5c400'/%3E%3Cpath d='M.5 .5H29.5V19.5H.5Z' fill='url(%23c)' stroke='%230b1f3a' stroke-opacity='.45'/%3E%3C/svg%3E")}
+:root[data-theme="boat"] .tab:hover{background:#ffffffb8;border-color:#dcd3c3;color:var(--navy)}
+:root[data-theme="boat"] .tab.active{color:#fff8ec;border-color:#5a260b;text-shadow:0 1px 1px #0000008c;
+  background:linear-gradient(90deg,#00000038,#0000000d),var(--wood);
+  box-shadow:0 0 0 2px #fdfbf7,0 0 0 3.5px #aab1b8,inset 0 1px 0 #ffffff40,0 6px 14px #3a1a0633}
+:root[data-theme="boat"] .tab.active::before{filter:drop-shadow(0 1px 2px #000a)}
+:root[data-theme="boat"] .nav-count{background:var(--screen);color:var(--ink-blue);font:700 11px/1.6 var(--lcd);text-shadow:0 0 6px var(--glow-blue);
+  box-shadow:0 0 0 1.5px #c9ced4,inset 0 1px 3px #0008}
+
+/* The helm (drawn by app.js): a varnished wheel with six chrome spokes; each points at its tab's flag, and the open
+   tab's spoke turns to the top, under the red lubber mark, while the flags stay upright */
+:root[data-theme="boat"] .skin-selector{display:block;margin:16px 4px 0}
+:root[data-theme="boat"] .helm{display:block;width:100%;max-width:156px;height:auto;margin:0 auto;overflow:visible;filter:drop-shadow(0 8px 10px #1b2a3a38)}
+:root[data-theme="boat"] .helm-wheel{transform-box:view-box;transform-origin:50% 50%;transition:transform .9s cubic-bezier(.3,1.2,.5,1)}
+:root[data-theme="boat"] .helm-flag{transform-box:fill-box;transform-origin:50% 50%;cursor:pointer;transition:transform .9s cubic-bezier(.3,1.2,.5,1)}
+:root[data-theme="boat"] .helm-flag-edge{stroke:#0b1f3a;stroke-opacity:.45;stroke-width:1}
+:root[data-theme="boat"] .helm-flag:hover .helm-flag-edge{stroke:var(--accent);stroke-opacity:1;stroke-width:2.4}
+:root[data-theme="boat"] .helm-flag.active{filter:drop-shadow(0 0 3px #1f8ad0)}
+:root[data-theme="boat"] .helm-flag.active .helm-flag-edge{stroke:var(--navy);stroke-opacity:1;stroke-width:2.4}
+:root[data-theme="boat"] .helm-lubber{fill:#c8102e}
+@media(max-height:860px){:root[data-theme="boat"] .skin-selector{display:none}}
+
+/* Top bar: the tinted windscreen, with the light on the glass, over a chrome trim */
+:root[data-theme="boat"] .topbar{position:relative;border-bottom:0;color:#40566d;
+  background:linear-gradient(112deg,#fff0 0 36%,#ffffff8c 41%,#fff0 47%,#fff0 60%,#ffffff59 63%,#fff0 67%),
+    linear-gradient(180deg,#eef8fcf2,#d9eff8eb 70%,#c9e6f3eb)}
+:root[data-theme="boat"] .topbar::after{content:"";position:absolute;left:0;right:0;bottom:-4px;height:4px;pointer-events:none;
+  background:var(--chrome);box-shadow:0 2px 6px #0f2a4726}
+:root[data-theme="boat"] .topbar strong{color:var(--navy);font-weight:600}
+:root[data-theme="boat"] .breadcrumb{color:#8fa3b5}
+:root[data-theme="boat"] .local-label{color:#40566d}
+:root[data-theme="boat"] #busy{color:var(--accent);font:700 10px/1 var(--ui);letter-spacing:1.4px;text-transform:uppercase}
+
+/* Surfaces: glossy gelcoat panels, with a navy boot stripe and a chrome pinstripe along the bottom, like a hull */
+:root[data-theme="boat"] .card{position:relative;background:var(--gelcoat);border:1px solid #e3dccd;
+  box-shadow:inset 0 1px 0 #fff,inset 0 -3px 0 var(--navy),inset 0 -5px 0 #fffdf8,inset 0 -6px 0 #c3c9cf,0 12px 30px #1b2a3a12}
+:root[data-theme="boat"] .metric{background:var(--gelcoat);border:1px solid #e3dccd;box-shadow:inset 0 1px 0 #fff,0 10px 26px #1b2a3a12}
+:root[data-theme="boat"] .metric:first-child{border-color:#d9ccb2;background:linear-gradient(180deg,#fffdf8,#f3ead8)}
+/* Each count is on a blue marine screen, set in a teak surround with a chrome edge */
+:root[data-theme="boat"] .metric .value{display:inline-block;min-width:3ch;padding:1px 14px;border:5px solid #0000;border-radius:11px;
+  color:var(--ink-blue);font-family:var(--ui);font-weight:600;letter-spacing:0;text-shadow:0 0 12px #5fd4ffa6;
+  background:var(--screen) padding-box,var(--wood);
+  box-shadow:0 0 0 1px #9aa1a9,0 0 0 2.5px #fdfbf7,0 0 0 3.5px #c3c9cf,inset 0 2px 9px #000a}
+:root[data-theme="boat"] .metric.ok .value{color:#9af3cf;text-shadow:0 0 12px #3ddc97a6}
+:root[data-theme="boat"] .metric.warn .value{color:#ffd684;text-shadow:0 0 12px #ffb000a6}
+:root[data-theme="boat"] .metric.bad .value{color:#ffb8b8;text-shadow:0 0 12px #ff4d4da6}
+:root[data-theme="boat"] .metric .label{color:var(--muted);font-family:var(--ui)}
+:root[data-theme="boat"] .metric:after,:root[data-theme="boat"] .metric:first-child:after{top:14px;right:14px;width:8px;height:8px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#fff,#c5cbd1 45%,#7d848c);box-shadow:0 1px 1px #0003}
+
+/* Switchgear. Buttons: cream push-buttons in a chrome ring. Primary: navy lacquer. Anything that sends an email:
+   signal red inside a lifebuoy's red-and-white ring. */
+:root[data-theme="boat"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link){border:1px solid #cdbfa6;border-radius:999px;
+  color:var(--navy);font-family:var(--ui);font-weight:600;letter-spacing:.2px;background:linear-gradient(180deg,#fffefb,#f1eadc);
+  box-shadow:inset 0 1px 0 #fff,0 0 0 2px #fdfbf7,0 0 0 3px #c9ced4,0 3px 8px #1b2a3a1f;
+  transition:background .15s,box-shadow .15s,transform .08s,filter .15s}
+:root[data-theme="boat"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link):hover{border-color:#b9a988;
+  background:linear-gradient(180deg,#fff,#f6f0e4)}
+:root[data-theme="boat"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link):active{transform:translateY(1px);
+  box-shadow:inset 0 2px 5px #1b2a3a2e,0 0 0 2px #fdfbf7,0 0 0 3px #c9ced4}
+:root[data-theme="boat"] :is(button,.button).primary{color:#fff;border-color:#0a1d33;text-shadow:0 1px 1px #0008;
+  background:linear-gradient(180deg,#2a649f,#0f2a47);box-shadow:inset 0 1px 0 #ffffff4d,0 0 0 2px #fdfbf7,0 0 0 3.5px #aab1b8,0 6px 14px #0f2a4740}
+:root[data-theme="boat"] :is(button,.button).primary:hover{border-color:#0a1d33;background:linear-gradient(180deg,#3274b5,#123356)}
+/* Send buttons: a navy instrument key with a thin metal ring and an aqua pilot light — sending is the
+   normal end of the work, not an alarm; red stays for alarms and destructive actions */
+:root[data-theme="boat"] :is(button,.button).send-action{border:1px solid #a9b5bb;color:#f5f2ea;font-size:13px;font-weight:600;
+  letter-spacing:.2px;text-transform:none;text-shadow:0 1px 0 #0006;
+  background:linear-gradient(180deg,#21506a,#173b4d 55%,#12303f);
+  box-shadow:inset 0 1px 0 #ffffff2e,inset 0 -1px 0 #0000004d,0 2px 4px #0f2a4740}
+:root[data-theme="boat"] :is(button,.button).send-action::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;
+  background:#48b8ac;box-shadow:0 0 0 1px #0f2a4799,0 0 6px #48b8ac99}
+/* 28/09: a send button with its own icon («Enviar já este por email») keeps only that one */
+:root[data-theme="boat"] :is(button,.button).send-action:has(.button-icon)::before{display:none}
+:root[data-theme="boat"] :is(button,.button).send-action:hover{border-color:#c4ced3;
+  background:linear-gradient(180deg,#27607e,#1a4458 55%,#143545)}
+:root[data-theme="boat"] :is(button,.button).send-action:active{transform:translateY(1px);
+  box-shadow:inset 0 1px 3px #0000004d,0 1px 2px #0f2a4733}
+:root[data-theme="boat"] :is(button,.button):disabled{filter:grayscale(.8);opacity:.55;transform:none}
+:root[data-theme="boat"] button.link{color:var(--accent);font-family:var(--ui);font-weight:600}
+:root[data-theme="boat"] button.link:hover{color:var(--accent-hover);text-decoration:underline;text-underline-offset:4px}
+:root[data-theme="boat"] .link.danger{color:var(--bad)}
+:root[data-theme="boat"] .segmented{border:1px solid #d6cdbb;border-radius:999px;background:#f1ebdf;box-shadow:inset 0 1px 3px #1b2a3a1f}
+:root[data-theme="boat"] .segmented button{border-radius:999px;color:#4a5b6e;font-family:var(--ui);font-weight:600}
+:root[data-theme="boat"] .segmented button.active{color:#fff;background:linear-gradient(180deg,#2a649f,#0f2a47);box-shadow:0 1px 3px #0f2a4740}
+
+/* Controls. Checkboxes are rocker switches with a blue pilot light; fields are white and slightly recessed */
+:root[data-theme="boat"] input[type=checkbox]{-webkit-appearance:none;appearance:none;position:relative;width:30px;height:19px;padding:0;
+  border:1px solid #0b0d10;border-radius:5px;cursor:pointer;background:linear-gradient(180deg,#434a54,#1a1e23 46%,#0d1013 54%,#2a2f36);
+  box-shadow:0 0 0 2px #fdfbf7,0 0 0 3px #b9c0c7,inset 0 1px 0 #ffffff2e}
+:root[data-theme="boat"] input[type=checkbox]::before{content:"";position:absolute;left:6px;right:6px;top:3px;height:3px;border-radius:2px;background:#2c3a47}
+:root[data-theme="boat"] input[type=checkbox]:checked{background:linear-gradient(180deg,#2a2f36,#0d1013 46%,#1a1e23 54%,#434a54)}
+:root[data-theme="boat"] input[type=checkbox]:checked::before{top:auto;bottom:3px;background:#5fd0ff;box-shadow:0 0 6px #5fd0ff}
+:root[data-theme="boat"] input[type=checkbox]:disabled{opacity:.4;cursor:not-allowed}
+:root[data-theme="boat"] select{-webkit-appearance:none;appearance:none;padding-right:34px;border:1px solid #cfc5b2;color:#13233a;cursor:auto;
+  background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%230f2a47' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") right 12px center/11px 8px no-repeat;box-shadow:inset 0 1px 2px #1b2a3a14}
+:root[data-theme="boat"] :is(input:not([type=checkbox],[type=radio]),textarea){border:1px solid #d6cdbb;background-color:#fff;color:#13233a;cursor:auto;
+  box-shadow:inset 0 1px 3px #1b2a3a17}
+:root[data-theme="boat"] :is(input,textarea,select):focus{border-color:#1f8ad0;outline:2px solid #1f8ad055;outline-offset:1px}
+:root[data-theme="boat"] .tag{border-color:#c9d6e2;background:#f3f7fb;color:var(--tag-text);font:700 10px/1.4 var(--ui);letter-spacing:.8px;text-transform:uppercase}
+:root[data-theme="boat"] .tag.draft{color:var(--ok);border-color:var(--success-border);background:var(--ok-bg)}
+:root[data-theme="boat"] .tag.visit{color:var(--warn);border-color:var(--warning-border);background:#fff6df}
+:root[data-theme="boat"] .alert{border-left:3px solid currentColor}
+:root[data-theme="boat"] pre{background:#fdfcf9;border-color:#e4ddcf;color:#13233a}
+:root[data-theme="boat"] .contacts-table th{font-family:var(--plaque);letter-spacing:1.6px;color:#6b7a89}
+/* Contactos (26/09): the table reads as a list, not a form — its fields show no box until pointed at or edited, and
+   the email is in the ink of the text, not faded */
+:root[data-theme="boat"] .contacts-table td.email{color:var(--text);font-size:13px}
+:root[data-theme="boat"] .contacts-table :is(input,select){border-color:#0000;background-color:#0000;box-shadow:none;color:var(--text);
+  font-size:13px}
+:root[data-theme="boat"] .contacts-table :is(input,select):is(:hover,:focus){border-color:#d6cdbb;background-color:#fff}
+
+/* Painel: a ship's clock (white enamel, chrome bezel, red seconds) on a round teak mount, beside the calendar,
+   both on a gelcoat panel */
+:root[data-theme="boat"] .retro-widget{background:var(--gelcoat);border:1px solid #e3dccd;box-shadow:inset 0 1px 0 #fff,0 10px 24px #1b2a3a14}
+:root[data-theme="boat"] .retro-clock{min-width:104px;gap:6px}
+:root[data-theme="boat"] .clock-analog{display:block;width:94px;height:94px;padding:5px;border-radius:50%;background:var(--wood);
+  box-shadow:0 0 0 1px #5a260b,inset 0 1px 0 #ffffff47,0 6px 14px #3a1a0640}
+:root[data-theme="boat"] .clock-analog svg{display:block;width:100%;height:100%}
+:root[data-theme="boat"] .retro-clock #clock-time{display:none}
+:root[data-theme="boat"] .clock-bezel{fill:#c9ced4;stroke:#7d848c;stroke-width:1.2}
+:root[data-theme="boat"] .clock-face{fill:#fffdf8;stroke:#9aa1a9;stroke-width:.8}
+:root[data-theme="boat"] .clock-tick{stroke:var(--navy)}
+:root[data-theme="boat"] .clock-numeral{fill:var(--navy);font:400 12px/1 var(--display)}
+:root[data-theme="boat"] .clock-hand line{stroke:var(--navy)}
+:root[data-theme="boat"] .clock-hand .second{stroke:#c8102e}
+:root[data-theme="boat"] .clock-cap{fill:#c8102e;stroke:#fff;stroke-width:.8}
+:root[data-theme="boat"] .retro-date,:root[data-theme="boat"] .retro-cal-month{color:var(--brass-text);font-family:var(--plaque);letter-spacing:1.8px}
+:root[data-theme="boat"] .cal-cell.today{background:var(--navy);color:#fff}
+:root[data-theme="boat"] .cal-cell.has-visit:after{background:#d7261e;box-shadow:none}
+
+/* Respostas: the four steps are waypoints on the route, WP1 to WP4 */
+:root[data-theme="boat"] .workflow{counter-reset:wp;border-color:#e3dccd;background:var(--gelcoat);box-shadow:inset 0 1px 0 #fff}
+:root[data-theme="boat"] .workflow li{counter-increment:wp}
+:root[data-theme="boat"] .workflow li+li{border-left-color:#e7e0d2}
+:root[data-theme="boat"] .workflow a{align-items:center;color:var(--navy);font:600 13px/1.4 var(--ui)}
+:root[data-theme="boat"] .workflow .num{font-size:0}
+:root[data-theme="boat"] .workflow .num::before{content:"WP" counter(wp);display:inline-grid;place-items:center;min-width:40px;height:24px;padding:0 6px;
+  border-radius:6px;background:var(--screen);color:var(--ink-blue);font:700 11px/1 var(--lcd);letter-spacing:.5px;
+  text-shadow:0 0 6px var(--glow-blue);box-shadow:0 0 0 1.5px #c3c9cf}
+:root[data-theme="boat"] .workflow li.done{background:linear-gradient(180deg,#e9f6ef,#dff1e7)}
+
+/* Imóveis: the slider sits on gelcoat, its arrows are chrome */
+:root[data-theme="boat"] .property-slider{background:var(--gelcoat);border-color:#e3dccd}
+:root[data-theme="boat"] .slider-arrow{border:1px solid #7d848c;color:var(--navy);background:radial-gradient(circle at 35% 30%,#fff,#dfe3e7 40%,#9ea5ad 85%);
+  box-shadow:inset 0 1px 0 #fff,0 3px 8px #1b2a3a2e}
+:root[data-theme="boat"] .slider-arrow:hover{border-color:#5f666e;box-shadow:inset 0 1px 0 #fff,0 0 0 3px #1f8ad044,0 3px 8px #1b2a3a2e}
+:root[data-theme="boat"] .slider-dot.active:before{background:var(--navy);box-shadow:0 0 0 2px #fff,0 0 0 3px #aab1b8}
+
+/* Each property's instruments. The dash is varnished teak with a curved brow and a chrome edge, as on the helm in
+   the photographs, and the dials are set into it: white enamel faces in chrome bezels, navy numbers, red needles and
+   a small blue screen for the reading. The barometer reads fair weather to storm. */
+:root[data-theme="boat"] .cluster-gauges{align-items:flex-start;gap:clamp(8px,1.6vw,26px);margin:10px 0 22px;padding:30px 22px 18px;
+  border-radius:48% 48% 22px 22px / 46px 46px 22px 22px;background:linear-gradient(180deg,#00000038,#0000004d 55%,#00000066),var(--wood);
+  box-shadow:0 0 0 2px #fdfbf7,0 0 0 4px #b9c0c7,inset 0 2px 0 #ffffff47,inset 0 -8px 18px #3a1a0640,0 14px 30px #1b2a3a2e}
+:root[data-theme="boat"] .cluster-gauges .gauge figcaption{color:#fff4e0;font:700 10px/1.5 var(--ui);letter-spacing:1.2px;text-transform:uppercase;
+  text-shadow:0 1px 2px #000b}
+:root[data-theme="boat"] .cluster-gauges .gauge-setting{color:#fbe9cf;font-family:var(--ui);text-shadow:0 1px 1px #0009}
+:root[data-theme="boat"] .cluster-gauges .gauge-setting button.link{color:#ffe7a3}
+:root[data-theme="boat"] .gauge svg{filter:drop-shadow(0 6px 10px #0000004d)}
+:root[data-theme="boat"] .gauge-big svg{width:clamp(168px,15vw,236px)}
+:root[data-theme="boat"] .gauge-small svg{width:clamp(120px,10.5vw,164px)}
+:root[data-theme="boat"] .gauge-mini svg{width:clamp(92px,7.6vw,122px)}
+:root[data-theme="boat"] .gauge-bezel{display:inline}
+:root[data-theme="boat"] .gauge-face{fill:#fffdf8;stroke:#aab1b8;stroke-width:1.5}
+:root[data-theme="boat"] .gauge-tick{stroke:var(--navy);stroke-width:1.2}
+:root[data-theme="boat"] .gauge-tick:not(.major),:root[data-theme="boat"] .gauge-number:not(.end){display:inline}
+:root[data-theme="boat"] .gauge-tick.major{stroke-width:2.8}
+:root[data-theme="boat"] .gauge-number{fill:var(--navy);font:700 14px/1 var(--ui)}
+:root[data-theme="boat"] .gauge-heat .gauge-number{font-size:7.4px;letter-spacing:.2px}
+:root[data-theme="boat"] .gauge-unit{fill:#566476;font:700 9px/1 var(--ui);letter-spacing:1.6px}
+:root[data-theme="boat"] .gauge-icon{display:inline;color:var(--navy)}
+:root[data-theme="boat"] .gauge-red{stroke:#c8102e;stroke-width:7;opacity:1}
+:root[data-theme="boat"] .gauge-readout-box{fill:#0b4a7a;stroke:#9aa1a9;stroke-width:1.5}
+:root[data-theme="boat"] .gauge-readout{fill:var(--ink-blue);font:600 12px/1 var(--lcd)}
+:root[data-theme="boat"] .gauge-alert .gauge-readout{fill:#ffb8b8;animation:boat-blink 1s steps(2,start) infinite}
+@keyframes boat-blink{to{visibility:hidden}}
+:root[data-theme="boat"] .gauge-needle{transition-duration:1.4s;transition-timing-function:cubic-bezier(.2,1.3,.4,1)}
+:root[data-theme="boat"] .gauge-needle path{fill:#c8102e}
+:root[data-theme="boat"] .gauge-cap{fill:#c3c9cf;stroke:#6f767e;stroke-width:2}
+/* The trip computer is a blue marine screen; the counters are a log's white wheels in a chrome frame */
+:root[data-theme="boat"] .trip-computer{border:1px solid #0a1d33;border-radius:12px;background:var(--screen);color:#bfe9ff;font:600 12px/1.4 var(--ui);
+  box-shadow:0 0 0 2px #fdfbf7,0 0 0 3.5px #aab1b8,inset 0 2px 8px #0008}
+:root[data-theme="boat"] .trip-title{color:#7fe3ff;font:700 10px/1 var(--ui);letter-spacing:2px}
+:root[data-theme="boat"] .trip-computer input{border:1px solid #1f5f93;background:#041a2f;color:var(--ink-blue);font:700 12px/1 var(--lcd);box-shadow:inset 0 1px 3px #000}
+:root[data-theme="boat"] .trip-computer button.link{color:#7fe3ff}
+:root[data-theme="boat"] .trip-reading{color:var(--ink-blue);font-family:var(--lcd)}
+:root[data-theme="boat"] .odometer-digits{gap:2px;padding:3px;border-radius:5px;background:linear-gradient(180deg,#eef1f4,#9aa1a9);
+  box-shadow:0 0 0 1px #7d848c,inset 0 1px 0 #fff}
+:root[data-theme="boat"] .odometer-digits .lead{display:grid}
+:root[data-theme="boat"] .odometer-digits span{display:grid;place-items:center;width:19px;height:27px;border-radius:2px;color:var(--navy);
+  font:700 16px/1 var(--lcd);background:linear-gradient(#d3d8de,#fff 42%,#fff 58%,#d3d8de)}
+:root[data-theme="boat"] .odometer-label{color:var(--muted);font:700 9px/1.4 var(--ui);letter-spacing:1.4px;text-transform:uppercase}
+/* Warning lights: a black switch panel in a chrome frame; each light stays dark until it is lit */
+:root[data-theme="boat"] .cluster-lamps{padding:12px;border-radius:14px;background:linear-gradient(180deg,#2a2f36,#111418);
+  box-shadow:0 0 0 2px #fdfbf7,0 0 0 3.5px #aab1b8,inset 0 1px 0 #ffffff1f,0 8px 18px #1b2a3a2e}
+:root[data-theme="boat"] .lamp{gap:8px;padding:6px 12px;border-color:#343a42;background:#171a1f;color:#9aa4ae;font:700 10px/1.2 var(--ui);
+  letter-spacing:1px;text-transform:uppercase}
+:root[data-theme="boat"] .lamp strong{color:#b4bcc5}
+:root[data-theme="boat"] .lamp-bulb{width:9px;height:9px;background:#2c323a;box-shadow:inset 0 1px 2px #000}
+:root[data-theme="boat"] .lamp.on,:root[data-theme="boat"] .lamp.on strong{color:#fff}
+:root[data-theme="boat"] .lamp.on.lamp-red .lamp-bulb{background:#ff4d4d;box-shadow:0 0 9px #ff4d4d}
+:root[data-theme="boat"] .lamp.on.lamp-amber .lamp-bulb{background:#ffb000;box-shadow:0 0 9px #ffb000}
+:root[data-theme="boat"] .lamp.on.lamp-green .lamp-bulb{background:#3ddc84;box-shadow:0 0 9px #3ddc84}
+:root[data-theme="boat"] .lamp.on.lamp-grey .lamp-bulb{background:#e3e7eb;box-shadow:0 0 7px #e3e7eb}
+/* Charts are the plotter: a nautical chart (pale water, a grid, a stretch of coast) in a black glass frame, requests in
+   chart blue and replies in the magenta of a course line */
+:root[data-theme="boat"] .chart{padding:8px 10px 4px;border:6px solid #15181c;border-radius:14px;
+  background:radial-gradient(90% 70% at 96% 118%,#efe4c8 0 24%,#d9c9a3 25%,#0000 26.5%),
+    repeating-linear-gradient(0deg,#0000 0 29px,#8fb8d24d 29px 30px),repeating-linear-gradient(90deg,#0000 0 29px,#8fb8d24d 29px 30px),
+    linear-gradient(180deg,#eaf5fb,#d3e9f5);
+  box-shadow:0 0 0 1.5px #aab1b8,inset 0 0 0 1px #ffffff80,0 8px 18px #1b2a3a2e}
+/* 28/09: the chart's pair (navy, magenta), validated against the white card; the bars, legend and tooltip use it */
+:root[data-theme="boat"]{--chart-requests:#0e5a8a;--chart-sent:#c2185b}
+:root[data-theme="boat"] .chart .bar-label{fill:#22384f}
+:root[data-theme="boat"] .chart .grid-line{stroke:var(--navy);stroke-opacity:.6}
+
+/* Agenda: the ship's logbook, a navy canvas binding with white ruled pages */
+:root[data-theme="boat"] .filofax{border:6px solid var(--navy);background:var(--navy);box-shadow:0 0 0 1px #0a1d33,inset 0 0 0 1px #2a4a6e,0 16px 40px #0f2a4733}
+:root[data-theme="boat"] .filofax-page{border-color:#d9e3ec;background-color:#fff;color:#13233a;
+  --agenda-rule:#bfd3e3;--agenda-paper:#fff}
+:root[data-theme="boat"] .filofax-page.today{background-color:#f1f8fd}
+:root[data-theme="boat"] .filofax-page .muted,:root[data-theme="boat"] .filofax-weekday{color:#6b7a89}
+:root[data-theme="boat"] .filofax-head{border-bottom-color:var(--navy)}
+:root[data-theme="boat"] .filofax-page.today .filofax-weekday{color:var(--accent)}
+:root[data-theme="boat"] .filofax-page:before{background-image:radial-gradient(circle,#aab1b8 1.6px,#0000 1.8px)}
+
+/* Messages: the toast is a marine screen in a chrome bezel; an empty inbox drops anchor */
+:root[data-theme="boat"] #toast{padding-left:46px;border:1px solid #0a1d33;border-radius:12px;background:var(--screen);color:#dff7ff;
+  font:600 13px/1.5 var(--ui);box-shadow:0 0 0 3px #fdfbf7,0 0 0 4.5px #aab1b8,0 16px 44px #0f2a4759}
+:root[data-theme="boat"] #toast::before{content:"";position:absolute;left:18px;top:50%;width:12px;height:12px;margin-top:-6px;border-radius:50%;
+  background:#1fbf6a;box-shadow:0 0 10px #1fbf6a}
+:root[data-theme="boat"] #toast.warn{color:#ffe0a3}
+:root[data-theme="boat"] #toast.warn::before{background:#f0a400;box-shadow:0 0 10px #f0a400}
+:root[data-theme="boat"] #toast.bad{color:#ffc2c2}
+:root[data-theme="boat"] #toast.bad::before{background:#e5382e;box-shadow:0 0 10px #e5382e}
+:root[data-theme="boat"] .empty-state{border-color:#cfc5b2;background:#fffdf880}
+:root[data-theme="boat"] .empty-state strong::before{content:"";display:block;width:40px;height:40px;margin:0 auto 10px;opacity:.85;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48' fill='none' stroke='%230f2a47' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='24' cy='8.5' r='4'/%3E%3Cpath d='M24 12.5V42M15 19.5h18'/%3E %3Cpath d='M8 27c2.4 8.6 8.6 13.6 16 15c7.4-1.4 13.6-6.4 16-15'/%3E%3Cpath d='M4.5 31 8 27l4.4 2.6M43.5 31 40 27l-4.4 2.6'/%3E%3C/svg%3E") center/contain no-repeat}
+
+/* The sea in motion, only in transform or background position, and all still with "reduce motion": two wave bands
+   at the foot of the window (the nearer one faster), a sloop with its gulls crossing the windscreen behind the top
+   bar's text, a radar sweeping while the page works, the open tab's flag flying, and buttons riding the swell */
+:root[data-theme="boat"] body::before{content:"";position:fixed;left:0;right:0;bottom:0;height:70px;z-index:-1;pointer-events:none;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='70'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E %3Cstop offset='0' stop-color='%238ccbe4'/%3E%3Cstop offset='1' stop-color='%234f9cc6'/%3E%3C/linearGradient%3E%3C/defs%3E %3Cpath d='M0 44C45 34 135 34 180 44S315 54 360 44V70H0Z' fill='url(%23g)'/%3E %3Cpath d='M0 44C45 34 135 34 180 44S315 54 360 44' fill='none' stroke='%23fff' stroke-opacity='.75' stroke-width='1.6'/%3E%3C/svg%3E") 0 100%/360px 70px repeat-x,url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='480' height='70'%3E %3Cpath d='M0 30C60 18 180 18 240 30S420 42 480 30V70H0Z' fill='%23d5ebf5'/%3E%3C/svg%3E") 0 100%/480px 70px repeat-x;
+  animation:boat-waves 36s linear infinite}
+@keyframes boat-waves{to{background-position:-720px 100%,-480px 100%}}
+:root[data-theme="boat"] .topbar{z-index:0}
+/* 29/09: em pausa, a pedido — o veículo já não passa no cabeçalho, só no rodapé. Para voltar, tira este comentário.
+:root[data-theme="boat"] .topbar::before{content:"";position:absolute;left:58%;bottom:3px;width:64px;height:40px;z-index:-1;pointer-events:none;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 40'%3E %3Cpath d='M28.6 5.5V28.5H44.5Z' fill='%23fff' stroke='%23b9c0c7' stroke-width='.6'/%3E %3Cpath d='M27.4 8V28.5H15.5Z' fill='%23f2f7fa' stroke='%23b9c0c7' stroke-width='.6'/%3E %3Cpath d='M28 3.5V29' stroke='%230f2a47' stroke-width='1.2'/%3E%3Cpath d='M28 3.5l5.5 1.6L28 6.7Z' fill='%23c8102e'/%3E %3Cpath d='M8 29.5H53L47 36H14Z' fill='%23fff' stroke='%230f2a47' stroke-width='.8'/%3E%3Cpath d='M10 32.2H50.6' stroke='%230f2a47' stroke-width='1.4'/%3E %3Cpath d='M4 38.5q6-2 12 0t12 0t12 0t12 0t12 0' fill='none' stroke='%23fff' stroke-opacity='.8' stroke-width='1'/%3E %3Cpath d='M46 9q2.6-2.6 5 0q2.4-2.6 5 0M52 15q1.8-1.8 3.6 0q1.8-1.8 3.6 0' fill='none' stroke='%230f2a47' stroke-width='1' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat;animation:boat-sail 140s linear infinite} */
+@keyframes boat-sail{0%{transform:translateX(45vw)}50%,100%{transform:translateX(-75vw)}}
+:root[data-theme="boat"] #busy{display:inline-flex;align-items:center;gap:9px}
+:root[data-theme="boat"] #busy::before{content:"";flex:none;width:20px;height:20px;border-radius:50%;
+  background:conic-gradient(#0000 0 290deg,#7dffc400 290deg,#7dffc4e6 360deg),
+    repeating-radial-gradient(circle,#0000 0 3.2px,#7dffc433 3.4px 3.9px),radial-gradient(circle,#0e3b2c,#061c14);
+  box-shadow:0 0 0 1.5px #fdfbf7,0 0 0 2.5px #9aa1a9,0 0 8px #7dffc466;animation:boat-radar 1.4s linear infinite}
+@keyframes boat-radar{to{transform:rotate(360deg)}}
+:root[data-theme="boat"] .tab.active::before{transform-origin:0 50%;animation:boat-flutter 2.8s ease-in-out infinite}
+@keyframes boat-flutter{0%,100%{transform:none}35%{transform:skewY(-5deg) scaleX(.94)}70%{transform:skewY(3deg) scaleX(.97)}}
+:root[data-theme="boat"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link):not(:disabled):hover{animation:boat-bob 1.6s ease-in-out infinite}
+:root[data-theme="boat"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link):not(:disabled):active{animation:none}
+@keyframes boat-bob{0%,100%{transform:none}50%{transform:translateY(-2px)}}
+
+/* The Sons switch (app.js shows it only in a skin with sounds): a small push-button with a bell, navy when on */
+:root[data-theme="boat"] .sound-toggle{margin-left:auto;min-height:32px;padding:4px 12px 4px 9px;gap:7px;font-size:11px;letter-spacing:.6px;text-transform:uppercase}
+:root[data-theme="boat"] .sound-toggle::before{content:"";width:15px;height:15px;background:currentColor;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v1.5M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.8 2H4.7Z'/%3E%3Cpath d='M10 20.5a2 2 0 0 0 4 0'/%3E %3Cpath d='M3.5 3.5l17 17'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v1.5M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.8 2H4.7Z'/%3E%3Cpath d='M10 20.5a2 2 0 0 0 4 0'/%3E %3Cpath d='M3.5 3.5l17 17'/%3E%3C/svg%3E") center/contain no-repeat}
+:root[data-theme="boat"] .sound-toggle[aria-pressed="true"]{color:#fff;border-color:#0a1d33;text-shadow:0 1px 1px #0008;
+  background:linear-gradient(180deg,#2a649f,#0f2a47)}
+:root[data-theme="boat"] .sound-toggle[aria-pressed="true"]::before{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v1.5M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.8 2H4.7Z'/%3E%3Cpath d='M10 20.5a2 2 0 0 0 4 0'/%3E %3Cpath d='M2.5 9.5a8 8 0 0 1 2-4M21.5 9.5a8 8 0 0 0-2-4'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3v1.5M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.8 2H4.7Z'/%3E%3Cpath d='M10 20.5a2 2 0 0 0 4 0'/%3E %3Cpath d='M2.5 9.5a8 8 0 0 1 2-4M21.5 9.5a8 8 0 0 0-2-4'/%3E%3C/svg%3E")}
+:root[data-theme="boat"] .sound-toggle:not([hidden])+.theme-control{margin-left:0}
+
+/* The night watch, from 20:00 to 7:00 (app.js sets data-watch on the page). Outside it is dark: stars over the page,
+   a moon in the windscreen, the sea by night, the sloop with her lights on, the red port light at the head of the
+   rail and the green starboard light at the far end of the windscreen. The lit cockpit (sidebar, cards, panels)
+   keeps its day colours, so every text inside it reads as by day; the few texts that sit straight on the night
+   take the light variables. */
+:root[data-theme="boat"][data-watch="night"]{--bg:#0a1624;--text:#e8eef5;--muted:#b3c1ce;--accent:#8fd0ff;--accent-hover:#b9e2ff;--line:#23364b;
+  --heading:#f3ead8;--pennant:#f3ead8;--pennant-text:#0f2a47;scrollbar-color:#5b6b7c #0a1624}
+:root[data-theme="boat"][data-watch="night"] :is(.card,.metric,.sidebar,.workflow,.retro-widget,.property-slider,.filofax,.empty-state,.table-wrap){color:var(--text);
+  --text:#13233a;--muted:#566476;--accent:#0e5a8a;--accent-hover:#0b4a72;--line:#e4ddcf;--heading:#0f2a47;--pennant:#0f2a47;
+  --pennant-text:#fff}
+:root[data-theme="boat"][data-watch="night"] body{background:radial-gradient(1.2px 1.2px at 23px 41px,#fff 60%,#0000) fixed,
+  radial-gradient(1px 1px at 131px 97px,#fffbe6 60%,#0000) fixed,radial-gradient(1.4px 1.4px at 199px 13px,#dfeaff 60%,#0000) fixed,
+  radial-gradient(ellipse at 88% -10%,#1d3a5c,#0000 45%) fixed,var(--bg);background-size:223px 181px,307px 263px,389px 331px,auto,auto}
+:root[data-theme="boat"][data-watch="night"] body::before{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='70'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E %3Cstop offset='0' stop-color='%2321507c'/%3E%3Cstop offset='1' stop-color='%230d2744'/%3E%3C/linearGradient%3E%3C/defs%3E %3Cpath d='M0 44C45 34 135 34 180 44S315 54 360 44V70H0Z' fill='url(%23g)'/%3E %3Cpath d='M0 44C45 34 135 34 180 44S315 54 360 44' fill='none' stroke='%23d9e8f5' stroke-opacity='.45' stroke-width='1.4'/%3E%3C/svg%3E") 0 100%/360px 70px repeat-x,url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='480' height='70'%3E %3Cpath d='M0 30C60 18 180 18 240 30S420 42 480 30V70H0Z' fill='%231a3a5c'/%3E%3C/svg%3E") 0 100%/480px 70px repeat-x}
+:root[data-theme="boat"][data-watch="night"] .topbar{color:#c9d6e3;
+  background:radial-gradient(circle at calc(100% - 16px) 12px,#6dffae 0 2.6px,#3dff8f80 4px,#0000 9px),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'%3E%3Cdefs%3E%3CradialGradient id='h'%3E%3Cstop offset='.3' stop-color='%23fff7d6' stop-opacity='.32'/%3E %3Cstop offset='1' stop-color='%23fff7d6' stop-opacity='0'/%3E%3C/radialGradient%3E %3Cmask id='m'%3E%3Crect width='60' height='60' fill='%23fff'/%3E%3Ccircle cx='36' cy='26' r='12' fill='%23000'/%3E%3C/mask%3E%3C/defs%3E %3Ccircle cx='30' cy='30' r='30' fill='url(%23h)'/%3E%3Ccircle cx='28' cy='30' r='13' fill='%23f6efd2' mask='url(%23m)'/%3E%3C/svg%3E") 44% 50%/46px 46px no-repeat,
+    radial-gradient(1px 1px at 37px 19px,#fff 60%,#0000),radial-gradient(1.2px 1.2px at 151px 41px,#fffbe6 60%,#0000),
+    linear-gradient(180deg,#0b1a2e,#12304f 72%,#1b4468);background-size:auto,46px 46px,193px 66px,277px 66px,auto}
+:root[data-theme="boat"][data-watch="night"] .topbar strong{color:#fff}
+:root[data-theme="boat"][data-watch="night"] .breadcrumb{color:#7f93a8}
+:root[data-theme="boat"][data-watch="night"] .local-label{color:#c9d6e3}
+:root[data-theme="boat"][data-watch="night"] #busy{color:#8fd0ff}
+:root[data-theme="boat"][data-watch="night"] .topbar::before{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 40'%3E%3Cdefs%3E%3CradialGradient id='l'%3E%3Cstop offset='0' stop-color='%23fff'/%3E %3Cstop offset='.35' stop-color='%23fff8dc' stop-opacity='.8'/%3E%3Cstop offset='1' stop-color='%23fff8dc' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E %3Cpath d='M28.6 5.5V28.5H44.5Z' fill='%23c9d6e3' fill-opacity='.8'/%3E%3Cpath d='M27.4 8V28.5H15.5Z' fill='%23b9c8d7' fill-opacity='.75'/%3E %3Cpath d='M28 3.5V29' stroke='%23dfe8f1' stroke-width='1.2'/%3E%3Ccircle cx='28' cy='3.6' r='4.5' fill='url(%23l)'/%3E %3Cpath d='M8 29.5H53L47 36H14Z' fill='%23dfe8f1'/%3E%3Cpath d='M10 32.2H50.6' stroke='%230f2a47' stroke-width='1.4'/%3E %3Ccircle cx='12' cy='30.5' r='2.4' fill='%23ff4d4d'/%3E%3Ccircle cx='50' cy='30.5' r='2.4' fill='%233dff8f'/%3E %3Cpath d='M4 38.5q6-2 12 0t12 0t12 0t12 0t12 0' fill='none' stroke='%23d9e8f5' stroke-opacity='.5' stroke-width='1'/%3E%3C/svg%3E")}
+:root[data-theme="boat"][data-watch="night"] .sidebar::before{background:radial-gradient(circle at 50% 8px,#ff6b6b 0 2.6px,#ff3b3b88 3.8px,#0000 7.5px) top/15px 16px no-repeat,
+  linear-gradient(90deg,#6f767e,#fff 45%,#9aa1a9) top/15px 16px no-repeat,linear-gradient(90deg,#6f767e,#fff 45%,#9aa1a9) bottom/15px 16px no-repeat}
+
+/* Phone: the helm becomes the top strip, the rail runs along its foot, and the six flags sit in two rows of three */
+@media(max-width:760px){
+  :root[data-theme="boat"] .sidebar{position:relative;border-right:0;border-bottom:1px solid #ddd3c1}
+  :root[data-theme="boat"] .sidebar::before{display:none}
+  :root[data-theme="boat"] .sidebar::after{top:auto;left:14px;right:14px;bottom:3px;width:auto;height:6px;background:var(--chrome)}
+  :root[data-theme="boat"] nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-right:0}
+  :root[data-theme="boat"] .tab{position:relative;justify-content:flex-start;gap:7px;padding:8px;font-size:12px;letter-spacing:0}
+  :root[data-theme="boat"] .tab::before{width:20px;height:14px}
+  :root[data-theme="boat"] .tab .nav-count{position:absolute;top:-7px;right:-5px;padding:0 5px}
+  :root[data-theme="boat"] .skin-selector{display:none}
+  :root[data-theme="boat"] .sound-toggle{padding:4px 8px;font-size:0;gap:0}
+  :root[data-theme="boat"] .cluster-gauges{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));justify-items:center;padding:24px 12px 14px;
+    border-radius:30px 30px 16px 16px}
+  :root[data-theme="boat"] .gauge-tach{order:-2}
+  :root[data-theme="boat"] .gauge-speedo{order:-1}
+  :root[data-theme="boat"] .gauge svg,:root[data-theme="boat"] .gauge-big svg,:root[data-theme="boat"] .gauge-small svg{width:100%;max-width:170px}
+  :root[data-theme="boat"] .gauge-mini svg{width:100%;max-width:130px}
+  :root[data-theme="boat"] .gauge-petrol{grid-column:1/-1}
+}
+@media(prefers-reduced-motion:reduce){:root[data-theme="boat"] .gauge-alert .gauge-readout,:root[data-theme="boat"] body::before,:root[data-theme="boat"] .topbar::before,:root[data-theme="boat"] #busy::before,
+  :root[data-theme="boat"] .tab.active::before,:root[data-theme="boat"] :is(button,.button):hover{animation:none}}
+/* Agenda: the day heads stay on top while the hours scroll, so they carry the paper's colour */
+:root[data-theme="boat"] .filofax-page{--page-bg:#fff}:root[data-theme="boat"] .filofax-page.today{--page-bg:#f1f8fd}
+
+/* …and the sloop comes back: once it has crossed the top bar to the left (first half of a 140 s cycle), it sails
+   the sea at the foot of the window the other way, mirrored, heading right (second half) */
+:root[data-theme="boat"] body::after{content:"";position:fixed;left:0;bottom:24px;width:64px;height:40px;z-index:-1;pointer-events:none;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 40'%3E %3Cpath d='M28.6 5.5V28.5H44.5Z' fill='%23fff' stroke='%23b9c0c7' stroke-width='.6'/%3E %3Cpath d='M27.4 8V28.5H15.5Z' fill='%23f2f7fa' stroke='%23b9c0c7' stroke-width='.6'/%3E %3Cpath d='M28 3.5V29' stroke='%230f2a47' stroke-width='1.2'/%3E%3Cpath d='M28 3.5l5.5 1.6L28 6.7Z' fill='%23c8102e'/%3E %3Cpath d='M8 29.5H53L47 36H14Z' fill='%23fff' stroke='%230f2a47' stroke-width='.8'/%3E%3Cpath d='M10 32.2H50.6' stroke='%230f2a47' stroke-width='1.4'/%3E %3Cpath d='M4 38.5q6-2 12 0t12 0t12 0t12 0t12 0' fill='none' stroke='%23fff' stroke-opacity='.8' stroke-width='1'/%3E %3Cpath d='M46 9q2.6-2.6 5 0q2.4-2.6 5 0M52 15q1.8-1.8 3.6 0q1.8-1.8 3.6 0' fill='none' stroke='%230f2a47' stroke-width='1' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat center/contain;transform:translateX(-90px) scaleX(-1);animation:boat-return 140s linear infinite}
+@keyframes boat-return{0%,50%{transform:translateX(-90px) scaleX(-1)}100%{transform:translateX(calc(100vw + 20px)) scaleX(-1)}}
+:root[data-theme="boat"][data-watch="night"] body::after{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 40'%3E%3Cdefs%3E%3CradialGradient id='l'%3E%3Cstop offset='0' stop-color='%23fff'/%3E %3Cstop offset='.35' stop-color='%23fff8dc' stop-opacity='.8'/%3E%3Cstop offset='1' stop-color='%23fff8dc' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E %3Cpath d='M28.6 5.5V28.5H44.5Z' fill='%23c9d6e3' fill-opacity='.8'/%3E%3Cpath d='M27.4 8V28.5H15.5Z' fill='%23b9c8d7' fill-opacity='.75'/%3E %3Cpath d='M28 3.5V29' stroke='%23dfe8f1' stroke-width='1.2'/%3E%3Ccircle cx='28' cy='3.6' r='4.5' fill='url(%23l)'/%3E %3Cpath d='M8 29.5H53L47 36H14Z' fill='%23dfe8f1'/%3E%3Cpath d='M10 32.2H50.6' stroke='%230f2a47' stroke-width='1.4'/%3E %3Ccircle cx='12' cy='30.5' r='2.4' fill='%23ff4d4d'/%3E%3Ccircle cx='50' cy='30.5' r='2.4' fill='%233dff8f'/%3E %3Cpath d='M4 38.5q6-2 12 0t12 0t12 0t12 0t12 0' fill='none' stroke='%23d9e8f5' stroke-opacity='.5' stroke-width='1'/%3E%3C/svg%3E")}
+@media(prefers-reduced-motion:reduce){:root[data-theme="boat"] body::after{display:none}}
+:root[data-theme="boat"] :is(button,.button).shortlist-toggle.on{background:linear-gradient(180deg,#2a649f,#0f2a47);color:#fff;border-color:#0a1d33}
+/* The chrome strip between «R» (Voz e estilo) and the gears (27/09) */
+:root[data-theme="boat"] nav .tab:is([data-tab="voice"],[data-tab="agenda"])::after{height:3px;border-radius:2px;background:linear-gradient(90deg,#0000,#8d969d 18%,#fff 50%,#8d969d 82%,#0000);box-shadow:0 1px 1px #0004}
+/* The page ends 40 px above the waves (70 px): the last card never sits on the sea (27/09) */
+:root[data-theme="boat"] main{padding-bottom:110px}
+@media(max-width:760px){:root[data-theme="boat"] main{padding-bottom:110px}}
+/* «Sensores a bordo» under the helm (27/09): a 1980 motorsailer at night in a chrome-rimmed screen, a pulsing light on
+   each sensor (green, amber, red; blue for the bow's visits), and the readings below */
+:root[data-theme="boat"] .boat-sensors{margin:14px 2px 0;padding:8px 8px 6px;border-radius:14px;background:#0a1a33;
+  box-shadow:0 0 0 2px #fdfbf7,0 0 0 3.5px #aab1b8,inset 0 1px 6px #0008}
+:root[data-theme="boat"] .boat-sensors-title{margin:0 0 4px;color:#7fe3ff;font:700 9px/1.4 var(--ui);letter-spacing:2px;text-align:center}
+:root[data-theme="boat"] .boat-sensors-drawing{display:block;width:100%;height:auto}
+:root[data-theme="boat"] .boat-sensor{cursor:pointer}
+:root[data-theme="boat"] .boat-sensor-ring{fill:none;stroke-width:1.2;transform-box:fill-box;transform-origin:center;
+  animation:boat-sensor-pulse 2.2s ease-out infinite}
+@keyframes boat-sensor-pulse{0%{transform:scale(.45);opacity:.95}100%{transform:scale(1.7);opacity:0}}
+:root[data-theme="boat"] .boat-sensor.green .boat-sensor-dot{fill:#3ddc84}:root[data-theme="boat"] .boat-sensor.green .boat-sensor-ring{stroke:#3ddc84}
+:root[data-theme="boat"] .boat-sensor.amber .boat-sensor-dot{fill:#ffb000}:root[data-theme="boat"] .boat-sensor.amber .boat-sensor-ring{stroke:#ffb000}
+:root[data-theme="boat"] .boat-sensor.red .boat-sensor-dot{fill:#ff4d4d}:root[data-theme="boat"] .boat-sensor.red .boat-sensor-ring{stroke:#ff4d4d;animation-duration:1.2s}
+:root[data-theme="boat"] .boat-sensor.blue .boat-sensor-dot{fill:#5fd4ff}:root[data-theme="boat"] .boat-sensor.blue .boat-sensor-ring{stroke:#5fd4ff}
+:root[data-theme="boat"] .boat-sensor.off .boat-sensor-dot{fill:#6b7a89}:root[data-theme="boat"] .boat-sensor.off .boat-sensor-ring{display:none}
+@media(prefers-reduced-motion:reduce){:root[data-theme="boat"] .boat-sensor-ring{animation:none;opacity:.5}}
+/* 02/10: the sensors' tooltip, over the panel (the legend under the boat is gone): the sensor, what it reads, the click */
+:root[data-theme="boat"] .boat-sensors{position:relative}
+:root[data-theme="boat"] .boat-sensor-hit{fill:transparent}
+:root[data-theme="boat"] .boat-sensor-tip{position:absolute;left:0;right:0;bottom:calc(100% + 8px);z-index:6;display:grid;gap:2px;
+  padding:9px 12px;border-radius:12px;background:#0a1a33;color:#cfe3f5;border:1px solid #2a5a8f;box-shadow:0 8px 24px #0006;
+  font:500 11.5px/1.4 var(--ui);pointer-events:none}
+:root[data-theme="boat"] .boat-sensor-tip strong{color:#fff;font-weight:700}
+:root[data-theme="boat"] .boat-sensor-tip.green strong{color:#3ddc84}
+:root[data-theme="boat"] .boat-sensor-tip.amber strong{color:#ffb000}
+:root[data-theme="boat"] .boat-sensor-tip.red strong{color:#ff6b6b}
+:root[data-theme="boat"] .boat-sensor-tip.blue strong{color:#5fd4ff}
+:root[data-theme="boat"] .boat-sensor-tip .boat-sensor-go{color:#8fb0cf}
