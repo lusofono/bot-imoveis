@@ -7,7 +7,7 @@ before the owner approves them, with only the conversation and the property's kn
 network or clock.
 """
 import hashlib
-from .ai import extract_json, now_line
+from .ai import extract_json, now_line, turn_text
 
 CRITERIA = {
     "factos": "Factos: não inventou nada que não esteja no conhecimento do imóvel ou na conversa",
@@ -49,7 +49,7 @@ def evaluation_prompt(instructions, items, hidden=True, now=None):
             parts.append("A verdade sobre este cliente (ficha escondida, que quem respondeu não conhece): "
                          + str(item["profile"])[:1500])
         parts.append("Conversa antes da resposta, a mais antiga primeiro:")
-        parts += [f"[{'Cliente' if turn.get('who') == 'cliente' else 'Nós'}] {str(turn.get('text') or '')[:3000]}"
+        parts += [f"[{'Cliente' if turn.get('who') == 'cliente' else 'Nós'}] {turn_text(turn, '', 3000)}"
                   for turn in item.get("turns") or []] or ["(nenhuma)"]
         parts += ["Resposta a avaliar:", str(item.get("reply") or "")[:6000]]
     parts += ["---", "", "Responde só com JSON:",

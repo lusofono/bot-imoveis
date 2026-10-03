@@ -644,6 +644,17 @@ def web_app(folder, token):
                                                                        body.get("name")), {"state": state(), "settings": service.settings()})[1]),
                 "owners/write": ("POST", lambda body: {**service.write_to_owner(body.get("property_ref") or None, body.get("subject"),
                                                                                 body.get("owner")), "state": state()}),
+                # 03/10: «Reconstruir a partir do Gmail»: read N days back twice, propose what is missing, apply what is ticked
+                "rebuild/scan": ("POST", lambda body: service.rebuild_scan(body.get("property_ref") or None,
+                                                                         int(body["days"]) if str(body.get("days", "")).isdigit() else body.get("days"))),
+                "rebuild/apply": ("POST", lambda body: {"done": service.rebuild_apply(body.get("property_ref") or None, body.get("ids") or []),
+                                                        "state": state(), "settings": service.settings()}),
+                # 03/10: the customer's context (notes, our WhatsApp and SMS, their calls)
+                "context/add": ("POST", lambda body: (service.add_context(body.get("property_ref") or None, body.get("email"),
+                                                                          body.get("text"), str(body.get("source") or "manual")),
+                                                      {"state": state()})[1]),
+                "context/delete": ("POST", lambda body: (service.delete_context(body.get("property_ref") or None, body.get("email"),
+                                                                                body.get("id") or None), {"state": state()})[1]),
                 # 03/10: the owners' list, and the inbox of the owners with no property
                 "owners/add": ("POST", lambda body: (service.add_owner(body.get("email"), body.get("name")), {"state": state()})[1]),
                 "owners/drafts": ("POST", lambda body: (service.caixa_drafts(body.get("replies")), {"state": state()})[1]),

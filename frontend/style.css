@@ -1133,3 +1133,15 @@ body:not(.admin) .prompt-view{display:none!important}
 .owner-refs{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:8px 0}
 .owner-refs .tag .link{padding:0 2px;min-height:0}
 .owner-new{margin-top:10px}
+/* 03/10: the customer's context, in the card's actions: one line per entry, the newest first, ✕ to take it out */
+.context-box{margin:4px 0 10px}
+.context-box summary{margin:0}
+.context-list{list-style:none;margin:6px 0;padding:0;display:grid;gap:4px}
+.context-entry{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:baseline;font-size:12.5px}
+.context-entry.call span:nth-child(2){color:var(--muted)}
+.context-entry .link{padding:0;min-height:0}
+.context-add input{flex:1 1 160px;width:auto}
+/* 03/10: «Reconstruir a partir do Gmail» on a property's page: the proposals, one per line, each ticked to go in */
+.rebuild-panel{margin:16px 0}
+.rebuild-panel summary{cursor:pointer}
+.rebuild-entry{display:flex;align-items:baseline;gap:6px;padding:4px 0;font-size:13px}

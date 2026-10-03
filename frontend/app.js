@@ -1873,13 +1873,19 @@ function card(email, index, list) {
   const whatsapp = writable && el('button', {type: 'button', class: 'whatsapp-action', disabled: !phone,
     title: phone ? 'Abre o WhatsApp do Mac na conversa deste cliente, com o rascunho escrito. Envias tu, lá.'
       : 'Sem telemóvel deste cliente: não há número para o WhatsApp.',
-    onclick: () => { location.href = `whatsapp://send?phone=${phone}&text=${encodeURIComponent(whatsappText(draft.value))}`; }},
+    onclick: () => run(async () => {  // 03/10: noted in the customer's context, then the app opens
+      if (address) state = (await call('api/context/add', {property_ref: queueRef(), email: address, source: 'whatsapp'})).state;
+      location.href = `whatsapp://send?phone=${phone}&text=${encodeURIComponent(whatsappText(draft.value))}`;
+    })},
     buttonIcon('chat'), 'Enviar por WhatsApp');
   // 27/09: the same by SMS or iMessage: opens the Mac's Messages on this number with the draft written in; sent there
   const sms = writable && el('button', {type: 'button', class: 'sms-action', disabled: !phone,
     title: phone ? 'Abre as Mensagens do Mac (SMS ou iMessage) para este número, com o rascunho escrito. Envias tu, lá.'
       : 'Sem telemóvel deste cliente: não há número para a mensagem.',
-    onclick: () => { location.href = `sms:+${phone}&body=${encodeURIComponent(whatsappText(draft.value))}`; }},
+    onclick: () => run(async () => {
+      if (address) state = (await call('api/context/add', {property_ref: queueRef(), email: address, source: 'sms'})).state;
+      location.href = `sms:+${phone}&body=${encodeURIComponent(whatsappText(draft.value))}`;
+    })},
     buttonIcon('phone'), 'Enviar por SMS / iMessage');
   refreshDraftActions();
   // 27/09: a reply from the API for this email alone (the same call as «Gerar respostas», with its extra instructions),
@@ -1996,6 +2002,7 @@ function card(email, index, list) {
         : email.conclusive_reply ? el('span', {class: 'tag warn', title: 'A resposta é conclusiva e a próxima é o fecho: '
           + 'decide agora (lista cinzenta, propor visita ou deixar seguir).'}, email.interaction + '.ª interação · conclusiva')
         : email.interaction && el('span', {class: 'tag'}, email.interaction + '.ª interação'),
+      contactCounts(email.contact_counts),
       email.merged?.length > 1 && el('span', {class: 'tag visit', title: 'Vários emails deste cliente juntos: uma só resposta responde a todos.'},
         email.merged.length + ' mensagens'),
       el('span', {class: 'tag' + (email.reply_status === 'draft' ? ' draft' : '')}, STATUS[email.reply_status] || email.reply_status || ''),
@@ -2043,6 +2050,7 @@ function card(email, index, list) {
       renderState(); toast('Consentimento confirmado e registado em contactos.csv.');
     }, event.currentTarget)}, 'Confirmar consentimento (RGPD)'),
     generateOne && !firstEmail && quickReplies(noteField),
+    address && contextBox(email, address),
     noteField,
     generateOne && el('div', {class: 'email-generate'},
       generateOne),
@@ -2074,6 +2082,36 @@ const QUICK_REPLIES = [
   ['Propor falar por telefone ou WhatsApp', 'Propõe falar por telefone ou WhatsApp e pergunta qual é a melhor hora para o contactarmos.'],
   ['Enviar a morada e o link do Google Maps', 'Envia a morada completa do imóvel e o link do Google Maps, tal como estão na base de '
     + 'conhecimento; se lá não estiverem, não os inventes e diz em nota que faltam.']];
+// 03/10: the customer's context — the owner's notes, our WhatsApp and SMS, their calls — read by the AI only in this
+// customer's replies; each entry goes with ✕ (a call is only hidden from it), and «Apagar tudo» clears it
+function contactCounts(counts) {
+  if (!counts || !(counts.calls || counts.whatsapp || counts.sms)) return null;
+  return el('span', {class: 'tag', title: 'Chamadas recebidas do portal e WhatsApp/SMS abertos pela ARIA'},
+    [counts.calls && `📞 ${counts.calls} (${counts.answered} atendida${counts.answered === 1 ? '' : 's'})`,
+     counts.whatsapp && `WhatsApp ${counts.whatsapp}`, counts.sms && `SMS ${counts.sms}`].filter(Boolean).join(' · '));
+}
+function contextBox(email, address) {
+  const entries = email.context || [];
+  const input = el('input', {placeholder: 'Ex.: prefere ser contactado depois das 18h', 'aria-label': 'Contexto deste cliente'});
+  const stamp = at => at ? `${at.slice(8, 10)}/${at.slice(5, 7)} ${at.slice(11, 16)}` : '';
+  const change = (path, body, button) => run(async () => { state = (await call(path, {property_ref: queueRef(), email: address, ...body})).state; renderState(); }, button);
+  return el('details', {class: 'context-box', open: entries.length > 0},
+    el('summary', {class: 'eyebrow'}, 'CONTEXTO DESTE CLIENTE' + (entries.length ? ` · ${entries.length}` : '')),
+    el('p', {class: 'muted small'}, 'Só entra nas respostas a este cliente.'),
+    entries.length ? el('ul', {class: 'context-list'}, entries.slice().reverse().map(entry => el('li', {class: 'context-entry ' + entry.source},
+      el('span', {class: 'muted small'}, stamp(entry.at)), el('span', {}, entry.text),
+      el('button', {type: 'button', class: 'link', title: entry.source === 'call' ? 'Tirar esta chamada do contexto' : 'Apagar',
+        onclick: event => change('api/context/delete', {id: entry.id}, event.currentTarget)}, '✕'))))
+      : null,
+    el('div', {class: 'row context-add'}, input, el('button', {type: 'button', onclick: event => {
+      if (!input.value.trim()) return;
+      change('api/context/add', {text: input.value.trim(), source: 'manual'}, event.currentTarget);
+    }}, 'Juntar')),
+    entries.length > 1 && el('button', {type: 'button', class: 'link', onclick: event => {
+      if (confirm('Apagar todo o contexto deste cliente?')) change('api/context/delete', {}, event.currentTarget);
+    }}, 'Apagar tudo'));
+}
+
 function quickReplies(noteField) {
   // 27/09: the last one, a little apart and only with one or more of the others on, is a mode, not a line: the reply is
   // then written with the chosen points only, leaving aside the interaction's prompt and what came before.
@@ -3459,6 +3497,7 @@ function propertyCard(property) {
       surveyReport(property),
       activeClientsList(property),
       callsList(property),
+      rebuildPanel(property),
       analysisPanel(property),
       visitsPanel(property)));
 }
@@ -3581,6 +3620,47 @@ function callsList(property) {
         }, event.currentTarget)}, 'Procurar')));
   };
   run(async () => draw(await call('api/calls', {})));
+  return box;
+}
+
+// 03/10: «Reconstruir a partir do Gmail»: after a loss, or to start from months of replies written by hand. Reads the
+// Gmail twice N days back, then lists what is missing — visits, surveys, the short list, the queue tidied — each ticked
+// to go in; nothing is sent.
+function rebuildPanel(property) {
+  const box = el('details', {class: 'rebuild-panel'}, el('summary', {class: 'eyebrow'}, 'RECONSTRUIR A PARTIR DO GMAIL'));
+  const days = el('select', {'aria-label': 'Quantos dias para trás'},
+    [30, 60, 90, 180].map(value => el('option', {value, selected: value === 60}, `últimos ${value} dias`)));
+  const list = el('div', {class: 'rebuild-list'});
+  const label = entry => entry.kind === 'visit' ? `Visita de ${entry.name} a ${entry.at.slice(8, 10)}/${entry.at.slice(5, 7)} às ${entry.at.slice(11, 16)}`
+      + (entry.at.slice(0, 10) < new Date().toLocaleDateString('sv-SE') ? ' (já passou: fica por registar)' : '')
+    : entry.kind === 'survey' ? `Inquérito de ${entry.name}: imóvel ${entry.survey?.imovel ?? '—'}, consultor ${entry.survey?.consultor ?? '—'}`
+    : entry.kind === 'shortlist' ? `${entry.name} na short list (${entry.status === 'chosen' ? 'escolhido' : entry.status === 'suplente' ? 'suplente' : 'short list'})`
+    : `Tirar da fila ${entry.count} email(s) já respondidos no Gmail`;
+  const source = entry => entry.source === 'marca' ? 'pela marca do email' : entry.source === 'ia' ? 'lido pela IA'
+    : entry.source ? entry.source : '';
+  const show = result => {
+    const boxes = result.proposals.map(entry => ({entry, box: el('input', {type: 'checkbox', checked: true})}));
+    list.replaceChildren(
+      result.ai_error ? el('p', {class: 'alert warn'}, 'A leitura das visitas pela IA falhou: ' + result.ai_error) : null,
+      boxes.length ? el('div', {}, boxes.map(({entry, box: tick}) => el('label', {class: 'check rebuild-entry'}, tick, ' ', label(entry),
+        source(entry) && el('span', {class: 'muted small'}, ' · ' + source(entry)))),
+        el('div', {class: 'actions'}, el('button', {class: 'primary', onclick: event => run(async () => {
+          const ids = boxes.filter(item => item.box.checked).map(item => item.entry.id);
+          const done = await call('api/rebuild/apply', {property_ref: property.reference, ids});
+          state = done.state; settings = done.settings; renderSettings(); renderState();
+          list.replaceChildren(el('p', {class: 'muted small'}, 'Feito: ' + (Object.entries(done.done).map(([kind, count]) =>
+            `${count} ${{visit: 'visita(s)', survey: 'inquérito(s)', shortlist: 'na short list', tidy: 'fila arrumada'}[kind] || kind}`).join(', ') || 'nada') + '.'));
+          toast('Reconstrução aplicada. Nada foi enviado.');
+        }, event.currentTarget)}, 'Adicionar os marcados')))
+        : el('p', {class: 'muted small'}, 'Nada em falta: o que o Gmail tem já está na ARIA.'));
+  };
+  box.append(el('p', {class: 'step'}, 'Lê o Gmail duas vezes, para trás, e mostra o que falta na ARIA: visitas, inquéritos, short list '
+      + 'e emails já respondidos. Escolhes o que entra; nada é enviado. Serve depois de perder dados, ou para começar a partir '
+      + 'de meses de respostas escritas à mão. Pode demorar alguns minutos.'),
+    el('div', {class: 'row'}, days, el('button', {onclick: event => run(async () => {
+      show(await call('api/rebuild/scan', {property_ref: property.reference, days: Number(days.value)}));
+      state = await call('api/state'); renderState();
+    }, event.currentTarget)}, 'Procurar')), list);
   return box;
 }
 

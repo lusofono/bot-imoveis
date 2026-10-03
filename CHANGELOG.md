@@ -15,6 +15,33 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.109.0 — 03/10/2026
+
+- **«Reconstruir a partir do Gmail»** (Imóveis, na página de cada imóvel): lê o Gmail duas vezes, 30 a 180 dias para trás
+  — a primeira refaz as conversas a partir dos Enviados, a segunda junta-lhes as respostas dos clientes — e **propõe** o
+  que falta: visitas (pela marca escondida dos nossos emails ou lidas pela IA; as que já passaram ficam por registar),
+  inquéritos (as respostas aos agradecimentos pós-visita), a short list (pela marca, ou por termos pedido identificação
+  ou IRS) e arrumar a fila dos emails já respondidos no Gmail. Marca-se o que entra; nada é enviado. Serve depois de
+  perder dados, ou para começar a partir de meses de respostas escritas à mão.
+- **A leitura guarda a marca dos nossos emails** encontrados nos Enviados (o n.º da interação, o tipo, a visita, a short
+  list) e refaz por ela o ponto da conversa.
+
+## α.108.0 — 03/10/2026
+
+- **RGPD: o que a IA recebe de cada cliente passa a ir minimizado.** Só o primeiro nome (a saudação «Caro»/«Cara»
+  precisa dele); nunca o apelido — tirado de todos os nomes por que o cliente é conhecido, também nas assinaturas e nas
+  nossas mensagens —, nem emails ou números de telefone, mesmo os que o cliente escreva nas mensagens (trocados por
+  «[email]» e «[telefone]»). Vale para as respostas, as rondas, a agenda, as fichas, a análise das visitas, o revisor e
+  as respostas aos proprietários. Datas, valores e o resto do texto ficam como estão.
+
+## α.107.0 — 03/10/2026
+
+- **O contexto de cada cliente**, no cartão (Comunicações): as tuas notas soltas («prefere ser contactado depois das
+  18h»), os WhatsApp e SMS abertos pela ARIA (registados ao carregar no botão) e as chamadas dele (pelos avisos do
+  portal e pelo telefone). Entra só no prompt dos emails desse cliente, como «Contexto deste cliente, fora dos emails».
+  Cada linha sai com ✕ (uma chamada só deixa de contar para o contexto) e «Apagar tudo» limpa-o. No topo do cartão, a
+  contagem: «📞 2 (1 atendida) · WhatsApp 1».
+
 ## α.106.0 — 03/10/2026
 
 - **Proprietários por proprietário:** em cima escolhe-se o proprietário (da lista de proprietários, com ou sem imóveis),

@@ -23,7 +23,8 @@ UNAVAILABLE = {"api/consent/confirm", "api/consent/request", "api/paste", "api/p
                "api/notices/update",  # 02/10: the notice board is only read in the demo
                "api/contact/farewell", "api/owners/generate", "api/owners/set", "api/owners/write",
                "api/backup", "api/backup/folder", "api/backup/now", "api/backup/choose", "api/portal", "api/portal/save", "api/calls", "api/calls/scan", "api/owners/add", "api/owners/drafts",
-               "api/owners/preview", "api/owners/send", "api/owners/dismiss"}
+               "api/owners/preview", "api/owners/send", "api/owners/dismiss",
+               "api/context/add", "api/context/delete", "api/rebuild/scan", "api/rebuild/apply"}
 
 
 @pytest.fixture(scope="module")

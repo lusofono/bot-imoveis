@@ -890,6 +890,7 @@ class MailService:
                 "interaction": interaction if email else None, "warnings": warnings, "phase": phase, "phone_only": phone_only,
                 "closing_reply": closing_reply, "conclusive_reply": later and interaction == CONCLUSIVE_AT and not closing_reply,
                 "farewell": bool(item.get("farewell")),
+                "known_name": conversation.get("name") or "",  # 03/10: for taking their surnames out of the AI's texts
                 # 03/10: the short list's documents: asked yet, what is still missing, and whether there is a guarantor
                 "docs_requested": bool(selection.get("docs_requested_at")), "fiador": bool(selection.get("fiador")),
                 "docs_missing": documents_summary(selection)["missing"] if phase == "shortlist" else [],
@@ -1248,6 +1249,10 @@ class MailService:
         it. Counted like a send, with the customer's wait.
         """
         recorded = Counter()
+        try:  # 03/10: the hidden mark of our own emails found in Sent (a rebuild): read back with the Mac's key
+            mark_key = tag_key(self.folder, self.config()["account"])
+        except Exception:
+            mark_key = None
         ours = {sent for data in queues.values()
                 for conversation in [*data["conversations"].values(), *data.get("owner_conversations", {}).values()]
                 for sent in conversation.get("sent_message_ids", [])}
@@ -1311,6 +1316,13 @@ class MailService:
                              if (item.get("recipient") or {}).get("name") or (item.get("customer") or {}).get("name")), "")
                 if name and not conversation.get("name"):
                     conversation["name"] = name
+            fields = mark.read_header(message.get("aria"), mark_key) if message.get("aria") and mark_key else None
+            if fields:  # 03/10: what our email was, as its mark says (our nth email, its kind, a visit, the short list)
+                marks = conversation.setdefault("marks", [])
+                if not any(entry.get("id") == key for entry in marks):
+                    marks.append({"id": key, "at": sent_at.astimezone(timezone.utc).isoformat(), **fields})
+                if str(fields.get("n") or "").isdigit():
+                    conversation["stage"] = max(conversation.get("stage", 0), int(fields["n"]))
             conversation.setdefault("sent_message_ids", []).append(key)
             if thread and thread not in conversation.setdefault("thread_ids", []):
                 conversation["thread_ids"].append(thread)
@@ -2203,8 +2215,94 @@ class MailService:
 
     def property_view(self, ref, profile, data, voice, added=None):
         """A property as the page shows it: its queue (view) and where each of its customers stands (pipeline)."""
-        return {**self.view(ref, profile, data, voice, added, self.open_visits(ref, voice)),
+        view = {**self.view(ref, profile, data, voice, added, self.open_visits(ref, voice)),
                 "pipeline": self.pipeline(ref, data, voice)}
+        # 03/10: each customer's context (the owner's notes, our WhatsApp and SMS, their calls) and the counts, on the card
+        calls = self.calls_by_customer(ref) if ref else {}
+        for email in view["emails"]:
+            address = recipient_email(email)
+            if not address or email.get("owner"):
+                continue
+            context = self.context_of(data, address, calls.get(address, []))
+            email["context"] = context
+            email["contact_counts"] = {"calls": sum(1 for entry in context if entry["source"] == "call"),
+                                       "answered": sum(1 for entry in context if entry.get("answered")),
+                                       "whatsapp": sum(1 for entry in context if entry["source"] == "whatsapp"),
+                                       "sms": sum(1 for entry in context if entry["source"] == "sms")}
+        return view
+
+    # ===== The customer's context (03/10): what happened outside the emails and what only the agency knows — the
+    # owner's notes, our WhatsApp and SMS (opened from the page), their calls (the portal's notices, by the phone). It
+    # goes in the prompt of that customer's emails only; each entry goes with one click (a call is hidden from it).
+
+    CONTEXT_SOURCES = ("manual", "whatsapp", "sms")
+
+    def calls_by_customer(self, ref):
+        """email → this property's calls tied to that customer by the phone (Contactos)."""
+        index = {}
+        for (email, row_ref), row in load_contacts(self.folder).items():
+            if row_ref == ref and row.get("telefone"):
+                index.setdefault(phone_key(row["telefone"]), set()).add(email)
+        found = {}
+        for call in load_calls(self.folder)["calls"]:
+            if call.get("property_ref") not in (ref, None):
+                continue
+            for email in index.get(phone_key(call.get("phone")), ()):
+                found.setdefault(email, []).append(call)
+        return found
+
+    @staticmethod
+    def context_of(data, email, calls):
+        """The customer's context as the page and the prompt see it, the oldest first; local times «AAAA-MM-DD HH:MM»."""
+        hidden = set((data.get("context_hidden") or {}).get(email) or [])
+        entries = [dict(entry) for entry in (data.get("customer_context") or {}).get(email) or []]
+        for call in calls:
+            if call["id"] in hidden:
+                continue
+            text = ("Ligou-nos — atendida" + (f" ({call['seconds']} s)" if call.get("seconds") else "")
+                    if call.get("answered") else "Ligou-nos — não atendida")
+            entries.append({"id": call["id"], "at": str(call.get("at") or "")[:16], "source": "call", "text": text,
+                            "answered": bool(call.get("answered"))})
+        return sorted(entries, key=lambda entry: str(entry.get("at") or ""))
+
+    def add_context(self, property_ref, email, text, source="manual"):
+        """One entry of a customer's context: a note of the owner's, or a WhatsApp or SMS we opened from the page."""
+        email = str(email or "").strip().casefold()
+        text = " ".join(str(text or "").split())
+        if source not in self.CONTEXT_SOURCES:
+            raise ValueError("Origem desconhecida.")
+        if source == "manual" and not 1 <= len(text) <= 500:
+            raise ValueError("Escreve o contexto numa ou duas frases (até 500 caracteres).")
+        if source != "manual":
+            text = f"Abrimos o {'WhatsApp' if source == 'whatsapp' else 'SMS'} para lhe escrever"
+        with locked(self.folder, wait=SHORT_WAIT):
+            ref = self.pick(self.profiles(), property_ref)
+            data = self.load(ref)
+            entries = data.setdefault("customer_context", {}).setdefault(email, [])
+            entries.append({"id": secrets.token_hex(5), "at": datetime.now().strftime("%Y-%m-%d %H:%M"), "source": source,
+                            "text": text})
+            del entries[:-50]
+            self.save(data, ref)
+        self.log("context_added", reference=ref, source=source)
+
+    def delete_context(self, property_ref, email, entry_id=None):
+        """Takes an entry out of a customer's context (a call is hidden from it); without entry_id, all of it."""
+        email = str(email or "").strip().casefold()
+        with locked(self.folder, wait=SHORT_WAIT):
+            ref = self.pick(self.profiles(), property_ref)
+            data = self.load(ref)
+            entries = (data.get("customer_context") or {}).get(email) or []
+            calls = [call["id"] for call in self.calls_by_customer(ref).get(email, [])]
+            hidden = data.setdefault("context_hidden", {}).setdefault(email, [])
+            if entry_id is None:
+                data.setdefault("customer_context", {})[email] = []
+                hidden.extend(call for call in calls if call not in hidden)
+            elif any(entry["id"] == entry_id for entry in entries):
+                data["customer_context"][email] = [entry for entry in entries if entry["id"] != entry_id]
+            elif entry_id in calls and entry_id not in hidden:
+                hidden.append(entry_id)
+            self.save(data, ref)
+        self.log("context_deleted", reference=ref)
 
     def pipeline(self, ref, data, voice=None, moment=None):
         """27/09: each customer of a property in one column, the furthest they got — for the table above the emails.
@@ -3165,6 +3263,134 @@ class MailService:
                 self.log("agenda_synced", reference=ref, **{k: v for k, v in result.items() if k != "property_ref"})
                 results.append({**result, "fuel": self.api_fuel(ref)})
             return {"properties": results}
+
+    # ===== «Reconstruir a partir do Gmail» (03/10): after a loss, or to start from months of replies written by hand. The
+    # Gmail is read twice N days back (the first read rebuilds our conversations from Sent; the second takes the
+    # customers' replies to them), then what is missing is PROPOSED, never applied: visits (from our emails' mark, or
+    # read by the AI), surveys (the answers to our after-visit thanks), the short list (from the mark, or because we asked
+    # for identification or the IRS — only ever asked of the short list) and the queue tidied of what was already
+    # answered. The owner ticks what goes in; nothing is sent.
+
+    SHORTLIST_ASKED = re.compile(r"\b(?:IRS|recibos? de vencimento|cart[ãa]o de cidad[ãa]o|documentos? de identifica[çc][ãa]o"
+                                 r"|comprovativos? de rendimentos?)\b", re.I)
+
+    def agenda_proposals(self, ref, days_back):
+        """The visits the AI reads in the conversations (confirmed ones, past or to come, N days back), as proposals."""
+        cfg = self.config()
+        if not has_openai_api_key(self.folder, cfg["account"]) or self.api_fuel(ref)["empty"]:
+            return []
+        profiles = self.profiles()
+        data = self.load(ref)
+        conversations = data.get("conversations", {})
+        people = [customer for customer in self.candidates(ref, data) if customer["state"] != "nao_quer"]
+        ids = {f"c{number}": customer["email"] for number, customer in enumerate(people, 1)}
+        if not ids:
+            return []
+        today = date.today().isoformat()
+        since = (date.today() - timedelta(days=days_back)).isoformat()
+        model = self.model(cfg)
+        answer, usage = complete(openai_api_key(self.folder, cfg["account"]), model, agenda_prompt(profiles[ref], [
+            (key, (conversations.get(email) or {}).get("name"), (conversations.get(email) or {}).get("history") or [], None)
+            for key, email in ids.items()], today, since))
+        self.log("openai_usage", model=model, **usage, reference=ref, purpose="rebuild", cost_usd=round(estimate_cost_usd(
+            model, **{k: usage[k] for k in ("prompt_tokens", "completion_tokens")}), 6))
+        return [{"kind": "visit", "email": ids[key], "at": found["at"], "source": "ia", "evidence": found["evidence"]}
+                for key, found in parse_agenda(answer, set(ids)).items()
+                if found["state"] == "confirmada" and found["at"] and found["at"][:10] >= since]
+
+    def rebuild_scan(self, property_ref, days):
+        """Reads the Gmail twice N days back and proposes what is missing (see above); kept until applied."""
+        if isinstance(days, bool) or not isinstance(days, int) or not 1 <= days <= 365:
+            raise ValueError("Indica quantos dias para trás: de 1 a 365.")
+        ref = self.pick(self.profiles(), property_ref)
+        if not ref:
+            raise ValueError("Escolhe um imóvel.")
+        self.read(days)
+        self.read(days)  # the customers' replies to the conversations the first read rebuilt
+        try:
+            from_ai = self.agenda_proposals(ref, days)
+        except Exception as exc:  # the rest is still proposed
+            from_ai, ai_error = [], str(exc)
+        else:
+            ai_error = None
+        with locked(self.folder, wait=SHORT_WAIT):
+            data = self.load(ref)
+            conversations = data.get("conversations", {})
+            slots = load_visits(self.folder, ref)["slots"]
+            proposals, seen = [], set()
+
+            def add(entry):
+                key = (entry["kind"], entry["email"], entry.get("at") or entry.get("status") or "")
+                if key not in seen:
+                    seen.add(key)
+                    name = (conversations.get(entry["email"]) or {}).get("name") or entry["email"]
+                    proposals.append({"id": secrets.token_hex(4), "name": (name.split() or [name])[0], **entry})
+
+            booked = {(slot["customer"], slot["at"]) for slot in slots}
+            for email, talk in conversations.items():
+                for found in talk.get("marks") or []:
+                    if found.get("vis") and found.get("k") in ("lead", "follow_up", "visit_proposal", "farewell"):
+                        at = found["vis"].replace("T", " ")[:16]
+                        if (email, at) not in booked:
+                            add({"kind": "visit", "email": email, "at": at, "source": "marca"})
+                    if found.get("k") == "docs_request" and not talk.get("selection"):
+                        add({"kind": "shortlist", "email": email, "status": found.get("sel") or "shortlist", "source": "marca",
+                             "at": found.get("at")})
+                    if found.get("k") == "visit_thanks" and not talk.get("visit_survey"):
+                        after = [turn for turn in talk.get("history") or []
+                                 if turn.get("who") == "cliente" and str(turn.get("ts") or "") > str(found.get("at") or "")]
+                        survey = next((parse_survey(turn.get("text")) for turn in after if parse_survey(turn.get("text"))), None)
+                        if survey:
+                            add({"kind": "survey", "email": email, "survey": survey, "visit": found.get("vis"),
+                                 "at": found.get("at"), "source": "marca"})
+                if not talk.get("selection") and any(turn.get("who") == "nos" and self.SHORTLIST_ASKED.search(turn.get("text") or "")
+                                                     for turn in talk.get("history") or []):
+                    add({"kind": "shortlist", "email": email, "status": "shortlist", "source": "pedido de documentos"})
+            for entry in from_ai:
+                at = entry["at"][:16]
+                if (entry["email"], at) not in booked and entry["email"] in conversations:
+                    add({**entry, "at": at})
+            # the queue tidied: what was already answered in Gmail, with nothing newer from the customer
+            tidy = [item["id"] for item in data["emails"] if item.get("answered_directly") and item.get("kind") in ("lead", "follow_up")]
+            if tidy:
+                proposals.append({"id": "arrumar", "kind": "tidy", "email": "", "name": "", "ids": tidy, "count": len(tidy)})
+            data["rebuild"] = {"at": now(), "days": days, "proposals": proposals}
+            self.save(data, ref)
+        self.log("rebuild_scanned", reference=ref, days=days, proposals=len(proposals))
+        return {"property_ref": ref, "proposals": proposals, "ai_error": ai_error}
+
+    def rebuild_apply(self, property_ref, ids):
+        """Applies the proposals the owner ticked. Nothing is sent: past visits stay «por registar»."""
+        with locked(self.folder, wait=SHORT_WAIT):
+            ref = self.pick(self.profiles(), property_ref)
+            data = self.load(ref)
+            chosen = [entry for entry in (data.get("rebuild") or {}).get("proposals") or [] if entry["id"] in set(ids or [])]
+            agenda = load_visits(self.folder, ref)
+            done = Counter()
+            for entry in chosen:
+                talk = data.get("conversations", {}).get(entry["email"]) or {}
+                if entry["kind"] == "visit" and not any(slot["customer"] == entry["email"] and slot["at"] == entry["at"]
+                                                        for slot in agenda["slots"]):
+                    agenda["slots"].append({"at": entry["at"], "customer": entry["email"], "name": talk.get("name") or "",
+                                            "source": "reconstrucao", "booked_at": now()})
+                elif entry["kind"] == "shortlist" and talk and not talk.get("selection"):
+                    talk["selection"] = {"status": entry.get("status") or "shortlist", "at": now(),
+                                         "docs_requested_at": entry.get("at") or now()}
+                elif entry["kind"] == "survey" and talk and not talk.get("visit_survey"):
+                    talk["visit_survey"] = {**entry["survey"], "at": entry.get("at") or now()}
+                    talk.setdefault("visit_check", {"attended": True, "checked_at": now(), "thanks_sent_at": entry.get("at")})
+                elif entry["kind"] == "tidy":
+                    gone = set(entry["ids"])
+                    data["replied_message_ids"].extend(item["id"] for item in data["emails"] if item["id"] in gone)
+                    data["emails"] = [item for item in data["emails"] if item["id"] not in gone]
+                else:
+                    continue
+                done[entry["kind"]] += 1
+            data.pop("rebuild", None)
+            save_visits(self.folder, ref, agenda)
+            self.save(data, ref)
+        self.log("rebuild_applied", reference=ref, **done)
+        return dict(done)
 
     def propose_visits(self, property_ref, day, start, end, emails, note="", common=False):
         """The owner's visit window, and one draft per chosen customer, in the customer's own conversation.
