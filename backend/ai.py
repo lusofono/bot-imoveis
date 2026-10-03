@@ -879,7 +879,7 @@ def parse_listing(text):
     return clean_property({key: data.get(key) for key in LISTING_FIELDS})
 
 
-def owner_prompt(profile, voice, owner_knowledge, report, items, now=None, extra=""):
+def owner_prompt(profile, voice, owner_knowledge, report, items, now=None, extra="", own_knowledge=()):
     """02/10: the replies to a property's owner. items: the owner's emails as the view has them (with "history")."""
     style = voice.get("style", {})
     prop = profile.get("property", {})
@@ -894,6 +894,10 @@ def owner_prompt(profile, voice, owner_knowledge, report, items, now=None, extra
     if owner_knowledge:
         parts += ["", "Know-how da agência para falar com proprietários (vale sobre a regra geral acima):"]
         for part in owner_knowledge:
+            parts += [f"[{part['file']}]", part["text"]]
+    if own_knowledge:  # 02/10: what is known of this owner alone (only in the replies to them)
+        parts += ["", "Conhecimento sobre este proprietário (vale sobre o da agência):"]
+        for part in own_knowledge:
             parts += [f"[{part['file']}]", part["text"]]
     if profile.get("_knowledge"):
         parts += ["", "Conhecimento do imóvel (factos):"]

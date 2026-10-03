@@ -618,6 +618,10 @@ def web_app(folder, token):
                                                         **service.contacts()}), "contacts/ignored": ("POST", contacts_ignored),
                 "fuel/fill": ("POST", fuel_fill),
                 "digest": ("GET", lambda body: service.digest_view()), "todo": ("GET", lambda body: service.todo()),
+                # 02/10: the portal's call notices (Contactos), and a search N days back
+                "calls": ("POST", lambda body: service.calls_view()),
+                "calls/scan": ("POST", lambda body: service.scan_calls(
+                    int(body["days"]) if str(body.get("days", "")).isdigit() else body.get("days"))),
                 # 02/10: the portal's senders and rules (Oficina)
                 "portal": ("POST", lambda body: (admin(), service.portal_view())[1]),
                 "portal/save": ("POST", lambda body: (admin(), service.save_portal(body.get("fields") or {},

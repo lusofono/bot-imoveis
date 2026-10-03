@@ -1119,3 +1119,12 @@ body:not(.admin) .prompt-view{display:none!important}
 /* 02/10: the portal's fields in the Oficina: two columns, the rules in a monospace face */
 .portal-fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:0 18px}
 .portal-fields .rule-input{font:12px/1.5 ui-monospace,SFMono-Regular,monospace}
+/* 02/10: the portal's calls on a property's page: one line per call, the missed ones marked */
+.calls-list{margin:16px 0}
+.call-row{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}
+.call-row .call-when{font-variant-numeric:tabular-nums;color:var(--muted);min-width:82px}
+.call-row .call-actions{display:flex;gap:12px;margin-left:auto}
+.call-row .call-actions .link{font-size:12px;text-decoration:none}
+.calls-scan{margin-top:10px;gap:8px}
+.calls-scan .days-input{flex:0 0 76px;width:76px}
+.calls-loose summary{margin-top:6px}

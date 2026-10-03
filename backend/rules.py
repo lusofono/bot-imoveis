@@ -37,12 +37,25 @@ def apply_portal(changes=None):
     CALL = {key: re.compile(PORTAL[key], re.I | re.M) for key in PORTAL if key.startswith(("chamada_", "assunto_chamada"))}
 
 
+def call_notice(item):
+    """02/10: a portal's call notice, told by its headers alone (sender and subject), before its text is fetched."""
+    senders = {address.casefold() for address in addresses(item.get("from") or [])}
+    return (PORTAL["remetente_chamadas"].casefold() in senders
+            and bool(CALL["assunto_chamada"].search(item.get("subject") or "")))
+
+
+def phone_key(value):
+    """02/10: a phone as digits to compare: a Portuguese one without its 351 (or 00351), any other with its country code."""
+    digits = re.sub(r"\D", "", str(value or ""))
+    digits = digits[2:] if digits.startswith("00") else digits
+    return digits[3:] if len(digits) == 12 and digits.startswith("351") else digits
+
+
 def parse_call(item):
     """02/10: a portal's call notice («Chamada atendida / não respondida de um interessado…»): who called (the phone,
     digits only), when (the call's own time, from the text: the email can come days later), whether it was answered,
     how long, and the listing and reference when the notice has them. None for any other email."""
-    senders = {address.casefold() for address in addresses(item.get("from") or [])}
-    if PORTAL["remetente_chamadas"].casefold() not in senders or not CALL["assunto_chamada"].search(item.get("subject") or ""):
+    if not call_notice(item):
         return None
     body = str(item.get("body_text") or "")
     found = {key: CALL[key].search(body) for key in CALL if key != "assunto_chamada"}

@@ -93,3 +93,21 @@ def test_the_owner_is_set_in_the_owners_tab_and_written_to_first_with_a_subject_
     assert next(item for item in service.settings()["properties"] if item["reference"] == REF)["owner_email"] is None
     with pytest.raises(ValueError, match="ainda não tem o email do proprietário"):
         service.write_to_owner(REF)
+
+
+def test_the_owners_reply_in_a_customers_thread_leaves_the_customers_history(service):
+    # 02/10: the owner answered in a customer's Gmail thread before their email was set: it was read as the customer's
+    from test_merge import follow_up
+    read(service, [lead("1")])
+    draft_and_send(service, "1", "Olá, Ana.")
+    owners_words = {**follow_up("o1", 1, "Por mim, a entrada pode ser quando quiserem.", service),
+                    "from": [{"name": "Rui Dono", "email": OWNER}]}
+    read(service, [owners_words])
+    [card] = service.pending()["properties"][0]["emails"]
+    assert card["blocked"] and card["kind"] == "follow_up"  # read as the customer's, in their thread
+    set_owner(service)
+    [card] = service.pending()["properties"][0]["emails"]
+    assert card["kind"] == "owner" and card["recipient"]["email"] == OWNER and not card["blocked"]
+    data = service.load(REF)
+    assert "quando quiserem" not in str(data["conversations"][CUSTOMER]["history"])  # no longer the customer's words
+    assert "quando quiserem" in str(data["owner_conversations"][OWNER]["history"])

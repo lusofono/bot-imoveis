@@ -34,12 +34,12 @@ from .rules import (DAY, DEALS, EMAIL, KNOWLEDGE_FILE, deal_of, RGPD_STATES, SUB
                     ficha_summary, merge_ficha,
                     survey_alerts, survey_report, check_slot, check_window, clean_property, consent_yes, free_times,
                     knowledge, photo_of, prepare, property_active, route, subject_of, QUOTE, addresses, has_token,
-                    apply_portal, parse_call)
+                    apply_portal, parse_call, call_notice, phone_key)
 from . import portals
 from .secrets import app_password, has_app_password, has_openai_api_key, openai_api_key, tag_key
 from . import mark
 from .store import (CONTACT_FIELDS, add_contacts, add_note, find_photo, knowledge_files, load_contacts, load_digest,
-                    load_notices, save_notices,
+                    load_notices, save_notices, load_calls, save_calls,
                     load_events, load_knowledge, load_panel, load_visits, locked, load_json, load_profiles, load_voice,
                     property_folder, read_photo, save_contacts, save_digest, save_json, save_panel, save_text,
                     save_visits, write_photo)
@@ -119,6 +119,11 @@ IGNORE_KINDS = ("black", "grey")
 BACKUP_PREFIX = "ARIA-copia-"
 DRIVE_NAMES = ("My Drive", "O meu disco", "Meu Drive", "A minha unidade")
 OWNER_FOLDER = "proprietarios"  # 02/10: the agency's know-how for owners, in data/proprietarios/knowledge/
+def owner_folder(folder, email):
+    """02/10: one owner's own knowledge, in data/proprietarios/donos/<their email, as a folder name>/knowledge/."""
+    return Path(folder) / OWNER_FOLDER / "donos" / re.sub(r"[^a-z0-9]+", "-", str(email or "").casefold()).strip("-")
+
+
 NOTICES_KEPT = 300  # 02/10: the notice board keeps the latest ones; the oldest (archived or not) fall off
 NOTICE_LEVELS = ("info", "warn", "bad")
 WAITING_NOTICE_HOURS = 72  # 02/10: a customer waiting this long for our answer is on the board (once a day)
@@ -658,6 +663,62 @@ class MailService:
                     f"{len(waiting)} cliente(s) de {ref} à espera da nossa resposta há 3 dias ou mais (o mais antigo, há "
                     f"{days} dias): " + ", ".join(names[:8]) + ("…" if len(names) > 8 else "") + ".", ref, "warn", "replies")
 
+    # ===== Calls (02/10): the portal's call notices («Chamada atendida / não respondida de um interessado»), read at
+    # «Ler emails» or by «Procurar chamadas» (N days back), kept in chamadas.json and tied to a customer by the phone.
+
+    def take_call(self, item, profiles):
+        """One call notice, once: its property by the reference it names (or its listing code), when it names one."""
+        found = parse_call(item)
+        if not found:
+            return False
+        key = message_key(item)
+        ref = found["ref"] if found["ref"] in profiles else next(
+            (other for other, profile in profiles.items() if found["listing"]
+             and str((profile.get("property") or {}).get("listing_id") or "") == found["listing"]), None)
+        with locked(self.folder, "calls", wait=SHORT_WAIT):
+            board = load_calls(self.folder)
+            if any(call["id"] == key for call in board["calls"]):
+                return False
+            board["calls"].append({"id": key, **found, "property_ref": ref, "notice_at": item.get("date") or now()})
+            save_calls(self.folder, board)
+        self.log("call_noted", reference=ref, answered=found["answered"])
+        return True
+
+    def scan_calls(self, days):
+        """«Procurar chamadas dos últimos N dias»: only the call notices, as far back as asked (a read goes back one day)."""
+        if isinstance(days, bool) or not isinstance(days, int) or not 1 <= days <= 365:
+            raise ValueError("Indica quantos dias para trás: de 1 a 365.")
+        cfg = self.config()
+        profiles = self.profiles()
+        known = {call["id"] for call in load_calls(self.folder)["calls"]}
+        messages, scanned, _ = read_messages(
+            cfg["account"], app_password(self.folder, cfg["account"]), "", (date.today() - timedelta(days=days)).isoformat(),
+            (datetime.now(timezone.utc).date() + timedelta(days=1)).isoformat(), mailbox=cfg.get("mailbox", "all"),
+            incoming_only=True, accept=lambda item: call_notice(item) and message_key(item) not in known)
+        added = sum(1 for item in messages if self.take_call(item, profiles))
+        self.log("calls_scanned", days=days, added=added)
+        return {**self.calls_view(), "added": added, "scanned": scanned}
+
+    def calls_view(self):
+        """Every call, newest first, with the customer it belongs to when the phone is known (Contactos: their row, a
+        lead's notice) — else «sem nome» — and the property: the one the notice names, else the customer's."""
+        profiles = self.profiles()
+        index = {}
+        for (email, ref), row in load_contacts(self.folder).items():
+            if row.get("telefone") and ref in profiles:
+                index.setdefault(phone_key(row["telefone"]), []).append((ref, email, row.get("nome") or ""))
+        shown = []
+        for call in sorted(load_calls(self.folder)["calls"], key=lambda call: call.get("at") or "", reverse=True):
+            matches = index.get(phone_key(call["phone"]), [])
+            mine = [match for match in matches if match[0] == call.get("property_ref")] or matches
+            who = mine[0] if mine else None
+            digits = phone_key(call["phone"])
+            international = "351" + digits if len(digits) == 9 else digits
+            shown.append({**call, "property_ref": call.get("property_ref") or (who[0] if who else None),
+                          "name": who[2] if who else "", "email": who[1] if who else "", "international": international,
+                          "phone_shown": (f"+351 {digits[:3]} {digits[3:6]} {digits[6:]}" if len(digits) == 9 else "+" + digits)})
+        return {"calls": shown}
+
     def notices(self):
         """The board as the page shows it: the ones not archived, newest first, and how many are unread."""
         board = load_notices(self.folder)
@@ -904,6 +965,7 @@ class MailService:
             known = {ref: {message_key(e) for e in data["emails"]} | {merged for e in data["emails"] for merged in e.get("merged_ids", [])}
                      | set(data["replied_message_ids"]) | set(data["dismissed_message_ids"]) for ref, data in queues.items()}
             seen = set().union(*known.values())
+            known_calls = {call["id"] for call in load_calls(self.folder)["calls"]}
 
             def before(item, since):
                 arrived = aware(item.get("date"))
@@ -915,6 +977,8 @@ class MailService:
                     return False
                 if not profiles:
                     return True
+                if call_notice(item):  # 02/10: the portal's call notices (no property reference in the subject)
+                    return message_key(item) not in known_calls
                 owner_ref = self.owner_route(item, owners)
                 if owner_ref:
                     return not before(item, starts[owner_ref])
@@ -955,6 +1019,9 @@ class MailService:
             self.reading.update(stage="save")
             added, ambiguous, contacts, received = dict.fromkeys(refs, 0), 0, [], {}
             for item in messages:
+                if profiles and call_notice(item):
+                    self.take_call(item, profiles)  # 02/10: into chamadas.json, never the queue
+                    continue
                 owner_ref = self.owner_route(item, owners) if profiles else None
                 if owner_ref:
                     key = message_key(item)
@@ -1475,9 +1542,27 @@ class MailService:
         email = email.casefold()
         moved = False
         for item in data["emails"]:
-            if ((item.get("recipient") or {}).get("email") or "").casefold() == email and item.get("kind") in ("lead", "follow_up"):
-                item["kind"] = "owner"
-                moved = True
+            senders = {address.casefold() for address in addresses(item.get("from") or [])}
+            if item.get("kind") not in ("lead", "follow_up") or not (recipient_email(item) == email or email in senders):
+                continue
+            message = (item.get("customer") or {}).get("message")
+            if email in senders and message:
+                # 02/10: sent by the owner in a customer's Gmail thread, it was read as that customer's (an «ambiguous
+                # conversation»): their words leave the customer's history, so the AI never reads them as the customer's
+                for holder in [*data.get("conversations", {}).values(), *(other for other in data["emails"] if other is not item)]:
+                    if holder.get("history"):
+                        holder["history"] = [turn for turn in holder["history"]
+                                             if not (turn.get("who") == "cliente" and turn.get("text") == message)]
+                talk = data.setdefault("owner_conversations", {}).setdefault(email, {"sent_message_ids": [], "thread_ids": []})
+                if not any(turn.get("text") == message for turn in talk.get("history") or []):
+                    self.append_history(talk, "cliente", message, contact_day(item), item.get("date"))
+            sender = next((entry for entry in item.get("from") or [] if str(entry.get("email") or "").casefold() == email), {})
+            name = (item.get("customer") or {}).get("name") or sender.get("name") or ""
+            item.update(kind="owner", recipient={"name": name, "email": email},
+                        customer={**(item.get("customer") or {}), "email": email, "name": name})
+            if str(item.get("blocked") or "").startswith("Conversa ambígua"):
+                item["blocked"] = None
+            moved = True
         if email in data.get("conversations", {}):
             talk = data["conversations"].pop(email)
             kept = data.setdefault("owner_conversations", {}).setdefault(email, {"sent_message_ids": [], "thread_ids": []})
@@ -1552,8 +1637,10 @@ class MailService:
             if not items:
                 raise ValueError("Escolhe pelo menos um email do proprietário.")
             report = self.owner_report_text(self.owner_report(ref, profiles[ref], data), date.today().isoformat())
+            owner = profiles[ref]["property"].get("owner_email")
             prompt = owner_prompt(profiles[ref], load_voice(self.folder), load_knowledge(self.folder / OWNER_FOLDER),
-                                  report, items, now, extra)
+                                  report, items, now, extra,
+                                  load_knowledge(owner_folder(self.folder, owner)) if owner else [])
             return ref, prompt, {"emails": items}
 
     def farewell(self, property_ref, item_id):
@@ -4048,21 +4135,29 @@ class MailService:
                     # agency's know-how in three — common, rentals only, sales only
                     "files": {"agency": files(self.folder), "property": files(base) if ref else [],
                               **{f"agency-{deal}": files(self.folder / deal) for deal in DEALS},
-                              "owners": files(self.folder / OWNER_FOLDER)}}  # 02/10: for talking to owners
+                              "owners": files(self.folder / OWNER_FOLDER),  # 02/10: for talking to owners
+                              # 02/10: this property's owner's own knowledge (only in the replies to them)
+                              "owner": files(owner_folder(self.folder, owner)) if (owner := ((profiles.get(ref) or {})
+                                                                                   .get("property") or {}).get("owner_email")) else []}}
 
     def save_knowledge(self, property_ref, file, text, scope="property"):
         """Writes one knowledge (RAG) file, whole. An empty text leaves the file empty, so it no longer counts."""
         file, text = str(file or "").strip(), str(text or "").replace("\r\n", "\n")
         if not KNOWLEDGE_FILE.fullmatch(file):
             raise ValueError("O nome do ficheiro só pode ter letras, algarismos, _ e -, e acabar em .md.")
-        if scope not in ("property", "agency", "owners", *(f"agency-{deal}" for deal in DEALS)):
+        if scope not in ("property", "agency", "owners", "owner", *(f"agency-{deal}" for deal in DEALS)):
             raise ValueError("Escolhe onde guardar: neste imóvel ou para todos.")
         with locked(self.folder):
-            ref = self.pick(self.profiles(), property_ref) if scope == "property" else None
-            if scope == "property" and not ref:
+            profiles = self.profiles()
+            ref = self.pick(profiles, property_ref) if scope in ("property", "owner") else None
+            if scope in ("property", "owner") and not ref:
                 raise ValueError("Esta pasta não tem imóveis.")
+            owner = ((profiles.get(ref) or {}).get("property") or {}).get("owner_email") if scope == "owner" else None
+            if scope == "owner" and not owner:
+                raise ValueError("Este imóvel ainda não tem o email do proprietário.")
             # 30/09: the agency's rentals-only or sales-only know-how lives in data/<deal>/knowledge/
-            base = (property_folder(self.folder, ref) if ref else self.folder / OWNER_FOLDER if scope == "owners"
+            base = (owner_folder(self.folder, owner) if owner else property_folder(self.folder, ref) if ref
+                    else self.folder / OWNER_FOLDER if scope == "owners"
                     else self.folder / scope.split("-", 1)[1] if "-" in scope else self.folder)
             # The whole base must stay within its limit, with this file as it will be.
             knowledge([(name, body) for name, body in knowledge_files(base) if name != file] + [(file, text)])

@@ -265,6 +265,16 @@ def save_notices(folder, board):
     save_json(Path(folder) / "avisos.json", board)
 
 
+def load_calls(folder):
+    """<folder>/chamadas.json (02/10): the portal's call notices, as read — who called, when, answered or not."""
+    board = load_json(Path(folder) / "chamadas.json", None)
+    return board if isinstance(board, dict) and isinstance(board.get("calls"), list) else {"calls": []}
+
+
+def save_calls(folder, board):
+    save_json(Path(folder) / "chamadas.json", board)
+
+
 def load_visits(folder, ref):
     """properties/<REF>/visitas.json: the windows proposed, the times booked, and whether visits are closed."""
     agenda = load_json(property_folder(folder, ref) / "visitas.json", {"windows": [], "slots": []})

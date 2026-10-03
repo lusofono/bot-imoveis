@@ -15,6 +15,22 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.103.1 — 03/10/2026
+
+- **Emails em tratamento: «Desistiu» sai das colunas** e passa a ser a primeira linha por baixo do quadro, antes de «Sem
+  resposta», aberta por defeito (com o motivo, quando há).
+- **Chamadas:** confirmado com os avisos verdadeiros do Gmail (12 em 10 dias, todos lidos). As chamadas de um anúncio da
+  agência que não está na ARIA guardam a referência e deixam de aparecer em «sem imóvel identificado».
+
+## α.103.0 — 02/10/2026
+
+- **Chamadas do portal na página de cada imóvel** (Imóveis): lidas em «Ler emails» (de `naoresponder@idealista.pt`),
+  guardadas à parte (`chamadas.json`), com a hora da chamada, atendida ou não, e o cliente quando o telefone é conhecido;
+  WhatsApp, SMS e Ligar; «Procurar» vai N dias para trás no Gmail. As sem imóvel nem cliente ficam numa linha no fim.
+- **Proprietários:** o que ele enviou numa conversa de um cliente (lida como «conversa ambígua») passa para o lado dele
+  e sai do histórico do cliente. O conhecimento para todos os proprietários passa para a Voz e estilo; no separador
+  Proprietários fica o conhecimento **deste** proprietário, só nas respostas a ele.
+
 ## α.102.0 — 02/10/2026
 
 - **O portal passa a ser configurável** (Oficina → «Portal · Idealista»): tudo o que é próprio dele num só sítio

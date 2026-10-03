@@ -1458,8 +1458,8 @@ function updateSteps() {
 setInterval(() => { if (state.properties) updateSteps(); }, 15000);  // 02/10: often enough for the test's 1 minute
 
 // 27/09: where each customer of the property stands, one column each (the furthest they got), a name per line;
-// «Desistiu» (declined the visit) greyed at the end. Under the table, only counted, the many that would make it long:
-// «Sem resposta», the greylist and the blacklist, whose names open there in a line that wraps. The dots say what
+// under the table, «Desistiu» (declined the visit, open by default), then, only counted, the many that would make it
+// long: «Sem resposta», the greylist and the blacklist, whose names open there in a line that wraps. The dots say what
 // needs doing, as set in Voz e estilo, each on its own hover; a name with a card below scrolls to it.
 const PIPELINE = [
   ['contacto', '1.º contacto', 'Pediram informação e ainda não lhes respondemos.'],
@@ -1469,11 +1469,11 @@ const PIPELINE = [
   ['por_confirmar', 'Hora por confirmar', 'Aceitaram ou pediram uma hora que ainda não confirmámos na agenda.'],
   ['marcada', 'Visita marcada', 'Têm visita na agenda.'],
   ['visitou', 'Visitou', 'Já visitaram o imóvel.'],
-  ['shortlist', 'Short list', 'Na short list de Visitas (com os escolhidos e os suplentes).'],
-  ['desistiu', 'Desistiu', 'Recusaram a visita.']];
-const PIPELINE_ASIDE = new Set(['desistiu']);
+  ['shortlist', 'Short list', 'Na short list de Visitas (com os escolhidos e os suplentes).']];
 const PIPELINE_SHOWN = 10;  // names shown per column; the rest counted in one line
+// 03/10: «Desistiu» left the columns: the first line under the table, open by default (the others closed)
 const PIPELINE_BELOW = [
+  ['desistiu', 'Desistiu', 'recusaram a visita'],
   ['sem_resposta', 'Sem resposta', 'o nosso último email está sem resposta há 3 dias ou mais, seja qual for a interação'],
   ['greylist', 'Greylist', 'ignorados por agora: disseram que não têm interesse; se voltarem a escrever, entram com um aviso'],
   ['blacklist', 'Blacklist', 'ignorados sempre: nada do que escrevem volta a entrar']];
@@ -1519,7 +1519,7 @@ function renderPipeline(queue) {
   };
   const below = PIPELINE_BELOW.map(([key, label, hint]) => {
     const list = customers.filter(customer => customer.column === key);
-    return list.length && el('details', {class: 'pipeline-below', open: !!belowOpen[key],
+    return list.length && el('details', {class: 'pipeline-below', open: key === 'desistiu' ? belowOpen[key] !== false : !!belowOpen[key],
       ontoggle: event => { belowOpen[key] = event.currentTarget.open; }},
       el('summary', {}, label + ' ', el('strong', {}, String(list.length)), el('span', {class: 'muted small'}, ' · ' + hint)),
       // 27/09: on the greylist and the blacklist, the reason after the name, when there is one
@@ -1528,10 +1528,9 @@ function renderPipeline(queue) {
         : name(customer))));
   });
   box.replaceChildren(el('div', {class: 'pipeline-scroll'}, el('table', {class: 'pipeline', 'aria-label': 'Clientes por fase'},
-    el('thead', {}, el('tr', {}, PIPELINE.map(([key, label, hint], index) => el('th', {scope: 'col', title: hint,
-      class: PIPELINE_ASIDE.has(key) ? 'aside' : ''}, label, el('span', {class: 'pipeline-count'}, String(columns[index].length)))))),
-    el('tbody', {}, Array.from({length: rows}, (_, row) => el('tr', {}, columns.map((list, index) =>
-      el('td', {class: PIPELINE_ASIDE.has(PIPELINE[index][0]) ? 'aside' : ''}, cell(list, row)))))))),
+    el('thead', {}, el('tr', {}, PIPELINE.map(([key, label, hint], index) => el('th', {scope: 'col', title: hint},
+      label, el('span', {class: 'pipeline-count'}, String(columns[index].length)))))),
+    el('tbody', {}, Array.from({length: rows}, (_, row) => el('tr', {}, columns.map(list => el('td', {}, cell(list, row)))))))),
     // 29/09: the dots' legend, under the table, on the right
     el('div', {class: 'pipeline-legend'},
       el('p', {}, el('strong', {}, 'Eles (esquerda):'),
@@ -1593,7 +1592,7 @@ function turnWhen(turn, dates) {
 // ===== Proprietários (02/10): each property's owner, apart from the customers. One card per message: the conversation,
 // the draft, «Gerar resposta» (the owner's prompt, with the property's state), «Guardar», «Enviar» and «Não precisa de
 // resposta». The property is chosen on top, like in the other tabs; the know-how for owners is at the bottom.
-let ownersKnowledgeShown = false;
+let ownersKnowledgeShown = null;
 function renderOwners() {
   const select = $('owners-property');
   const properties = activeProperties().filter(property => !property.test);
@@ -1606,11 +1605,13 @@ function renderOwners() {
   $('owners-emails').replaceChildren(...(emails.length ? emails.map(email => ownerCard(email, ref))
     : [el('p', {class: 'empty-state'}, el('strong', {}, 'Sem mensagens do proprietário'),
         property?.owner_email ? 'Quando ele escrever, a mensagem aparece aqui depois de «Ler emails».' : '')]));
-  if (!ownersKnowledgeShown) {
-    ownersKnowledgeShown = true;
-    $('owners-knowledge').replaceChildren(el('p', {class: 'step'}, 'Como a agência fala com proprietários: o tom, o que se '
-      + 'reporta e quando, o que se decide com eles. Vale para todos os imóveis, só nas respostas aos proprietários.'),
-      knowledgeEditor('owners', null));
+  // 02/10: this owner's own knowledge (the agency's, for every owner, is in Voz e estilo)
+  if (ownersKnowledgeShown !== ref) {
+    ownersKnowledgeShown = ref;
+    $('owners-knowledge').replaceChildren(property?.owner_email
+      ? el('div', {}, el('p', {class: 'step'}, 'O que se sabe deste proprietário: só entra nas respostas a ele, em todos os imóveis dele.'),
+        knowledgeEditor('owner', ref))
+      : el('p', {class: 'muted small'}, 'Põe primeiro o email do proprietário, em cima.'));
   }
   holdFuelButtons();
 }
@@ -3355,7 +3356,8 @@ function renderSettings() {
     el('h2', {}, 'Conhecimento da agência'),
     el('p', {class: 'step'}, 'Cada imóvel recebe o comum e o do seu tipo de negócio (arrendamento ou venda, nos dados do imóvel); '
       + 'o do seu tipo vale sobre o comum, e o do próprio imóvel sobre os dois.'),
-    ...[['agency', 'Comum a todos os imóveis'], ['agency-arrendamento', 'Só para arrendamentos'], ['agency-venda', 'Só para vendas']]
+    ...[['agency', 'Comum a todos os imóveis'], ['agency-arrendamento', 'Só para arrendamentos'], ['agency-venda', 'Só para vendas'],
+      ['owners', 'Para falar com proprietários (todos)']]
       .map(([scope, title]) => el('details', {class: 'knowledge-group', open: scope === 'agency'},
         el('summary', {}, title), knowledgeEditor(scope, null))));
   if (!$('f-first-read').value) $('f-first-read').value = settings.first_read_days || 45;
@@ -3400,6 +3402,7 @@ function propertyCard(property) {
     el('div', {class: 'property-operations'},
       surveyReport(property),
       activeClientsList(property),
+      callsList(property),
       analysisPanel(property),
       visitsPanel(property)));
 }
@@ -3468,6 +3471,8 @@ function knowledgeEditor(scope, ref) {
         ? 'Vale para todos os imóveis; se o conhecimento de um imóvel disser outra coisa, prevalece o do imóvel.'
         : scope === 'agency-arrendamento' ? 'Só para os imóveis para arrendar: os imóveis à venda nunca o recebem.'
         : scope === 'agency-venda' ? 'Só para os imóveis à venda: os arrendamentos nunca o recebem.'
+        : scope === 'owners' ? 'Como a agência fala com proprietários: o tom, o que se reporta e quando. Só nas respostas aos proprietários.'
+        : scope === 'owner' ? 'Só deste proprietário: só nas respostas a ele.'
         : 'Só para este imóvel. O texto entre <!-- e --> fica para ti: não chega ao assistente.'),
       ...(files.length ? files.map(block) : [el('p', {class: 'muted small'}, 'Ainda não há ficheiros.')]),
       el('details', {}, el('summary', {class: 'muted small'}, '+ Novo ficheiro'), name, text,
@@ -3481,6 +3486,48 @@ const CLIENT_STATE_LABEL = {ok: 'ativo', pending: 'por responder', booked: 'visi
 
 // Persistent, not behind a click: everyone this property has written to, and where they stand — until
 // the property closes (sold/rented/withdrawn is the same "Fechar visitas" event, not a separate state).
+// 02/10: the portal's calls for this property — answered or not, when (the call's own time), the phone and, when the
+// number is known, the customer — with WhatsApp, SMS and a call back. A call whose notice names no property and whose
+// number is no customer's yet shows at the foot, in every property, until the number turns up.
+function callsList(property) {
+  const box = el('div', {class: 'calls-list'}, el('p', {class: 'eyebrow'}, 'CHAMADAS DO PORTAL'),
+    el('p', {class: 'muted small'}, 'A carregar…'));
+  const days = el('input', {type: 'number', min: 1, max: 365, value: 30, class: 'days-input', 'aria-label': 'Dias para trás'});
+  const stamp = at => { const [day, clock] = String(at || '').split(' ');
+    return day ? `${day.slice(8, 10)}/${day.slice(5, 7)} ${String(clock || '').slice(0, 5)}` : ''; };
+  const row = item => el('div', {class: 'call-row' + (item.answered ? '' : ' missed')},
+    el('span', {class: 'call-when'}, stamp(item.at)),
+    el('span', {class: 'tag ' + (item.answered ? 'visit' : 'warn')}, item.answered
+      ? 'atendida' + (item.seconds ? ` · ${item.seconds} s` : '') : 'não atendida'),
+    el('strong', {}, item.name || 'sem nome'),
+    el('span', {class: 'muted small'}, item.phone_shown),
+    el('span', {class: 'call-actions'},
+      el('a', {class: 'link', href: `whatsapp://send?phone=${item.international}`}, 'WhatsApp'),
+      el('a', {class: 'link', href: `sms:+${item.international}`}, 'SMS'),
+      el('a', {class: 'link', href: `tel:+${item.international}`}, 'Ligar')));
+  const draw = data => {
+    const mine = data.calls.filter(item => item.property_ref === property.reference);
+    // a notice naming a listing that is not in the ARIA (another of the agency's) is not «sem imóvel»: it is left out
+    const loose = data.calls.filter(item => !item.property_ref && !item.ref);
+    const missed = mine.filter(item => !item.answered).length;
+    box.replaceChildren(el('p', {class: 'eyebrow'}, 'CHAMADAS DO PORTAL'),
+      el('p', {class: 'muted small'}, mine.length ? `${mine.length} chamada(s), ${missed} não atendida(s).`
+        : 'Ainda sem chamadas deste imóvel.' + (data.added === undefined ? ' As novas chegam com «Ler emails»; as antigas, com «Procurar».' : '')),
+      ...mine.slice(0, 30).map(row),
+      loose.length ? el('details', {class: 'calls-loose'}, el('summary', {class: 'muted small'},
+        `${loose.length} chamada(s) sem imóvel identificado (o aviso não diz o imóvel e o número ainda não é de nenhum cliente)`),
+        ...loose.slice(0, 30).map(row)) : null,
+      el('div', {class: 'row calls-scan'}, el('span', {class: 'muted small'}, 'Procurar no Gmail as chamadas dos últimos'), days,
+        el('span', {class: 'muted small'}, 'dias'),
+        el('button', {onclick: event => run(async () => {
+          const result = await call('api/calls/scan', {days: Number(days.value)});
+          draw(result); toast(`${result.added} chamada(s) nova(s) encontrada(s) no Gmail.`);
+        }, event.currentTarget)}, 'Procurar')));
+  };
+  run(async () => draw(await call('api/calls', {})));
+  return box;
+}
+
 function activeClientsList(property) {
   const box = el('div', {class: 'client-list'}, el('p', {class: 'muted small'}, 'A carregar…'));
   if (property.visits?.closed_at) {
