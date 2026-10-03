@@ -111,3 +111,39 @@ def test_the_owners_reply_in_a_customers_thread_leaves_the_customers_history(ser
     data = service.load(REF)
     assert "quando quiserem" not in str(data["conversations"][CUSTOMER]["history"])  # no longer the customer's words
     assert "quando quiserem" in str(data["owner_conversations"][OWNER]["history"])
+
+
+def test_an_owner_with_no_property_has_an_inbox_and_is_answered_from_it(service):
+    # 03/10: in the owners' list without a property: their emails go to the owners' inbox, never a customer's
+    import pytest
+    from unittest.mock import patch
+    from test_properties import SMTP
+    with pytest.raises(ValueError, match="endereço de email"):
+        service.add_owner("não é email")
+    service.add_owner("outro.dono@example.com", "Rita Dona")
+    owners = {owner["email"]: owner for owner in service.pending()["owners"]["owners"]}
+    assert owners["outro.dono@example.com"] == {"email": "outro.dono@example.com", "name": "Rita Dona", "refs": []}
+    message = {**from_owner("r1", "Tenho um T2 para arrendar em breve."), "from": [{"name": "Rita", "email": "outro.dono@example.com"}]}
+    read(service, [message])
+    read(service, [message])  # the same email again: once
+    assert service.pending()["properties"][0]["emails"] == []  # never a customer's card
+    [card] = service.pending()["owners"]["inbox"]
+    assert card["property_ref"] == "_caixa" and card["recipient"]["email"] == "outro.dono@example.com"
+    ref, prompt, chosen = service.owner_prompt_for("_caixa", [card["id"]])
+    assert ref == "_caixa" and "ainda não tem imóveis" in prompt and "T2 para arrendar" in prompt
+    service.caixa_drafts([{"id": card["id"], "reply_text": "Bom dia, Rita. Com todo o gosto."}])
+    preview = service.caixa_preview(card["id"])
+    assert preview["to"] == "outro.dono@example.com"
+    with pytest.raises(ValueError, match="mudou"):
+        service.caixa_send(card["id"], "outra", True)
+    SMTP.sent = []
+    with patch("backend.service.app_password", return_value="fake"), patch("backend.service.smtplib.SMTP_SSL", SMTP):
+        service.caixa_send(card["id"], preview["check"], True)
+    [sent] = SMTP.sent
+    assert sent["X-ARIA"] and sent["In-Reply-To"] == "<r1@dono>"
+    assert service.pending()["owners"]["inbox"] == []
+    made = service.write_to_owner("_caixa", "Visita ao T2", "outro.dono@example.com")
+    [card] = service.pending()["owners"]["inbox"]
+    assert card["id"] == made["id"] and card["outbound"] and card["new_subject"] == "Visita ao T2"
+    service.caixa_dismiss(card["id"])
+    assert service.pending()["owners"]["inbox"] == []

@@ -1128,3 +1128,8 @@ body:not(.admin) .prompt-view{display:none!important}
 .calls-scan{margin-top:10px;gap:8px}
 .calls-scan .days-input{flex:0 0 76px;width:76px}
 .calls-loose summary{margin-top:6px}
+/* 03/10: Proprietários by owner: the owner on top, their properties as tags, a new owner folded */
+.owners-row select{min-width:min(100%,420px)}
+.owner-refs{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:8px 0}
+.owner-refs .tag .link{padding:0 2px;min-height:0}
+.owner-new{margin-top:10px}

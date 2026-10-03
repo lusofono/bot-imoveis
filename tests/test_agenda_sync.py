@@ -93,3 +93,27 @@ def test_without_a_key_it_says_so_and_with_an_empty_tank_the_property_is_skipped
     with patch.object(type(service), "api_fuel", return_value={"empty": True}):
         result, call = sync(service, {"clientes": []})
     assert result["properties"][0]["skipped"] and call.call_count == 0
+
+
+def test_n_days_back_brings_the_visits_gone_by_to_register_and_sends_nothing(service):
+    # 03/10: rebuilding the agenda: a visit confirmed 10 days ago comes back «por registar», once; nothing older than asked
+    import pytest
+    past = (date.today() - timedelta(days=10)).isoformat()
+    old = (date.today() - timedelta(days=50)).isoformat()
+    customers(service, "a@example.com", "b@example.com")
+    answer = {"clientes": [{"id": "c1", "estado": "confirmada", "hora": f"{past} 15:00", "prova": "Confirmado às 15h."},
+                           {"id": "c2", "estado": "confirmada", "hora": f"{old} 11:00", "prova": "Confirmado às 11h."}]}
+    with patch("backend.service.has_openai_api_key", return_value=True), \
+            patch("backend.service.openai_api_key", return_value="sk-test"), \
+            patch("backend.service.complete", return_value=(json.dumps(answer), USAGE)) as call:
+        result = service.sync_agenda(None, 30)
+        again = service.sync_agenda(None, 30)  # the same visit again: still one
+        with pytest.raises(ValueError, match="de 0 a 365"):
+            service.sync_agenda(None, 400)
+    assert "Conta também as visitas que já passaram" in call.call_args.args[2]
+    assert result["properties"][0]["past"] == 1 and again["properties"][0]["past"] == 0
+    agenda = load_visits(service.folder, REF)
+    assert [(slot["at"], slot["customer"], slot["source"]) for slot in agenda["slots"]] == [(f"{past} 15:00", "a@example.com", "api-passada")]
+    tasks = {task["kind"]: task for task in service.todo()["tasks"]}
+    assert tasks["check"]["count"] == 1  # «Visitas por registar: veio ou não veio»
+    assert not [email for email in service.pending()["properties"][0]["emails"] if email.get("kind") == "visit_thanks"]

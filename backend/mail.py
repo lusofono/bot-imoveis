@@ -246,6 +246,9 @@ def read_messages(account, password, subject_contains, date_from, date_to,
             item["body_text"], item["body_truncated"], profile = fetch_text_only(mail, uid, structure_bytes)
             if profile:
                 item["profile_url"] = profile
+            files = attachment_names(parse_structure(structure_bytes))
+            if files:
+                item["attachments"] = files  # 02/10: their names only, for the short list's documents
             result.append(item)
         return len(uids)
 
@@ -351,6 +354,40 @@ def body_sections(node, prefix=""):
             if any(str(k).lower() in ("name", "filename") for k in disposition[1][::2]):
                 return []
     return [(prefix or "1", str(node[1]).lower())]
+
+
+def attachment_names(node):
+    """02/10: the names of a message's attached files, from its structure alone — nothing is downloaded or opened. An
+    image placed inline (a signature's logo) is not an attachment; a file marked attachment, or a document part, is."""
+    names = []
+
+    def pairs(values):
+        values = values if isinstance(values, list) else []
+        return {str(key).lower(): value for key, value in zip(values[::2], values[1::2])}
+
+    def walk(part):
+        if not isinstance(part, list) or not part:
+            return
+        if isinstance(part[0], list):  # a multipart: its parts come first, then its own subtype and parameters
+            for child in part:
+                if not isinstance(child, list) or not child or not isinstance(child[0], (list, str)):
+                    break
+                if isinstance(child[0], str) and len(child) < 7:
+                    break
+                walk(child)
+            return
+        if len(part) < 7:
+            return
+        kind = str(part[0]).lower()
+        disposition = part[9 if kind == "text" else 8] if len(part) > (9 if kind == "text" else 8) else None
+        disposition = disposition if isinstance(disposition, list) and disposition else None
+        attached = bool(disposition) and str(disposition[0]).lower() == "attachment"
+        name = (pairs(disposition[1]).get("filename") if disposition and len(disposition) > 1 else None) or pairs(part[2]).get("name")
+        if name and (attached or (kind == "application" and not disposition)):
+            names.append(decode_mime(str(name))[:120])
+
+    walk(node)
+    return names[:20]
 
 
 def fetch_literal(mail, uid, section):

@@ -20,6 +20,7 @@ from . import APP_NAME
 from .ai import (AFTER_VISIT_RULE, AFTER_VISIT_TEMPLATE, BOOKED_REPLY_RULE, DOCS_REQUEST_RULE, KNOWLEDGE_RULE, VISIT_REMINDER_RULE, VISITED_REPLY_RULE, extract_json, ficha_profile_prompt,
                  REMINDER_RULE, SURVEY_REPLY_RULE, VISIT_MISSED_RULE, CLOSING_FROM, CLOSING_REPLY_RULE, LATER_REPLY_RULE,
                  CONCLUSIVE_AT, CONCLUSIVE_REPLY_RULE, ALERT_KINDS, OWNER_REPLY_RULE, owner_prompt,
+                 SHORTLIST_REQUEST_RULE, SHORTLIST_DOCS_RULE,
                  fichas_prompt, parse_fichas_batch,
                  listing_text_prompt, parse_listing, agenda_prompt, describe, instructions,
                  parse_agenda, parse_survey, visit_analysis_prompt, clean_round, round_text)
@@ -82,7 +83,7 @@ VIEW_FIELDS = ("id", "kind", "date", "subject", "customer", "recipient", "blocke
                "reply_text", "reply_status", "reply_error", "reply_message_id", "visit_window", "visit_slot",
                "visit_status", "reminder", "closing", "consent_suggested", "consent_confirmed", "history", "merged",
                "merged_ids", "visit_done", "visit_reminder", "survey_reply", "docs_request", "visit_missed", "profile_url",
-               "round", "review")
+               "round", "review", "attachments")
 # 30/09: the prompts common to every property that the Oficina edits (voice.json), with the code's own text; the
 # behaviour («Comportamento geral») lives at the root of voice.json, the others under style.
 COMMON_PROMPTS = {"application_instructions": "", "after_visit": AFTER_VISIT_RULE, "after_visit_template": AFTER_VISIT_TEMPLATE,
@@ -90,7 +91,7 @@ COMMON_PROMPTS = {"application_instructions": "", "after_visit": AFTER_VISIT_RUL
                   "docs_request": DOCS_REQUEST_RULE, "survey_reply": SURVEY_REPLY_RULE, "reminder_rule": REMINDER_RULE,
                   "visit_missed": VISIT_MISSED_RULE, "later_reply": LATER_REPLY_RULE,
                   "conclusive_reply": CONCLUSIVE_REPLY_RULE, "closing_reply": CLOSING_REPLY_RULE,
-                  "owner_reply": OWNER_REPLY_RULE}
+                  "owner_reply": OWNER_REPLY_RULE, "shortlist_request": SHORTLIST_REQUEST_RULE, "shortlist_docs": SHORTLIST_DOCS_RULE}
 # Page field → (profile prompt, key), the same prompts the terminal setup asks for.
 PROMPT_FIELDS = {"general": ("general", "text"), "first": ("first_interaction", "text"),
                  "first_template": ("first_interaction", "reply_template"), "second": ("second_interaction", "text"),
@@ -119,6 +120,7 @@ IGNORE_KINDS = ("black", "grey")
 BACKUP_PREFIX = "ARIA-copia-"
 DRIVE_NAMES = ("My Drive", "O meu disco", "Meu Drive", "A minha unidade")
 OWNER_FOLDER = "proprietarios"  # 02/10: the agency's know-how for owners, in data/proprietarios/knowledge/
+CAIXA = "_caixa"  # 03/10: the inbox of the owners with no property in the ARIA (data/proprietarios/caixa.json)
 def owner_folder(folder, email):
     """02/10: one owner's own knowledge, in data/proprietarios/donos/<their email, as a folder name>/knowledge/."""
     return Path(folder) / OWNER_FOLDER / "donos" / re.sub(r"[^a-z0-9]+", "-", str(email or "").casefold()).strip("-")
@@ -628,6 +630,30 @@ class MailService:
         except Exception:
             return False
 
+    def mark_documents(self, ref, found):
+        """03/10: the documents a short-list customer sent (read by the AI from their words and the files' names) are
+        marked as arrived in their selection; the owner can untick any in Contactos."""
+        with locked(self.folder, wait=SHORT_WAIT):
+            data = self.load(ref)
+            by_id = {item["id"]: item for item in data["emails"]}
+            marked = 0
+            for entry in found:
+                email = recipient_email(by_id.get(entry["id"]) or {})
+                selection = (data.get("conversations", {}).get(email) or {}).get("selection")
+                if not selection:
+                    continue
+                docs = selection.setdefault("docs", {})
+                for code in entry["docs"]:
+                    if code.startswith("fiador:") and not selection.get("fiador"):
+                        continue
+                    if not docs.get(code):
+                        docs[code] = True
+                        marked += 1
+            if marked:
+                self.save(data, ref)
+                self.log("documents_marked", reference=ref, count=marked)
+            return marked
+
     def flag_alerts(self, ref, alerts):
         """02/10: messages the AI flagged as important, dramatic or insulting — a warning on their card and a notice on
         the board, for the owner to read before answering (and maybe the grey or the black list)."""
@@ -833,7 +859,11 @@ class MailService:
                 interaction = 4
             # 27/09: a customer's own email once their visit is booked, or after they visited: its own prompt, not «5.ª»
             check = conversation.get("visit_check") or {}
-            phase = (None if item.get("kind") != "follow_up" or item.get("survey_reply") else
+            selection = conversation.get("selection") or {}
+            phase = (None if item.get("kind") not in ("lead", "follow_up") or item.get("survey_reply") else
+                     # 03/10: on the short list, their reply asks for the documents (or says what came): over the rest
+                     "shortlist" if selection.get("status") in SELECTION_STATES else
+                     None if item.get("kind") != "follow_up" else
                      "visited" if check.get("attended") is True else "booked" if email in booked else None)
             # 27/09: a portal notice with no email of the customer's (blocked for the email) but a phone: its reply is
             # still written, to be sent by WhatsApp or SMS
@@ -860,6 +890,9 @@ class MailService:
                 "interaction": interaction if email else None, "warnings": warnings, "phase": phase, "phone_only": phone_only,
                 "closing_reply": closing_reply, "conclusive_reply": later and interaction == CONCLUSIVE_AT and not closing_reply,
                 "farewell": bool(item.get("farewell")),
+                # 03/10: the short list's documents: asked yet, what is still missing, and whether there is a guarantor
+                "docs_requested": bool(selection.get("docs_requested_at")), "fiador": bool(selection.get("fiador")),
+                "docs_missing": documents_summary(selection)["missing"] if phase == "shortlist" else [],
                 "booked_at": ((visits or {}).get("booked_at") or {}).get(email) if phase == "booked" else None,
                 "ficha": ficha, "ficha_summary": ficha_summary(ficha) if ref else None, "qualifying_limit": limit,
                 "draft_checks": draft_checks(item.get("reply_text"), signature, house, item.get("visit_slot")),
@@ -909,7 +942,8 @@ class MailService:
             refs = [self.pick(profiles, property_ref)] if property_ref else list(profiles)
             voice = load_voice(self.folder)
             return {"account": self.config()["account"],
-                    "properties": [self.property_view(ref, profiles[ref], self.load(ref), voice) for ref in refs]}
+                    "properties": [self.property_view(ref, profiles[ref], self.load(ref), voice) for ref in refs],
+                    "owners": self.owners_view(profiles)}  # 03/10: the Proprietários tab
 
     def read(self, days=None):
         """Brings the new emails, each property from the day before its last read (27/09: no more «Dias para trás»
@@ -945,6 +979,7 @@ class MailService:
             queues = {ref: self.load(ref) for ref in refs}
             # 02/10: each property's owner (its owner_email): their emails are not a customer's — a queue of their own
             owners = self.owner_index(profiles)
+            caixa = self.load_caixa()  # 03/10: the owners with no property
             for owner_email, owner_refs in owners.items():
                 for owner_ref in owner_refs:
                     self.adopt_owner(owner_ref, queues[owner_ref], owner_email)
@@ -980,6 +1015,8 @@ class MailService:
                 if call_notice(item):  # 02/10: the portal's call notices (no property reference in the subject)
                     return message_key(item) not in known_calls
                 owner_ref = self.owner_route(item, owners)
+                if owner_ref == CAIXA:
+                    return message_key(item) not in set(caixa.get("seen_ids") or [])
                 if owner_ref:
                     return not before(item, starts[owner_ref])
                 ref, kind, _ = route(item, profiles, queues)
@@ -1023,6 +1060,11 @@ class MailService:
                     self.take_call(item, profiles)  # 02/10: into chamadas.json, never the queue
                     continue
                 owner_ref = self.owner_route(item, owners) if profiles else None
+                if owner_ref == CAIXA:
+                    if message_key(item) not in set(caixa.get("seen_ids") or []):
+                        self.take_owner_email(None, caixa, item, {"property": {}, "reply": {}}, cfg["account"])
+                        caixa.setdefault("seen_ids", []).append(message_key(item))
+                    continue
                 if owner_ref:
                     key = message_key(item)
                     if key not in known[owner_ref]:
@@ -1119,6 +1161,7 @@ class MailService:
             # received: message ID → the day the customer's email arrived, so the dashboard still counts it
             # after it is answered or dismissed and leaves the queue. IDs and dates only, never an address.
             if profiles:
+                self.save_caixa(caixa)
                 self.auto_backup()  # 02/10: once a day, at the first read (the queue is saved and still locked: a clean copy)
             self.log("read", added=sum(added.values()), ambiguous=ambiguous, direct=sum(direct.values()),
                      pending=sum(len(data["emails"]) for data in queues.values()), received=received)
@@ -1498,11 +1541,10 @@ class MailService:
                         None, "bad", "dashboard")
             return None
 
-    @staticmethod
-    @staticmethod
-    def owner_index(profiles):
-        """owner's email → the properties it owns (test properties never have a real owner)."""
-        index = {}
+    def owner_index(self, profiles):
+        """owner's email → the properties it owns (test properties never have a real owner); 03/10: the owners' list too,
+        an owner with no property owning [] (their emails go to the owners' inbox)."""
+        index = {email: [] for email in self.owners_list()}
         for ref, profile in profiles.items():
             email = str((profile.get("property") or {}).get("owner_email") or "").strip().casefold()
             if email and not profile.get("test"):
@@ -1515,15 +1557,18 @@ class MailService:
         if item.get("test"):
             return None
         senders = {address.casefold() for address in addresses(item.get("from") or [])}
-        refs = next((owners[email] for email in senders if email in owners), None)
-        if not refs:
+        email = next((email for email in senders if email in owners), None)
+        if email is None:
             return None
+        refs = owners[email]
+        if not refs:
+            return CAIXA  # 03/10: an owner with no property in the ARIA: the owners' inbox
         return next((ref for ref in refs if has_token(item.get("subject", ""), ref)), refs[0])
 
     def take_owner_email(self, ref, data, item, profile, account):
         """One email from the owner, into the owner's queue with its conversation's history."""
-        email = next(address for address in addresses(item.get("from") or [])
-                     if address.casefold() in {str(profile["property"].get("owner_email") or "").casefold()})
+        owners = {str(profile["property"].get("owner_email") or "").casefold()} if ref else set(self.owners_list())
+        email = next(address for address in addresses(item.get("from") or []) if address.casefold() in owners)
         item.update(prepare(item, "follow_up", email.casefold(), profile, account), kind="owner")
         talk = data.setdefault("owner_conversations", {}).setdefault(email.casefold(), {"sent_message_ids": [],
                                                                                          "thread_ids": []})
@@ -1578,6 +1623,125 @@ class MailService:
             save_contacts(self.folder, contacts)
         return moved
 
+    # ===== The owners' list and the inbox of those with no property (03/10): an owner is in the list with or without
+    # properties; their emails never become a customer's. Those of an owner with no property in the ARIA go to
+    # data/proprietarios/caixa.json, answered in the Proprietários tab like the others.
+
+    def owners_list(self):
+        """email → {"name"} — the owners' list (data/proprietarios/donos.json)."""
+        owners = load_json(self.folder / OWNER_FOLDER / "donos.json", {}).get("owners")
+        return {str(email).casefold(): value for email, value in (owners or {}).items()} if isinstance(owners, dict) else {}
+
+    def add_owner(self, email, name=""):
+        """An owner into the list (or their name updated), with or without properties."""
+        email = " ".join(str(email or "").split())
+        if not email or len(email) > 200 or not EMAIL.fullmatch(email):
+            raise ValueError("O email do proprietário tem de ser um endereço de email.")
+        if email.casefold() == self.config()["account"].casefold():
+            raise ValueError("O email do proprietário não pode ser o desta conta.")
+        path = self.folder / OWNER_FOLDER / "donos.json"
+        with locked(self.folder, "owners", wait=SHORT_WAIT):
+            data = load_json(path, {})
+            owners = data.setdefault("owners", {})
+            entry = owners.setdefault(email.casefold(), {"added_at": now()})
+            if " ".join(str(name or "").split()):
+                entry["name"] = " ".join(str(name).split())[:100]
+            save_json(path, data)
+        return email.casefold()
+
+    def load_caixa(self):
+        caixa = load_json(self.folder / OWNER_FOLDER / "caixa.json", None)
+        return caixa if isinstance(caixa, dict) and isinstance(caixa.get("emails"), list) else {"emails": [], "seen_ids": []}
+
+    def save_caixa(self, caixa):
+        (self.folder / OWNER_FOLDER).mkdir(parents=True, exist_ok=True)
+        save_json(self.folder / OWNER_FOLDER / "caixa.json", caixa)
+
+    def owners_view(self, profiles=None):
+        """The Proprietários tab: every owner (the list and the properties' owners), their properties, and the inbox's
+        emails (those of owners with no property), as cards."""
+        profiles = profiles if profiles is not None else self.profiles()
+        index = self.owner_index(profiles)
+        names = {email: (value.get("name") or "") for email, value in self.owners_list().items()}
+        for ref in profiles:
+            prop = profiles[ref].get("property") or {}
+            if prop.get("owner_email") and prop.get("owner_name"):
+                names.setdefault(str(prop["owner_email"]).casefold(), prop["owner_name"])
+        caixa = self.load_caixa()
+        talks = caixa.get("owner_conversations") or {}
+        emails = [{**{key: item.get(key) for key in VIEW_FIELDS}, "owner": True, "outbound": bool(item.get("outbound")),
+                   "new_subject": item.get("new_subject"), "property_ref": CAIXA, "warnings": list(item.get("warnings") or []),
+                   "conversation": list((talks.get(recipient_email(item)) or {}).get("history") or [])} for item in caixa["emails"]]
+        return {"owners": [{"email": email, "name": names.get(email) or "", "refs": refs} for email, refs in sorted(index.items())],
+                "inbox": emails}
+
+    def caixa_drafts(self, replies):
+        """Drafts of the inbox's emails (owners with no property)."""
+        with locked(self.folder, "owners", wait=SHORT_WAIT):
+            caixa = self.load_caixa()
+            by_id = {item["id"]: item for item in caixa["emails"]}
+            saved = 0
+            for reply in replies or []:
+                item = by_id.get(reply.get("id"))
+                if item is not None:
+                    item.update(reply_text=str(reply.get("reply_text") or ""), reply_status="draft" if str(reply.get("reply_text") or "").strip() else "pending")
+                    saved += 1
+            self.save_caixa(caixa)
+            return saved
+
+    def caixa_preview(self, item_id):
+        """Who it goes to, the subject, and the text's fingerprint the send must find unchanged."""
+        caixa = self.load_caixa()
+        item = next((entry for entry in caixa["emails"] if entry["id"] == item_id), None)
+        if item is None or not str(item.get("reply_text") or "").strip():
+            raise ValueError("Escreve primeiro a resposta.")
+        email = recipient_email(item)
+        if email not in self.owners_list():
+            raise ValueError("Esse email já não está na lista de proprietários.")
+        msg, recipient = build_reply(item, self.config()["account"], (load_voice(self.folder).get("style", {}).get("sender_name") or {}).get("text") or "",
+                                     item.get("new_subject"))
+        return {"to": recipient, "subject": str(msg["Subject"]), "check": text_hash(item["reply_text"])}
+
+    def caixa_send(self, item_id, check, confirmed):
+        """Sends one inbox email after its preview (the same text: check), with the hidden mark; the owner's conversation
+        keeps it."""
+        if confirmed is not True:
+            raise ValueError("É necessária confirmação explícita.")
+        cfg = self.config()
+        with locked(self.folder, "owners", wait=SHORT_WAIT):
+            caixa = self.load_caixa()
+            item = next((entry for entry in caixa["emails"] if entry["id"] == item_id), None)
+            if item is None or text_hash(item.get("reply_text")) != check:
+                raise ValueError("A resposta mudou: revê-a e confirma de novo.")
+            if recipient_email(item) not in self.owners_list():
+                raise ValueError("Esse email já não está na lista de proprietários.")
+            style = load_voice(self.folder).get("style", {})
+            msg, recipient = build_reply(item, cfg["account"], (style.get("sender_name") or {}).get("text") or "", item.get("new_subject"))
+            try:
+                key = tag_key(self.folder, cfg["account"])
+                fields = {"ref": "caixa", "n": len(((caixa.get("owner_conversations") or {}).get(recipient_email(item)) or {})
+                                                   .get("sent_message_ids") or []) + 1, "k": "owner"}
+                del msg["Message-ID"]
+                msg["Message-ID"] = mark.message_id(fields, key)
+                msg["X-ARIA"] = mark.header(fields, key)
+            except Exception:
+                pass  # without the mark's key the email still goes
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as smtp:
+                smtp.login(cfg["account"], app_password(self.folder, cfg["account"]))
+                smtp.send_message(msg)
+            caixa["emails"].remove(item)
+            item["reply_message_id"] = str(msg["Message-ID"])
+            self.advance(caixa, item)  # the owner's conversation (kind "owner")
+            self.save_caixa(caixa)
+        self.log("send", message_id=item_id, status="sent", kind="owner", reference=None)
+        return {"status": "sent", "to": recipient}
+
+    def caixa_dismiss(self, item_id):
+        with locked(self.folder, "owners", wait=SHORT_WAIT):
+            caixa = self.load_caixa()
+            caixa["emails"] = [item for item in caixa["emails"] if item["id"] != item_id]
+            self.save_caixa(caixa)
+
     def set_owner(self, property_ref, email, name=""):
         """02/10, Proprietários: a property's owner (email and name), set or changed there; the same owner may have several
         properties. An empty email takes the owner off. What came in from them as a customer moves to their side."""
@@ -1597,15 +1761,36 @@ class MailService:
             profile["property"].update(owner_email=email or None, owner_name=name or None)
             save_json(path, profile)
             if email:
+                self.add_owner(email, name)  # 03/10: the owners' list
+            if email:
                 data = self.load(ref)
                 if self.adopt_owner(ref, data, email):
                     self.save(data, ref)
             self.log("owner_set", reference=ref, owner=bool(email))
             return ref
 
-    def write_to_owner(self, property_ref, subject=""):
+    def write_to_owner(self, property_ref, subject="", owner=None):
         """02/10, «Escrever ao proprietário»: a new email to them, without them writing first — a card of its own, to
-        write by hand or with the AI, then reviewed and sent like a reply."""
+        write by hand or with the AI, then reviewed and sent like a reply. 03/10: property_ref CAIXA + owner: to an owner
+        with no property (the owners' inbox)."""
+        if property_ref == CAIXA:
+            email = str(owner or "").strip().casefold()
+            owners = self.owners_list()
+            if email not in owners:
+                raise ValueError("Escolhe um proprietário da lista.")
+            with locked(self.folder, "owners", wait=SHORT_WAIT):
+                caixa = self.load_caixa()
+                name = owners[email].get("name") or ""
+                talk = (caixa.get("owner_conversations") or {}).get(email) or {}
+                subject = " ".join(str(subject or "").split())[:150] or "Contacto da agência"
+                key = f"proprietario-{secrets.token_hex(5)}"
+                caixa["emails"].append({"id": key, "kind": "owner", "outbound": True, "new_subject": subject, "subject": subject,
+                                        "date": now(), "recipient": {"name": name, "email": email},
+                                        "customer": {"name": name, "email": email, "phone": None, "message": None},
+                                        "history": list(talk.get("history") or []), "blocked": None, "warnings": [],
+                                        "reply_text": "", "send_reply": False, "reply_status": "pending"})
+                self.save_caixa(caixa)
+            return {"property_ref": CAIXA, "id": key}
         with locked(self.folder, wait=SHORT_WAIT):
             profiles = self.profiles()
             ref = self.pick(profiles, property_ref)
@@ -1629,6 +1814,16 @@ class MailService:
 
     def owner_prompt_for(self, property_ref, ids, now=None, extra=""):
         """02/10: the prompt for the owner's emails chosen, and what parsing its answer needs (the emails, the revision)."""
+        if property_ref == CAIXA:  # 03/10: an owner with no property in the ARIA
+            items = [item for item in self.load_caixa()["emails"] if item["id"] in set(ids or [])]
+            if not items:
+                raise ValueError("Escolhe pelo menos um email do proprietário.")
+            owner = recipient_email(items[0])
+            profile = {"property": {"reference": "sem imóvel", "description": "um proprietário sem imóveis na ARIA"}}
+            prompt = owner_prompt(profile, load_voice(self.folder), load_knowledge(self.folder / OWNER_FOLDER),
+                                  "(este proprietário ainda não tem imóveis nesta pasta de dados)", items, now, extra,
+                                  load_knowledge(owner_folder(self.folder, owner)))
+            return CAIXA, prompt, {"emails": items}
         with locked(self.folder, wait=SHORT_WAIT):
             profiles = self.profiles()
             ref = self.pick(profiles, property_ref)
@@ -1742,6 +1937,10 @@ class MailService:
             conversation["visit_proposed"] = True  # the qualification is over for them
         if item.get("farewell"):
             conversation["closed_at"] = now()  # 02/10: «Encerrar contacto»: no rounds or reminders from now on
+        selection = conversation.get("selection") or {}
+        if (item.get("kind") in ("lead", "follow_up") and selection.get("status") in SELECTION_STATES
+                and not selection.get("docs_requested_at")):
+            selection["docs_requested_at"] = now()  # 03/10: the short list's reply asked for the documents
         if item.get("ficha") and (conversation.get("ficha") or {}).get("at", "") <= item["ficha"].get("at", ""):
             conversation["ficha"] = item["ficha"]
         if item.get("kind") == "reminder" and item.get("reminder"):
@@ -2876,13 +3075,17 @@ class MailService:
             self.log("active_removed", reference=ref)
             return {"removed": 1, "property_ref": ref}
 
-    def sync_agenda(self, property_ref=None):
+    def sync_agenda(self, property_ref=None, days_back=0):
         """«Atualizar agenda»: the API reads each active customer's conversation — their emails and ours, those
         written straight in Gmail too — and, as the owner chose (25/09), updates the agenda by itself: a day and
         time we confirmed becomes a booked visit (green); one the customer proposed or accepted, still
         unconfirmed, shows orange until then. Customers already booked, who declined or are ignored are not
         asked about, and nothing is ever booked in the past. Every property, or one; a property whose tank is
-        empty or whose visits are closed is skipped and says why."""
+        empty or whose visits are closed is skipped and says why.
+        days_back (03/10): also the visits confirmed in the last N days that have gone by — added «por registar» (came
+        or not, the owner says; nothing is sent), when not on the agenda yet; for rebuilding the agenda."""
+        if isinstance(days_back, bool) or not isinstance(days_back, int) or not 0 <= days_back <= 365:
+            raise ValueError("Indica quantos dias para trás: de 0 a 365.")
         with locked(self.folder):
             profiles = self.profiles()
             if not profiles:
@@ -2893,11 +3096,12 @@ class MailService:
             key = openai_api_key(self.folder, cfg["account"])
             model = self.model(cfg)
             today = date.today().isoformat()
+            since = (date.today() - timedelta(days=days_back)).isoformat() if days_back else None
             results = []
             for ref in [self.pick(profiles, property_ref)] if property_ref else list(profiles):
                 agenda = load_visits(self.folder, ref)
                 result = {"property_ref": ref, "confirmed": 0, "moved": 0, "accepted": 0, "offered": 0, "unbooked": 0,
-                          "cleared": 0, "asked": 0}
+                          "cleared": 0, "asked": 0, "past": 0}
                 if agenda.get("closed_at"):
                     results.append({**result, "skipped": "as visitas deste imóvel estão fechadas"})
                     continue
@@ -2914,7 +3118,7 @@ class MailService:
                 if ids:
                     prompt_text = agenda_prompt(profiles[ref], [
                         (key_id, (conversations.get(email) or {}).get("name"), (conversations.get(email) or {}).get("history") or [],
-                         (booked.get(email) or {}).get("at")) for key_id, email in ids.items()], today)
+                         (booked.get(email) or {}).get("at")) for key_id, email in ids.items()], today, since)
                     answer, usage = complete(key, model, prompt_text)
                     self.log("openai_usage", model=model, **usage, reference=ref, cost_usd=round(estimate_cost_usd(
                         model, **{k: usage[k] for k in ("prompt_tokens", "completion_tokens")}), 6))
@@ -2923,6 +3127,13 @@ class MailService:
                         conversation = conversations[email]
                         slot = booked.get(email)
                         state, at = found["state"], found["at"]
+                        if since and state == "confirmada" and since <= at[:10] < today:
+                            # 03/10: a visit that has gone by, rebuilt «por registar»: nothing is sent from here
+                            if not any(slot["customer"] == email and slot["at"] == at for slot in agenda["slots"]):
+                                agenda["slots"].append({"at": at, "customer": email, "name": conversation.get("name") or "",
+                                                        "source": "api-passada", "evidence": found["evidence"], "booked_at": now()})
+                                result["past"] += 1
+                            continue
                         if state == "nenhuma" or at[:10] < today:
                             # Never unbooks on a vague answer: only what was pending (orange, blue) is cleared.
                             result["cleared"] += bool(conversation.pop("visit_accepted", None))
@@ -4120,7 +4331,7 @@ class MailService:
             self.log("property_saved", reference=ref)
             return {"reference": ref, "created": created}
 
-    def knowledge(self, property_ref=None):
+    def knowledge(self, property_ref=None, owner=None):
         """What the assistant knows, exactly as it gets it: the property's base and the agency's know-how."""
         with locked(self.folder):
             profiles = self.profiles()
@@ -4137,10 +4348,10 @@ class MailService:
                               **{f"agency-{deal}": files(self.folder / deal) for deal in DEALS},
                               "owners": files(self.folder / OWNER_FOLDER),  # 02/10: for talking to owners
                               # 02/10: this property's owner's own knowledge (only in the replies to them)
-                              "owner": files(owner_folder(self.folder, owner)) if (owner := ((profiles.get(ref) or {})
+                              "owner": files(owner_folder(self.folder, owner)) if (owner := owner or ((profiles.get(ref) or {})
                                                                                    .get("property") or {}).get("owner_email")) else []}}
 
-    def save_knowledge(self, property_ref, file, text, scope="property"):
+    def save_knowledge(self, property_ref, file, text, scope="property", owner=None):
         """Writes one knowledge (RAG) file, whole. An empty text leaves the file empty, so it no longer counts."""
         file, text = str(file or "").strip(), str(text or "").replace("\r\n", "\n")
         if not KNOWLEDGE_FILE.fullmatch(file):
@@ -4149,12 +4360,17 @@ class MailService:
             raise ValueError("Escolhe onde guardar: neste imóvel ou para todos.")
         with locked(self.folder):
             profiles = self.profiles()
-            ref = self.pick(profiles, property_ref) if scope in ("property", "owner") else None
-            if scope in ("property", "owner") and not ref:
+            owner = str(owner or "").strip().casefold() if scope == "owner" else None
+            if owner and owner not in self.owner_index(profiles):
+                raise ValueError("Esse email não está na lista de proprietários.")
+            ref = self.pick(profiles, property_ref) if scope == "property" or (scope == "owner" and not owner) else None
+            if scope == "property" and not ref:
                 raise ValueError("Esta pasta não tem imóveis.")
-            owner = ((profiles.get(ref) or {}).get("property") or {}).get("owner_email") if scope == "owner" else None
             if scope == "owner" and not owner:
-                raise ValueError("Este imóvel ainda não tem o email do proprietário.")
+                owner = ((profiles.get(ref) or {}).get("property") or {}).get("owner_email")
+                if not owner:
+                    raise ValueError("Este imóvel ainda não tem o email do proprietário.")
+                ref = None
             # 30/09: the agency's rentals-only or sales-only know-how lives in data/<deal>/knowledge/
             base = (owner_folder(self.folder, owner) if owner else property_folder(self.folder, ref) if ref
                     else self.folder / OWNER_FOLDER if scope == "owners"

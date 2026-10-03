@@ -164,7 +164,8 @@
     <div class="page-heading"><div><p class="eyebrow">PROPRIETÁRIOS</p><h1>Falar com quem é dono do imóvel.</h1>
       <p class="step">As mensagens do proprietário de cada imóvel, à parte das dos clientes. A IA responde com o estado do
         imóvel e o conhecimento para proprietários; tu revês antes de enviar.</p></div></div>
-    <div class="queue-row"><label class="muted">Imóvel <select id="owners-property"></select></label></div>
+    <!-- 03/10: the owner on top (the owners' list, with or without properties) -->
+    <div class="row owners-row"><label class="muted">Proprietário <select id="owners-select"></select></label></div>
     <!-- 02/10: the owner of the property chosen (email and name; the same owner may have several) and a new email to them -->
     <article class="card owner-box" id="owners-box"></article>
     <div id="owners-emails"></div>
@@ -270,6 +271,10 @@
     <div class="row agenda-controls">
       <label class="muted">Imóvel <select id="agenda-property"><option value="">Todos</option></select></label>
       <button id="agenda-sync-here" type="button" title="A IA (API) lê as conversas e atualiza as Visitas.">Atualizar visitas</button>
+      <!-- 03/10: how far back: 0 = the visits to come (as before); more = also those gone by, «por registar» -->
+      <select id="agenda-sync-days" aria-label="Até quantos dias para trás">
+        <option value="0">só as próximas</option><option value="30">e as dos últimos 30 dias</option>
+        <option value="60">e as dos últimos 60 dias</option><option value="90">e as dos últimos 90 dias</option></select>
       <div class="agenda-nav">
         <strong id="agenda-range" class="agenda-range"></strong>
         <div class="agenda-nav-buttons">

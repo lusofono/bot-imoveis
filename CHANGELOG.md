@@ -15,6 +15,34 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.106.0 — 03/10/2026
+
+- **Proprietários por proprietário:** em cima escolhe-se o proprietário (da lista de proprietários, com ou sem imóveis),
+  e vêem-se os imóveis dele (juntar ou tirar um imóvel ali mesmo), todas as mensagens dele de qualquer imóvel, «Escrever
+  ao proprietário» (sobre um dos imóveis dele, ou sem imóvel), o ponto de situação de cada imóvel dele e o conhecimento
+  só dele. «Novo proprietário» junta um à lista, com ou sem imóveis.
+- **Um proprietário sem imóveis na ARIA** também é lido: os emails dele vão para a caixa dos proprietários
+  (`data/proprietarios/caixa.json`) — nunca para as Comunicações —, e responde-se-lhe da mesma forma (rascunho, IA,
+  pré-visualização, envio com a marca). As mensagens dos proprietários nunca aparecem nas Comunicações; o contador do
+  menu conta as de todos.
+
+## α.105.0 — 03/10/2026
+
+- **Short list sem botão:** quando um cliente está na short list (escolhido, suplente ou short list), a resposta
+  seguinte nas Comunicações pede os documentos sozinha (prompt «Short list: pedir documentos», editável na Oficina),
+  sem nunca dizer «short list», «escolhido» nem «suplente». Depois de pedidos, cada resposta dele é lida pelo que
+  escreveu e pelos **nomes dos anexos** (nada se abre nem descarrega): a IA agradece o que chegou, diz o que falta, e os
+  documentos que chegaram ficam marcados na seleção (Contactos), onde se podem corrigir. O cartão diz «short list ·
+  pedir documentos» ou «short list · documentos», mostra os anexos (📎) e o que ainda falta.
+- **A leitura guarda os nomes dos anexos** de cada email, tirados da estrutura da mensagem; as imagens das
+  assinaturas não contam.
+
+## α.104.0 — 03/10/2026
+
+- **Visitas: «Atualizar visitas» pode ir dias para trás** (só as próximas, 30, 60 ou 90 dias). As visitas confirmadas
+  nesse período que já passaram entram na agenda «por registar» (veio ou não veio, dizes tu), uma só vez e sem enviar
+  nada; o agradecimento e o inquérito saem só depois de registares. Serve para reconstruir a agenda.
+
 ## α.103.1 — 03/10/2026
 
 - **Emails em tratamento: «Desistiu» sai das colunas** e passa a ser a primeira linha por baixo do quadro, antes de «Sem

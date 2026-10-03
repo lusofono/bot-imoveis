@@ -1072,7 +1072,10 @@ const COMMON_PROMPT_FIELDS = [
   ['visited_reply', 'Cliente que já visitou', 5],
   ['visit_missed', 'Visita que não aconteceu', 4],
   ['reminder_rule', 'Lembrete sem resposta (aos 2 e aos 4 dias, quando não há frase fixa)', 4],
-  ['docs_request', 'Pedido de documentos (sem nunca dizer «short list»)', 5]];
+  ['docs_request', 'Pedido de documentos (sem nunca dizer «short list»)', 5],
+  // 03/10: a short-list customer's next reply asks for the documents; then each reply says what came and what is missing
+  ['shortlist_request', 'Short list: a resposta seguinte pede os documentos', 5],
+  ['shortlist_docs', 'Short list: o que chegou (pelo que disse e pelos nomes dos anexos) e o que falta', 5]];
 const PROPERTY_PROMPT_FIELDS = [
   ['general', 'Prompt base: contexto do imóvel', 4], ['first', '1.ª interação: primeira resposta', 4],
   ['first_template', 'Texto base da 1.ª resposta (opcional)', 5], ['second', '2.ª interação: qualificação (pedir o que falta)', 5],
@@ -1367,7 +1370,8 @@ function renderState() {
   $('account').textContent = state.account || '';
   $('nav-count').textContent = state.properties.reduce((n, q) => n + q.emails.filter(email => !email.round && !email.owner).length, 0);
   // 02/10: the owners' messages have their own tab and count
-  const ownerWaiting = state.properties.reduce((n, q) => n + q.emails.filter(email => email.owner).length, 0);
+  const ownerWaiting = state.properties.reduce((n, q) => n + q.emails.filter(email => email.owner).length, 0)
+    + (state.owners?.inbox?.length || 0);
   $('owner-count').textContent = String(ownerWaiting); $('owner-count').hidden = !ownerWaiting;
   if (activeTab === 'owners') renderOwners();
   $('error').hidden = !state.error; $('error').textContent = state.error || '';
@@ -1589,76 +1593,100 @@ function turnWhen(turn, dates) {
   return turn.at ? turn.at.slice(8, 10) + '/' + turn.at.slice(5, 7) : '';
 }
 
-// ===== Proprietários (02/10): each property's owner, apart from the customers. One card per message: the conversation,
-// the draft, «Gerar resposta» (the owner's prompt, with the property's state), «Guardar», «Enviar» and «Não precisa de
-// resposta». The property is chosen on top, like in the other tabs; the know-how for owners is at the bottom.
-let ownersKnowledgeShown = null;
+// ===== Proprietários (02/10; 03/10 by owner): the owners' list — with or without properties — chosen on top; for the one
+// chosen, their properties, every message of theirs (from any property, or the inbox when they have none), «Escrever ao
+// proprietário», the ponto de situação of each property and what is known of them alone.
+const CAIXA = '_caixa';
+let ownerChosen = null, ownerDigestRef = null, ownersKnowledgeShown = null;
+function ownersData() { return state?.owners || {owners: [], inbox: []}; }
+function ownerMessages(email) {
+  const mine = item => (item.recipient?.email || '').toLowerCase() === email;
+  return [...(state?.properties || []).flatMap(queue => (queue.emails || []).filter(item => item.owner && mine(item))
+    .map(item => ({...item, property_ref: queue.property_ref}))), ...ownersData().inbox.filter(mine)];
+}
 function renderOwners() {
-  const select = $('owners-property');
-  const properties = activeProperties().filter(property => !property.test);
-  fillSelect(select, Object.fromEntries(properties.map(property => [property.reference, property.reference])));
-  const ref = select.value || properties[0]?.reference || '';
-  const property = properties.find(item => item.reference === ref);
-  renderOwnerBox(property, properties);
-  const queue = (state?.properties || []).find(item => item.property_ref === ref);
-  const emails = (queue?.emails || []).filter(email => email.owner);
-  $('owners-emails').replaceChildren(...(emails.length ? emails.map(email => ownerCard(email, ref))
-    : [el('p', {class: 'empty-state'}, el('strong', {}, 'Sem mensagens do proprietário'),
-        property?.owner_email ? 'Quando ele escrever, a mensagem aparece aqui depois de «Ler emails».' : '')]));
-  // 02/10: this owner's own knowledge (the agency's, for every owner, is in Voz e estilo)
-  if (ownersKnowledgeShown !== ref) {
-    ownersKnowledgeShown = ref;
-    $('owners-knowledge').replaceChildren(property?.owner_email
-      ? el('div', {}, el('p', {class: 'step'}, 'O que se sabe deste proprietário: só entra nas respostas a ele, em todos os imóveis dele.'),
-        knowledgeEditor('owner', ref))
-      : el('p', {class: 'muted small'}, 'Põe primeiro o email do proprietário, em cima.'));
+  const owners = ownersData().owners;
+  if (!owners.some(owner => owner.email === ownerChosen)) ownerChosen = owners[0]?.email || null;
+  const select = $('owners-select');
+  select.replaceChildren(...owners.map(owner => el('option', {value: owner.email},
+    `${owner.name || owner.email}${owner.name ? ' — ' + owner.email : ''} · ${owner.refs.length ? owner.refs.join(', ') : 'sem imóveis'}`
+    + (ownerMessages(owner.email).length ? ` · ${ownerMessages(owner.email).length} por responder` : ''))));
+  select.value = ownerChosen || '';
+  select.hidden = !owners.length;
+  const owner = owners.find(item => item.email === ownerChosen);
+  renderOwnerBox(owner);
+  const emails = owner ? ownerMessages(owner.email) : [];
+  $('owners-emails').replaceChildren(...(emails.length ? emails.map(email => ownerCard(email, email.property_ref))
+    : [el('p', {class: 'empty-state'}, el('strong', {}, owner ? 'Sem mensagens deste proprietário' : 'Ainda sem proprietários'),
+        owner ? 'Quando ele escrever, a mensagem aparece aqui depois de «Ler emails».' : 'Junta o primeiro em «Novo proprietário».')]));
+  if (owner && ownersKnowledgeShown !== owner.email) {
+    ownersKnowledgeShown = owner.email;
+    $('owners-knowledge').replaceChildren(el('p', {class: 'step'}, 'O que se sabe deste proprietário: só entra nas respostas a ele, em todos os imóveis dele.'),
+      knowledgeEditor('owner', null, owner.email));
   }
+  if (!owner) $('owners-knowledge').replaceChildren(el('p', {class: 'muted small'}, 'Escolhe um proprietário.'));
   holdFuelButtons();
 }
-$('owners-property').addEventListener('change', () => { renderOwners(); run(loadOwnersDigest); });
+$('owners-select').addEventListener('change', event => { ownerChosen = event.target.value; ownerDigestRef = null; renderOwners(); run(loadOwnersDigest); });
 
-// 02/10: the owner of the property chosen — set or changed here (the same email in several properties is one owner with
-// several) — and «Escrever ao proprietário», a new email without them writing first
-function renderOwnerBox(property, properties) {
+function renderOwnerBox(owner) {
   const box = $('owners-box');
-  if (!property) { box.replaceChildren(el('p', {class: 'muted small'}, 'Sem imóveis.')); return; }
-  const ref = property.reference, email = property.owner_email || '';
-  const name = el('input', {value: property.owner_name || '', placeholder: 'Nome do proprietário', 'aria-label': 'Nome do proprietário'});
-  const address = el('input', {type: 'email', value: email, placeholder: 'email@exemplo.com', 'aria-label': 'Email do proprietário'});
-  const others = email ? properties.filter(item => item.reference !== ref
-    && (item.owner_email || '').toLowerCase() === email.toLowerCase()).map(item => item.reference) : [];
-  const subject = el('input', {placeholder: `Assunto (opcional; por defeito: ${ref} — ${property.description || ''})`, 'aria-label': 'Assunto do email novo'});
+  const properties = activeProperties().filter(property => !property.test);
+  const name = el('input', {placeholder: 'Nome do proprietário', 'aria-label': 'Nome do novo proprietário'});
+  const address = el('input', {type: 'email', placeholder: 'email@exemplo.com', 'aria-label': 'Email do novo proprietário'});
+  const adding = el('details', {class: 'owner-new'}, el('summary', {class: 'muted small'}, '+ Novo proprietário (com ou sem imóveis)'),
+    el('div', {class: 'row owner-fields'}, name, address, el('button', {onclick: event => run(async () => {
+      state = (await call('api/owners/add', {email: address.value.trim(), name: name.value.trim()})).state;
+      ownerChosen = address.value.trim().toLowerCase(); renderState(); renderOwners();
+      toast('Proprietário na lista: as mensagens dele passam a vir para aqui.');
+    }, event.currentTarget)}, 'Juntar')));
+  if (!owner) { box.replaceChildren(el('p', {class: 'eyebrow'}, 'PROPRIETÁRIOS'), adding); return; }
+  const rename = el('input', {value: owner.name || '', placeholder: 'Nome', 'aria-label': 'Nome do proprietário'});
+  const others = properties.filter(property => !owner.refs.includes(property.reference));
+  const join = el('select', {'aria-label': 'Juntar um imóvel'}, el('option', {value: ''}, 'Juntar um imóvel…'),
+    others.map(property => el('option', {value: property.reference}, `${property.reference}${property.owner_email ? ' (tem outro proprietário)' : ''}`)));
+  const subject = el('input', {placeholder: 'Assunto (opcional)', 'aria-label': 'Assunto do email novo'});
+  const about = el('select', {'aria-label': 'Sobre que imóvel'}, owner.refs.length
+    ? owner.refs.map(ref => el('option', {value: ref}, ref)) : el('option', {value: CAIXA}, 'sem imóvel'));
+  const setOwner = (ref, email, label) => run(async () => {
+    const result = await call('api/owners/set', {property_ref: ref, email, name: owner.name || ''});
+    state = result.state; settings = result.settings; renderSettings(); renderState(); renderOwners(); toast(label);
+  });
   box.replaceChildren(
-    el('p', {class: 'eyebrow'}, 'PROPRIETÁRIO DE ' + ref),
-    el('div', {class: 'row owner-fields'}, name, address,
-      el('button', {onclick: event => run(async () => {
-        const result = await call('api/owners/set', {property_ref: ref, email: address.value.trim(), name: name.value.trim()});
-        state = result.state; settings = result.settings; renderSettings(); renderState(); renderOwners();
-        toast(address.value.trim() ? 'Proprietário guardado: os emails dele passam a vir para aqui.' : 'Proprietário retirado deste imóvel.');
-      }, event.currentTarget)}, 'Guardar')),
-    el('p', {class: 'muted small'}, email
-      ? (others.length ? `Também é proprietário de ${others.join(', ')}.` : 'As mensagens deste email vêm para aqui, não para as Comunicações.')
-      : 'Sem o email do proprietário, as mensagens dele entram como as de um cliente. O mesmo email pode estar em vários imóveis.'),
-    el('div', {class: 'row owner-write'}, subject,
-      el('button', {class: 'primary', disabled: !email, title: email ? '' : 'Põe primeiro o email do proprietário.',
-        onclick: event => run(async () => {
-          const result = await call('api/owners/write', {property_ref: ref, subject: subject.value.trim()});
-          state = result.state; renderState();
-          toast('Email novo ao proprietário: escreve-o no cartão abaixo, ou com «Gerar resposta», e envia.');
-        }, event.currentTarget)}, 'Escrever ao proprietário')));
+    el('p', {class: 'eyebrow'}, 'PROPRIETÁRIO · ' + owner.email),
+    el('div', {class: 'row owner-fields'}, rename, el('button', {onclick: event => run(async () => {
+      state = (await call('api/owners/add', {email: owner.email, name: rename.value.trim()})).state; renderState(); renderOwners();
+      toast('Nome guardado.');
+    }, event.currentTarget)}, 'Guardar o nome')),
+    el('div', {class: 'owner-refs'}, el('span', {class: 'muted small'}, owner.refs.length ? 'Imóveis:' : 'Ainda sem imóveis nesta pasta de dados.'),
+      owner.refs.map(ref => el('span', {class: 'tag'}, ref, ' ', el('button', {type: 'button', class: 'link', title: 'Tirar este imóvel ao proprietário',
+        onclick: () => { if (confirm(`Tirar ${ref} a este proprietário?`)) setOwner(ref, '', `${ref} já não tem este proprietário.`); }}, '×'))),
+      others.length ? join : null),
+    el('div', {class: 'row owner-write'}, subject, about,
+      el('button', {class: 'primary', onclick: event => run(async () => {
+        const result = await call('api/owners/write', {property_ref: about.value, subject: subject.value.trim(), owner: owner.email});
+        state = result.state; renderState();
+        toast('Email novo ao proprietário: escreve-o no cartão abaixo, ou com «Gerar resposta», e envia.');
+      }, event.currentTarget)}, 'Escrever ao proprietário')),
+    adding);
+  join.addEventListener('change', () => { if (join.value) setOwner(join.value, owner.email, `${join.value} passou a ser deste proprietário.`); });
 }
 
 function ownerCard(email, ref) {
+  const inbox = ref === CAIXA;
   const who = email.customer?.name || email.recipient?.name || 'Proprietário';
   const draft = el('textarea', {rows: 9, 'aria-label': 'Resposta ao proprietário'}, email.reply_text || '');
   const turns = email.conversation?.length ? email.conversation
     : [{who: 'cliente', text: email.customer?.message || email.body_text || '', ts: email.date}];
-  const save = () => call('api/drafts', {property_ref: ref, replies: [{id: email.id, reply_text: draft.value}]});
+  const save = async () => (await call(inbox ? 'api/owners/drafts' : 'api/drafts',
+    inbox ? {replies: [{id: email.id, reply_text: draft.value}]} : {property_ref: ref, replies: [{id: email.id, reply_text: draft.value}]}));
+  const keep = result => { state = result.state || result; };
   const extra = el('textarea', {rows: 2, 'aria-label': 'O que lhe queres dizer',
     placeholder: email.outbound ? 'O que lhe queres dizer (opcional): por exemplo, propor baixar a renda 50 €.'
       : 'Instruções para esta resposta (opcional).'});
   return el('article', {class: 'card email-card owner-card' + (email.outbound ? ' outbound' : '')},
     el('div', {class: 'card-head'}, el('div', {class: 'who'}, el('strong', {}, who), el('span', {class: 'muted small'}, email.recipient?.email || '')),
+      el('span', {class: 'tag'}, inbox ? 'sem imóvel' : ref),
       el('span', {class: 'tag'}, email.outbound ? 'email novo · ' + (email.new_subject || '') : 'proprietário'),
       el('span', {class: 'tag' + (email.reply_status === 'draft' ? ' draft' : '')}, STATUS[email.reply_status] || email.reply_status || ''),
       el('span', {class: 'muted small'}, when(email.date))),
@@ -1672,27 +1700,37 @@ function ownerCard(email, ref) {
         if (draft.value.trim() && draft.value !== (email.reply_text || '')
             && !confirm('O rascunho tem alterações por guardar, e a resposta nova substitui-as. Continuar?')) return;
         const result = await call('api/owners/generate', {property_ref: ref, ids: [email.id], extra: extra.value.trim()});
-        state = result.state; applyFuel(result.fuel, ref); renderState();
+        state = result.state; if (!inbox) applyFuel(result.fuel, ref); renderState();
         const note = (result.notes || []).find(item => item.id === email.id)?.nota;
         toast(result.saved ? 'Resposta ao proprietário gerada: revê-a antes de enviar.' + (note ? ` Nota: ${note}` : '')
           : 'A IA não escreveu a resposta.' + (note ? ` Porquê: ${note}` : ''), result.saved ? 'ok' : 'warn');
       }, event.currentTarget)}, 'Gerar resposta'),
-      el('button', {onclick: event => run(async () => { state = await save(); renderState(); toast('Rascunho guardado.'); }, event.currentTarget)}, 'Guardar'),
+      el('button', {onclick: event => run(async () => { keep(await save()); renderState(); toast('Rascunho guardado.'); }, event.currentTarget)}, 'Guardar'),
       el('button', {class: 'primary send-action', onclick: event => run(async () => {
         if (!draft.value.trim()) throw new Error('Escreve o texto antes de enviar.');
-        state = await save();
-        const check = await call('api/preview', {property_ref: ref, ids: [email.id]});
-        const [reply] = check.replies;
-        if (!confirm(`Enviar ao proprietário, tal como está?\n\nPara: ${reply.to}\nAssunto: ${reply.subject}`)) { renderState(); return; }
-        const result = await call('api/send', {property_ref: ref, preview_token: check.preview_token, confirmed: true});
-        const sent = result.results[0]?.status === 'sent';
+        keep(await save());
+        let sent = false, to = '';
+        if (inbox) {
+          const check = await call('api/owners/preview', {id: email.id});
+          if (!confirm(`Enviar ao proprietário, tal como está?\n\nPara: ${check.to}\nAssunto: ${check.subject}`)) { renderState(); return; }
+          const result = await call('api/owners/send', {id: email.id, check: check.check, confirmed: true});
+          state = result.state; sent = result.status === 'sent'; to = check.to;
+        } else {
+          const check = await call('api/preview', {property_ref: ref, ids: [email.id]});
+          const [reply] = check.replies;
+          if (!confirm(`Enviar ao proprietário, tal como está?\n\nPara: ${reply.to}\nAssunto: ${reply.subject}`)) { renderState(); return; }
+          const result = await call('api/send', {property_ref: ref, preview_token: check.preview_token, confirmed: true});
+          sent = result.results[0]?.status === 'sent'; to = reply.to;
+          state = await call('api/state');
+        }
         if (sent) playSound('send');
-        state = await call('api/state'); renderState();
-        toast(sent ? `Enviado para ${reply.to}.` : 'Não saiu: vê o aviso no próprio cartão antes de repetir.', sent ? 'ok' : 'bad');
+        renderState();
+        toast(sent ? `Enviado para ${to}.` : 'Não saiu: vê o aviso no próprio cartão antes de repetir.', sent ? 'ok' : 'bad');
       }, event.currentTarget)}, 'Enviar'),
       el('button', {class: 'link', onclick: event => run(async () => {
         if (!confirm('Esta mensagem do proprietário não precisa de resposta? Sai da lista; o Gmail não muda.')) return;
-        state = await call('api/dismiss', {property_ref: ref, ids: [email.id]}); renderState();
+        keep(await call(inbox ? 'api/owners/dismiss' : 'api/dismiss', inbox ? {id: email.id} : {property_ref: ref, ids: [email.id]}));
+        renderState();
       }, event.currentTarget)}, 'Não precisa de resposta')));
 }
 
@@ -1946,6 +1984,9 @@ function card(email, index, list) {
           (email.visit_reminder?.when === 'vespera' ? 'lembrete de visita · amanhã ' : 'lembrete de visita · hoje ')
           + String(email.visit_reminder?.at || '').slice(11))
         : email.kind === 'addition' ? el('span', {class: 'tag visit'}, 'acrescento')
+        : email.phase === 'shortlist' ? el('span', {class: 'tag visit', title: email.docs_requested
+          ? 'Já lhe pedimos os documentos: a resposta diz o que chegou e o que falta.' : 'A resposta pede os documentos.'},
+          email.docs_requested ? 'short list · documentos' : 'short list · pedir documentos')
         : email.phase === 'visited' ? el('span', {class: 'tag visit'}, 'já visitou')
         : email.phase === 'booked' ? el('span', {class: 'tag visit', title: email.booked_at ? 'Visita: ' + slotLabel(email.booked_at) : ''}, 'visita marcada')
         // 02/10: from the 9th on, the closing — the reply says goodbye and the rounds leave them out
@@ -1979,6 +2020,10 @@ function card(email, index, list) {
       ? el('p', {class: 'alert warn'}, 'Sem email do cliente no aviso: a resposta não segue por email. Gera-a com «Atualizar resposta» e envia-a por WhatsApp ou SMS.')
       : el('p', {class: 'alert bad'}, email.blocked)),
     (email.warnings || []).map(warning => el('p', {class: 'alert warn'}, warning)),
+    // 03/10: the attached files, by name (nothing is opened here); on the short list they tell what came
+    email.attachments?.length && el('p', {class: 'muted small attachments-line'}, '📎 ' + email.attachments.join(' · ')),
+    email.phase === 'shortlist' && email.docs_requested && email.docs_missing?.length
+      && el('p', {class: 'muted small'}, 'Ainda faltam: ' + email.docs_missing.join('; ') + '.'),
     email.reply_error && el('p', {class: 'alert bad'}, email.reply_error),
     (email.draft_checks || []).map(check => el('p', {class: 'alert warn'}, 'Verificação do rascunho: ' + check)),
     email.consent_suggested && el('p', {class: 'alert warn'}, 'O cliente parece ter dito que sim: confirma para gravar em contactos.csv.'),
@@ -2726,7 +2771,18 @@ function renderNotepad(view, place = null) {
 
 async function loadDigest() { renderDigest(await call('api/digest')); }
 // 02/10: Proprietários shows the ponto de situação of the property chosen there (it stays in the Painel too)
-function renderOwnersDigest(view) { renderNotepad(view, {box: $('owners-digest'), ref: $('owners-property').value}); }
+// 03/10: the ponto de situação of one of the owner's properties (a menu when they have several); none without property
+function renderOwnersDigest(view) {
+  const owner = ownersData().owners.find(item => item.email === ownerChosen);
+  const refs = owner?.refs || [];
+  if (!refs.includes(ownerDigestRef)) ownerDigestRef = refs[0] || null;
+  if (!ownerDigestRef) { $('owners-digest').replaceChildren(); return; }
+  const holder = el('div');
+  renderNotepad(view, {box: holder, ref: ownerDigestRef});
+  const pick = refs.length > 1 && el('select', {'aria-label': 'Ponto de situação de que imóvel', onchange: event => {
+    ownerDigestRef = event.target.value; renderOwnersDigest(view); }}, refs.map(ref => el('option', {value: ref, selected: ref === ownerDigestRef}, ref)));
+  $('owners-digest').replaceChildren(...[pick, holder].filter(Boolean));
+}
 async function loadOwnersDigest() { renderOwnersDigest(await call('api/digest')); }
 
 // What a past round looked like: who it went to, and where each one stands now (booked and when, declined,
@@ -3344,7 +3400,7 @@ function propertySwitcher(select) {
   SWITCHERS.push(render);
   render();
 }
-for (const id of ['queue', 'agenda-property', 'fichas-property', 'owners-property']) propertySwitcher($(id));
+for (const id of ['queue', 'agenda-property', 'fichas-property']) propertySwitcher($(id));
 
 function renderSettings() {
   SWITCHERS.forEach(render => render());  // the descriptions come with the settings
@@ -3449,12 +3505,12 @@ function knowledgeDetails(ref) {
 }
 
 // The knowledge files as the owner wrote them: each one editable whole, and new ones can be added.
-function knowledgeEditor(scope, ref) {
+function knowledgeEditor(scope, ref, owner = null) {
   const box = el('div', {class: 'knowledge-editor'}, el('p', {class: 'muted small'}, 'A carregar…'));
   const load = () => run(async () => {
-    const data = await call('api/knowledge', {property_ref: ref});
+    const data = await call('api/knowledge', {property_ref: ref, owner});
     const save = (file, area, button) => run(async () => {
-      const result = await call('api/knowledge/save', {scope, property_ref: ref, file, text: area.value});
+      const result = await call('api/knowledge/save', {scope, property_ref: ref, owner, file, text: area.value});
       state = result.state; renderState(); load();
       toast(`${result.file} guardado. O próximo prompt já o leva.`);
     }, button);
@@ -3932,12 +3988,12 @@ function openVisitCheck(entry) {
 
 // «Atualizar agenda»: the API reads the active customers' conversations and updates the agenda by itself.
 async function syncAgenda() {
-  const result = await call('api/agenda/sync', {});
+  const result = await call('api/agenda/sync', {days: Number($('agenda-sync-days').value) || 0});
   settings = result.settings; state = result.state; renderSettings(); renderState();
   if (activeTab === 'agenda') renderAgenda();
   const done = result.properties.map(item => item.skipped ? `${item.property_ref}: ${item.skipped}`
     : `${item.property_ref}: ${item.confirmed} nova(s), ${item.moved} mudada(s) de hora, ${item.accepted} aceite(s) `
-      + `por confirmar, ${item.offered} proposta(s) nossa(s)`);
+      + `por confirmar, ${item.offered} proposta(s) nossa(s)` + (item.past ? `, ${item.past} já passada(s), por registar` : ''));
   toast('Visitas atualizadas. ' + done.join(' · '));
 }
 $('agenda-sync-here').addEventListener('click', event => run(syncAgenda, event.currentTarget));

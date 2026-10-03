@@ -23,7 +23,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from starlette.routing import Route
 from . import APP_NAME
-from .ai import (listing_prompt, parse_fichas, parse_listing, parse_alerts, parse_replies, parse_round, parse_visits, reply_prompt,
+from .ai import (listing_prompt, parse_fichas, parse_listing, parse_alerts, parse_documents, parse_replies, parse_round, parse_visits, reply_prompt,
                  round_prompt, short_id, sign)
 from .openai_client import complete, context_of, estimate_cost_usd, estimate_tokens
 from .rules import phone_in
@@ -120,7 +120,7 @@ def web_app(folder, token):
                                               if turn.get("who") == "cliente" for found in [phone_in(turn.get("text"))] if found), ""))
                 # 27/09: the customer's profile on the portal («Ver perfil»), from this notice or an earlier one
                 email["profile_url"] = email.get("profile_url") or profiles.get((address, queue.get("property_ref")), "")
-        return {"account": data["account"], "error": None, "properties": queues}
+        return {"account": data["account"], "error": None, "properties": queues, "owners": data.get("owners")}
 
     def queue(ref):
         current = state()
@@ -153,6 +153,9 @@ def web_app(folder, token):
         saved = 0
         if replies or visits or fichas:
             saved = service.drafts(replies, current["revision"], current["property_ref"], visits, fichas)["saved"]
+        documents = parse_documents(text, current) if current["property_ref"] else []
+        if documents:  # 03/10: what a short-list customer sent, marked as arrived
+            service.mark_documents(current["property_ref"], documents)
         alerts = parse_alerts(text, current) if current["property_ref"] else []
         if alerts:  # 02/10: important, dramatic or insulting: on the card and on the notice board
             service.flag_alerts(current["property_ref"], alerts)
@@ -172,7 +175,7 @@ def web_app(folder, token):
         replies, notes = parse_replies(answer, chosen)
         signature = service.voice_signature()
         replies = [{**reply, "reply_text": sign(reply["reply_text"], signature)} for reply in replies]
-        saved = service.drafts(replies, queue(ref)["revision"], ref)["saved"] if replies else 0
+        saved = (service.caixa_drafts(replies) if ref == "_caixa" else service.drafts(replies, queue(ref)["revision"], ref)["saved"]) if replies else 0
         return {"saved": saved, "notes": notes, "state": state(), "fuel": service.api_fuel(ref), "prompt": prompt_text}
 
     def paste(body):
@@ -309,7 +312,8 @@ def web_app(folder, token):
 
     def agenda_sync(body):
         # «Atualizar agenda»: the API reads the conversations and updates the agenda by itself.
-        return {**service.sync_agenda(body.get("property_ref") or None), "settings": service.settings(), "state": state()}
+        days = int(body["days"]) if str(body.get("days", "")).isdigit() else body.get("days") or 0
+        return {**service.sync_agenda(body.get("property_ref") or None, days), "settings": service.settings(), "state": state()}
 
     def visit_propose(body):
         emails = body.get("emails")
@@ -549,8 +553,9 @@ def web_app(folder, token):
 
     def knowledge_save(body):
         ref = body.get("property_ref") or None
-        result = service.save_knowledge(ref, body.get("file"), body.get("text"), str(body.get("scope") or "property"))
-        return {**result, "knowledge": service.knowledge(ref), "state": state()}
+        result = service.save_knowledge(ref, body.get("file"), body.get("text"), str(body.get("scope") or "property"),
+                                        body.get("owner") or None)
+        return {**result, "knowledge": service.knowledge(ref, body.get("owner") or None), "state": state()}
 
     def note(body):
         ref = body.get("property_ref") or None
@@ -637,8 +642,15 @@ def web_app(folder, token):
                 "owners/generate": ("POST", owners_generate),
                 "owners/set": ("POST", lambda body: (service.set_owner(body.get("property_ref") or None, body.get("email"),
                                                                        body.get("name")), {"state": state(), "settings": service.settings()})[1]),
-                "owners/write": ("POST", lambda body: {**service.write_to_owner(body.get("property_ref") or None, body.get("subject")),
-                                                       "state": state()}),
+                "owners/write": ("POST", lambda body: {**service.write_to_owner(body.get("property_ref") or None, body.get("subject"),
+                                                                                body.get("owner")), "state": state()}),
+                # 03/10: the owners' list, and the inbox of the owners with no property
+                "owners/add": ("POST", lambda body: (service.add_owner(body.get("email"), body.get("name")), {"state": state()})[1]),
+                "owners/drafts": ("POST", lambda body: (service.caixa_drafts(body.get("replies")), {"state": state()})[1]),
+                "owners/preview": ("POST", lambda body: service.caixa_preview(str(body.get("id") or ""))),
+                "owners/send": ("POST", lambda body: {**service.caixa_send(str(body.get("id") or ""), str(body.get("check") or ""),
+                                                                           body.get("confirmed")), "state": state()}),
+                "owners/dismiss": ("POST", lambda body: (service.caixa_dismiss(str(body.get("id") or "")), {"state": state()})[1]),
                 # 02/10: «Encerrar contacto»: the reply becomes a cordial goodbye; once sent, no rounds or reminders
                 "contact/farewell": ("POST", lambda body: (service.farewell(body.get("property_ref") or None,
                                                                             str(body.get("id") or "")), {"state": state()})[1]),
@@ -649,7 +661,7 @@ def web_app(folder, token):
                 "digest/save": ("POST", digest_save), "digest/send": ("POST", digest_send),
                 "digest/send-all": ("POST", digest_send_all),
                 "digest/refresh": ("POST", lambda body: service.refresh_digest(body.get("property_ref") or None)),
-                "knowledge": ("POST", lambda body: service.knowledge(body.get("property_ref") or None)),
+                "knowledge": ("POST", lambda body: service.knowledge(body.get("property_ref") or None, body.get("owner") or None)),
                 "knowledge/note": ("POST", note), "knowledge/save": ("POST", knowledge_save)}
     concurrent.update({handlers["read/progress"][1], handlers["prompt/generate"][1], handlers["backup/choose"][1]})
     routes = ([Route("/", page), Route("/photo/{ref}", photo), Route("/contactos.csv", contacts_csv)]
