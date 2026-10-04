@@ -121,6 +121,13 @@ def test_the_page_is_served_as_its_own_files(page):
     assert scooter.headers["content-type"].startswith("text/css") and ':root[data-theme="scooter"]' in scooter.text
     assert not any(brand in served.text for served in (html, script, style, racing, boat, scooter)
                    for brand in ("Vespa", "Piaggio", "Lambretta"))
+    # 04/10: 00's UK Cabrio, inspired by the British convertible hatches of the 2000s, with no brand anywhere either.
+    assert '<link rel="stylesheet" href="themes/cabrio.css">' in html.text
+    assert '<option value="cabrio">00\'s UK Cabrio</option>' in html.text and "'cabrio'" in script.text
+    cabrio = client.get("/themes/cabrio.css")
+    assert cabrio.headers["content-type"].startswith("text/css") and ':root[data-theme="cabrio"]' in cabrio.text
+    assert not any(brand in served.text for served in (cabrio, style) for brand in ("MINI", "Mini", "Cooper", "BMW"))
+    assert not any(brand in script.text for brand in ("Cooper", "BMW"))
     # KW-Area is the one theme with a real brand (asked for, 27/09): colours and shapes only, its own stylesheet.
     assert '<link rel="stylesheet" href="themes/kw.css">' in html.text
     assert '<option value="kw">KW-Area</option>' in html.text and "'kw'" in script.text
@@ -603,9 +610,31 @@ def test_every_theme_gets_the_new_parts(page):
     style = client.get("/style.css").text
     for theme in ("day", "indigo", "amber"):
         assert f':root[data-theme="{theme}"]{{--chart-requests:' in style
-    for theme in ("racing", "boat", "scooter", "kw", "apalace", "agentval"):
+    for theme in ("racing", "boat", "scooter", "cabrio", "kw", "apalace", "agentval"):
         css = client.get(f"/themes/{theme}.css").text
         assert f':root[data-theme="{theme}"]{{--chart-requests:' in css
-        if theme in ("racing", "boat", "scooter"):
+        if theme in ("racing", "boat", "scooter", "cabrio"):
             assert ".pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link)" in css and "segmented *)" not in css
     assert 'class="dashboard-grid digest-row card"' in client.get("/").text
+
+
+def test_the_cabrio_skin_has_its_instruments_selector_sounds_and_lights():
+    # 04/10: 00's UK Cabrio fills every slot of a rich theme: the giant speedometer among its dials, the toggle bank as its
+    # tab selector (with the ambient light switch, kept in this browser), its own sounds, and a meaning for each light
+    script = (Path(__file__).resolve().parents[1] / "frontend" / "app.js").read_text(encoding="utf-8")
+    entry = script[script.index("  cabrio: {\n    words:"):]
+    entry = entry[:entry.index("\n  },\n")]
+    for slot in ("instruments: cabrioInstruments", "selector: cabrioConsole",
+                 "sounds: {send: cabrioHorn, read: cabrioIndicator, click: cabrioToggle, shift: cabrioFlick}"):
+        assert slot in entry
+    for name in ("cabrioInstruments", "toggleBank", "cabrioGears", "cabrioConsole", "cabrioHorn", "cabrioIndicator", "cabrioToggle", "cabrioFlick", "applyAmbient"):
+        assert f"function {name}(" in script
+    assert "role: 'speedo'" in script[script.index("function cabrioInstruments("):script.index("function heatLimit(")]
+    assert "localStorage.setItem('bot-mail-ambient'" in script
+    lights = script[script.index("  cabrio: [\n"):]
+    lights = re.findall(r"\{key: '(\w+)'", lights[:lights.index("\n  ],")])
+    means = script[script.index("  cabrio: {turn:"):]
+    means = re.findall(r"(\w+): '", means[:means.index("},")])
+    assert lights and set(lights) == set(means)
+    css = (Path(__file__).resolve().parents[1] / "frontend" / "themes" / "cabrio.css").read_text(encoding="utf-8")
+    assert ':root[data-theme="cabrio"][data-ambient="night"]{' in css and ".gauge-speedo svg{" in css and ".bank-toggle.on" in css

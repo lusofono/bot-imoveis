@@ -57,11 +57,13 @@ Abre `http://127.0.0.1:8765` no browser, já com o link certo. É o mesmo que `.
 - **Arrancar outra vez fecha a página anterior** da mesma pasta de dados; nunca mexe noutros programas.
 - Tem quatro separadores: **Painel** (métricas dos últimos 14 dias, imóveis e estado da configuração),
   **Respostas**, **Imóveis** e **Voz e estilo**, com quatro temas visuais simples (Default, Noite, Dia e Índigo)
-  e três temas ricos: o **80's RacingCar** (um cockpit de GT italiano dos anos 80: carbono, nogueira, pele, caixa
+  e quatro temas ricos: o **80's RacingCar** (um cockpit de GT italiano dos anos 80: carbono, nogueira, pele, caixa
   de velocidades como navegação e um quadro de instrumentos por imóvel) e o **90's Boat** (o posto de comando de
   um iate de luxo dos anos 90: casco creme, cromados, teca envernizada nos detalhes, ecrãs azuis e bandeiras de
   sinais nos separadores) e o **70's Scooter** (uma scooter italiana dos anos 70: creme, cromados, verde-menta, as
-  riscas dos anos 70 e um punho de mudanças como navegação), e ainda o **KW-Area** (as cores e a sinalética da
+  riscas dos anos 70 e um punho de mudanças como navegação) e o **00's UK Cabrio** (um descapotável britânico dos anos
+  2000: verde inglês, pele castanha, riscas brancas, a capota de lona, a fila de interruptores da consola como navegação,
+  o velocímetro central gigante e uma luz ambiente de dia ou de noite), e ainda o **KW-Area** (as cores e a sinalética da
   Keller Williams, só cores e formas) e o **APalace** (o aspeto do site da A|Palace). O **Default** (antes «Âmbar») é o primeiro da lista e o tema de partida (desde 27/09: a
   interface é simplificada nele primeiro, e os outros acompanham; a 28/09 passaram todos para o desenho novo). Os temas ricos vivem em `frontend/themes/`, cada um com a sua folha de estilo e, quando
   traz palavras, instrumentos, seletor, relógio ou sons próprios, o seu registo em `SKINS` no `app.js`.
@@ -258,7 +260,7 @@ backend/                   o código Python
   demo.py                  pasta de demonstração, só com dados fictícios
   templates/               exemplos publicados, com dados fictícios: config, voz e perfil de imóvel
 frontend/                  a página: index.html, app.js, style.css (só fala com a API)
-  themes/<tema>.css        os temas ricos ("skins"), um ficheiro cada: racing.css (80's RacingCar), boat.css (90's Boat), scooter.css (70's Scooter), kw.css (KW-Area), apalace.css (APalace)
+  themes/<tema>.css        os temas ricos ("skins"), um ficheiro cada: racing.css (80's RacingCar), boat.css (90's Boat), scooter.css (70's Scooter), cabrio.css (00's UK Cabrio), kw.css (KW-Area), apalace.css (APalace)
 mac/                       atalhos de duplo clique: web, setup, password, openai_key, read, send e o agendamento do READ
 main.py                    arranque local: a página em 127.0.0.1 e o browser; mais tarde, a .app
 data/                      os teus dados (local, ignorado pelo Git)

@@ -42,10 +42,10 @@ def test_a_bad_survey_answer_is_flagged_thanked_and_counted(service):
     [property_] = service.settings()["properties"]
     report = property_["survey_report"]
     assert report["responses"] == 1 and report["alerts"] == 1 and report["parts"]["consultor"]["score"] == 0
-    assert report["answers"][0]["name"] == "Ana" and report["answers"][0]["comment"] == "o consultor chegou atrasado"
+    assert report["answers"][0]["name"] == "Ana Exemplo" and report["answers"][0]["comment"] == "o consultor chegou atrasado"
     assert service.metrics(14)["quality"]["parts"]["imovel"]["score"] == 75
     tasks = {task["kind"]: task for task in service.todo()["tasks"]}
-    assert tasks["survey_alert"]["names"] == ["Ana"] and "reply" not in tasks  # not counted twice
+    assert tasks["survey_alert"]["names"] == ["Ana Exemplo"] and "reply" not in tasks  # not counted twice
 
 
 def test_marks_in_words_over_wrapped_lines_are_read_and_old_answers_are_repaired(service):

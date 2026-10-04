@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="themes/racing.css">
 <link rel="stylesheet" href="themes/boat.css">
 <link rel="stylesheet" href="themes/scooter.css">
+<link rel="stylesheet" href="themes/cabrio.css">
 <link rel="stylesheet" href="themes/kw.css">
 <link rel="stylesheet" href="themes/apalace.css">
 <link rel="stylesheet" href="themes/agentval.css">
@@ -30,17 +31,17 @@
   <!-- A skin's own tab selector (80's RacingCar: the gated gearbox); a copy of the nav above, for the mouse only. -->
   <div id="skin-selector" class="skin-selector" aria-hidden="true"></div>
   <button id="workshop-link" class="workshop-link" type="button" hidden>Oficina</button>
-  <div class="sidebar-note"><span class="status-dot"></span> Ambiente local<span class="app-version" title="Versão da aplicação (ver CHANGELOG.md) e quando este processo arrancou com este código"><strong>v{{VERSION}}</strong><span class="app-build">{{BUILD_AT}}</span></span></div>
+  <div class="sidebar-note"><span class="status-dot" role="img" aria-label="Ambiente local" title="Ambiente local"></span><span class="app-version" title="Versão da aplicação (ver CHANGELOG.md) e quando este processo arrancou com este código"><strong>v{{VERSION}}</strong><span class="app-build">{{BUILD_AT}}</span></span></div>
   <div class="account-card"><span class="avatar" aria-hidden="true">@</span><div><span class="small muted">A tua conta</span><span id="account"></span></div></div>
 </header>
 <div class="workspace">
-<div class="topbar"><span>Workspace <span class="breadcrumb">/</span> <strong id="page-label">Painel</strong></span><span id="busy" role="status" hidden><span class="shift-lights" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>A trabalhar…</span><button id="sound-toggle" class="sound-toggle" type="button" aria-pressed="false" hidden title="Sons deste tema: buzina ao enviar, sino quando chegam emails novos">Sons</button><label class="theme-control" for="theme-select"><span>Tema</span><select id="theme-select" aria-label="Tema visual"><option value="amber">Default</option><option value="apalace">APalace</option><option value="agentval">AgentVal</option><option value="night">Noite</option><option value="day">Dia</option><option value="indigo">Índigo</option><option value="racing">80's RacingCar</option><option value="boat">90's Boat</option><option value="scooter">70's Scooter</option><option value="kw">KW-Area</option></select></label><span class="local-label"><span class="status-dot"></span> Local</span></div>
+<div class="topbar"><span>Workspace <span class="breadcrumb">/</span> <strong id="page-label">Painel</strong></span><span id="busy" role="status" hidden><span class="shift-lights" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>A trabalhar…</span><button id="sound-toggle" class="sound-toggle" type="button" aria-pressed="false" hidden title="Sons deste tema: buzina ao enviar, sino quando chegam emails novos">Sons</button><label class="theme-control" for="theme-select"><span>Tema</span><select id="theme-select" aria-label="Tema visual"><option value="amber">Default</option><option value="apalace">APalace</option><option value="agentval">AgentVal</option><option value="night">Noite</option><option value="day">Dia</option><option value="indigo">Índigo</option><option value="racing">80's RacingCar</option><option value="boat">90's Boat</option><option value="scooter">70's Scooter</option><option value="cabrio">00's UK Cabrio</option><option value="kw">KW-Area</option></select></label><span class="local-label"><span class="status-dot"></span> Local</span></div>
 <main id="main">
 
   <p id="error" class="alert bad" role="alert" hidden></p>
 
   <section id="tab-dashboard" aria-label="Painel">
-    <div class="page-heading"><div><p class="eyebrow" data-word="dashboard.eyebrow">VISÃO GERAL</p><h1 data-word="dashboard.title">O teu dia, em perspetiva.</h1><p class="step" data-word="dashboard.step">Contactos, respostas e imóveis. Tudo no mesmo lugar.</p><p id="dashboard-read" class="small dashboard-read"></p></div>
+    <div class="page-heading"><div><p class="eyebrow" data-word="dashboard.eyebrow">VISÃO GERAL</p><p class="step" data-word="dashboard.step">Contactos, respostas e imóveis. Tudo no mesmo lugar.</p><p id="dashboard-read" class="small dashboard-read"></p></div>
       <div class="retro-widget" aria-label="Relógio e calendário">
         <div class="retro-clock"><span id="clock-analog" class="clock-analog" aria-hidden="true"></span><span id="clock-time">--:--:--</span><span id="clock-date" class="retro-date"></span></div>
         <div class="retro-calendar">
@@ -64,7 +65,8 @@
     <!-- 27/09: the API tanks before the activity summary -->
     <article class="card" id="openai-usage-card"><p class="eyebrow">DEPÓSITOS · API OPENAI</p>
       <div class="fuel-layout"><div id="fuel-panel"></div>
-        <aside class="wallet" id="usage-wallet" aria-label="Gasto total da API, todos os imóveis" title="Estimativa a partir dos tokens exatos que a OpenAI devolve; os preços por token podem já ter mudado. Confirma a fatura real em platform.openai.com/usage."></aside></div></article>
+        <aside class="wallet" id="usage-wallet" aria-label="Gasto total da API, todos os imóveis" title="Estimativa a partir dos tokens exatos que a OpenAI devolve; os preços por token podem já ter mudado. Confirma a fatura real em platform.openai.com/usage."></aside>
+        <div id="fuel-panel-right"></div></div></article>
 
     <article class="card activity-card"><div class="section-heading activity-heading"><p class="eyebrow" data-word="activity.eyebrow">RESUMO DA ATIVIDADE</p><div class="activity-heading-right"><span class="activity-title" data-word="activity.title">O ritmo dos teus contactos</span><select id="chart-period" class="period-select" aria-label="Período do gráfico">
         <option value="all" selected>Desde sempre</option><option value="7">Semana</option><option value="14">Quinzena</option>

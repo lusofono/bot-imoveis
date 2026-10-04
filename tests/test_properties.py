@@ -293,21 +293,23 @@ def test_ambiguous_or_impossible_rent_is_refused(rent):
 
 
 @midnight_sensitive
-def test_dashboard_carries_first_names_only_never_contacts(service):
+def test_dashboard_carries_names_only_never_contacts(service):
     read(service, [lead("1"), lead("2", reply_to=(), body_email="")])
     with patch("backend.service.has_app_password", return_value=False):
         metrics = service.metrics()
-    assert metrics["totals"] == {"pending": 2, "drafts": 0, "blocked": 1, "attention": 0, "answered": 0, "customers": 0}
+    assert metrics["totals"] == {"pending": 2, "drafts": 0, "blocked": 1, "attention": 0, "answered": 0, "customers": 0,
+                                 "owners_pending": 0, "visits_booked": 0}
     assert metrics["setup"] == {"account": True, "app_password": False, "voice": True, "properties": 1,
                                 "openai_key": False}
     assert [item["pending"] for item in metrics["properties"]] == [2]
-    # 27/09: what is behind the queue numbers, for their hover: first name, date, kind, status, blocked; nothing else.
+    # 27/09: what is behind the queue numbers, for their hover: name, date, kind, status, blocked; nothing else.
+    # 04/10: the name as shown everywhere — first name and surname (shown_name)
     queue = metrics["properties"][0]["queue"]
     assert [(item["name"], item["kind"], item["status"], item["blocked"]) for item in queue] == [
-        ("Ana", "lead", "pending", False), ("Ana", "lead", "pending", True)]
+        ("Ana Exemplo", "lead", "pending", False), ("Ana Exemplo", "lead", "pending", True)]
     assert all(set(item) == {"name", "date", "kind", "status", "blocked"} for item in queue)
     text = json.dumps(metrics, ensure_ascii=False)
-    for private in (CUSTOMER, "900 000 001", "Ana Exemplo"):
+    for private in (CUSTOMER, "900 000 001"):
         assert private not in text
 
     draft_and_send(service, "1")
@@ -315,12 +317,12 @@ def test_dashboard_carries_first_names_only_never_contacts(service):
         after = service.metrics()
     assert after["totals"]["answered"] == 1 and after["totals"]["pending"] == 1
     assert after["by_day"][-1]["sent"] == 1  # the send was logged today
-    # The one exception (22/09): who was answered, by first name, for the hover of «Respostas enviadas».
+    # The one exception (22/09): who was answered, by name, for the hover of «Respostas enviadas».
     today = after["by_day"][-1]["day"]
     assert after["properties"][0]["answered_customers"] == [
-        {"name": "Ana", "first_contact": today, "last_reply": today, "interactions": 1}]
+        {"name": "Ana Exemplo", "first_contact": today, "last_reply": today, "interactions": 1}]
     text = json.dumps(after, ensure_ascii=False)
-    for private in (CUSTOMER, "900 000 001", "Ana Exemplo"):
+    for private in (CUSTOMER, "900 000 001"):
         assert private not in text
 
 
@@ -475,3 +477,35 @@ def test_a_notice_with_no_email_but_a_phone_gets_a_reply_for_whatsapp_or_sms_nev
     service.drafts([{"id": "1", "reply_text": "Olá Ana"}], queue["revision"])
     with pytest.raises(ValueError, match="bloqueado"):
         service.preview(["1"])  # never by email
+
+
+def test_a_name_is_shown_as_first_name_and_surname_cut_at_about_22_characters():
+    # 04/10: everywhere the owner sees a customer — never the first name alone when there are more
+    from backend.service import SHOWN_NAME_CHARS, shown_name
+    assert shown_name("Ana Maria Costa Exemplo") == "Ana Exemplo"
+    assert shown_name("  maria  ") == "maria" and shown_name("", "Um cliente") == "Um cliente" and shown_name(None) == "sem nome"
+    long = shown_name("Maximiliana Albuquerquerrrr")
+    assert long.endswith("…") and len(long) == SHOWN_NAME_CHARS == 22 and long.startswith("Maximiliana Albuquer")
+
+
+def test_the_painel_counts_the_owners_emails_to_answer_and_the_visits_booked(service):
+    # 04/10: the Painel's fourth column — the owners' emails still to answer (not the ones we wrote first; the owners'
+    # inbox too) and the visits booked from today on
+    from datetime import date, timedelta
+    from backend.store import load_visits, save_visits
+    read(service, [lead("1")])
+    queue = service.load(REF)
+    queue["emails"] += [{"id": "o1", "kind": "owner", "reply_status": "pending"},
+                        {"id": "o2", "kind": "owner", "reply_status": "draft"},
+                        {"id": "o3", "kind": "owner", "outbound": True, "reply_status": "pending"}]
+    service.save(queue, REF)
+    service.save_caixa({"emails": [{"id": "c1", "kind": "owner", "reply_status": "pending"}], "seen_ids": []})
+    agenda = load_visits(service.folder, REF)
+    tomorrow, yesterday = (date.today() + timedelta(days=1)).isoformat(), (date.today() - timedelta(days=1)).isoformat()
+    agenda["slots"] += [{"at": f"{tomorrow} 15:00", "customer": "a@example.com"},
+                        {"at": f"{yesterday} 15:00", "customer": "b@example.com"}]
+    save_visits(service.folder, REF, agenda)
+    metrics = service.metrics()
+    assert metrics["totals"]["owners_pending"] == 3 and metrics["owners_inbox_pending"] == 1
+    assert metrics["properties"][0]["owners_pending"] == 2
+    assert metrics["totals"]["visits_booked"] == 1 and metrics["totals"]["pending"] == 1  # the owners' are not customers

@@ -39,7 +39,7 @@ def test_expired_contacts_are_listed_then_erased_on_the_owners_click(service, pa
     assert service.expired_contacts() == []
     later = datetime.now(timezone.utc) + timedelta(days=200)
     [expired] = service.expired_contacts(later)
-    assert expired["email"] == CUSTOMER and expired["name"] == "Ana"
+    assert expired["email"] == CUSTOMER and expired["name"] == "Ana Exemplo"
     contacts = load_contacts(service.folder)
     contacts[(CUSTOMER, REF)]["rgpd"] = "sim"  # with consent: kept
     save_contacts(service.folder, contacts)

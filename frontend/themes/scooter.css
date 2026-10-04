@@ -108,7 +108,7 @@
 :root[data-theme="scooter"] .metric:after,:root[data-theme="scooter"] .metric:first-child:after{top:0;right:24px;width:44px;height:9px;border-radius:0 0 6px 6px;background:var(--stripes);box-shadow:none}
 /* Each count sits on the odometer drum: white italic digits on black, in a chrome frame */
 :root[data-theme="scooter"] .metric .value{display:inline-block;min-width:3ch;padding:0 12px;border-radius:9px;color:#fff;background:linear-gradient(180deg,#3a3634,#141212 50%,#2a2624);
-  font:italic 800 32px/1.25 var(--display);box-shadow:0 0 0 3px #dfe4e7,0 0 0 4.5px #8d969d,inset 0 2px 5px #000}
+  font:italic 800 32px/1.12 var(--display);box-shadow:0 0 0 3px #dfe4e7,0 0 0 4.5px #8d969d,inset 0 2px 5px #000}
 :root[data-theme="scooter"] .metric.ok .value{color:#b8f5dd}
 :root[data-theme="scooter"] .metric.warn .value{color:#ffd57a}
 :root[data-theme="scooter"] .metric.bad .value{color:#ffb3aa}

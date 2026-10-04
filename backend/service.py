@@ -213,6 +213,20 @@ def was_proposed(conversation, email, proposed):
                 or conversation.get("visit_check"))
 
 
+SHOWN_NAME_CHARS = 22  # 04/10: a customer's name on the page and the board, cut at about this length
+
+
+def shown_name(name, fallback="sem nome"):
+    """04/10: a customer as the owner sees them, everywhere (notices, «A fazer», the Painel, the reports): the first name
+    and the last surname — never one name alone when there are more — cut at about SHOWN_NAME_CHARS with «…». Only for
+    the owner's eyes: the AI still gets the first name only (ai.first_name)."""
+    words = str(name or "").split()
+    if not words:
+        return fallback
+    text = words[0] if len(words) == 1 else f"{words[0]} {words[-1]}"
+    return text if len(text) <= SHOWN_NAME_CHARS else text[:SHOWN_NAME_CHARS - 1].rstrip() + "…"
+
+
 def waited_hours(item):
     """Hours between the customer's email and now, or None when the email had no usable date."""
     try:
@@ -754,8 +768,7 @@ class MailService:
             if flagged:
                 self.save(data, ref)
         for item, alert in flagged:
-            name = (str((item.get("recipient") or {}).get("name") or (item.get("customer") or {}).get("name") or "").split()
-                    or ["Um cliente"])[0]
+            name = shown_name((item.get("recipient") or {}).get("name") or (item.get("customer") or {}).get("name"), "Um cliente")
             self.notify(f"alerta-{ref}-{item['id']}", f"{name} ({ref}): mensagem {ALERT_KINDS[alert['kind']]}"
                         + (f" — {alert['reason']}" if alert["reason"] else "") + ". Lê-a antes de responder; se for caso "
                         "disso, põe-o na lista cinzenta ou na lista negra.", ref,
@@ -772,8 +785,8 @@ class MailService:
         waiting = self.waiting_customers(data)
         if not waiting:
             return
-        names = [(str((item.get("recipient") or {}).get("name") or (item.get("customer") or {}).get("name") or "").split()
-                  or ["sem nome"])[0] for item in waiting]
+        names = [shown_name((item.get("recipient") or {}).get("name") or (item.get("customer") or {}).get("name"))
+                 for item in waiting]
         days = int(max(waited_hours(item) for item in waiting) // 24)
         self.notify(f"espera-{ref}-{date.today().isoformat()}",
                     f"{len(waiting)} cliente(s) de {ref} à espera da nossa resposta há 3 dias ou mais (o mais antigo, há "
@@ -1224,8 +1237,7 @@ class MailService:
                     selection = ((conversation or {}).get("selection") or {}).get("status")
                     if selection in SELECTION_STATES and not item.get("blocked"):
                         # 02/10: someone on the short list wrote: urgent, on the notice board at once
-                        who = (str(item["customer"].get("name") or (conversation or {}).get("name") or "").split()
-                               or ["Um cliente"])[0]
+                        who = shown_name(item["customer"].get("name") or (conversation or {}).get("name"), "Um cliente")
                         self.notify(f"shortlist-{ref}-{key}", f"{who} ({ref}), na short list ({SELECTION_STATES[selection]}), "
                                     "escreveu: é urgente, responde quanto antes.", ref, "bad", "replies")
                     if conversation is not None:
@@ -2016,7 +2028,7 @@ class MailService:
         today = date.today().isoformat()
         if any(slot["customer"] == email and slot["at"][:10] >= today for slot in load_visits(self.folder, ref)["slots"]):
             return
-        name = (str(conversation.get("name") or "").split() or ["Um cliente"])[0]
+        name = shown_name(conversation.get("name"), "Um cliente")
         key = f"interacao-{stage}-{ref}-{hashlib.sha256(email.encode()).hexdigest()[:8]}"
         if stage == CONCLUSIVE_AT:
             self.notify(key, f"{name} ({ref}): foi a {CONCLUSIVE_AT}.ª interação sem visita marcada. Precisa da tua "
@@ -3438,7 +3450,7 @@ class MailService:
                 if key not in seen:
                     seen.add(key)
                     name = (conversations.get(entry["email"]) or {}).get("name") or entry["email"]
-                    proposals.append({"id": secrets.token_hex(4), "name": (name.split() or [name])[0], **entry})
+                    proposals.append({"id": secrets.token_hex(4), "name": shown_name(name, entry["email"]), **entry})
 
             booked = {(slot["customer"], slot["at"]) for slot in slots}
             for email, talk in conversations.items():
@@ -3970,7 +3982,7 @@ class MailService:
             stamps += [turn.get("ts") or turn.get("at") or "" for turn in conversation.get("history") or []]
             last = max(stamps)[:10]  # by day: some stamps are days, others full times
             if last and last < limit[:10]:
-                expired.append({"email": email, "imovel": ref, "name": ((row.get("nome") or "").split() or ["sem nome"])[0],
+                expired.append({"email": email, "imovel": ref, "name": shown_name(row.get("nome")),
                                 "last": last})
         return sorted(expired, key=lambda item: item["last"])
 
@@ -4140,7 +4152,7 @@ class MailService:
                    if conversation.get("visit_survey")]
         answers.sort(key=lambda pair: pair[1].get("at") or "", reverse=True)
         return {**survey_report([survey for _, survey in answers]),
-                "answers": [{"name": (name.split() or ["sem nome"])[0], "at": survey.get("at"), "comment": survey.get("comentario"),
+                "answers": [{"name": shown_name(name), "at": survey.get("at"), "comment": survey.get("comentario"),
                              "interest": survey.get("interesse"), "alerts": survey_alerts(survey),
                              **{part: survey.get(part) for part in ("imovel", "consultor", "marcacao")}}
                             for name, survey in answers]}
@@ -4162,10 +4174,10 @@ class MailService:
 
     def todo(self):
         """«A fazer» (26/09), right under the dashboard's telemetry: what needs doing now, worked out from the data.
-        Nothing is typed by hand, and a task goes away once it is done. Of the customers, only first names leave
-        this call (as in metrics): never an address or a phone."""
+        Nothing is typed by hand, and a task goes away once it is done. Of the customers, only their names leave
+        this call (as in metrics; 04/10: first name and surname, shown_name): never an address or a phone."""
         def first_names(names):
-            return [(str(name or "").split() or ["sem nome"])[0] for name in names]
+            return [shown_name(name) for name in names]
 
         def name_of(item):
             return (item.get("recipient") or {}).get("name") or (item.get("customer") or {}).get("name") or ""
@@ -4255,7 +4267,7 @@ class MailService:
             return {"tasks": tasks}
 
     def metrics(self, days=14):
-        """Numbers for the dashboard. Of the customers, only first names leave this call: no address or phone.
+        """Numbers for the dashboard. Of the customers, only names leave this call (first name and surname, shown_name): no address or phone.
 
         days: the chart's period, one of CHART_PERIODS; 3 months are drawn one bar per week, not per day. "all"
         (27/09, «Desde sempre»): from the first day with data, one bar per day up to a month, per week up to half a
@@ -4328,23 +4340,28 @@ class MailService:
                 for item in emails:
                     if item.get("kind") not in PROGRAM_KINDS:
                         derived.setdefault(item["id"], str(item.get("date") or "")[:10])
-                # The one exception to "no customer data" on the dashboard (22/09): first name, dates and
+                # The one exception to "no customer data" on the dashboard (22/09): the name (04/10: shown_name), dates and
                 # how many replies, for the hover of «Respostas enviadas». Never an address or a phone.
-                customers = sorted(({"name": ((conversation.get("name") or "").split() or ["(sem nome)"])[0],
+                customers = sorted(({"name": shown_name(conversation.get("name"), "(sem nome)"),
                                      "first_contact": (contacts.get((email, ref)) or {}).get("primeiro_contacto") or None,
                                      "last_reply": str(conversation.get("last_sent_at") or "")[:10] or None,
                                      "interactions": conversation.get("stage", 0)}
                                     for email, conversation in conversations.items() if conversation.get("stage")),
                                    key=lambda customer: customer["last_reply"] or "", reverse=True)
-                # 27/09: what is behind the Painel's four queue numbers, for their hover (the last ten of each): first
-                # name, day, what it is and how it stands. The same exception as above: never an address or a phone.
-                queue = [{"name": ((((item.get("customer") or {}).get("name") or (item.get("recipient") or {}).get("name")
-                                     or "").split()) or ["(sem nome)"])[0],
+                # 27/09: what is behind the Painel's four queue numbers, for their hover (the last ten of each): the
+                # name (shown_name), day, what it is and how it stands. The same exception as above: never an address or a phone.
+                queue = [{"name": shown_name((item.get("customer") or {}).get("name") or (item.get("recipient") or {}).get("name"),
+                                             "(sem nome)"),
                           "date": str(item.get("date") or ""), "kind": item.get("kind"),
                           "status": item.get("reply_status") or "pending", "blocked": bool(item.get("blocked"))}
                          for item in emails]
+                # 04/10: the owners' emails still to answer (theirs, not the ones we wrote first) and the visits booked
+                # from today on — the Painel's fourth column
+                owners_pending = sum(1 for item in data["emails"] if item.get("kind") == "owner" and not item.get("outbound")
+                                     and item.get("reply_status") in (None, "pending", "draft"))
+                visits_booked = sum(1 for slot in slots if slot["at"][:10] >= today_iso)
                 totals.update(pending=len(emails), drafts=status["draft"], blocked=blocked, answered=answered,
-                              customers=len(conversations),
+                              customers=len(conversations), owners_pending=owners_pending, visits_booked=visits_booked,
                               attention=status["uncertain"] + status["error"] + status["sending"])
                 last_read = max([stamp for stamp in (last_read, data.get("last_read_at")) if stamp], default=None)
                 listing = profiles[ref]["property"] if ref else {}
@@ -4356,7 +4373,7 @@ class MailService:
                                    "oldest_wait_hours": max([hours for hours in waits if hours is not None], default=None),
                                    "blocked": blocked, "answered": answered, "customers": len(conversations),
                                    "attention": status["uncertain"] + status["error"] + status["sending"],
-                                   "visits_booked": sum(1 for slot in slots if slot["at"][:10] >= today_iso),
+                                   "visits_booked": visits_booked, "owners_pending": owners_pending,
                                    "reply_hours_max": self.panel(ref)["reply_hours_max"],
                                    "api_fuel": self.api_fuel(ref, events),
                                    "petrol": self.visit_petrol(self.panel(ref), slots),
@@ -4438,12 +4455,17 @@ class MailService:
                                      "sent": mine["sent"].get(day, 0)} for day in starts],
                             reply_hours=round(sum(mine["waited"]) / len(mine["waited"]), 1) if mine["waited"] else None,
                             openai_usage={"period": usage_of(mine["period"]), "all_time": usage_of(mine["all_time"])})
-            # The Painel's quality dials: every property's survey answers together (first names never leave here).
+            # The Painel's quality dials: every property's survey answers together (names never leave here).
             quality_all = survey_report([survey_of(conversation) for ref in refs if ref
                                          for conversation in self.load(ref).get("conversations", {}).values()])
+            # 04/10: the owners with no property write to the owners' inbox: their emails to answer count too
+            caixa_pending = sum(1 for item in self.load_caixa()["emails"] if not item.get("outbound")
+                                and item.get("reply_status") in (None, "pending", "draft"))
+            totals["owners_pending"] += caixa_pending
             return {"account": account, "last_read_at": last_read, "properties": properties, "quality": quality_all,
-                    "totals": {key: totals[key] for key in
-                               ("pending", "drafts", "blocked", "attention", "answered", "customers")},
+                    "totals": {key: totals[key] for key in ("pending", "drafts", "blocked", "attention", "answered", "customers",
+                                                            "owners_pending", "visits_booked")},
+                    "owners_inbox_pending": caixa_pending,
                     "period_days": days, "bucket_days": step,
                     "by_day": [{"day": day, "requests": requests.get(day, 0), "sent": sent.get(day, 0)}
                                for day in starts],

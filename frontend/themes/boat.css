@@ -81,7 +81,7 @@
 :root[data-theme="boat"] nav{margin-right:12px}
 /* The flag, the icon, the name and the count did not fit in the sidebar (about 210 px for «Comunicações»), so the tab
    ran under the rail: tighter gaps, a smaller flag, and the count as a bubble on the tab's corner (26/09) */
-:root[data-theme="boat"] .tab .nav-count{position:absolute;top:-7px;right:-6px;margin:0;padding:0 6px;z-index:1}
+:root[data-theme="boat"] .tab .nav-count{position:absolute;top:-2px;right:-6px;margin:0;padding:0 6px;z-index:1}  /* 04/10: 5px lower */
 :root[data-theme="boat"] .tab{position:relative;gap:8px;padding:9px 10px;border-radius:10px;color:#23384f;font:600 14px/1.3 var(--ui);letter-spacing:.2px}
 :root[data-theme="boat"] .tab>span:first-child{display:none}
 :root[data-theme="boat"] .tab::before{content:"";flex:none;width:22px;height:15px;background:var(--flag) center/contain no-repeat;
@@ -133,7 +133,7 @@
 :root[data-theme="boat"] .metric{background:var(--gelcoat);border:1px solid #e3dccd;box-shadow:inset 0 1px 0 #fff,0 10px 26px #1b2a3a12}
 :root[data-theme="boat"] .metric:first-child{border-color:#d9ccb2;background:linear-gradient(180deg,#fffdf8,#f3ead8)}
 /* Each count is on a blue marine screen, set in a teak surround with a chrome edge */
-:root[data-theme="boat"] .metric .value{display:inline-block;min-width:3ch;padding:1px 14px;border:5px solid #0000;border-radius:11px;
+:root[data-theme="boat"] .metric .value{display:inline-block;min-width:3ch;padding:0 14px;border:5px solid #0000;border-radius:11px;
   color:var(--ink-blue);font-family:var(--ui);font-weight:600;letter-spacing:0;text-shadow:0 0 12px #5fd4ffa6;
   background:var(--screen) padding-box,var(--wood);
   box-shadow:0 0 0 1px #9aa1a9,0 0 0 2.5px #fdfbf7,0 0 0 3.5px #c3c9cf,inset 0 2px 9px #000a}

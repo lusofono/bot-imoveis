@@ -18,7 +18,7 @@ def test_the_queue_the_agenda_and_the_setup_become_tasks_that_go_away_when_done(
 
     read(service, [lead("1")])
     task = kinds(service)["reply"]
-    assert (task["tab"], task["property_ref"], task["count"], task["names"]) == ("replies", REF, 1, ["Ana"])
+    assert (task["tab"], task["property_ref"], task["count"], task["names"]) == ("replies", REF, 1, ["Ana Exemplo"])
     revision = service.pending()["properties"][0]["revision"]
     service.drafts([{"id": "1", "reply_text": "Olá."}], revision, REF)
     assert "reply" not in kinds(service) and kinds(service)["draft"]["count"] == 1

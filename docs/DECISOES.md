@@ -3,6 +3,25 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 04/10/2026: o tema 00's UK Cabrio, e um plano para as skins (α.114.0)
+
+**Decisão (conversa com o utilizador, 04/10).**
+- **Novo tema rico, «00's UK Cabrio»** (id `cabrio`): inspirado nos descapotáveis britânicos de 2001–2013, em verde
+  inglês, pele castanha e branco. Não usa o nome nem o emblema das marcas (MINI e Cooper são marcas da BMW, e o ARIA é
+  para vender), tal como os outros temas ricos. Tem a fila de interruptores da consola como navegação, o velocímetro
+  central gigante no painel de cada imóvel, sons sintetizados (sem gravações do carro) e uma luz ambiente de dia ou de
+  noite, guardada no navegador como o tema.
+- **Construído no formato atual** (escolha do utilizador): CSS próprio em `frontend/themes/cabrio.css` e o resto em
+  `app.js`, como o barco e a vespa. Fica mais um tema rico a rever em cada mudança visual.
+- **Para o futuro, skins sem mexer no código:**
+  1. um contrato de variáveis, em que as peças da página leem variáveis em vez de terem regras por tema;
+  2. uma skin como pacote de ficheiros (`skin.json`, CSS limitado ao contrato, imagens e sons), lido de uma pasta e
+     instalado na Oficina;
+  3. nunca JS vindo de fora;
+  4. pacotes assinados pela BigLearn, se for para vender;
+  5. testes de contraste e uma galeria de todas as peças.
+  Por fases: primeiro os temas simples, por fim os três (agora quatro) temas ricos.
+
 ## 04/10/2026: os avisos do quadro saem sozinhos, não se arquivam (α.110.0)
 
 **Decisão (pedido do utilizador, 04/10):** «se existe o aviso tem de ficar». O quadro de avisos deixa de ter

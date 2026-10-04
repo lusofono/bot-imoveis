@@ -11,7 +11,7 @@ let state = {properties: []}, settings = null, preview = null;
 // APalace is first, and the one a browser with no choice saved starts in (27/09).
 // «Default» (id amber, once «Âmbar») first and the one to start with (27/09): the interface is being simplified in it,
 // the others follow later.
-const THEMES = ['amber', 'apalace', 'agentval', 'night', 'day', 'indigo', 'racing', 'boat', 'scooter', 'kw'];
+const THEMES = ['amber', 'apalace', 'agentval', 'night', 'day', 'indigo', 'racing', 'boat', 'scooter', 'cabrio', 'kw'];
 function applyTheme(theme) {
   const chosen = THEMES.includes(theme) ? theme : 'amber';
   document.documentElement.dataset.theme = chosen;
@@ -19,6 +19,14 @@ function applyTheme(theme) {
 }
 try { applyTheme(localStorage.getItem('bot-mail-theme')); }
 catch { applyTheme('amber'); }
+// 04/10: 00's UK Cabrio's ambient light, day or night — kept in this browser like the theme; only that skin dresses it
+function ambient() { return document.documentElement.dataset.ambient === 'night' ? 'night' : 'day'; }
+function applyAmbient(value) {
+  document.documentElement.dataset.ambient = value === 'night' ? 'night' : 'day';
+  try { localStorage.setItem('bot-mail-ambient', document.documentElement.dataset.ambient); } catch { /* Storage may be unavailable. */ }
+}
+try { document.documentElement.dataset.ambient = localStorage.getItem('bot-mail-ambient') === 'night' ? 'night' : 'day'; }
+catch { document.documentElement.dataset.ambient = 'day'; }
 $('theme-select').addEventListener('change', event => {
   applyTheme(event.target.value);
   try { localStorage.setItem('bot-mail-theme', event.target.value); } catch { /* Storage may be unavailable. */ }
@@ -42,7 +50,7 @@ const SKINS = {
   // 30/09: AgentVal speaks with a warmer, more human voice; its colours and type are in themes/agentval.css
   agentval: {
     words: {
-      'dashboard.eyebrow': 'O SEU DIA', 'dashboard.title': 'Cada contacto, uma decisão a acompanhar.',
+      'dashboard.eyebrow': 'O SEU DIA',
       'activity.eyebrow': 'PERCURSO', 'activity.title': 'Pedidos e respostas, lado a lado',
       'setup.eyebrow': 'PRÓXIMO PASSO', 'setup.title': 'Tudo pronto para acompanhar',
       'replies.eyebrow': 'CONVERSAS', 'replies.title': 'Responder com cuidado, a cada pessoa.',
@@ -54,7 +62,7 @@ const SKINS = {
   },
   racing: {
     words: {
-      'dashboard.eyebrow': 'COCKPIT', 'dashboard.title': 'O teu dia, a todo o gás.',
+      'dashboard.eyebrow': 'COCKPIT',
       'dashboard.step': 'Contactos, respostas e imóveis: todos os instrumentos à vista.',
       'activity.eyebrow': 'ROAD BOOK', 'activity.title': 'Pedidos e respostas, volta a volta',
       'setup.eyebrow': 'CHECK-LIST DE PARTIDA', 'setup.title': 'Pronto para arrancar',
@@ -73,7 +81,7 @@ const SKINS = {
   },
   boat: {
     words: {
-      'dashboard.eyebrow': 'PONTE DE COMANDO', 'dashboard.title': 'O teu dia, a todo o pano.',
+      'dashboard.eyebrow': 'PONTE DE COMANDO',
       'dashboard.step': 'Contactos, respostas e imóveis: todos os instrumentos de bordo à vista.',
       'activity.eyebrow': 'DIÁRIO DE BORDO', 'activity.title': 'Pedidos e respostas, milha a milha',
       'setup.eyebrow': 'ANTES DE LARGAR', 'setup.title': 'Pronto para largar amarras',
@@ -92,7 +100,7 @@ const SKINS = {
   },
   scooter: {
     words: {
-      'dashboard.eyebrow': 'GUIADOR', 'dashboard.title': 'O teu dia, a passear numa vila costeira.',
+      'dashboard.eyebrow': 'GUIADOR',
       'dashboard.step': 'Contactos, respostas e imóveis: tudo à vista, entre os punhos.',
       'activity.eyebrow': 'ROAD BOOK', 'activity.title': 'Pedidos e respostas, curva a curva',
       'setup.eyebrow': 'ANTES DO ARRANQUE', 'setup.title': 'Pronto para dar ao pedal',
@@ -108,6 +116,27 @@ const SKINS = {
     instruments: scooterInstruments,
     selector: twistGrip,
     sounds: {send: scooterRev, read: scooterStart, click: chromeTick, shift: scooterGear},
+  },
+  // 04/10: 00's UK Cabrio — a British convertible hatch of the 2000s, in racing green, tan leather and white stripes;
+  // inspired by the cars of the time, with no brand, badge or name (as the other skins). Its look is in themes/cabrio.css.
+  cabrio: {
+    words: {
+      'dashboard.eyebrow': 'TABLIER',
+      'dashboard.step': 'Contactos, respostas e imóveis: tudo no velocímetro central.',
+      'activity.eyebrow': 'ROAD TRIP', 'activity.title': 'Pedidos e respostas, milha a milha',
+      'setup.eyebrow': 'ANTES DE ARRANCAR', 'setup.title': 'Capota aberta, pronto a sair',
+      'replies.eyebrow': 'A CONSOLA', 'replies.title': 'Cada resposta, num toque de interruptor.',
+      'properties.eyebrow': 'A GARAGEM', 'properties.title': 'Cada imóvel, o seu descapotável.',
+      'properties.step': 'Um tablier por imóvel: o velocímetro central, o conta-rotações, a temperatura e o depósito.',
+      'contacts.eyebrow': 'O CLUBE', 'contacts.title': 'Quem já entrou no clube, num só registo.',
+      'agenda.eyebrow': 'ROTEIRO', 'agenda.title': 'A semana, curva a curva.',
+      'voice.eyebrow': 'AFINAÇÃO', 'voice.title': 'Afinação: as tuas palavras, o teu estilo.',
+      'cluster.eyebrow': 'TABLIER · INSTRUMENTOS', 'cluster.chart': 'O PERCURSO DESTE IMÓVEL',
+      'lamp.heat': 'Motor quente', 'heat.limit': 'Quente às', 'trip.title': 'Computador de bordo',
+    },
+    instruments: cabrioInstruments,
+    selector: cabrioConsole,
+    sounds: {send: cabrioHorn, read: cabrioIndicator, click: cabrioToggle, shift: cabrioFlick},
   },
 };
 function skin() { return SKINS[document.documentElement.dataset.theme] || null; }
@@ -395,6 +424,75 @@ function chromeTick(context) {
   partial.connect(gain).connect(context.destination); partial.start(t); partial.stop(t + 0.08);
 }
 
+// 00's UK Cabrio (04/10), made on the spot like the others' fallbacks. Emails out: the horn, «bip-bip» — two short
+// twin-tone honks, fuller and lower than the scooter's.
+function cabrioHorn(context) {
+  const t = context.currentTime, filter = context.createBiquadFilter(), out = context.createGain();
+  filter.type = 'bandpass'; filter.frequency.value = 650; filter.Q.value = 0.7;
+  out.gain.value = 0.9;
+  filter.connect(out).connect(context.destination);
+  for (const at of [t, t + 0.22]) {
+    const gain = context.createGain();
+    gain.gain.setValueAtTime(0.0001, at);
+    gain.gain.exponentialRampToValueAtTime(0.1, at + 0.012);
+    gain.gain.setValueAtTime(0.1, at + 0.12);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
+    gain.connect(filter);
+    for (const frequency of [415, 494]) {  // a small car's twin horn
+      const voice = context.createOscillator();
+      voice.type = 'square'; voice.frequency.value = frequency;
+      voice.connect(gain); voice.start(at); voice.stop(at + 0.17);
+    }
+  }
+}
+// The indicator's relay: a click with a little body, high on the «tick», lower on the «tock».
+function relayClick(context, at, frequency, level) {
+  noiseBurst(context, at, 0.018, 'bandpass', frequency, level);
+  const body = context.createOscillator(), gain = context.createGain();
+  body.type = 'triangle'; body.frequency.value = frequency / 3;
+  gain.gain.setValueAtTime(level * 0.5, at); gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.03);
+  body.connect(gain).connect(context.destination); body.start(at); body.stop(at + 0.035);
+}
+// New emails: the indicator ticking, three times — tick-tock, tick-tock, tick-tock.
+function cabrioIndicator(context) {
+  const t = context.currentTime;
+  for (let i = 0; i < 3; i++) {
+    relayClick(context, t + i * 0.5, 2600, 0.09);
+    relayClick(context, t + i * 0.5 + 0.25, 1700, 0.07);
+  }
+}
+// Every button: a toggle switch on the console — a firm metal click, a short spring ring and a small thump.
+function cabrioToggle(context) {
+  const t = context.currentTime;
+  noiseBurst(context, t, 0.02, 'highpass', 3000, 0.16);
+  const ring = context.createOscillator(), gain = context.createGain();
+  ring.type = 'sine'; ring.frequency.value = 3400;
+  gain.gain.setValueAtTime(0.025, t + 0.004); gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+  ring.connect(gain).connect(context.destination); ring.start(t); ring.stop(t + 0.13);
+  const thump = context.createOscillator(), low = context.createGain();
+  thump.type = 'sine'; thump.frequency.setValueAtTime(180, t); thump.frequency.exponentialRampToValueAtTime(70, t + 0.05);
+  low.gain.setValueAtTime(0.1, t); low.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+  thump.connect(low).connect(context.destination); thump.start(t); thump.stop(t + 0.07);
+}
+// A tab: its toggle flicked over, and the small four-cylinder answering, a touch higher in each gear.
+function cabrioFlick(context, gear) {
+  cabrioToggle(context);
+  const t = context.currentTime + 0.05, g = Math.max(1, gear), base = 55 * 1.1 ** (g - 1);
+  const out = context.createGain(), filter = context.createBiquadFilter();
+  filter.type = 'lowpass'; filter.frequency.setValueAtTime(700, t); filter.frequency.linearRampToValueAtTime(1300 + g * 120, t + 0.25);
+  out.gain.setValueAtTime(0.0001, t); out.gain.exponentialRampToValueAtTime(0.07, t + 0.05);
+  out.gain.setValueAtTime(0.07, t + 0.3); out.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+  filter.connect(out).connect(context.destination);
+  for (const [ratio, detune] of [[1, 0], [2, 4]]) {
+    const voice = context.createOscillator();
+    voice.type = 'sawtooth'; voice.detune.value = detune;
+    voice.frequency.setValueAtTime(base * ratio, t);
+    voice.frequency.exponentialRampToValueAtTime(base * 1.8 * ratio, t + 0.25);
+    voice.frequency.exponentialRampToValueAtTime(base * 1.2 * ratio, t + 0.6);
+    voice.connect(filter); voice.start(t); voice.stop(t + 0.62);
+  }
+}
+
 // 70's Scooter's tab selector: the twist grip of a 70s Italian scooter, with its gear drum in a chrome housing. The
 // tabs are gears: the drum slides until the open tab's number sits in the window, and ▲ and ▼ on the black grip move
 // one gear up or down (02/10). Like the gearbox and the helm, it repeats the nav for the mouse only (aria-hidden).
@@ -463,6 +561,139 @@ function twistGrip(box) {
     }
     current = index;
   }};
+}
+
+// 00's UK Cabrio's toggle bank (04/10): the chrome toggle switches on the centre console of a British hatch of the
+// 2000s, under its chrome guard bar. The gears below are the tab selector; what these extra switches do is for later —
+// for now R, 5 and 6 still open their tabs (Voz e estilo, Imóveis, Proprietários), and the last one, apart, switches the
+// ambient light between day and night. It repeats the nav for the mouse only (aria-hidden).
+function toggleBank(box) {
+  // 04/10: only R, 5 and 6 (and the light) are left, wider and further apart, at the same height; drawn like the real
+  // ones — a short chrome lever, tilted, in a dark socket with a chrome collar, between glossy black guard loops
+  const tabs = ['voice', 'properties', 'owners'], places = [34, 78, 122], light_at = 168, loops = [12, 56, 100, 145, 186], y = 46;
+  const gradient = (tag, id, attrs, colours) => svg(tag, {id, ...attrs},
+    colours.map(([offset, colour]) => svg('stop', {offset, 'stop-color': colour})));
+  const barrel = turn => svg('g', {class: 'bank-lever ' + (turn > 90 ? 'up' : 'down'), transform: `rotate(${turn})`},
+    svg('rect', {x: -4.6, y: -1, width: 9.2, height: 19, rx: 4.6}),
+    svg('ellipse', {cy: 16.6, rx: 4.1, ry: 2.5, class: 'bank-tip'}),
+    svg('path', {d: 'M-1.8 1.5V14', class: 'bank-shine'}));
+  const lever = (x, label, extra = '') => svg('g', {class: 'bank-toggle' + extra, transform: `translate(${x} ${y})`},
+    svg('rect', {x: -18, y: -22, width: 36, height: 52, class: 'bank-hit'}),
+    svg('circle', {r: 11.5, class: 'bank-socket'}),
+    svg('circle', {r: 7.4, class: 'bank-ring'}),
+    barrel(-28), barrel(208),
+    svg('text', {y: 33, class: 'bank-label'}, label));
+  const toggles = tabs.map((tab, i) => {
+    const node = lever(places[i], tab === 'voice' ? 'R' : String(gearOf(tab)));
+    node.append(svg('title', {}, TAB_NAMES[tab]));
+    node.addEventListener('click', () => showTab(tab));
+    return node;
+  });
+  const light = lever(light_at, 'LUZ', ' light');
+  const title = svg('title', {});
+  light.append(title);
+  const paintLight = () => {
+    light.classList.toggle('on', ambient() === 'night');
+    title.textContent = ambient() === 'night' ? 'Luz ambiente: noite (clica para dia)' : 'Luz ambiente: dia (clica para noite)';
+  };
+  light.addEventListener('click', () => { applyAmbient(ambient() === 'night' ? 'day' : 'night'); playSound('click'); paintLight(); });
+  const loop = x => [svg('path', {d: `M${x - 5} 76V32Q${x - 5} 21 ${x} 21Q${x + 5} 21 ${x + 5} 32V76`, class: 'bank-loop'}),
+    svg('path', {d: `M${x - 3.3} 70V33Q${x - 3.3} 24.5 ${x} 24`, class: 'bank-loop-shine'})];
+  box.append(svg('svg', {viewBox: '0 0 198 92', class: 'toggle-bank'},
+    svg('defs', {},
+      gradient('linearGradient', 'bank-panel', {x1: 0, y1: 0, x2: 0, y2: 1}, [[0, '#2a2f2c'], [0.5, '#121513'], [1, '#050605']]),
+      gradient('linearGradient', 'bank-chrome', {x1: 0, y1: 0, x2: 0, y2: 1},
+        [[0, '#fff'], [0.3, '#d6dce0'], [0.52, '#8d969d'], [0.62, '#eef1f3'], [1, '#9aa3aa']]),
+      gradient('linearGradient', 'bank-barrel', {x1: 0, y1: 0, x2: 1, y2: 0},
+        [[0, '#5f676d'], [0.28, '#eef1f3'], [0.45, '#ffffff'], [0.7, '#b9c1c6'], [1, '#4f565c']]),
+      gradient('radialGradient', 'bank-socket', {cx: 0.5, cy: 0.45, r: 0.55}, [[0, '#000'], [0.75, '#0d0d0d'], [1, '#2e2e2e']])),
+    svg('rect', {x: 2, y: 12, width: 194, height: 76, rx: 13, class: 'bank-panel'}),
+    loops.map(loop),
+    toggles, light));
+  paintLight();
+  return {update(tab) {
+    tabs.forEach((name, i) => toggles[i].classList.toggle('on', name === tab));
+  }};
+}
+
+// 00's UK Cabrio's gears (04/10): the gear stick of a British hatch of the 2000s, seen from above — a round base with a
+// chrome ring and black leather in the middle, stitched round, the gear numbers in the leather where each gear is (an
+// H, R and 1 to 6, one per tab, like the RacingCar's), and the knob — a dark ball in a chrome band, the engaged gear on
+// its top — moving inside it with its leather boot. It goes through neutral like a real one; a click on a gear changes
+// tab. Like the other selectors, it repeats the nav for the mouse only (aria-hidden).
+const CABRIO_GEARS = {voice: [-36, -26], dashboard: [-12, -26], replies: [-12, 26], contacts: [12, -26], agenda: [12, 26],
+  properties: [36, -26], owners: [36, 26]};
+function cabrioGears(box) {
+  const cx = 70, cy = 70, ring = 64, columns = [-36, -12, 12, 36], row = 26;
+  const gradient = (tag, id, attrs, colours) => svg(tag, {id, ...attrs},
+    colours.map(([offset, colour]) => svg('stop', {offset, 'stop-color': colour})));
+  const tabs = Object.keys(CABRIO_GEARS);
+  const number = tab => tab === 'voice' ? 'R' : String(gearOf(tab) || tabs.indexOf(tab));
+  const spots = tabs.map(tab => svg('text', {x: cx + CABRIO_GEARS[tab][0], y: cy + CABRIO_GEARS[tab][1] + 4.5, class: 'mg-spot',
+    'data-tab': tab}, number(tab)));
+  const hits = tabs.map(tab => svg('circle', {cx: cx + CABRIO_GEARS[tab][0], cy: cy + CABRIO_GEARS[tab][1], r: 11, fill: 'transparent',
+    class: 'mg-hit', 'data-tab': tab}, svg('title', {}, TAB_NAMES[tab])));
+  for (const node of [...spots, ...hits]) node.addEventListener('click', () => showTab(node.dataset.tab));
+  // the gate, as a faint stitched seam in the leather
+  const seam = `M${cx + columns[0]} ${cy}H${cx + columns[3]}`
+    + columns.map((x, i) => `M${cx + x} ${cy - row}V${cy + (i ? row : 0)}`).join('');
+  const engaged = svg('text', {y: 5, class: 'mg-knob-number'}, '');
+  const knob = svg('g', {class: 'mg-knob'}, svg('g', {transform: 'scale(1.2)'},  // 04/10: the ball 20 % bigger
+    svg('circle', {r: 23, fill: 'url(#mg-boot)'}),
+    [0, 72, 144, 216, 288].map(turn => svg('path', {d: 'M0 -22Q5 -12 0 -4', class: 'mg-fold', transform: `rotate(${turn})`})),
+    svg('circle', {cx: 1, cy: 3.5, r: 15, fill: '#000', opacity: 0.45}),
+    svg('circle', {r: 15, fill: 'url(#mg-chrome-ball)', stroke: '#4a5157', 'stroke-width': 0.6}),
+    svg('circle', {r: 11, fill: 'url(#mg-top)'}),
+    engaged,
+    svg('ellipse', {cx: -4.5, cy: -7, rx: 6, ry: 2.6, fill: '#fff', opacity: 0.28})));
+  box.append(svg('svg', {viewBox: '0 0 140 142', class: 'cabrio-gears'},
+    svg('defs', {},
+      gradient('linearGradient', 'mg-chrome', {x1: 0, y1: 0, x2: 0, y2: 1},
+        [[0, '#fff'], [0.3, '#d6dce0'], [0.52, '#8d969d'], [0.62, '#eef1f3'], [1, '#9aa3aa']]),
+      gradient('radialGradient', 'mg-leather', {cx: 0.5, cy: 0.45, r: 0.6}, [[0, '#2c2824'], [0.7, '#171513'], [1, '#0b0a09']]),
+      gradient('radialGradient', 'mg-boot', {cx: 0.45, cy: 0.4, r: 0.6}, [[0, '#3c352e'], [0.75, '#1a1714'], [1, '#0b0a0900']]),
+      gradient('radialGradient', 'mg-chrome-ball', {cx: 0.38, cy: 0.32, r: 0.8}, [[0, '#ffffff'], [0.45, '#c9d0d4'], [0.8, '#7c858c'], [1, '#4a5157']]),
+      gradient('radialGradient', 'mg-top', {cx: 0.4, cy: 0.35, r: 0.8}, [[0, '#3a3a3a'], [1, '#0b0b0b']])),
+    svg('circle', {cx, cy: cy + 3, r: ring + 4, fill: '#000', opacity: 0.3}),
+    svg('circle', {cx, cy, r: ring, class: 'mg-ring'}),
+    svg('circle', {cx, cy, r: ring - 6, class: 'mg-leather'}),
+    svg('circle', {cx, cy, r: ring - 11, class: 'mg-stitch'}),
+    svg('path', {d: seam, class: 'mg-seam'}),
+    spots, hits, knob));
+  // The knob moves in the drawing's own units (its transform attribute), tweened here, as the scooter's drum
+  const spot = tab => [cx + CABRIO_GEARS[tab][0], cy + CABRIO_GEARS[tab][1]];
+  let at = null, frame = null;
+  const place = ([x, y]) => knob.setAttribute('transform', `translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+  const travel = points => {
+    cancelAnimationFrame(frame);
+    let from = at.slice(), index = 0, start = performance.now();
+    const step = now => {
+      const target = points[index], t = Math.min(1, (now - start) / 130);
+      place([from[0] + (target[0] - from[0]) * t, from[1] + (target[1] - from[1]) * t]);
+      if (t < 1) frame = requestAnimationFrame(step);
+      else if (++index < points.length) { from = target; start = now; frame = requestAnimationFrame(step); }
+    };
+    frame = requestAnimationFrame(step);
+  };
+  return {update(tab) {
+    if (!CABRIO_GEARS[tab]) return;
+    const target = spot(tab);
+    engaged.textContent = number(tab);
+    for (const node of spots) node.classList.toggle('active', node.dataset.tab === tab);
+    if (!at || matchMedia('(prefers-reduced-motion: reduce)').matches) { cancelAnimationFrame(frame); place(target); }
+    else if (target[0] !== at[0] || target[1] !== at[1]) travel([[at[0], cy], [target[0], cy], target]);
+    at = target;
+  }};
+}
+// 00's UK Cabrio's console (04/10): on top, the gears choosing the tab; below them, one piano black panel, as on the
+// car — the warning lights as a row of keys with a small LED on top, and under them the toggle bank between its half
+// loops (what its extra switches do is for later).
+function cabrioConsole(box) {
+  const gears = cabrioGears(box), panel = el('div', {class: 'cabrio-panel'});
+  box.append(panel);
+  telltales(panel, 'cabrio');
+  const bank = toggleBank(panel);
+  return {update(tab) { bank.update(tab); gears.update(tab); }};
 }
 
 // 80's RacingCar's tab selector: the open gated gearbox of a GT of the time. Gears 1 to 6 are the six tabs (reverse is
@@ -672,6 +903,16 @@ const TELLTALES = {
     {key: 'belt', icon: 'belt', tone: 'red', tab: 'replies', on: s => s.drafts > 0, text: s => `${s.drafts} rascunho(s) por enviar`},
     {key: 'door', icon: 'door', tone: 'red', tab: 'replies', on: s => s.uncertain > 0, text: s => `${s.uncertain} envio(s) incerto(s)`},
   ],
+  // 04/10: 00's UK Cabrio, the warning lights of the speedometer's rim
+  cabrio: [
+    {key: 'turn', icon: 'turn', tone: 'green', blink: true, tab: 'replies', on: s => s.waiting > 0, text: s => `${s.waiting} por responder`},
+    {key: 'headlamp', icon: 'headlamp', tone: 'green', tab: 'replies', on: s => s.hours != null && s.hours < 24, text: s => 'Gmail: ' + ago(s.lastRead)},
+    {key: 'high', icon: 'high', tone: 'blue', tab: 'agenda', on: s => s.visits > 0, text: s => `${s.visits} visita(s) hoje`},
+    {key: 'engine', icon: 'engine', tone: 'amber', tab: 'replies', on: s => s.blocked > 0, text: s => `${s.blocked} email(s) bloqueado(s)`},
+    {key: 'fuel', icon: 'fuel', tone: 'amber', tab: 'properties', on: s => s.empty || s.reserve,
+      text: s => s.empty ? 'um depósito da API vazio' : s.reserve ? 'depósito da API na reserva' : 'depósitos com tokens'},
+    {key: 'belt', icon: 'belt', tone: 'red', tab: 'replies', on: s => s.drafts > 0, text: s => `${s.drafts} rascunho(s) por enviar`},
+  ],
   scooter: [
     {key: 'headlamp', icon: 'headlamp', tone: 'green', tab: 'replies', on: s => s.hours != null && s.hours < 24, text: s => 'Gmail: ' + ago(s.lastRead)},
     {key: 'oil', icon: 'oil', tone: 'red', tab: 'replies', on: s => s.waiting > 0, text: s => `${s.waiting} por responder`},
@@ -694,6 +935,12 @@ const TELLTALE_MEANS = {
     battery: 'Acende quando o Gmail não é lido há 24 horas ou mais.',
     belt: 'Acende quando há rascunhos por rever e enviar.',
     door: 'Acende quando há envios com resultado incerto: confirma no Gmail antes de repetir.'},
+  cabrio: {turn: 'Pisca quando há emails de clientes por responder.',
+    headlamp: 'Acesa quando o Gmail foi lido nas últimas 24 horas.',
+    high: 'Acende quando há visitas marcadas para hoje.',
+    engine: 'Acende quando há emails bloqueados, que não se podem enviar: tratar à mão.',
+    fuel: 'Acende quando o depósito da API de um imóvel está na reserva ou vazio.',
+    belt: 'Acende quando há rascunhos por rever e enviar.'},
   scooter: {headlamp: 'Acesa quando o Gmail foi lido nas últimas 24 horas.',
     oil: 'Acende quando há emails de clientes por responder.',
     neutral: 'Acende quando há rascunhos por rever e enviar.',
@@ -1140,7 +1387,7 @@ function labEvaluation(evaluation) {
     evaluation.last?.length ? el('details', {class: 'lab-eval-last'}, el('summary', {class: 'lab-eval-title'},
       `ÚLTIMA RONDA (${evaluation.last.length})`),
       evaluation.last.map(item => el('div', {class: 'lab-eval-item'},
-        el('span', {}, `${item.name} · ${item.side === 'aria' ? 'ARIA' : 'consultor'} · ${decimal(item.score)}/10`),
+        el('span', {}, `${shortName(item.name)} · ${item.side === 'aria' ? 'ARIA' : 'consultor'} · ${decimal(item.score)}/10`),
         item.errors?.length ? el('ul', {}, item.errors.map(error => el('li', {}, error)))
           : el('span', {class: 'muted small'}, ' sem erros')))) : null);
 }
@@ -1203,7 +1450,7 @@ function renderLab(lab) {
     labLog.length ? el('pre', {class: 'lab-log'}, labLog.slice(0, 12).join('\n')) : null,
     labEvaluation(lab.evaluation),
     lab.clients?.length ? el('div', {class: 'client-list'}, lab.clients.slice().reverse().map(client => el('div', {class: 'client-row'},
-      el('span', {}, `${client.number}. ${client.name}`), el('span', {class: 'tag'}, client.language || '?'),
+      el('span', {}, `${client.number}. ${shortName(client.name)}`), el('span', {class: 'tag'}, client.language || '?'),
       lab.contest?.on && el('span', {class: 'tag' + (client.consultant ? ' draft' : '')}, client.consultant ? 'consultor ✓' : 'sem cópia'),
       client.ended ? el('span', {class: 'tag'}, 'terminou') : client.rounds ? el('span', {class: 'tag draft'}, `${client.rounds} resp.`) : null,
       el('span', {class: 'muted small'}, client.address)))) : el('p', {class: 'muted small'}, 'Ainda sem clientes de teste.'),
@@ -1309,7 +1556,7 @@ function showNotes(notes = []) {
 
 function nameOf(id) {
   const email = (currentQueue()?.emails || []).find(item => item.id === id) || {};
-  return (email.customer || {}).name || id;
+  return shortName((email.customer || {}).name) || id;
 }
 
 // Workflow steps 01-04: a step only ever looks "done" through this call, never by coincidence (e.g. an
@@ -1494,9 +1741,13 @@ function splitDot(them, us, label = '') {
   return el('span', {class: `pipeline-dot split them-${them || 'none'} us-${us || 'none'}`, role: 'img',
     'aria-label': label || [them && 'eles: ' + dotMeaning(them), us && 'nós: ' + dotMeaning(us)].filter(Boolean).join('; ')});
 }
-function shortName(name) {  // first name and surname: «Ana Maria Exemplo» → «Ana Exemplo»
+// A person's name on the page: first name and surname, «Ana Maria Exemplo» → «Ana Exemplo». 04/10: everywhere a name is
+// shown (never the first name alone when there are more), cut at about NAME_CHARS characters.
+const NAME_CHARS = 22;
+function shortName(name) {
   const words = String(name || '').trim().split(/\s+/).filter(Boolean);
-  return words.length > 2 ? `${words[0]} ${words[words.length - 1]}` : words.join(' ');
+  const text = words.length > 2 ? `${words[0]} ${words[words.length - 1]}` : words.join(' ');
+  return text.length > NAME_CHARS ? text.slice(0, NAME_CHARS - 1).trimEnd() + '…' : text;
 }
 function renderPipeline(queue) {
   const customers = queue?.pipeline || [], box = $('pipeline');
@@ -1553,7 +1804,7 @@ function activeCard(active) {
   });
   return el('article', {class: 'card email-card sent-card', 'data-customer': active.email},
     el('div', {class: 'card-head'},
-      el('span', {class: 'who'}, el('strong', {}, active.name || active.email)),
+      el('span', {class: 'who'}, el('strong', {}, shortName(active.name) || active.email)),
       el('span', {class: 'tag sent'}, 'enviado'),
       el('span', {class: 'tag'}, active.stage + '.ª interação'),
       active.visit_accepted && el('span', {class: 'tag visit'}, 'aceite ' + slotLabel(active.visit_accepted)),
@@ -1609,7 +1860,7 @@ function renderOwners() {
   if (!owners.some(owner => owner.email === ownerChosen)) ownerChosen = owners[0]?.email || null;
   const select = $('owners-select');
   select.replaceChildren(...owners.map(owner => el('option', {value: owner.email},
-    `${owner.name || owner.email}${owner.name ? ' — ' + owner.email : ''} · ${owner.refs.length ? owner.refs.join(', ') : 'sem imóveis'}`
+    `${shortName(owner.name) || owner.email}${owner.name ? ' — ' + owner.email : ''} · ${owner.refs.length ? owner.refs.join(', ') : 'sem imóveis'}`
     + (ownerMessages(owner.email).length ? ` · ${ownerMessages(owner.email).length} por responder` : ''))));
   select.value = ownerChosen || '';
   select.hidden = !owners.length;
@@ -1674,7 +1925,7 @@ function renderOwnerBox(owner) {
 
 function ownerCard(email, ref) {
   const inbox = ref === CAIXA;
-  const who = email.customer?.name || email.recipient?.name || 'Proprietário';
+  const who = shortName(email.customer?.name || email.recipient?.name) || 'Proprietário';
   const draft = el('textarea', {rows: 9, 'aria-label': 'Resposta ao proprietário'}, email.reply_text || '');
   const turns = email.conversation?.length ? email.conversation
     : [{who: 'cliente', text: email.customer?.message || email.body_text || '', ts: email.date}];
@@ -1932,7 +2183,7 @@ function card(email, index, list) {
       title: 'Encerra o contacto com uma despedida cordial (o prompt do fecho), que revês antes de enviar. Depois de enviada, '
         + 'deixamos de lhe escrever primeiro (rondas e lembretes), sem lista cinzenta; se voltar a escrever, entra normalmente.',
       onclick: event => run(async () => {
-        const who = ignoreTarget.name || ignoreTarget.email;
+        const who = shortName(ignoreTarget.name) || ignoreTarget.email;
         if (!confirm(`Encerrar o contacto com ${who}? A resposta passa a ser uma despedida cordial, que revês antes de enviar.`)) return;
         state = (await call('api/contact/farewell', {property_ref: queueRef(), id: email.id})).state;
         renderState();
@@ -1948,24 +2199,24 @@ function card(email, index, list) {
     ignoreTarget && el('button', {class: 'pill-action grey', title: 'O cliente disse que não quer: sai da fila e deixamos de lhe '
         + 'escrever primeiro (propostas de visita, lembretes e outros envios automáticos). Se voltar a escrever, a mensagem '
         + 'entra, com um aviso. Reverte-se em Imóveis.', onclick: event => run(async () => {
-      if (!confirm(`${ignoreTarget.name || ignoreTarget.email} disse que não tem interesse? Sai da fila e deixa de `
+      if (!confirm(`${shortName(ignoreTarget.name) || ignoreTarget.email} disse que não tem interesse? Sai da fila e deixa de `
           + 'receber propostas de visita e outros envios automáticos, neste imóvel. Se voltar a escrever, a mensagem '
           + 'entra, com um aviso. Podes reverter mais tarde em Imóveis.')) return;
       const result = await call('api/contacts/ignore', {property_ref: queueRef(), email: ignoreTarget.email,
         ignored: true, kind: 'grey', reason: 'Cliente disse que não tem interesse.'});
       state = result.state; renderState();
-      toast(`${ignoreTarget.name || ignoreTarget.email} passou a ser ignorado(a) neste imóvel.`);
+      toast(`${shortName(ignoreTarget.name) || ignoreTarget.email} passou a ser ignorado(a) neste imóvel.`);
     }, event.currentTarget)}, 'Não tem interesse'),
     ignoreTarget && el('button', {class: 'pill-action danger', title: 'Blacklist, para quem não queres ouvir mais: sai da fila '
         + 'e nada do que escrever volta a entrar, neste imóvel. Não recebe nenhum envio nosso. Reverte-se em Imóveis.',
       onclick: event => run(async () => {
-      if (!confirm(`Ignorar ${ignoreTarget.name || ignoreTarget.email} sempre (blacklist), neste imóvel? Este email sai da `
+      if (!confirm(`Ignorar ${shortName(ignoreTarget.name) || ignoreTarget.email} sempre (blacklist), neste imóvel? Este email sai da `
           + 'fila e nunca mais volta a entrar, mesmo que escreva de novo — e não recebe propostas de visita '
           + 'nem outros envios automáticos. Podes reverter mais tarde em Imóveis.')) return;
       const result = await call('api/contacts/ignore', {property_ref: queueRef(), email: ignoreTarget.email,
         ignored: true, kind: 'black'});
       state = result.state; renderState();
-      toast(`${ignoreTarget.name || ignoreTarget.email} passou para a blacklist deste imóvel.`);
+      toast(`${shortName(ignoreTarget.name) || ignoreTarget.email} passou para a blacklist deste imóvel.`);
     }, event.currentTarget)}, 'Ignorar sempre / Blacklist'));
   const approve = reviewBar(email, draft);  // 29/09: «Aprovar» in the card's top corner
   // 02/10: «3 / 20» in the card's corner, to know where one is in a long queue (in the order chosen in «Ordenar»)
@@ -1978,7 +2229,7 @@ function card(email, index, list) {
     el('div', {class: 'card-head'},
       el('label', {class: 'who'}, el('input', {type: 'checkbox', class: 'pick', 'data-id': email.id,
         checked: !email.blocked && !email.answered_direct, disabled: !!email.blocked}),
-        el('strong', {}, customer.name || sender.name || sender.email || 'Sem nome')),
+        el('strong', {}, shortName(customer.name || sender.name) || sender.email || 'Sem nome')),
       // 02/10: «Encerrar contacto»: the reply is a cordial goodbye
       email.farewell ? el('span', {class: 'tag warn', title: 'A resposta é uma despedida cordial (o prompt do fecho). Depois de '
         + 'enviada, deixamos de lhe escrever primeiro (rondas e lembretes), sem lista cinzenta.'}, 'encerrar contacto · despedida')
@@ -2343,7 +2594,7 @@ function queueHover(properties, shows, header) {
     return isNaN(moment) ? '' : moment.toLocaleString('pt-PT', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
   };
   const lines = items.slice(0, 10).map(item =>
-    [item.name, properties.length > 1 && item.ref, stamp(item.date), QUEUE_KINDS[item.kind]].filter(Boolean).join(' · '));
+    [shortName(item.name), properties.length > 1 && item.ref, stamp(item.date), QUEUE_KINDS[item.kind]].filter(Boolean).join(' · '));
   const rest = items.length - lines.length;
   if (rest > 0) lines.push(`+ ${rest} ${rest === 1 ? 'item' : 'itens'}`);
   return (header ? header + '\n\n' : '') + lines.join('\n');
@@ -2474,7 +2725,7 @@ function visitDays() {
   const days = {};
   for (const property of settings?.properties || []) {
     for (const slot of property.visits?.slots || []) {
-      (days[slot.at.slice(0, 10)] ??= []).push(slot.name || slot.customer || 'visita');
+      (days[slot.at.slice(0, 10)] ??= []).push(shortName(slot.name) || slot.customer || 'visita');
     }
   }
   return days;
@@ -2520,7 +2771,7 @@ function renderQuality(report) {
   // Through a filter: replaceChildren itself would print a null as the text «null» (26/09). 27/09: no «Continua
   // interessado…» line under the dials; the answers themselves are in Imóveis.
   box.replaceChildren(...[el('div', {class: 'section-heading'},
-      el('div', {}, el('p', {class: 'eyebrow'}, 'QUALIDADE · INQUÉRITOS PÓS-VISITA'), el('h2', {}, 'Como te avaliam, em todos os imóveis')),
+      el('div', {}, el('p', {class: 'eyebrow'}, 'QUALIDADE · INQUÉRITOS PÓS-VISITA')),  // 04/10: no subtitle
       el('span', {class: 'tag'}, `${report.responses} resposta(s)`)),
     qualityGauges(report, 'painel:quality'),
     report.responses ? null : el('p', {class: 'muted small'}, 'Ainda não há respostas ao inquérito: os ponteiros ficam a meio até chegarem, depois do agradecimento pós-visita.')]
@@ -2553,6 +2804,8 @@ function renderByProperty(properties) {
     : (item.oldest_wait_hours ?? 0) >= limit ? 'orange' : item.pending || item.drafts ? 'yellow' : 'green';
   const meaning = {green: 'Nada por responder nem por enviar', yellow: 'Emails por responder ou rascunhos por enviar, dentro do tempo',
     orange: `Um cliente espera há mais de ${limit} h`, red: 'Precisa de ti: envio incerto ou com erro, email bloqueado, ou um cliente à espera há 3 dias ou mais'};
+  const brief = {green: 'Tudo em dia', yellow: 'Por tratar, a tempo', orange: `À espera há mais de ${limit} h`,
+    red: 'Precisa de ti'};
   const dot = item => { const tone = level(item);
     return el('span', {class: 'state-dot ' + tone, title: meaning[tone], 'aria-label': meaning[tone]}); };
   box.replaceChildren(el('p', {class: 'eyebrow'}, 'POR IMÓVEL'),
@@ -2565,16 +2818,17 @@ function renderByProperty(properties) {
         el('th', {scope: 'row'}, dot(item), el('button', {type: 'button', class: 'link', title: 'Abrir nas Comunicações',
           onclick: () => openReplies(item)}, item.property_ref || 'Fila única'),
           item.test ? el('span', {class: 'tag test-tag', title: 'Fora dos totais e do ponto de situação'}, 'TESTE') : null,
-          item.description ? el('span', {class: 'muted small', title: item.description}, ' · ' + short(item.description)) : null),
+          item.description ? el('span', {class: 'muted small by-property-desc', title: item.description}, ' · ' + short(item.description)) : null),
         el('td', {class: 'num'}, rent(item.advertised_rent_eur)),
         columns.map(([key, , tone]) => cell(item[key], tone)),
         el('td', {class: 'num'}, item.reply_hours == null ? '—' : hoursText(item.reply_hours)),
         el('td', {class: 'by-property-links'},
-          el('button', {type: 'button', class: 'link', onclick: () => openReplies(item)}, 'Comunicações →'),
+          el('button', {type: 'button', class: 'link', onclick: () => openReplies(item)}, 'Comunicações'),
           item.property_ref ? el('button', {type: 'button', class: 'link', title: 'O painel do imóvel, em Imóveis',
-            onclick: () => openPanel(item)}, 'Painel →') : null)))))),
+            onclick: () => openPanel(item)}, 'Painel') : null)))))),
+    // 04/10: the legend in short, on one line; the whole meaning on hover (as on the dots)
     el('p', {class: 'by-property-legend muted small'}, ['green', 'yellow', 'orange', 'red'].map(tone =>
-      el('span', {}, el('span', {class: 'state-dot ' + tone, 'aria-hidden': 'true'}), meaning[tone]))));
+      el('span', {title: meaning[tone]}, el('span', {class: 'state-dot ' + tone, 'aria-hidden': 'true'}), brief[tone]))));
 }
 
 function renderDashboard(data) {
@@ -2592,21 +2846,27 @@ function renderDashboard(data) {
       if (!people.length) continue;
       if (data.properties.length > 1) lines.push('', item.property_ref || 'Fila única');
       for (const person of people) {
-        lines.push(`${person.name} · ${person.first_contact ? 'pedido ' + dm(person.first_contact) + ' · ' : ''}`
+        lines.push(`${shortName(person.name)} · ${person.first_contact ? 'pedido ' + dm(person.first_contact) + ' · ' : ''}`
           + `respondido ${dm(person.last_reply)} · ${person.interactions} interaç${person.interactions === 1 ? 'ão' : 'ões'}`);
       }
     }
     return lines.join('\n');
   };
+  const ownersSplit = () => [...data.properties.filter(item => item.owners_pending)
+    .map(item => `${item.property_ref || 'Fila única'}: ${item.owners_pending}`),
+    ...(data.owners_inbox_pending ? [`Sem imóvel (caixa dos proprietários): ${data.owners_inbox_pending}`] : [])].join('\n') || undefined;
   $('metric-cards').replaceChildren(
     metricCard(totals.pending, 'Pedidos por responder', null,
       {title: queueHover(data.properties, QUEUE_SHOWS.pending, split('pending'))}),
     metricCard(totals.drafts, 'Rascunhos prontos', 'ok', {title: queueHover(data.properties, QUEUE_SHOWS.drafts, split('drafts'))}),
     metricCard(totals.blocked, 'Bloqueados', 'warn', {title: queueHover(data.properties, QUEUE_SHOWS.blocked, split('blocked'))}),
+    // 04/10: a fourth column — the owners' emails to answer (Proprietários) above, the visits booked from today below
+    metricCard(totals.owners_pending || 0, 'Proprietários por responder', 'warn', {title: ownersSplit()}),
     metricCard(totals.attention, 'A precisar de atenção', 'bad',
       {title: queueHover(data.properties, QUEUE_SHOWS.attention, split('attention'))}),
     metricCard(totals.answered, 'Respostas enviadas', null, {title: answeredList()}),
-    metricCard(hoursText(data.reply_hours), 'Tempo médio até resposta'));
+    metricCard(hoursText(data.reply_hours), 'Tempo médio até resposta'),
+    metricCard(totals.visits_booked || 0, 'Visitas marcadas', null, {title: split('visits_booked')}));
   renderByProperty([...data.properties, ...(data.test_properties || [])]);  // 04/10: the test one last, marked
   $('dashboard-read').textContent = `Última leitura ${ago(data.last_read_at)}`
     + (data.last_read_at ? ` (${when(data.last_read_at)})` : '') + ` · conta ${data.account}`;
@@ -2722,7 +2982,7 @@ function renderTodo(data) {
   $('dashboard-todo').hidden = false;
   $('dashboard-todo').replaceChildren(
     el('div', {class: 'section-heading'}, el('div', {}, el('p', {class: 'eyebrow'}, 'A FAZER'),
-      el('h2', {}, tasks.length ? 'O que tens de fazer agora' : 'Tudo em dia')),
+      tasks.length ? null : el('h2', {}, 'Tudo em dia')),  // 04/10: no subtitle over the tasks; «Tudo em dia» says something
       el('span', {class: 'tag'}, String(tasks.reduce((sum, task) => sum + task.count, 0)))),
     tasks.length ? el('ul', {class: 'todo-list'}, tasks.map(task => el('li', {},
       el('button', {type: 'button', class: 'todo-item' + (TODO_URGENT.has(task.kind) ? ' urgent' : ''), onclick: () => openTask(task)},
@@ -2774,7 +3034,7 @@ function renderDigest(view) {
       pill(page.still_active, 'ainda ativos', '', ACTIVE_HINT), pill(page.booked, 'marcaram visita'),
       pill(page.visited.length, 'visitaram', page.visited.length ? 'ok' : '')),
     page.visited.length ? el('div', {class: 'digest-names'}, el('span', {class: 'muted small'}, 'Visitaram:'),
-      page.visited.map(person => el('span', {class: 'digest-chip'}, person.name)))
+      page.visited.map(person => el('span', {class: 'digest-chip'}, shortName(person.name))))
       : el('p', {class: 'muted small digest-clear'}, 'Ainda sem visitas feitas'
         + (page.upcoming.length ? `; a próxima é ${slotLabel(page.upcoming[0])}.` : '.')));
   $('digest-panel').replaceChildren(el('article', {class: 'card digest-card'},
@@ -2856,7 +3116,8 @@ function renderNotepad(view, place = null) {
     }, event.currentTarget)}, label);
   box.replaceChildren(el('article', {class: 'card notepad-card'},
     el('div', {class: 'section-heading'},
-      el('div', {}, el('p', {class: 'eyebrow'}, 'PARA O PROPRIETÁRIO · ' + ref), el('h2', {}, 'Bloco de notas')),
+      // 04/10: the property's reference is the subtitle (it was in the label, under «Bloco de notas»)
+      el('div', {}, el('p', {class: 'eyebrow'}, 'PARA O PROPRIETÁRIO'), el('h2', {}, ref)),
       el('span', {class: 'tag' + (status === 'draft' ? ' draft' : status === 'sent' ? ' visit' : '')}, tag)),
     page.reply_error && el('p', {class: 'alert bad'}, page.reply_error),
     el('div', {class: 'notepad'}, text),
@@ -2907,7 +3168,7 @@ function roundSummaryContent(data) {
     el('p', {class: 'muted small'},
       `Última ronda: ${dayLabel(data.window.day)}, das ${data.window.start} às ${data.window.end}`),
     el('div', {class: 'client-list'}, data.recipients.map(person => el('div', {class: 'client-row'},
-      el('span', {}, person.name || person.email),
+      el('span', {}, shortName(person.name) || person.email),
       el('span', {class: 'tag' + (person.state === 'booked' ? ' visit' : person.state === 'pending' ? ' draft' : '')},
         person.visit_at ? slotLabel(person.visit_at) : (stateLabel[person.state] || person.state)),
       el('span', {class: 'muted small'}, note(person)))))];
@@ -3034,7 +3295,7 @@ function renderRoundCommon(box, data, reload, actions) {
   const summaries = Object.fromEntries(Object.entries(data.summaries || {}).map(([lang, text]) =>
     [lang, el('textarea', {rows: 4, 'aria-label': `Resumo em ${lang}`}, text)]));
   const greetings = Object.fromEntries(items.map(item =>
-    [item.id, el('input', {type: 'text', value: item.greeting || '', 'aria-label': `Saudação de ${item.name || item.email}`})]));
+    [item.id, el('input', {type: 'text', value: item.greeting || '', 'aria-label': `Saudação de ${shortName(item.name) || item.email}`})]));
   const common = () => ({texts: Object.fromEntries(Object.entries(texts).map(([lang, box]) => [lang, box.value])),
     summaries: Object.fromEntries(Object.entries(summaries).map(([lang, box]) => [lang, box.value])),
     clients: Object.fromEntries(items.map(item => [item.id, {language: item.language, lang: item.lang, greeting: greetings[item.id].value}]))});
@@ -3074,7 +3335,7 @@ function renderRoundCommon(box, data, reload, actions) {
       el('span', {class: 'muted small'}, `Resumo em «${lang}», a seguir ao texto em inglês (`
         + `${items.filter(item => item.lang === lang).length} cliente(s))`), textarea)),
     el('div', {class: 'client-list'}, items.map(item => el('div', {class: 'client-row'},
-      el('span', {}, item.name || item.email),
+      el('span', {}, shortName(item.name) || item.email),
       hasTexts && greetings[item.id],
       el('span', {class: 'tag' + (item.reply_status === 'error' ? ' warn' : '')},
         item.reply_status === 'error' ? `não saiu: ${item.reply_error || 'erro'}`
@@ -3083,7 +3344,7 @@ function renderRoundCommon(box, data, reload, actions) {
       el('button', {class: 'link', title: 'Tira-o da ronda: fica nas Comunicações, para escreveres e enviares só a ele.',
         onclick: event => run(async () => {
           redraw(await call('api/visits/round-individual', {property_ref: ref, id: item.id}));
-          toast(`${item.name || item.email} passou para as Comunicações.`);
+          toast(`${shortName(item.name) || item.email} passou para as Comunicações.`);
         }, event.currentTarget)}, 'Individualizar'))))));
   if (hasTexts) actions.replaceChildren(
       el('button', {onclick: event => run(async () => {
@@ -3211,14 +3472,14 @@ function fichaCard(item) {
     el('dt', {}, FICHA_LABELS[key]),
     el('dd', {class: item.ficha[key] ? '' : 'ficha-missing'}, item.ficha[key] || 'falta')]);
   return el('article', {class: 'ficha-card'},
-    el('div', {class: 'card-head'}, el('strong', {}, item.name || item.email),
+    el('div', {class: 'card-head'}, el('strong', {}, shortName(item.name) || item.email),
       fichaTag({falta: item.falta, complete: item.complete, known: item.known, total: item.total})),
     el('div', {class: 'muted small'}, [item.phase, item.pending && 'email por responder',
       item.last && 'última troca ' + when(item.last)].filter(Boolean).join(' · ')),
     el('div', {class: 'muted small ficha-email'}, item.email),
     el('dl', {}, rows),
     profileImport(item),
-    el('div', {class: 'actions'}, shortlistToggle(item.selection, item.name || item.email,
+    el('div', {class: 'actions'}, shortlistToggle(item.selection, shortName(item.name) || item.email,
       status => selectionCall('set', item, {status}))));
 }
 
@@ -3239,7 +3500,7 @@ function renderExpired() {
   $('contacts-expired').hidden = !expired.length;
   $('contacts-expired').replaceChildren(...(expired.length ? [
     el('span', {}, `${expired.length} contacto(s) sem consentimento com mais de 6 meses: `
-      + expired.slice(0, 8).map(item => `${item.name} (${item.imovel})`).join(', ') + (expired.length > 8 ? '…' : '') + '. '),
+      + expired.slice(0, 8).map(item => `${shortName(item.name)} (${item.imovel})`).join(', ') + (expired.length > 8 ? '…' : '') + '. '),
     el('button', {type: 'button', class: 'link danger', onclick: event => run(async () => {
       if (!confirm(`Apagar de vez ${expired.length} contacto(s), com as conversas, fichas e visitas? Não se pode desfazer.`)) return;
       const result = await call('api/contacts/purge', {});
@@ -3259,7 +3520,7 @@ const SCORE_LABELS = {imovel: 'imóvel', consultor: 'consultor', marcacao: 'marc
 // «Escolher» is the one decision that ends the search (26/09): an emergency button behind a striped safety guard. The first
 // click lifts the guard (armed: red, pulsing, «Confirmar»); the second chooses. Left armed, it closes again after 6 s.
 function ejectChoose(item) {
-  const name = item.name || item.email;
+  const name = shortName(item.name) || item.email;
   const guard = el('span', {class: 'eject-guard'});
   let timer = null;
   const disarm = () => { clearTimeout(timer); guard.classList.remove('armed'); guard.replaceChildren(closed()); };
@@ -3285,7 +3546,7 @@ function selectionColumn(item) {
       selectionCall('doc', item, {document: `${who}:${key}`, received: event.target.checked}))}), labels[key]);
   const visit = item.visit, survey = item.survey;
   return el('article', {class: 'selection-column ' + item.status},
-    el('div', {class: 'card-head'}, el('strong', {}, item.name || item.email),
+    el('div', {class: 'card-head'}, el('strong', {}, shortName(item.name) || item.email),
       el('span', {class: 'tag ' + (item.status === 'chosen' ? 'draft' : item.status === 'suplente' ? 'visit' : '')}, item.label)),
     el('div', {class: 'muted small ficha-email'}, item.email),
     el('p', {class: 'eyebrow'}, 'FICHA'),
@@ -3313,7 +3574,7 @@ function selectionColumn(item) {
       }, event.currentTarget)}, item.docs_requested_at ? 'Pedir de novo' : 'Pedir documentos'),
       item.status !== 'chosen' && ejectChoose(item),
       item.status !== 'suplente' && el('button', {type: 'button', onclick: event => run(() =>
-        selectionCall('set', item, {status: 'suplente'}, `${item.name || item.email} fica como suplente.`), event.currentTarget)}, 'Suplente'),
+        selectionCall('set', item, {status: 'suplente'}, `${shortName(item.name) || item.email} fica como suplente.`), event.currentTarget)}, 'Suplente'),
       el('button', {type: 'button', class: 'link danger', onclick: event => run(() =>
         selectionCall('set', item, {status: null}, 'Saiu da short list.'), event.currentTarget)}, 'Tirar da short list')));
 }
@@ -3601,7 +3862,7 @@ function surveyReport(property) {
     qualityGauges(report, 'imovel:quality:' + property.reference, 'mini'),
     el('p', {class: 'muted small'}, `Continua interessado: sim ${report.interest.sim} · talvez ${report.interest.talvez} · não ${report.interest['não']}`),
     el('div', {class: 'client-list'}, answers.map(answer => el('div', {class: 'client-row survey-row'},
-      el('span', {}, answer.name, el('span', {class: 'muted small'}, ' ' + when(answer.at))),
+      el('span', {}, shortName(answer.name), el('span', {class: 'muted small'}, ' ' + when(answer.at))),
       el('span', {class: 'tag ' + (answer.alerts.length ? 'warn' : 'draft')},
         `imóvel ${answer.imovel ?? '–'} · consultor ${answer.consultor ?? '–'} · marcação ${answer.marcacao ?? '–'}`),
       answer.interest && el('span', {class: 'muted small'}, 'interesse: ' + answer.interest),
@@ -3667,7 +3928,7 @@ function callsList(property) {
     el('span', {class: 'call-when'}, stamp(item.at)),
     el('span', {class: 'tag ' + (item.answered ? 'visit' : 'warn')}, item.answered
       ? 'atendida' + (item.seconds ? ` · ${item.seconds} s` : '') : 'não atendida'),
-    el('strong', {}, item.name || 'sem nome'),
+    el('strong', {}, shortName(item.name) || 'sem nome'),
     el('span', {class: 'muted small'}, item.phone_shown),
     el('span', {class: 'call-actions'},
       el('a', {class: 'link', href: `whatsapp://send?phone=${item.international}`}, 'WhatsApp'),
@@ -3704,10 +3965,10 @@ function rebuildPanel(property) {
   const days = el('select', {'aria-label': 'Quantos dias para trás'},
     [30, 60, 90, 180].map(value => el('option', {value, selected: value === 60}, `últimos ${value} dias`)));
   const list = el('div', {class: 'rebuild-list'});
-  const label = entry => entry.kind === 'visit' ? `Visita de ${entry.name} a ${entry.at.slice(8, 10)}/${entry.at.slice(5, 7)} às ${entry.at.slice(11, 16)}`
+  const label = entry => entry.kind === 'visit' ? `Visita de ${shortName(entry.name)} a ${entry.at.slice(8, 10)}/${entry.at.slice(5, 7)} às ${entry.at.slice(11, 16)}`
       + (entry.at.slice(0, 10) < new Date().toLocaleDateString('sv-SE') ? ' (já passou: fica por registar)' : '')
-    : entry.kind === 'survey' ? `Inquérito de ${entry.name}: imóvel ${entry.survey?.imovel ?? '—'}, consultor ${entry.survey?.consultor ?? '—'}`
-    : entry.kind === 'shortlist' ? `${entry.name} na short list (${entry.status === 'chosen' ? 'escolhido' : entry.status === 'suplente' ? 'suplente' : 'short list'})`
+    : entry.kind === 'survey' ? `Inquérito de ${shortName(entry.name)}: imóvel ${entry.survey?.imovel ?? '—'}, consultor ${entry.survey?.consultor ?? '—'}`
+    : entry.kind === 'shortlist' ? `${shortName(entry.name)} na short list (${entry.status === 'chosen' ? 'escolhido' : entry.status === 'suplente' ? 'suplente' : 'short list'})`
     : `Tirar da fila ${entry.count} email(s) já respondidos no Gmail`;
   const source = entry => entry.source === 'marca' ? 'pela marca do email' : entry.source === 'ia' ? 'lido pela IA'
     : entry.source ? entry.source : '';
@@ -3745,7 +4006,7 @@ function activeClientsList(property) {
     run(async () => {
       const data = await call('api/visits/candidates', {property_ref: property.reference});
       box.replaceChildren(...(data.customers.length ? data.customers.map(customer => el('div', {class: 'client-row'},
-        el('span', {}, customer.name || customer.email),
+        el('span', {}, shortName(customer.name) || customer.email),
         el('span', {class: 'tag' + (customer.state === 'booked' ? ' visit' : customer.state === 'ok' ? ' draft' : '')},
           CLIENT_STATE_LABEL[customer.state] || customer.state),
         fichaTag(customer.ficha),
@@ -3801,7 +4062,7 @@ function visitsPanel(property) {
     const rows = data.customers.map(customer => el('label', {class: 'candidate'},
       el('input', {type: 'checkbox', 'data-email': customer.email, checked: customer.state === 'ok',
         disabled: customer.state === 'pending' || customer.state === 'booked'}),
-      el('span', {}, customer.name || customer.email),
+      el('span', {}, shortName(customer.name) || customer.email),
       customer.reason && el('span', {class: 'muted small'}, '— ' + customer.reason)));
     list.replaceChildren(...(rows.length ? rows : [el('p', {class: 'muted small'}, 'Ainda não escrevemos a nenhum cliente deste imóvel.')]),
       rows.length && el('div', {class: 'actions'}, el('button', {class: 'primary', onclick: event => run(async () => {
@@ -3829,7 +4090,7 @@ function visitsPanel(property) {
     !closed && (visits.windows.length
       ? visits.windows.map(window => el('p', {class: 'small'}, `Proposta: ${dayLabel(window.day)}, das ${window.start} às ${window.end}`))
       : [el('p', {class: 'muted small'}, 'Sem visitas propostas.')]),
-    !closed && visits.slots.map(booked => el('p', {class: 'small'}, el('strong', {}, slotLabel(booked.at)), ' · ', booked.name || booked.customer)),
+    !closed && visits.slots.map(booked => el('p', {class: 'small'}, el('strong', {}, slotLabel(booked.at)), ' · ', shortName(booked.name) || booked.customer)),
     !closed && el('p', {class: 'step'}, `Escolhe o dia e o intervalo. Marcam-se de ${slot} em ${slot} minutos (em Voz e estilo).`),
     !closed && el('div', {class: 'row'}, dateStepper(day), timeStepper(start, slot), timeStepper(end, slot),
       el('button', {onclick: choose}, 'Escolher clientes')), !closed && list,
@@ -3903,16 +4164,16 @@ function agendaEntries(iso) {
         start: minutesOf(window.start), end: minutesOf(window.end), text: `Janela: ${window.start}–${window.end}`});
     }
     for (const slot of property.visits?.slots || []) {
-      visit(property.reference, slot.at, slot.name || slot.customer, 'confirmed', slot.source === 'api' && slot.evidence,
+      visit(property.reference, slot.at, shortName(slot.name) || slot.customer, 'confirmed', slot.source === 'api' && slot.evidence,
         slot.previous, slot);
     }
     // Still to be agreed, found by «Atualizar agenda»: accepted by the customer (orange), offered by us (blue).
     for (const accepted of property.visits?.accepted || []) {
-      visit(property.reference, accepted.at, accepted.name || accepted.customer, 'accepted', accepted.evidence, accepted.replaces,
+      visit(property.reference, accepted.at, shortName(accepted.name) || accepted.customer, 'accepted', accepted.evidence, accepted.replaces,
         {customer: accepted.customer});
     }
     for (const offered of property.visits?.offered || []) {
-      visit(property.reference, offered.at, offered.name || offered.customer, 'offered', offered.evidence, offered.replaces,
+      visit(property.reference, offered.at, shortName(offered.name) || offered.customer, 'offered', offered.evidence, offered.replaces,
         {customer: offered.customer});
     }
   }
@@ -3920,7 +4181,7 @@ function agendaEntries(iso) {
   for (const queue of state?.properties || []) {
     for (const email of queue.emails || []) {
       if (email.visit_slot) visit(queue.property_ref, email.visit_slot,
-        email.recipient?.name || email.customer?.name || email.recipient?.email, 'accepted');
+        shortName(email.recipient?.name || email.customer?.name) || email.recipient?.email, 'accepted');
     }
   }
   // Overbooking: two visits (accepted or confirmed, any property) whose times overlap.
@@ -4092,7 +4353,7 @@ function renderVisitTodo(filter) {
     el('span', {class: 'muted small'}, 'quem apareceu, notas e agradecimento:'),
     ...todo.map(entry => el('button', {type: 'button', class: 'agenda-todo-item ' + entry.kind,
       title: 'Assinalar esta visita e criar o agradecimento', onclick: () => openVisitCheck(entry)},
-      `${entry.name || entry.customer} · ${entry.at.slice(8, 10)}/${entry.at.slice(5, 7)} ${entry.at.slice(11)}`))] : []));
+      `${shortName(entry.name) || entry.customer} · ${entry.at.slice(8, 10)}/${entry.at.slice(5, 7)} ${entry.at.slice(11)}`))] : []));
   $('agenda-todo').hidden = !todo.length;
 }
 
@@ -4113,7 +4374,7 @@ function openVisitCheck(entry) {
   };
   const score = value => value == null ? '–' : `${value}/5`;
   box.replaceChildren(el('section', {class: 'card visit-check'},
-    el('div', {class: 'section-heading'}, el('h2', {}, `Visita · ${entry.name || entry.customer}`),
+    el('div', {class: 'section-heading'}, el('h2', {}, `Visita · ${shortName(entry.name) || entry.customer}`),
       el('button', {type: 'button', class: 'link', onclick: () => box.replaceChildren()}, 'Fechar')),
     el('p', {class: 'muted small'}, `${slotLabel(entry.at)} · ${entry.label} · ${entry.customer}`),
     entry.ficha && el('p', {class: 'alert ' + (entry.ficha.complete ? 'ok' : 'warn')}, entry.ficha.complete
@@ -4540,7 +4801,10 @@ function renderFuelOverview(metrics) {
         el('button', {class: 'link', title: 'Clicar para mudar os limites de gastos', 'aria-label': `Mudar o limite de gastos de ${ref}`,
           onclick: event => fill(event.currentTarget)}, 'Encher')));
   });
-  $('fuel-panel').replaceChildren(...(rows.length ? rows : [fuelGauge(metrics.api_fuel, 'painel:fuel', 'Depósito da API')]));
+  // 04/10: the total, the big dial, in the middle; the tanks on either side of it, the first half on the left
+  const half = Math.ceil(rows.length / 2);
+  $('fuel-panel').replaceChildren(...(rows.length ? rows.slice(0, half) : [fuelGauge(metrics.api_fuel, 'painel:fuel', 'Depósito da API')]));
+  $('fuel-panel-right').replaceChildren(...rows.slice(half));
 }
 
 // What a property's panel measures, whatever a skin draws it as: emails waiting, the average reply time
@@ -4630,6 +4894,25 @@ function scooterInstruments(ref, s) {
     gauge({key: ref + ':pending', role: 'tach', value: s.pending, max: s.pendingMax, red: [s.pendingMax / 2, s.pendingMax],
       unit: 'emails', size: 'big', face: 'cream', divisions: 10, minor: 2, readout: String(s.pending),
       caption: 'Por responder'}),
+    fuelGauge(s.fuel, 'cluster:fuel'),
+    petrolGauge(ref, s.petrol, 'Gasolina · visitas')];
+}
+
+// 00's UK Cabrio (04/10): the dash of a British hatch of the 2000s. The giant round speedometer in the middle of the dash
+// is the requests per day, with the ambient light around it; the rev counter on the steering column, the emails waiting;
+// the engine temperature, the average reply time against this property's own limit; the tank, the property's tokens;
+// and, smaller, the petrol its visits took. Black faces, white numbers, orange needles (in themes/cabrio.css).
+function cabrioInstruments(ref, s) {
+  const speedMax = Math.max(10, niceMax(Math.max(1, s.perDay)));
+  return [
+    gauge({key: ref + ':pending', role: 'tach', value: s.pending, max: s.pendingMax, red: [s.pendingMax / 2, s.pendingMax],
+      unit: 'emails', face: 'cabrio', divisions: 5, minor: 2, readout: String(s.pending), caption: 'Por responder'}),
+    gauge({key: ref + ':speed', role: 'speedo', value: s.perDay, max: speedMax, unit: 'pedidos / dia', size: 'big',
+      face: 'cabrio', divisions: 5, minor: 4, readout: s.perDay.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + ' /dia',
+      caption: 'Pedidos por dia'}),
+    gauge({key: ref + ':hours', role: 'heat', value: s.hours || 0, max: s.hoursMax, red: [s.hoursMax * 0.75, s.hoursMax],
+      unit: 'motor', face: 'cabrio', icon: 'heat', labels: ['C', '', 'H'], divisions: 2, minor: 4, readout: hoursText(s.hours),
+      caption: 'Tempo médio de resposta', alert: s.hot}),
     fuelGauge(s.fuel, 'cluster:fuel'),
     petrolGauge(ref, s.petrol, 'Gasolina · visitas')];
 }
@@ -4781,12 +5064,12 @@ function visitorsCard(property) {
   const row = slot => {
     const survey = slot.survey;
     return el('div', {class: 'client-row visitor-row'},
-      el('span', {}, el('strong', {}, slot.name || slot.customer), el('span', {class: 'muted small'}, ' · ' + slotLabel(slot.at))),
+      el('span', {}, el('strong', {}, shortName(slot.name) || slot.customer), el('span', {class: 'muted small'}, ' · ' + slotLabel(slot.at))),
       survey ? el('span', {class: 'tag ' + (['imovel', 'consultor', 'marcacao'].some(key => survey[key] <= 2) || survey.interesse === 'não' ? 'warn' : 'draft')},
         `imóvel ${survey.imovel ?? '–'} · consultor ${survey.consultor ?? '–'} · marcação ${survey.marcacao ?? '–'}`
           + (survey.interesse ? ` · ${survey.interesse}` : '')) : el('span', {class: 'muted small'}, 'sem inquérito'),
       fichaTag(slot.ficha),
-      shortlistToggle(slot.selection, slot.name || slot.customer, async status => {
+      shortlistToggle(slot.selection, shortName(slot.name) || slot.customer, async status => {
         await call('api/selection/set', {property_ref: property.reference, email: slot.customer, status});
         settings = await call('api/settings');
         renderPropertyDashboard(settings.properties.find(item => item.reference === property.reference) || property);
@@ -4798,7 +5081,7 @@ function visitorsCard(property) {
       el('span', {class: 'tag'}, `${came.length} visitaram`)),
     came.length ? el('div', {class: 'client-list'}, came.map(row))
       : el('p', {class: 'muted small'}, 'Ainda ninguém registado como tendo vindo: marca-o em Visitas, depois de cada visita.'),
-    missed.length ? el('p', {class: 'muted small'}, `Não apareceram: ${missed.map(slot => slot.name || slot.customer).join(', ')}.`) : null);
+    missed.length ? el('p', {class: 'muted small'}, `Não apareceram: ${missed.map(slot => shortName(slot.name) || slot.customer).join(', ')}.`) : null);
 }
 
 // Black list (the owner decided): never queued again, whatever they write. Grey list (the customer opted out,
@@ -4816,11 +5099,11 @@ function ignoreListCard(property, kind, customers) {
       ? 'Disseram que não têm interesse: não recebem mais nada nosso (lembretes, rondas, fecho). Se voltarem a escrever, o email entra na fila e podes responder.'
       : 'Por decisão tua: nunca mais entram nas Comunicações, mesmo que escrevam, nem recebem envios automáticos.'),
     el('div', {class: 'client-list'}, customers.length ? customers.map(customer => el('div', {class: 'client-row'},
-      el('span', {}, customer.name || customer.email,
+      el('span', {}, shortName(customer.name) || customer.email,
         customer.reason ? el('span', {class: 'muted small ignore-reason'}, customer.reason) : null),
       el('button', {class: 'link', onclick: event => run(async () => {
         done(await call('api/contacts/ignore', {property_ref: property.reference, email: customer.email, ignored: false}));
-        toast(`${customer.name || customer.email} deixou de ser ignorado(a).`);
+        toast(`${shortName(customer.name) || customer.email} deixou de ser ignorado(a).`);
       }, event.currentTarget)}, 'Deixar de ignorar')))
       : el('p', {class: 'muted small'}, 'Ninguém.')),
     el('div', {class: 'row'}, input, el('button', {onclick: event => run(async () => {

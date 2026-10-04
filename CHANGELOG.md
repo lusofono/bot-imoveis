@@ -15,6 +15,149 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.114.9 — 04/10/2026
+
+- **00's UK Cabrio:** a alavanca das mudanças passa para cima e o painel das teclas e dos interruptores para baixo.
+
+## α.114.8 — 04/10/2026
+
+- **Painel, ponto de situação para o proprietário:** o título fica só «PARA O PROPRIETÁRIO» e a referência do imóvel
+  passa para o subtítulo, no lugar de «Bloco de notas». Em todos os temas.
+
+## α.114.7 — 04/10/2026
+
+- **00's UK Cabrio, a consola:**
+  - Os interruptores perdem o 1 ao 4. Ficam o R, o 5, o 6 e o «LUZ», mais largos e mais espaçados, com a mesma altura.
+  - Passam a ser desenhados como os do carro: alavanca cromada curta e inclinada (para cima quando ligada, para baixo
+    quando desligada), num casquilho escuro com aro cromado, entre meias argolas de proteção em preto brilhante.
+  - As luzes de aviso juntam-se a eles num só painel preto: uma fila de teclas pretas com o ícone e um pequeno LED em
+    cima, apagado ou aceso na sua cor (o pisca pisca).
+  - A alavanca das mudanças fica por baixo do painel.
+
+## α.114.6 — 04/10/2026
+
+- **00's UK Cabrio, a alavanca:** a bola fica 20 % maior.
+
+## α.114.5 — 04/10/2026
+
+- **00's UK Cabrio, quadro de avisos:** fica na mesma pele preta da barra lateral, sem a moldura de madeira; à volta,
+  o pesponto castanho da pele.
+
+## α.114.4 — 04/10/2026
+
+- **Fundo da barra lateral, em todos os temas:** sai o texto «Ambiente local». Fica só a bola, que diz «Ambiente
+  local» ao passar o rato, e logo a seguir a versão e a hora do arranque, sem cápsula, numa letra simples que se lê bem
+  em pequeno, na cor das palavras da barra de cada tema.
+- **00's UK Cabrio, a alavanca:** a bola é maior e mostra em cima a mudança engatada (R, 1, 2…). Os números saem de
+  fora do aro e ficam dentro da base, no sítio de cada mudança. A pele do meio passa a preta.
+
+## α.114.3 — 04/10/2026
+
+- **Painel, «Depósitos · API OpenAI»:** o mostrador grande do gasto total fica ao meio. Os depósitos de cada imóvel
+  repartem-se pelos dois lados (a primeira metade à esquerda, o resto à direita), com a bomba virada para o meio nos
+  dois lados. Em ecrãs estreitos fica tudo em coluna. Vale para todos os temas.
+- **00's UK Cabrio:**
+  - A pele passa a cabedal preto com um toque de castanho, com costura castanha: na barra lateral, no quadro de avisos
+    e na agenda. Sai a pele clara.
+  - Os mostradores passam a fundo branco com números pretos em itálico, zona vermelha, ponteiro laranja com sombra, aro
+    cromado num anel preto e o centro em bola cromada, com mais relevo. O relógio do Painel fica igual.
+
+## α.114.2 — 04/10/2026
+
+- **00's UK Cabrio, afinações:**
+  - **Alavanca das mudanças a escolher os separadores**, como no RacingCar: R e 1 a 6, em H. Vista de cima, tem a base
+    redonda com aro cromado e pele castanha com costura no meio, e a bola (escura, numa cinta cromada, com o desenho
+    das mudanças em cima) a andar lá dentro com o seu fole de pele, passando pelo ponto morto. Os números ficam à volta
+    do aro.
+  - Os interruptores ficam por cima. Por agora continuam a abrir os separadores, e o «LUZ» muda a luz ambiente; o que
+    fazem os interruptores extra fica para depois.
+  - **Luzes de aviso numa só fila**, por baixo, num painel branco com aro cromado: claras quando apagadas, na sua cor
+    quando acesas (à noite, o painel escurece).
+  - **Cromado no topo dos painéis**, em vez das riscas verdes.
+  - **Os títulos pequenos passam a etiqueta verde com letra branca**, com o recorte da flâmula do barco e numa só linha
+    («REVISOR · OPCIONAL» partia-se em duas).
+  - **Nenhum texto sobre cromado** (perdia legibilidade): os números do menu passam a verde com letra branca; a versão,
+    as setas do carrossel e o avatar ficam com fundo creme; os números dos passos passam a verde. O cromado fica só
+    nos aros.
+  - A barra lateral fica mais compacta (a bandeira mais pequena) e, se não couber no ecrã, desliza.
+
+## α.114.1 — 04/10/2026
+
+- **Menu lateral:** mais 2px entre os separadores, em todos os temas. No 90's Boat, os números dos separadores (os
+  avisos por ler, os emails por responder) descem 5px.
+
+## α.114.0 — 04/10/2026
+
+- **Novo tema rico: 00's UK Cabrio** — um descapotável britânico dos anos 2000, inspirado nos da época, sem marca nem
+  emblema.
+  - Cores: verde inglês com as duas riscas brancas do capô no topo dos cartões e dos números do Painel, pele castanha
+    com costura creme na barra lateral (com a bandeira britânica ao fundo), cromados e a capota de lona dobrada na barra
+    de cima, com costura.
+  - Títulos em Gill Sans; os pequenos rótulos são emblemas ovais cromados.
+  - Navegação: a fila de interruptores da consola, debaixo da barra cromada de proteção. Cada separador é um
+    interruptor (R, 1 a 6), e o de Comunicações é o vermelho de arranque; o separador aberto fica para cima.
+  - O último interruptor, «LUZ», muda a luz ambiente: de dia, laranja; de noite, cabine escura e luz azul. Fica
+    guardada no navegador.
+  - Por baixo dos interruptores, as luzes de aviso (pisca, farol, máximos, motor, gasolina, cinto), cada uma com a
+    explicação ao passar o rato.
+  - O painel de cada imóvel é o tablier: o velocímetro central gigante (pedidos por dia), envolto na luz ambiente, o
+    conta-rotações (por responder), a temperatura (tempo de resposta), o depósito e a gasolina das visitas, com
+    mostradores pretos, números brancos e ponteiros laranja.
+  - Os números do Painel ficam em visores pretos com aro cromado.
+  - Os botões são interruptores creme com aro cromado: o principal é verde e o «Enviar» é o vermelho de arranque.
+  - O quadro de avisos é de pele castanha com moldura de madeira; a agenda é um livro de pele.
+  - No rodapé, uma estrada no campo inglês por onde o descapotável passa de 45 em 45 segundos.
+  - Sons sintetizados: buzina «bip-bip» ao enviar, pisca quando chegam emails, clique de interruptor nos botões e nos
+    separadores.
+
+## α.113.2 — 04/10/2026
+
+- **Menu lateral mais baixo** (cerca de 15 %) em todos os temas: separadores mais baixos, menos espaço entre eles e à
+  volta das duas linhas. No telemóvel, a fila de separadores fica como estava.
+
+## α.113.1 — 04/10/2026
+
+- **Quadro de avisos:** a moldura de madeira do 90's Boat passa para todos os quadros que tinham moldura castanha lisa
+  — a ardósia dos temas escuros (Noite, Índigo, 80's RacingCar e o tema de origem) —, com a mesma largura (12px). O
+  quadro de linho dos temas claros mantém a moldura branca.
+
+## α.113.0 — 04/10/2026
+
+- **Painel com uma 4.ª coluna de cartões:** «Proprietários por responder» (os emails dos proprietários ainda por
+  responder, de todos os imóveis e da caixa dos proprietários sem imóvel; não conta os que escrevemos primeiro) e, por
+  baixo, «Visitas marcadas» (de hoje em diante). Ao passar o rato, o número de cada imóvel. Quatro cartões por linha;
+  dois em ecrãs estreitos.
+- **90's Boat:** a moldura do quadro de cortiça passa a ser da madeira do próprio tema (a dos painéis e do separador
+  ativo), em vez do castanho liso, e 20 % mais larga.
+
+## α.112.3 — 04/10/2026
+
+- **Painel sem o título grande** «O teu dia, em perspetiva.» (e as versões de cada tema: «a todo o gás», «a todo o
+  pano», «a passear numa vila costeira», «Cada contacto, uma decisão a acompanhar.»); ficam «VISÃO GERAL» e a linha
+  por baixo.
+- **«Por imóvel»:** a linha do imóvel de teste deixa de ter fundo roxo (a etiqueta TESTE já o diz). A tabela aperta-se
+  para caber na largura (os atalhos ficavam cortados): células mais justas, a descrição cortada conforme a largura do
+  ecrã (inteira ao passar o rato) e os atalhos só «Comunicações» e «Painel». A legenda das bolas fica resumida numa só
+  linha («Tudo em dia», «Por tratar, a tempo», «À espera há mais de 48 h», «Precisa de ti»); o significado completo
+  aparece ao passar o rato, como nas bolas.
+
+## α.112.1 — 04/10/2026
+
+- **Painel sem subtítulos que não diziam nada:** saem «O que tens de fazer agora» (A FAZER; sem tarefas, continua «Tudo
+  em dia») e «Como te avaliam, em todos os imóveis» (QUALIDADE · INQUÉRITOS PÓS-VISITA).
+
+## α.112.0 — 04/10/2026
+
+- **Nomes em todo o lado: nome próprio + apelido**, nunca só o primeiro nome quando há mais (por exemplo, «Ana Maria
+  Costa Exemplo» → «Ana Exemplo»), cortados à volta dos 22 caracteres com «…». Vale para os avisos do quadro, o «A
+  fazer», o Painel (o que aparece ao passar o rato nos cartões e nas respostas enviadas), as Comunicações, os
+  Contactos, a short list, as Visitas e a agenda, os Proprietários, os inquéritos, a reconstrução a partir do Gmail, os
+  contactos expirados (RGPD) e a Oficina. Os emails aos clientes continuam a cumprimentar pelo primeiro nome, e a IA
+  continua a receber só o primeiro nome (RGPD). O aviso de clientes à espera
+  já no quadro muda na próxima leitura; os outros avisos antigos ficam com o texto que tinham até saírem.
+- **Painel:** os cartões de números («Pedidos por responder», «Rascunhos prontos»…) ficam cerca de 20 % mais baixos
+  em todos os temas (menos margem, o número mais junto da legenda); o tamanho do número não muda.
+
 ## α.111.0 — 04/10/2026
 
 - **Painel sem os cartões dos imóveis:** repetiam o que «Por imóvel» já mostra. A tabela fica com o que só os cartões
