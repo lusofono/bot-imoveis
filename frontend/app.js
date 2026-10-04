@@ -2527,6 +2527,56 @@ function renderQuality(report) {
     .filter(Boolean));
 }
 
+// 04/10: the cards' numbers for each property, in one table right under them; a property's name opens its Comunicações.
+// With a single property the cards already say it all.
+function renderByProperty(properties) {
+  // 04/10: the Painel's only list of the properties (the cards below it are gone): from one property on, with the rent
+  // and the ways in — the property's Comunicações and its Painel
+  const box = $('metric-by-property');
+  box.hidden = !properties.length;
+  if (box.hidden) { box.replaceChildren(); return; }
+  const rent = value => value == null ? '—'
+    : new Intl.NumberFormat('pt-PT', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0}).format(value);
+  const openReplies = item => openTask({tab: 'replies', property_ref: item.property_ref});
+  const openPanel = item => { selectProperty(item.property_ref, 0, false); showPropertiesView('list'); showTab('properties'); };
+  // 04/10: the titles in two lines and the description cut short (the whole of it on hover), so it all fits across
+  const columns = [['pending', ['Por', 'responder'], ''], ['drafts', ['Rascunhos'], 'ok'], ['blocked', ['Bloqueados'], 'warn'],
+    ['attention', ['A precisar', 'de atenção'], 'bad'], ['answered', ['Respostas', 'enviadas'], '']];
+  const title = lines => lines.flatMap((line, index) => index ? [el('br'), line] : [line]);
+  const short = text => text.length > 36 ? text.slice(0, 35).trimEnd() + '…' : text;
+  const cell = (value, tone) => el('td', {class: 'num' + (value ? ' ' + tone : ' zero')}, String(value || 0));
+  // 04/10: a dot before each property — green, nothing to do; yellow, emails to answer or drafts to send, in time; orange,
+  // a customer waiting past the reply limit (Voz e estilo); red, something needs you (an uncertain or failed send, a
+  // blocked email, or a customer waiting 3 days or more)
+  const limit = settings?.voice?.alerts?.our_turn_hours || 48;
+  const level = item => item.attention || item.blocked || (item.oldest_wait_hours ?? 0) >= 72 ? 'red'
+    : (item.oldest_wait_hours ?? 0) >= limit ? 'orange' : item.pending || item.drafts ? 'yellow' : 'green';
+  const meaning = {green: 'Nada por responder nem por enviar', yellow: 'Emails por responder ou rascunhos por enviar, dentro do tempo',
+    orange: `Um cliente espera há mais de ${limit} h`, red: 'Precisa de ti: envio incerto ou com erro, email bloqueado, ou um cliente à espera há 3 dias ou mais'};
+  const dot = item => { const tone = level(item);
+    return el('span', {class: 'state-dot ' + tone, title: meaning[tone], 'aria-label': meaning[tone]}); };
+  box.replaceChildren(el('p', {class: 'eyebrow'}, 'POR IMÓVEL'),
+    el('div', {class: 'by-property-scroll'}, el('table', {class: 'by-property'},
+      el('thead', {}, el('tr', {}, el('th', {scope: 'col'}, 'Imóvel'), el('th', {scope: 'col', class: 'num'}, 'Renda'),
+        columns.map(([, label]) => el('th', {scope: 'col', class: 'num'}, title(label))),
+        el('th', {scope: 'col', class: 'num'}, title(['Tempo', 'médio'])),
+        el('th', {scope: 'col', class: 'by-property-links'}, el('span', {class: 'sr-only'}, 'Abrir')))),
+      el('tbody', {}, properties.map(item => el('tr', {class: item.test ? 'test-row' : ''},
+        el('th', {scope: 'row'}, dot(item), el('button', {type: 'button', class: 'link', title: 'Abrir nas Comunicações',
+          onclick: () => openReplies(item)}, item.property_ref || 'Fila única'),
+          item.test ? el('span', {class: 'tag test-tag', title: 'Fora dos totais e do ponto de situação'}, 'TESTE') : null,
+          item.description ? el('span', {class: 'muted small', title: item.description}, ' · ' + short(item.description)) : null),
+        el('td', {class: 'num'}, rent(item.advertised_rent_eur)),
+        columns.map(([key, , tone]) => cell(item[key], tone)),
+        el('td', {class: 'num'}, item.reply_hours == null ? '—' : hoursText(item.reply_hours)),
+        el('td', {class: 'by-property-links'},
+          el('button', {type: 'button', class: 'link', onclick: () => openReplies(item)}, 'Comunicações →'),
+          item.property_ref ? el('button', {type: 'button', class: 'link', title: 'O painel do imóvel, em Imóveis',
+            onclick: () => openPanel(item)}, 'Painel →') : null)))))),
+    el('p', {class: 'by-property-legend muted small'}, ['green', 'yellow', 'orange', 'red'].map(tone =>
+      el('span', {}, el('span', {class: 'state-dot ' + tone, 'aria-hidden': 'true'}), meaning[tone]))));
+}
+
 function renderDashboard(data) {
   renderQuality(data.quality);
   const totals = data.totals;
@@ -2557,29 +2607,17 @@ function renderDashboard(data) {
       {title: queueHover(data.properties, QUEUE_SHOWS.attention, split('attention'))}),
     metricCard(totals.answered, 'Respostas enviadas', null, {title: answeredList()}),
     metricCard(hoursText(data.reply_hours), 'Tempo médio até resposta'));
+  renderByProperty([...data.properties, ...(data.test_properties || [])]);  // 04/10: the test one last, marked
   $('dashboard-read').textContent = `Última leitura ${ago(data.last_read_at)}`
     + (data.last_read_at ? ` (${when(data.last_read_at)})` : '') + ` · conta ${data.account}`;
   $('activity-summary').replaceChildren(...activitySummary(data));
   $('dashboard-chart').replaceChildren(chart(data.by_day, data.bucket_days || 1));
   $('chart-note').textContent = data.bucket_days >= 30 ? 'Cada barra soma 30 dias.' : data.bucket_days > 1 ? 'Cada barra soma uma semana.' : '';
-  $('dashboard-properties').replaceChildren(...(data.properties.length ? data.properties.map(item =>
-    el('article', {class: 'card property-tile'},
-      propertyCover(item.property_ref, item.photo),
-      el('div', {class: 'property-body'},
-        el('span', {class: 'property-ref'}, item.property_ref || 'Fila única'),
-        el('h3', {class: 'property-title'}, item.description || 'Mensagens da conta'),
-        el('div', {class: 'property-stats'},
-          ...[[item.pending, 'Pendentes'], [item.drafts, 'Rascunhos'], [item.blocked, 'Bloqueados'], [item.answered, 'Respondidos']]
-            .map(([value, label]) => el('div', {}, el('strong', {}, String(value)), el('span', {}, label)))),
-        el('div', {class: 'property-footer'},
-          el('span', {class: 'muted small'}, item.advertised_rent_eur != null ? new Intl.NumberFormat('pt-PT', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0}).format(item.advertised_rent_eur) : 'Renda não definida'),
-          el('div', {class: 'property-links'},
-            item.property_ref && el('button', {class: 'link', onclick: () => {
-              selectProperty(item.property_ref, 0, false); showPropertiesView('list'); showTab('properties');
-            }}, 'Painel do imóvel →'),
-            el('button', {class: 'link', onclick: () => {
-              $('queue').value = item.property_ref || ''; renderState(); showTab('replies');
-            }}, 'Comunicações do imóvel →')))))) : [el('div', {class: 'empty-state'}, 'Ainda não há imóveis configurados. Adiciona o primeiro em Imóveis.')]));
+  // 04/10: no property cards any more — «Por imóvel» has it all; here only the word when there is no property yet
+  const none = !data.properties.length && !(data.test_properties || []).length;
+  $('dashboard-properties').hidden = !none;
+  $('dashboard-properties').replaceChildren(...(none
+    ? [el('div', {class: 'empty-state'}, 'Ainda não há imóveis configurados. Adiciona o primeiro em Imóveis.')] : []));
   const check = (ok, label, hint) => el('li', {},
     el('span', {class: 'dot' + (ok ? '' : ' missing')}), el('span', {}, label,
       !ok && hint ? el('span', {class: 'muted small'}, ' — ' + hint) : ''));
@@ -2612,18 +2650,53 @@ function renderNotices(data) {
     return `${moment.toLocaleDateString('pt-PT', {day: '2-digit', month: '2-digit'})} ${moment.toLocaleTimeString('pt-PT', {hour: '2-digit', minute: '2-digit'})}`; };
   box.replaceChildren(
     el('div', {class: 'section-heading'}, el('div', {}, el('p', {class: 'eyebrow'}, 'QUADRO DE AVISOS'),
-      el('h2', {}, unread ? `${unread} aviso${unread === 1 ? '' : 's'} por ler` : 'Avisos do sistema')),
-      el('div', {class: 'notices-actions'},
-        unread ? el('button', {type: 'button', class: 'link', onclick: event => update(null, 'read', event.currentTarget)}, 'Marcar todos como lidos') : null,
-        el('button', {type: 'button', class: 'link', onclick: event => update(null, 'archive', event.currentTarget)}, 'Arquivar todos'))),
-    el('ul', {class: 'notice-list'}, notices.slice(0, 40).map(notice => el('li', {class: `notice ${notice.level}${notice.read ? '' : ' unread'}`},
-      el('span', {class: 'notice-dot', 'aria-hidden': 'true'}),
+      unread ? el('h2', {}, `${unread} aviso${unread === 1 ? '' : 's'} por ler`) : null),  // 04/10: no subtitle when all read
+      // 04/10: no archiving — a notice leaves the board by itself once what it says is over. On the right, on the
+      // heading's line, what the pin's colour says; below it, «Marcar todos como lidos»
+      el('div', {class: 'notices-side'},
+        el('p', {class: 'notice-legend'}, Object.entries(NOTICE_COLOURS).map(([level, label]) =>
+          el('span', {}, el('span', {class: `notice-pin-key ${level}`, 'aria-hidden': 'true'}), label))),
+        el('div', {class: 'notices-actions'},
+          unread ? el('button', {type: 'button', class: 'link', onclick: event => update(null, 'read', event.currentTarget)}, 'Marcar todos como lidos') : null))),
+    el('ul', {class: 'notice-list'}, notices.slice(0, 40).map(notice => el('li', {class: `notice ${notice.level}${notice.read ? '' : ' unread'}`,
+      title: NOTICE_COLOURS[notice.level] ? `Pionés: ${NOTICE_COLOURS[notice.level]}` : ''},
       el('span', {class: 'notice-when'}, stamp(notice.at)),
       el('span', {class: 'notice-text'}, notice.text),
       el('span', {class: 'notice-buttons'},
+        noticeNote(notice, text => run(async () => renderNotices(await call('api/notices/update', {ids: [notice.id], action: 'note', note: text})))),
         notice.tab && notice.tab !== 'dashboard' && el('button', {type: 'button', class: 'link', onclick: () => {
-          update([notice.id], 'read'); openTask({tab: notice.tab, property_ref: notice.ref}); }}, 'Ver →'),
-        el('button', {type: 'button', class: 'link', title: 'Sai do quadro', onclick: event => update([notice.id], 'archive', event.currentTarget)}, 'Arquivar'))))));
+          update([notice.id], 'read'); openTask({tab: notice.tab, property_ref: notice.ref}); }}, 'Ver →'))))));
+}
+const NOTICE_COLOURS = {ok: 'tudo bem', info: 'informação', watch: 'a vigiar', warn: 'precisa de atenção', bad: 'urgente'};
+// 04/10: our own note on a notice, up to 25 characters: «+» to write it; written, a click changes it (empty takes it
+// off). Enter or leaving the field keeps it, Esc gives up.
+const NOTICE_NOTE_CHARS = 25;
+function noticeNote(notice, save) {
+  const box = el('span', {class: 'notice-note-box'});
+  const show = () => box.replaceChildren(notice.note
+    ? el('button', {type: 'button', class: 'link notice-note', title: 'A nossa nota: clica para mudar ou apagar', onclick: edit}, notice.note)
+    : el('button', {type: 'button', class: 'link notice-add', title: `Acrescentar uma nota nossa (até ${NOTICE_NOTE_CHARS} caracteres)`,
+      'aria-label': 'Acrescentar uma nota', onclick: edit}, '+'));
+  function edit() {
+    let done = false;
+    const input = el('input', {type: 'text', class: 'notice-note-input', maxlength: String(NOTICE_NOTE_CHARS), value: notice.note || '',
+      placeholder: `Nota (até ${NOTICE_NOTE_CHARS} caracteres)`, 'aria-label': 'A nossa nota neste aviso'});
+    const finish = keep => {
+      if (done) return;
+      done = true;
+      const text = input.value.trim();
+      if (keep && text !== (notice.note || '')) save(text); else show();
+    };
+    input.addEventListener('keydown', event => {
+      if (event.key === 'Enter') { event.preventDefault(); finish(true); }
+      else if (event.key === 'Escape') finish(false);
+    });
+    input.addEventListener('blur', () => finish(true));
+    box.replaceChildren(input);
+    input.focus();
+  }
+  show();
+  return box;
 }
 
 // «A fazer» (26/09): worked out from the data, most urgent first; each line takes you to where it is done.

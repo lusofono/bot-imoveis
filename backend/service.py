@@ -126,8 +126,12 @@ def owner_folder(folder, email):
     return Path(folder) / OWNER_FOLDER / "donos" / re.sub(r"[^a-z0-9]+", "-", str(email or "").casefold()).strip("-")
 
 
-NOTICES_KEPT = 300  # 02/10: the notice board keeps the latest ones; the oldest (archived or not) fall off
-NOTICE_LEVELS = ("info", "warn", "bad")
+NOTICES_KEPT = 300  # 02/10: the notice board keeps the latest ones; the oldest finished ones fall off first
+NOTICE_NOTE_CHARS = 25  # 04/10: the owner's own short note on a notice
+NOTICE_EVENT_DAYS = 7  # 04/10: a green or grey notice (news, nothing to do) leaves the board after a week
+# 04/10: five levels, the colour of the board's pin — ok (green, all well), info (grey), watch (yellow), warn (orange,
+# needs you), bad (red, urgent)
+NOTICE_LEVELS = ("ok", "info", "watch", "warn", "bad")
 WAITING_NOTICE_HOURS = 72  # 02/10: a customer waiting this long for our answer is on the board (once a day)
 FUEL_DEFAULT_EUR = 5.0
 FUEL_TEST_EUR = 3.0  # 02/10: the test property's tank, unless the owner fills it with another amount
@@ -611,24 +615,105 @@ class MailService:
         save_json(self.queue_path(ref), data)
 
     # ===== The notice board (02/10): the system's important messages for the owner, on the Painel. Each one once (by
-    # its key), with when, which property and where to go; read or archived by the owner. Events, not to-dos: «A fazer»
-    # is worked out from the data and goes away when done, a notice stays until archived.
+    # its key), with when, which property and where to go; read by the owner. 04/10: no longer archived by hand — while
+    # what it says is true, it stays; it leaves by itself once over (the customer answered, the tank filled, a read or a
+    # backup that worked, the customer moved on), the green and grey news after a week. The owner may pin a short note.
 
     def notify(self, key, text, ref=None, level="warn", tab=None):
-        """Puts a message on the board, once per key; never fails what the caller was doing."""
+        """Puts a message on the board, once per key while the last one is on it; never fails what the caller was doing."""
         try:
             with locked(self.folder, "notices", wait=SHORT_WAIT):
                 board = load_notices(self.folder)
-                if any(notice.get("key") == key for notice in board["notices"]):
+                if any(notice.get("key") == key and not notice.get("over") for notice in board["notices"]):
                     return False
                 board["notices"].append({"id": secrets.token_hex(6), "key": key, "at": now(), "ref": ref,
                                          "level": level if level in NOTICE_LEVELS else "warn", "text": text[:600],
                                          "tab": tab, "read": False, "archived": False})
-                del board["notices"][:-NOTICES_KEPT]
+                self.trim_notices(board)
                 save_notices(self.folder, board)
                 return True
         except Exception:
             return False
+
+    @staticmethod
+    def trim_notices(board):
+        """Keeps NOTICES_KEPT: the oldest finished ones go first, then the oldest of all."""
+        extra = len(board["notices"]) - NOTICES_KEPT
+        if extra > 0:
+            finished = {id(notice) for notice in board["notices"] if notice.get("over") or notice.get("archived")}
+            drop = set()
+            for notice in board["notices"]:
+                if len(drop) == extra:
+                    break
+                if id(notice) in finished:
+                    drop.add(id(notice))
+            board["notices"] = [notice for notice in board["notices"] if id(notice) not in drop]
+            del board["notices"][:-NOTICES_KEPT]
+
+    def clear_notices(self, prefix):
+        """04/10: what the notices of this kind said is over (a read or a backup that worked): they leave the board."""
+        try:
+            with locked(self.folder, "notices", wait=SHORT_WAIT):
+                board = load_notices(self.folder)
+                ended = [notice for notice in board["notices"]
+                         if str(notice.get("key") or "").startswith(prefix) and not notice.get("over")]
+                for notice in ended:
+                    notice["over"] = now()
+                if ended:
+                    save_notices(self.folder, board)
+        except Exception:
+            pass
+
+    def notice_over(self, notice, board, queues):
+        """04/10: whether what a notice says is no longer true, worked out from the data. queues: a cache by property."""
+        key, ref = str(notice.get("key") or ""), notice.get("ref")
+        if notice.get("level") in ("ok", "info"):
+            try:
+                age = datetime.now(timezone.utc) - datetime.fromisoformat(str(notice.get("at")))
+            except (TypeError, ValueError):
+                return False
+            return age >= timedelta(days=NOTICE_EVENT_DAYS)
+        if not ref:
+            return False
+        if ref not in queues:
+            try:
+                queues[ref] = self.load(ref) if self.queue_path(ref).exists() else None
+            except Exception:
+                queues[ref] = None
+        data = queues[ref]
+        if data is None:
+            return key.startswith(("espera-", "alerta-", "shortlist-", "interacao-"))  # the property is gone
+        if key.startswith("espera-"):  # the latest one says it all; over when no one waits that long any more
+            newer = any(str(other.get("key") or "").startswith(f"espera-{ref}-") and not other.get("over")
+                        and str(other.get("at")) > str(notice.get("at")) for other in board["notices"])
+            return newer or not self.waiting_customers(data)
+        if key.startswith(f"alerta-{ref}-"):  # the flagged message was answered (or left the queue)
+            return all(item.get("id") != key[len(f"alerta-{ref}-"):] for item in data["emails"])
+        if key.startswith(f"shortlist-{ref}-"):
+            wrote = key[len(f"shortlist-{ref}-"):]
+            return all(wrote not in (item.get("id"), item.get("gmail_message_id"), item.get("message_id"))
+                       for item in data["emails"])
+        if key.startswith(f"interacao-{CONCLUSIVE_AT}-{ref}-"):  # the owner stepped in, or the customer moved on
+            digest = key.rsplit("-", 1)[-1]
+            for email, conversation in data.get("conversations", {}).items():
+                if hashlib.sha256(email.encode()).hexdigest()[:8] == digest:
+                    today = date.today().isoformat()
+                    return (conversation.get("stage", 0) != CONCLUSIVE_AT or bool(conversation.get("ignored"))
+                            or shut_out(conversation) or bool(conversation.get("closed_at") or conversation.get("selection"))
+                            or any(slot["customer"] == email and slot["at"][:10] >= today
+                                   for slot in load_visits(self.folder, ref)["slots"]))
+            return True
+        if key.startswith((f"deposito-vazio-{ref}-", f"deposito-reserva-{ref}-")):  # filled again
+            try:
+                fuel = self.api_fuel(ref)
+            except Exception:
+                return False
+            empty = key.startswith("deposito-vazio-")
+            filled = key[len(f"deposito-{'vazio' if empty else 'reserva'}-{ref}-"):]
+            if not fuel["configured"] or str(fuel["filled_at"]) != filled:
+                return True
+            return not fuel["empty"] if empty else (fuel["empty"] or not fuel["reserve"])
+        return False
 
     def mark_documents(self, ref, found):
         """03/10: the documents a short-list customer sent (read by the AI from their words and the files' names) are
@@ -676,10 +761,15 @@ class MailService:
                         "disso, põe-o na lista cinzenta ou na lista negra.", ref,
                         "warn" if alert["kind"] == "importante" else "bad", "replies")
 
+    @staticmethod
+    def waiting_customers(data):
+        """The emails of customers waiting WAITING_NOTICE_HOURS or more for our answer."""
+        return [item for item in data["emails"] if item.get("kind") in ("lead", "follow_up") and not item.get("blocked")
+                and not item.get("answered_directly") and (waited_hours(item) or 0) >= WAITING_NOTICE_HOURS]
+
     def waiting_notices(self, ref, data):
         """02/10, the board: customers waiting WAITING_NOTICE_HOURS or more for our answer, one notice per property a day."""
-        waiting = [item for item in data["emails"] if item.get("kind") in ("lead", "follow_up") and not item.get("blocked")
-                   and not item.get("answered_directly") and (waited_hours(item) or 0) >= WAITING_NOTICE_HOURS]
+        waiting = self.waiting_customers(data)
         if not waiting:
             return
         names = [(str((item.get("recipient") or {}).get("name") or (item.get("customer") or {}).get("name") or "").split()
@@ -746,23 +836,44 @@ class MailService:
         return {"calls": shown}
 
     def notices(self):
-        """The board as the page shows it: the ones not archived, newest first, and how many are unread."""
-        board = load_notices(self.folder)
-        shown = [notice for notice in reversed(board["notices"]) if not notice.get("archived")]
+        """The board as the page shows it: the ones still true, newest first, and how many are unread. 04/10: the ones
+        whose news is over are marked so here, and leave (archived ones, from before 04/10, stay out)."""
+        with locked(self.folder, "notices", wait=SHORT_WAIT):
+            board, queues = load_notices(self.folder), {}
+            ended = [notice for notice in board["notices"] if not notice.get("over") and not notice.get("archived")
+                     and self.notice_over(notice, board, queues)]
+            for notice in ended:
+                notice["over"] = now()
+            if ended:
+                save_notices(self.folder, board)
+        shown = [notice for notice in reversed(board["notices"]) if not notice.get("archived") and not notice.get("over")]
         return {"notices": shown, "unread": sum(1 for notice in shown if not notice.get("read"))}
 
-    def update_notices(self, ids, action):
-        """Marks notices read, or archives them (they leave the board); ids None: every one shown."""
-        if action not in ("read", "archive"):
+    def update_notices(self, ids, action, note=None):
+        """Marks notices read (ids None: every one shown); 04/10: or pins the owner's note on one (up to
+        NOTICE_NOTE_CHARS; empty takes it off). No archiving: a notice leaves when what it says is over."""
+        if action not in ("read", "note"):
             raise ValueError("Ação desconhecida no quadro de avisos.")
+        if action == "note" and (not ids or len(ids) != 1):
+            raise ValueError("A nota vai num aviso de cada vez.")
+        text = " ".join(str(note or "").split())
+        if action == "note" and len(text) > NOTICE_NOTE_CHARS:
+            raise ValueError(f"A nota tem no máximo {NOTICE_NOTE_CHARS} caracteres.")
         with locked(self.folder, "notices", wait=SHORT_WAIT):
             board = load_notices(self.folder)
             chosen = None if ids is None else {str(key) for key in ids}
+            found = False
             for notice in board["notices"]:
                 if chosen is None or notice.get("id") in chosen:
+                    found = True
                     notice["read"] = True
-                    if action == "archive":
-                        notice["archived"] = True
+                    if action == "note" and text:
+                        notice["note"], notice["note_at"] = text, now()
+                    elif action == "note":
+                        notice.pop("note", None)
+                        notice.pop("note_at", None)
+            if action == "note" and not found:
+                raise ValueError("Esse aviso já não está no quadro.")
             save_notices(self.folder, board)
         return self.notices()
 
@@ -791,7 +902,7 @@ class MailService:
                         "neste imóvel até o encheres (Painel → Depósitos).", ref, "bad", "dashboard")
         else:
             self.notify(f"deposito-reserva-{ref}-{fuel['filled_at']}", f"O depósito da API de {ref} está na reserva: "
-                        f"restam {left} €.", ref, "warn", "dashboard")
+                        f"restam {left} €.", ref, "watch", "dashboard")
 
     @staticmethod
     def view(ref, profile, data, voice, added=None, visits=None):
@@ -955,7 +1066,9 @@ class MailService:
         self.reading.clear()
         self.reading.update(stage="connect")  # 02/10: what the read is doing, for the page (api read/progress)
         try:
-            return self.read_now(days)
+            result = self.read_now(days)
+            self.clear_notices("leitura-")  # 04/10: a read that worked: the failed read's notice is over
+            return result
         except Exception as exc:
             if not isinstance(exc, RuntimeError):  # «another operation is running» is no failure
                 message = " ".join(str(exc).split())[:300] or type(exc).__name__
@@ -1536,6 +1649,7 @@ class MailService:
                 archive.write(path, Path("data") / relative)
         partial.replace(target)  # nothing older is deleted: backups are only ever added
         self.log("backup_made", bytes=target.stat().st_size)
+        self.clear_notices("copia-")  # 04/10: a backup that worked: a failed one's notice is over
         return self.backup_settings()
 
     def auto_backup(self):
@@ -1910,7 +2024,7 @@ class MailService:
                         ref, "warn", "contacts")
         else:
             self.notify(key, f"{name} ({ref}): levou o email de fecho ({CLOSING_FROM}.ª interação). Deixamos de "
-                        "insistir: fica fora das rondas de visitas.", ref, "info", "contacts")
+                        "insistir: fica fora das rondas de visitas.", ref, "ok", "contacts")
 
     @classmethod
     def advance(cls, data, item):
@@ -4031,6 +4145,21 @@ class MailService:
                              **{part: survey.get(part) for part in ("imovel", "consultor", "marcacao")}}
                             for name, survey in answers]}
 
+    def queue_numbers(self, ref, profile):
+        """04/10: a property's queue in numbers (the Painel's «Por imóvel»), for one kept out of the totals (the test one)."""
+        data = self.load(ref)
+        emails = [item for item in data["emails"] if item.get("kind") != "owner"]
+        status = Counter(item.get("reply_status") or "pending" for item in emails)
+        waits = [waited_hours(item) for item in emails if item.get("kind") in ("lead", "follow_up") and not item.get("blocked")
+                 and not item.get("answered_directly") and item.get("reply_status") in (None, "pending", "draft")]
+        listing = profile.get("property") or {}
+        return {"property_ref": ref, "description": listing.get("description"), "test": True,
+                "advertised_rent_eur": listing.get("advertised_rent_eur"),  # 04/10: «Por imóvel» shows the rent
+                "pending": len(emails), "drafts": status["draft"], "blocked": sum(1 for item in emails if item.get("blocked")),
+                "attention": status["uncertain"] + status["error"] + status["sending"],
+                "answered": sum(conversation.get("stage", 0) for conversation in (data.get("conversations") or {}).values()),
+                "reply_hours": None, "oldest_wait_hours": max([hours for hours in waits if hours is not None], default=None)}
+
     def todo(self):
         """«A fazer» (26/09), right under the dashboard's telemetry: what needs doing now, worked out from the data.
         Nothing is typed by hand, and a task goes away once it is done. Of the customers, only first names leave
@@ -4219,7 +4348,12 @@ class MailService:
                               attention=status["uncertain"] + status["error"] + status["sending"])
                 last_read = max([stamp for stamp in (last_read, data.get("last_read_at")) if stamp], default=None)
                 listing = profiles[ref]["property"] if ref else {}
+                # 04/10: how long the customer who has waited longest for us has waited (the Painel's dot by property)
+                waits = [waited_hours(item) for item in emails if item.get("kind") in ("lead", "follow_up")
+                         and not item.get("blocked") and not item.get("answered_directly")
+                         and item.get("reply_status") in (None, "pending", "draft")]
                 properties.append({"property_ref": ref, "pending": len(emails), "drafts": status["draft"],
+                                   "oldest_wait_hours": max([hours for hours in waits if hours is not None], default=None),
                                    "blocked": blocked, "answered": answered, "customers": len(conversations),
                                    "attention": status["uncertain"] + status["error"] + status["sending"],
                                    "visits_booked": sum(1 for slot in slots if slot["at"][:10] >= today_iso),
@@ -4318,6 +4452,8 @@ class MailService:
                                      "month": usage_of(openai_month),
                                      "unattributed": usage_of(unattributed)},
                     "api_fuel": self.api_fuel(None, events),
+                    # 04/10: the test property's row for «Por imóvel» (never in the totals nor the ponto de situação)
+                    "test_properties": [self.queue_numbers(ref, profiles[ref]) for ref in sorted(test_refs & set(profiles))],
                     # 02/10: the test property's tank, apart from the properties (it never counts in the Painel)
                     "test_tanks": [{"property_ref": ref, "api_fuel": self.api_fuel(ref, events),
                                     "openai_usage": {"period": usage_of(mine["period"]), "all_time": usage_of(mine["all_time"])}}

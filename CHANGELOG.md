@@ -15,6 +15,79 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.111.0 — 04/10/2026
+
+- **Painel sem os cartões dos imóveis:** repetiam o que «Por imóvel» já mostra. A tabela fica com o que só os cartões
+  tinham: a **renda** de cada imóvel, numa coluna logo a seguir ao nome, e, no fim de cada linha, «Comunicações →» e
+  «Painel →» (o painel do imóvel, em Imóveis). Aparece logo a partir de um imóvel (antes, só com dois ou mais). O
+  imóvel de teste também mostra a renda. A fotografia continua na página do imóvel. Sem nenhum imóvel, fica a frase
+  para adicionar o primeiro.
+
+## α.110.4 — 04/10/2026
+
+- **Quadro de avisos:** «QUADRO DE AVISOS» em letra branca no KW e em preto no 80's RacingCar (na letra do tema, como
+  nos outros títulos), para se ler na placa de cada tema.
+
+## α.110.3 — 04/10/2026
+
+- **Quadro de avisos:** a legenda das cores dos pionés sobe para o canto superior direito, na linha de «QUADRO DE
+  AVISOS»; «Marcar todos como lidos» fica logo por baixo dela. Em ecrãs estreitos, ambos vão para baixo do título.
+
+## α.110.2 — 04/10/2026
+
+- **Quadro de avisos:** a legenda das cores dos pionés passa para o canto inferior direito, com o espaço de mais uma
+  linha antes.
+
+## α.110.1 — 04/10/2026
+
+- **Quadro de avisos:** sai o subtítulo «Avisos do sistema» (com tudo lido, fica só «QUADRO DE AVISOS»; com avisos por
+  ler, continua «N avisos por ler»). No 90's Boat, «QUADRO DE AVISOS» passa a letra branca, para se ler.
+
+## α.110.0 — 04/10/2026
+
+- **Os avisos já não se arquivam:** saem «Arquivar» e «Arquivar todos». Enquanto o que um aviso diz for verdade, fica no
+  quadro; sai sozinho quando acaba: o cliente à espera ou a mensagem assinalada (alerta da IA, short list) foi
+  respondida; o depósito voltou a ser cheio (o da reserva sai também quando passa a vazio, que diz tudo); uma leitura
+  ou uma cópia de segurança correu bem depois de uma que falhou; o cliente da 8.ª interação seguiu em frente (lista
+  cinzenta ou negra, visita marcada, short list, fecho). Do aviso diário de clientes à espera, fica só o mais recente.
+  Os verdes e cinzentos (notícias, nada a fazer) saem passada uma semana. «Marcar todos como lidos» continua.
+- **A nossa nota no aviso:** um «+» no canto de cada post-it abre um campo para uma nota curta, até 25 caracteres
+  (por exemplo, «Liguei ao dono»). Fica escrita à mão no post-it; um clique muda-a, e apagá-la tira-a. Enter ou sair
+  do campo guarda; Esc desiste.
+- **Canto de post-it:** o canto inferior direito de cada nota levanta-se um pouco do quadro, com uma curva larga, uma
+  sombra no papel dobrado e outra por baixo, mais funda nesse canto; na ardósia, a curva vai no traço de giz.
+
+## α.109.4 — 04/10/2026
+
+- **Quadro de avisos em post-its:** em todos os temas, os avisos passam a notas mais altas, três por linha (duas em
+  ecrãs estreitos, uma no telemóvel), com a hora em cima, o texto a meio e «Ver» e «Arquivar» em baixo.
+- **A cor do aviso vai no pionés,** em cima de cada nota (também na ardósia), e sai a bola da esquerda. Cinco níveis,
+  com legenda por baixo das notas: verde, tudo bem (o fecho enviado); cinza, informação; amarelo, a vigiar (o depósito
+  na reserva); laranja, precisa de atenção (cliente à espera, 8.ª interação, mensagem importante); vermelho, urgente
+  (leitura falhada, depósito vazio, mensagem dramática ou insultuosa, short list que escreveu). Ao passar o rato numa
+  nota, diz o que quer dizer a cor.
+- **70's Scooter sem cortiça:** volta ao cartão do próprio tema, com os post-its e os pionés como nos outros; a
+  cortiça fica só no 90's Boat.
+
+## α.109.3 — 04/10/2026
+
+- **Quadro de avisos com cara de quadro:** nos temas claros e modernos (Âmbar, Dia, APalace, AgentVal, KW), um quadro de
+  tecido cinza-claro com moldura branca, os avisos em papel branco com um pionés verde e os por ler num post-it amarelo
+  claro; de cortiça, com moldura de madeira, só nos antigos (90's Boat, 70's Scooter: papel preso com pionés, os por ler
+  em amarelo, cada um ligeiramente torto); de ardósia nos escuros (Noite, Índigo, 80's RacingCar: letra de giz, os avisos
+  desenhados a giz, os por ler a giz amarelo). Só o aspeto muda.
+
+## α.109.1 — 04/10/2026
+
+- **Painel: «Por imóvel»**, logo a seguir aos cartões — os mesmos números para cada imóvel (por responder, rascunhos,
+  bloqueados, a precisar de atenção, respostas enviadas e tempo médio), com a cor de cada cartão onde não é zero. O nome
+  do imóvel abre as Comunicações nesse imóvel. Só com dois imóveis ou mais. Os títulos vão em duas linhas e a descrição
+  do imóvel corta-se aos 36 caracteres (inteira ao passar o rato), para caber tudo na largura. Antes da referência, uma
+  bola: verde (nada por fazer), amarela (por responder ou por enviar, dentro do tempo), laranja (um cliente espera há
+  mais do que o limite de resposta da Voz e estilo) ou vermelha (envio incerto ou com erro, email bloqueado, ou um
+  cliente à espera há 3 dias ou mais); legenda por baixo. O imóvel de teste entra na última linha, em roxo claro e
+  marcado «TESTE», mas nunca nos totais dos cartões nem no ponto de situação.
+
 ## α.109.0 — 03/10/2026
 
 - **«Reconstruir a partir do Gmail»** (Imóveis, na página de cada imóvel): lê o Gmail duas vezes, 30 a 180 dias para trás

@@ -37,6 +37,19 @@ def test_one_backup_a_day_at_the_read_and_none_without_a_folder(service, tmp_pat
     assert len(list(copies.glob("ARIA-copia-*.zip"))) == 1
 
 
+def test_a_failed_backup_is_on_the_board_until_one_works(service, tmp_path_factory):
+    # 04/10: the notice leaves by itself once a backup works
+    copies = tmp_path_factory.mktemp("copias")
+    service.set_backup_folder(str(copies))
+    copies.rmdir()  # the folder went missing (a Drive not mounted)
+    assert service.auto_backup() is None
+    [notice] = service.notices()["notices"]
+    assert notice["text"].startswith("A cópia de segurança de hoje falhou")
+    copies.mkdir()
+    service.backup()
+    assert service.notices()["notices"] == []
+
+
 def test_google_drive_for_desktop_is_offered_and_its_folder_made(service, tmp_path_factory, monkeypatch):
     from pathlib import Path
     home = tmp_path_factory.mktemp("home")

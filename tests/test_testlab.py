@@ -390,3 +390,14 @@ def test_the_common_prompts_change_only_in_the_oficina_and_reach_the_instruction
     choices = {key: voice["style"][key]["selected"] for key in ("greeting", "languages", "closing")}
     call("/api/voice", {**choices, "signature": "Equipa", "survey_reply": "Outra coisa."})
     assert service.settings()["voice"]["survey_reply"] == "Agradece só, em duas linhas."
+
+
+def test_the_test_property_has_its_row_by_property_but_never_counts_in_the_totals(service):
+    # 04/10: «Por imóvel» shows it last, marked; the cards' totals and the ponto de situação leave it out
+    with_test_property(service)
+    read(service, [marked_notice("t1")])
+    metrics = service.metrics()
+    assert TEST_REF not in [item["property_ref"] for item in metrics["properties"]] and metrics["totals"]["pending"] == 0
+    [row] = metrics["test_properties"]
+    assert (row["property_ref"], row["test"], row["pending"]) == (TEST_REF, True, 1)
+    assert "advertised_rent_eur" in row  # 04/10: the rent column, as for every property

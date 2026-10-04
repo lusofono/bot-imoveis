@@ -668,7 +668,7 @@ def web_app(folder, token):
                 # 02/10: the notice board (Painel): the system's important messages for the owner
                 "notices": ("GET", lambda body: service.notices()),
                 "notices/update": ("POST", lambda body: service.update_notices(
-                    body.get("ids") if isinstance(body.get("ids"), list) else None, body.get("action"))),
+                    body.get("ids") if isinstance(body.get("ids"), list) else None, body.get("action"), body.get("note"))),
                 "digest/save": ("POST", digest_save), "digest/send": ("POST", digest_send),
                 "digest/send-all": ("POST", digest_send_all),
                 "digest/refresh": ("POST", lambda body: service.refresh_digest(body.get("property_ref") or None)),

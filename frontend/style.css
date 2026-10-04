@@ -1082,24 +1082,48 @@ body:not(.admin) .prompt-view{display:none!important}
 :root #tab-replies.test-mode button.send-action:hover:not(:disabled){background:#25844b;border-color:#25844b}
 :root #tab-replies.test-mode button.send-action .step-num{color:#2e9e5b}
 :root #tab-replies.test-mode button.send-action::before,:root #tab-replies.test-mode button.send-action::after{display:none}
-/* 02/10: the notice board (Painel) — one line per message: a dot of its level, when, the text, then «Ver» and «Arquivar»;
-   the unread ones in bold, on a tint of the accent */
+/* 02/10: the notice board (Painel). 04/10: post-it notes, three a row, every theme — when, the text, then «Ver» and
+   «Arquivar» at the foot; the notice's level in the colour of the pin on top (green all well, grey information, yellow
+   to watch, orange needs you, red urgent), with a legend under the notes; the unread ones in bold, on a tint of the accent */
 .notices-card .section-heading{align-items:flex-start}
 .notices-actions{display:flex;flex-wrap:wrap;gap:4px 16px}
-.notice-list{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:6px}
-.notice{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;align-items:baseline;gap:4px 12px;padding:8px 12px;
-  border:1px solid var(--line);border-radius:10px;font-size:13px}
+.notice-list{list-style:none;margin:18px 0 0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px 16px}
+.notice{--pin:#8b8f94;position:relative;display:flex;flex-direction:column;gap:8px;min-height:150px;padding:18px 16px 12px;
+  background:var(--card);border:1px solid var(--line);font-size:13.5px;line-height:1.45;
+  /* 04/10: the post-it's bottom-right corner lifts off the board — a wide, flat curve, a shade on the curled paper
+     (::after) and a shadow that deepens under it */
+  border-radius:10px 10px 46px 10px/10px 10px 13px 10px;
+  box-shadow:0 1px 1px #0000001a,0 4px 7px -4px #00000024,10px 12px 12px -9px #00000059}
+.notice::after{content:"";position:absolute;right:0;bottom:0;width:64px;height:28px;border-bottom-right-radius:inherit;pointer-events:none;
+  background:linear-gradient(to bottom right,#0000 48%,#0000001a)}
+.notice.ok{--pin:#2e9e5b}.notice.info{--pin:#8b8f94}.notice.watch{--pin:#e6b800}.notice.warn{--pin:#ef7d1a}.notice.bad{--pin:#d63c2f}
 .notice.unread{background:var(--accent-tint);font-weight:600}
-.notice-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);align-self:center}
-.notice.warn .notice-dot{background:var(--warn)}
-.notice.bad .notice-dot{background:var(--bad)}
-.notice.info .notice-dot{background:var(--ok)}
+.notice::before{content:"";position:absolute;top:-7px;left:50%;width:14px;height:14px;margin-left:-7px;border-radius:50%;
+  background:radial-gradient(circle at 35% 35%,color-mix(in srgb,var(--pin) 45%,#fff),var(--pin) 58%,color-mix(in srgb,var(--pin) 55%,#000));
+  box-shadow:0 2px 2px #00000052}
 .notice-when{color:var(--muted);font-size:11.5px;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:400}
-.notice-text{overflow-wrap:anywhere}
-.notice-buttons{display:flex;gap:12px;white-space:nowrap}
+.notice-text{flex:1;overflow-wrap:anywhere}
+.notice-buttons{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px 14px}
 .notice-buttons .link{padding:0;min-height:0;font-size:12.5px;font-weight:500}
-@media(max-width:760px){.notice{grid-template-columns:auto minmax(0,1fr)}.notice-when{grid-column:2}.notice-text{grid-column:1/-1}
-  .notice-buttons{grid-column:1/-1}}
+.notice-buttons>.link:last-child{margin-left:auto}
+/* 04/10: our note on a notice — «+» in a small circle; written, in pen, as if by hand */
+.notice{--ink:#2b4fa0}
+.notice-note-box{display:inline-flex;align-items:center;min-width:0;max-width:100%}
+.notice-buttons .link.notice-add{width:22px;height:22px;justify-content:center;border:1.5px solid currentColor;border-radius:50%;
+  font-size:15px;line-height:1;font-weight:700;color:var(--ink);opacity:.7}
+.notice-buttons .link.notice-add:hover{opacity:1}
+.notice-buttons .link.notice-note{font-family:"Bradley Hand","Segoe Print","Marker Felt","Comic Sans MS",cursive;font-size:15px;
+  font-weight:600;color:var(--ink);text-align:left;overflow-wrap:anywhere}
+.notice-note-input{width:16em;max-width:100%;padding:3px 8px;font-size:12.5px;border-radius:6px;font-weight:400}
+.notices-side{display:flex;flex-direction:column;align-items:flex-end;gap:8px;min-width:0}
+.notice-legend{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px 16px;margin:0;font-size:11.5px;color:var(--muted)}
+@media(max-width:760px){.notices-side{align-items:flex-start}.notice-legend{justify-content:flex-start}}
+.notice-legend>span{display:inline-flex;align-items:center;gap:6px}
+.notice-pin-key{width:9px;height:9px;border-radius:50%;display:inline-block}
+.notice-pin-key.ok{background:#2e9e5b}.notice-pin-key.info{background:#8b8f94}.notice-pin-key.watch{background:#e6b800}
+.notice-pin-key.warn{background:#ef7d1a}.notice-pin-key.bad{background:#d63c2f}
+@media(max-width:980px){.notice-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.notice-list{grid-template-columns:minmax(0,1fr)}.notice{min-height:0}}
 /* 02/10: Proprietários — the owner's cards: the conversation (newest first, scrolling when long) above the draft */
 .owner-card .owner-history{display:grid;gap:8px;max-height:420px;overflow:auto;margin:6px 0 12px}
 .owner-card textarea{margin-top:4px}
@@ -1145,3 +1169,88 @@ body:not(.admin) .prompt-view{display:none!important}
 .rebuild-panel{margin:16px 0}
 .rebuild-panel summary{cursor:pointer}
 .rebuild-entry{display:flex;align-items:baseline;gap:6px;padding:4px 0;font-size:13px}
+/* 04/10: the Painel's numbers by property, under the cards */
+.by-property-card{padding:16px 22px}
+.by-property-scroll{overflow-x:auto}
+.by-property{width:100%;border-collapse:collapse;font-size:13px}
+.by-property th,.by-property td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+.by-property thead th{font-size:11.5px;line-height:1.3;color:var(--muted);font-weight:600;vertical-align:bottom}
+.by-property .num{text-align:right;font-variant-numeric:tabular-nums}
+.by-property td.zero{color:var(--muted)}
+.by-property td.ok{color:var(--ok);font-weight:600}
+.by-property td.warn{color:var(--warn);font-weight:600}
+.by-property td.bad{color:var(--bad);font-weight:600}
+.by-property tbody th .link{padding:0;min-height:0;font-weight:600}
+/* 04/10: the ways into each property, at the end of its row (the cards below are gone) */
+.by-property td.by-property-links{text-align:right}
+.by-property td.by-property-links .link{padding:0;min-height:0;font-size:12.5px;font-weight:600}
+.by-property td.by-property-links .link+.link{margin-left:14px}
+/* 04/10: the dot of each property in «Por imóvel», and its legend */
+.state-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:middle;flex:none}
+.state-dot.green{background:#2e9e5b}.state-dot.yellow{background:#e6b800}.state-dot.orange{background:#ef7d1a}.state-dot.red{background:#d63c2f}
+.by-property-legend{display:flex;flex-wrap:wrap;gap:4px 18px;margin:10px 0 0}
+.by-property-legend>span{display:inline-flex;align-items:center}
+/* 04/10: the notice board as a board — a grey linen pinboard in a white frame in the light, modern themes (the notes on
+   white paper, the unread on a pale yellow note); cork, in a wooden frame, only in the 90's Boat (the notes on paper, the
+   unread on yellow, each a little askew; the 70's Scooter keeps its own card); slate in the dark ones (chalk words, the
+   notes drawn in chalk, the unread in yellow chalk). The post-its and their pins are common to every theme. */
+:root:is([data-theme="boat"]) .card.notices-card{border:10px solid #8a5a2b;border-radius:12px;padding:22px 24px 26px;
+  background-color:#c89b69;
+  background-image:radial-gradient(circle at 20% 30%,#b3824f 0 1.4px,#0000 2px),radial-gradient(circle at 70% 60%,#dcb588 0 1.1px,#0000 1.7px),
+    radial-gradient(circle at 40% 80%,#a5763f 0 1.3px,#0000 1.9px),radial-gradient(circle at 85% 15%,#d2a874 0 0.9px,#0000 1.5px);
+  background-size:13px 13px,11px 11px,17px 17px,9px 9px;
+  box-shadow:inset 0 0 0 1px #5e3a17,inset 0 2px 12px #0000004d,0 6px 18px #3b24102e}
+:root:is([data-theme="boat"]) .card.notices-card .eyebrow{color:#fff}  /* 04/10: white, to be read on the boat's plate */
+:root:is([data-theme="boat"]) .card.notices-card h2{color:#2b1a0b}
+:root:is([data-theme="boat"]) .card.notices-card .notices-actions .link{color:#3b2410;font-weight:700}
+:root:is([data-theme="boat"]) .card.notices-card .notice-list{margin-top:20px}
+:root:is([data-theme="boat"]) .card.notices-card .notice{position:relative;background:#fffdf6;color:#2d2416;border:0;border-radius:2px 2px 46px 2px/2px 2px 13px 2px;
+  box-shadow:0 1px 1px #00000021,0 4px 7px -4px #00000029,10px 12px 12px -9px #00000066;transform:rotate(-.35deg)}
+:root:is([data-theme="boat"]) .card.notices-card .notice:nth-child(even){transform:rotate(.3deg)}
+:root:is([data-theme="boat"]) .card.notices-card .notice.unread{background:#fff2a6}
+:root:is([data-theme="boat"]) .card.notices-card .notice .notice-when{color:#6b5a43}
+:root:is([data-theme="boat"]) .card.notices-card .notice .link{color:#7a4a15}
+
+:root:is([data-theme="night"],[data-theme="indigo"],[data-theme="racing"],:not([data-theme])) .card.notices-card{border:10px solid #5b3a1e;border-radius:12px;padding:22px 24px 26px;
+  background-color:#2e3a36;
+  background-image:radial-gradient(ellipse at 20% 30%,#ffffff0d,#0000 45%),radial-gradient(ellipse at 75% 70%,#ffffff0a,#0000 50%),
+    radial-gradient(circle at 50% 50%,#ffffff05 0 1px,#0000 1.5px);
+  background-size:100% 100%,100% 100%,7px 7px;
+  box-shadow:inset 0 0 0 1px #3a2412,inset 0 0 30px #00000066,0 6px 18px #0000004d}
+:root:is([data-theme="night"],[data-theme="indigo"],[data-theme="racing"],:not([data-theme])) .card.notices-card :is(.eyebrow,h2){color:#eef2ec;font-family:"Chalkboard SE","Chalkboard","Comic Sans MS",cursive;letter-spacing:.04em}
+:root:is([data-theme="night"],[data-theme="indigo"],[data-theme="racing"],:not([data-theme])) .card.notices-card h2{font-weight:400}
+:root:is([data-theme="night"],[data-theme="indigo"],[data-theme="racing"],:not([data-theme])) .card.notices-card .notices-actions .link{color:#d7ecff}
+:root:is([data-theme="night"],[data-theme="indigo"],[data-theme="racing"],:not([data-theme])) .card.notices-card .notice-list{margin-top:20px}
+:root:is([data-theme="night"],[data-theme="indigo"],[data-theme="racing"],:not([data-theme])) .card.notices-card .notice{background:#0000;border:1.5px dashed #eef2ec66;border-radius:6px 6px 46px 6px/6px 6px 13px 6px;box-shadow:10px 12px 12px -9px #0000008c;color:#eef2ec;font-weight:400}
+:root:is([data-theme="night"],[data-theme="indigo"],[data-theme="racing"],:not([data-theme])) .card.notices-card .notice.unread{border-color:#f3e27a;color:#f8ecb0;font-weight:600}
+:root:is([data-theme="night"],[data-theme="indigo"],[data-theme="racing"],:not([data-theme])) .card.notices-card .notice .notice-when{color:#c9d3cc}
+:root:is([data-theme="night"],[data-theme="indigo"],[data-theme="racing"],:not([data-theme])) .card.notices-card .notice .link{color:#d7ecff}
+:root:is([data-theme="night"],[data-theme="indigo"],[data-theme="racing"],:not([data-theme])) .card.notices-card .notice{--ink:#f3e27a}
+:root:is([data-theme="night"],[data-theme="indigo"],[data-theme="racing"],:not([data-theme])) .card.notices-card .notice::after{background:linear-gradient(to bottom right,#0000 48%,#eef2ec1f)}
+/* 04/10: the test property's row in «Por imóvel»: light purple, out of the totals */
+.by-property tr.test-row>*{background:color-mix(in srgb,#8e6cd8 10%,transparent)}
+.by-property .test-tag{margin-left:8px;color:#6a4bc4;border-color:#b9a6ec}
+:root:is([data-theme="amber"],[data-theme="day"],[data-theme="apalace"],[data-theme="agentval"],[data-theme="kw"]) .card.notices-card{border:12px solid #fbfaf7;border-radius:6px;padding:22px 24px 26px;
+  background-color:#d9d6d0;
+  background-image:repeating-linear-gradient(0deg,#ffffff1f 0 1px,#0000 1px 3px),repeating-linear-gradient(90deg,#0000000f 0 1px,#0000 1px 3px),
+    repeating-linear-gradient(45deg,#ffffff0a 0 2px,#0000 2px 6px);
+  box-shadow:0 0 0 1px #e4e1db,inset 0 1px 6px #0000001f,0 8px 22px #0000001a}
+:root:is([data-theme="amber"],[data-theme="day"],[data-theme="apalace"],[data-theme="agentval"],[data-theme="kw"]) .card.notices-card .eyebrow{color:#5b5650}
+:root:is([data-theme="amber"],[data-theme="day"],[data-theme="apalace"],[data-theme="agentval"],[data-theme="kw"]) .card.notices-card h2{color:#2f2c28}
+:root:is([data-theme="amber"],[data-theme="day"],[data-theme="apalace"],[data-theme="agentval"],[data-theme="kw"]) .card.notices-card .notices-actions .link{color:#3e3a35;font-weight:700}
+:root:is([data-theme="amber"],[data-theme="day"],[data-theme="apalace"],[data-theme="agentval"],[data-theme="kw"]) .card.notices-card .notice-list{margin-top:20px}
+:root:is([data-theme="amber"],[data-theme="day"],[data-theme="apalace"],[data-theme="agentval"],[data-theme="kw"]) .card.notices-card .notice{position:relative;background:#fff;color:#2c2925;border:0;border-radius:2px 2px 46px 2px/2px 2px 13px 2px;
+  box-shadow:0 1px 1px #00000021,0 4px 7px -4px #00000029,10px 12px 12px -9px #0000005c}
+:root:is([data-theme="amber"],[data-theme="day"],[data-theme="apalace"],[data-theme="agentval"],[data-theme="kw"]) .card.notices-card .notice:nth-child(even){transform:rotate(.2deg)}
+:root:is([data-theme="amber"],[data-theme="day"],[data-theme="apalace"],[data-theme="agentval"],[data-theme="kw"]) .card.notices-card .notice.unread{background:#fbf5d2}
+:root:is([data-theme="amber"],[data-theme="day"],[data-theme="apalace"],[data-theme="agentval"],[data-theme="kw"]) .card.notices-card .notice .notice-when{color:#77716a}
+:root:is([data-theme="amber"],[data-theme="day"],[data-theme="apalace"],[data-theme="agentval"],[data-theme="kw"]) .card.notices-card .notice .link{color:#3e5f8a}
+:root:is([data-theme="amber"],[data-theme="day"],[data-theme="apalace"],[data-theme="agentval"],[data-theme="kw"]) .card.notices-card .notice-legend{color:#4a4640}
+:root:is([data-theme="boat"]) .card.notices-card .notice-legend{color:#2b1a0b}
+:root:is([data-theme="night"],[data-theme="indigo"],[data-theme="racing"],:not([data-theme])) .card.notices-card .notice-legend{color:#dfe6e1}
+/* 04/10: our note keeps its pen's colour on every board (the boards colour their links) */
+#dashboard-notices .notice .link:is(.notice-add,.notice-note){color:var(--ink)}
+/* 04/10: where the theme's title is a plate, the board keeps its letters: white on KW's red, black on the racing car's
+   aluminium (its own font, as in every other title) */
+:root[data-theme="kw"] .card.notices-card .eyebrow{color:#fff}
+:root[data-theme="racing"] .card.notices-card .eyebrow{color:#1c1c1c;font:800 10px/1.6 var(--din);letter-spacing:2.2px}

@@ -3,6 +3,14 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 04/10/2026: os avisos do quadro saem sozinhos, não se arquivam (α.110.0)
+
+**Decisão (pedido do utilizador, 04/10):** «se existe o aviso tem de ficar». O quadro de avisos deixa de ter
+«Arquivar»: um aviso fica enquanto o que diz for verdade e sai quando os dados mostram que acabou (cliente respondido,
+depósito cheio, leitura ou cópia que voltou a correr bem, cliente que seguiu em frente). Os avisos verdes e cinzentos
+são notícias, sem nada para fazer, e saem passada uma semana. O utilizador pode deixar no aviso uma nota sua com até
+25 caracteres. Os avisos arquivados antes desta versão continuam fora do quadro.
+
 ## 02/10/2026: cópias de segurança, marca escondida e reconstrução a partir do Gmail
 
 **Decisão (conversa com o utilizador, 02/10).**
