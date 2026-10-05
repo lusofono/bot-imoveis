@@ -46,3 +46,33 @@ def test_write_more_is_a_draft_in_the_conversation_that_spends_no_step(service):
     assert conversation["stage"] == 1 and conversation["last_text"] == "Acrescento: o estacionamento está incluído."
     assert SMTP.sent[-1]["Subject"].startswith("Re: ")
     assert [c["email"] for c in queue(service)["active"]] == [email]  # back as a sent card
+
+
+def test_write_to_all_makes_one_addition_for_each_active_customer_or_only_the_unanswered(service):
+    # 04/10, «Escrever a todos»: the owner's words, one addition draft per customer — every active customer, or only
+    # those whose last turn is ours; never the greylist, who declined or a closed contact; one with an email in the
+    # queue is left out (answered there)
+    people = ["a@example.com", "b@example.com", "c@example.com", "d@example.com"]
+    read(service, [lead(str(n), reply_to=(email,), body_email=email) for n, email in enumerate(people, 1)])
+    for n in range(1, 5):
+        draft_and_send(service, str(n), "Olá.")
+    data = service.load(REF)
+    data["conversations"]["b@example.com"]["history"].append({"who": "cliente", "text": "Obrigado.", "at": DAY})
+    data["conversations"]["c@example.com"].update(ignored=True, ignored_kind="grey")
+    service.save(data, REF)
+    assert queue(service)["write_all"] == {"all": 3, "unanswered": 2, "queued": 0}
+    import pytest
+    for audience, note, error in (("todos", "Olá", "a quem escrever"), ("all", "  ", "o que queres dizer")):
+        with pytest.raises(ValueError, match=error):
+            service.write_to_all(REF, audience, note)
+    note = "A casa está livre a partir de terça; precisamos da disponibilidade para 7 a 9 de outubro."
+    assert service.write_to_all(REF, "unanswered", note)["created"] == 2
+    current = queue(service)
+    made = {item["recipient"]["email"]: item for item in current["emails"]}
+    assert set(made) == {"a@example.com", "d@example.com"} and all(item["kind"] == "addition" for item in made.values())
+    assert current["write_all"] == {"all": 1, "unanswered": 0, "queued": 2}  # the two drafts are in the queue now
+    prompt = reply_prompt(current, [made["a@example.com"]["id"]])
+    assert "escrito a todos os clientes" in prompt and "7 a 9 de outubro" in prompt
+    assert service.write_to_all(REF, "all", "Outra nota.")["created"] == 1  # b, who had answered
+    with pytest.raises(ValueError, match="Ninguém a quem escrever"):
+        service.write_to_all(REF, "all", "Mais uma.")

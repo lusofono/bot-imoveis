@@ -26,7 +26,7 @@ def test_one_chosen_and_one_reserve_per_property(service):
     assert [(c["email"], c["status"]) for c in service.contacts()["selection"]] == [
         ("b@example.com", "chosen"), ("a@example.com", "shortlist")]
     service.set_selection(REF, "a@example.com", "suplente")
-    assert [c["label"] for c in service.contacts()["selection"]] == ["Escolhido", "Suplente"]
+    assert [c["label"] for c in service.contacts()["selection"]] == ["Selecionado", "Suplente"]
     service.set_selection(REF, "a@example.com", None)
     assert [c["email"] for c in service.contacts()["selection"]] == ["b@example.com"]
 
@@ -74,3 +74,16 @@ def test_every_booking_says_where_its_customer_stands_in_the_selection(service):
     assert slot["check"]["attended"] is True and slot["selection"] is None  # «Quem já visitou», not on the list yet
     service.set_selection(REF, "a@example.com", "shortlist")
     assert service.settings()["properties"][0]["visits"]["slots"][0]["selection"] == "shortlist"
+
+
+def test_the_selected_has_a_column_of_its_own_and_an_owner_is_marked_in_the_table(service):
+    # 04/10: «Selecionado» (once «Escolhido») is the last column of «Emails em tratamento», golden in the page; a registered
+    # owner who is in the table is marked, for a frame of their own
+    two_customers(service)
+    service.set_selection(REF, "a@example.com", "chosen")
+    service.set_selection(REF, "b@example.com", "shortlist")
+    service.add_owner("b@example.com", "Bea Dona")  # on the owners' list (set_owner here would take her to the owner's side)
+    queue = service.pending()["properties"][0]
+    table = {customer["email"]: customer for customer in queue["pipeline"]}
+    assert table["a@example.com"]["column"] == "selecionado" and table["b@example.com"]["column"] == "shortlist"
+    assert table["b@example.com"]["owner"] is True and table["a@example.com"]["owner"] is False

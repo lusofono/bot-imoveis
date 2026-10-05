@@ -280,7 +280,7 @@ def story_turns(turns, us="ARIA", waiting=()):
         text = own_text(turn.get("text")) or str(turn.get("text") or "").strip()
         who = "CLIENTE" if turn.get("who") == "cliente" else us
         if who == "CLIENTE" and text and text in waiting:
-            who += " — por responder, na fila das Comunicações"
+            who += " — por responder, na fila de Emails"
         lines += ["", f"[{local_time(turn.get('ts') or turn.get('at'))}] {who}", text or "(vazio)"]
     return lines
 

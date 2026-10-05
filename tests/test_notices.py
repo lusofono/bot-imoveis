@@ -34,6 +34,24 @@ def test_a_notice_comes_once_the_owner_reads_it_and_pins_a_note_but_cannot_archi
     assert len(service.notices()["notices"]) == 2  # read, still on the board
 
 
+def test_the_owner_marks_a_post_it_urgent_not_urgent_or_dealt_with(service):
+    # 04/10: the post-it's colour, from its top-right corner: red urgent, blue not urgent, green dealt with; a marked
+    # notice is read; empty takes the mark off; one notice at a time, only those three
+    service.notify("a", "Primeiro aviso.", REF)
+    [notice] = service.notices()["notices"]
+    board = service.update_notices([notice["id"]], "mark", mark="urgent")
+    assert board["notices"][0]["mark"] == "urgent" and board["notices"][0]["read"] is True and board["unread"] == 0
+    for mark in ("calm", "done"):
+        assert service.update_notices([notice["id"]], "mark", mark=mark)["notices"][0]["mark"] == mark
+    assert "mark" not in service.update_notices([notice["id"]], "mark", mark="")["notices"][0]
+    with pytest.raises(ValueError, match="Marca desconhecida"):
+        service.update_notices([notice["id"]], "mark", mark="amarelo")
+    with pytest.raises(ValueError, match="um aviso de cada vez"):
+        service.update_notices(None, "mark", mark="done")
+    with pytest.raises(ValueError, match="já não está no quadro"):
+        service.update_notices(["nenhum"], "mark", mark="done")
+
+
 def test_the_conclusive_eighth_and_the_closing_leave_a_notice(service):
     read(service, [lead("1")])
     draft_and_send(service, "1", "Olá, Ana.")
@@ -140,7 +158,7 @@ def test_someone_on_the_short_list_who_writes_is_urgent_on_the_board(service):
     service.save(queue, REF)
     read(service, [follow_up("c2", 1, "Já tenho os documentos.", service)])
     [notice] = service.notices()["notices"]
-    assert "na short list (Escolhido)" in notice["text"] and notice["level"] == "bad" and notice["tab"] == "replies"
+    assert "na short list (Selecionado)" in notice["text"] and notice["level"] == "bad" and notice["tab"] == "replies"
     [card] = service.pending()["properties"][0]["emails"]
     assert any("short list" in warning for warning in card["warnings"])
     draft_and_send(service, "c2", "Obrigado, Ana.")

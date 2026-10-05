@@ -15,6 +15,224 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.121.0 — 04/10/2026
+
+- **Emails, «Escrever a todos»:** por cima de «Enviados · clientes ativos», um painel (fechado até se abrir) para
+  escrever a todos os clientes do imóvel: **todos os clientes ativos** ou **só os que não responderam ao nosso último
+  email**, com quantos são em cada escolha. Escreves uma vez o que queres dizer e, depois de confirmares, fica um
+  rascunho de acrescento para cada um na fila, com as tuas palavras guardadas nele para a IA; depois «Gerar respostas»,
+  rever e enviar, como sempre. Nada é enviado sozinho. Ficam de fora a blacklist, a greylist, quem disse que não quer
+  visitar e os contactos encerrados; quem já tem um email na fila recebe a mensagem quando lhe responderes (pelas
+  instruções extra do passo 2).
+
+## α.120.2 — 04/10/2026
+
+- **Emails, instruções extra do passo 2 nos lembretes:** os lembretes aos 2 e 4 dias (quem não respondeu ao nosso último
+  email) passam a levar também as instruções extra que escreves antes de «Gerar respostas», perguntas incluídas. Antes
+  a regra do lembrete («não faças perguntas novas») ganhava e a IA deixava-as de fora. As instruções dizem agora que
+  valem para todos os emails escolhidos, também os que o programa preparou.
+
+## α.120.1 — 04/10/2026
+
+- **Imóveis:** a Blacklist e a Greylist ficam nas mesmas colunas que «Quem já visitou» e «Selecionados», por cima
+  (3 para 2): os quatro painéis alinham.
+
+## α.120.0 — 04/10/2026
+
+- **Quadro de avisos, proprietários à espera:** um só post-it, vermelho (urgente) e por ler, com todos os proprietários
+  cujo email espera resposta nossa (o nome e o imóvel, ou «sem imóvel na ARIA», e quantos emails, se mais de um). A
+  lista mantém-se certa à medida que se responde; um email novo de um proprietário volta a pô-lo vermelho e por ler; sai
+  sozinho quando já ninguém espera. «Ver →» leva a Proprietários.
+- **«Ver →» dos avisos:** em Emails, abre também no imóvel do aviso (antes ficava no imóvel em que estava).
+- Um post-it marcado e ainda por ler fica a negrito.
+
+## α.119.3 — 04/10/2026
+
+- **Quadro de avisos:** o botão amarelo (voltar ao post-it normal) um pouco menos pastel.
+
+## α.119.2 — 04/10/2026
+
+- **Quadro de avisos, o pionés:** maior, em 3D e inclinado (um pionés de cabeça, como o da imagem do utilizador), na cor
+  do nível do aviso, com a agulha de metal e sombra no papel.
+
+## α.119.1 — 04/10/2026
+
+- **Quadro de avisos:** um quarto botão, amarelo, para voltar ao post-it normal (sem marca); as cores das marcas e dos
+  post-its ficam mais pastel.
+
+## α.119.0 — 04/10/2026
+
+- **Quadro de avisos, em cada post-it:** no canto superior direito, «✓» para o marcar como lido (enquanto está por ler)
+  e três marcas nossas, que mudam a cor do post-it: vermelho, urgente; azul, não urgente; verde, tratado. Carregar outra
+  vez na marca tira-a; um post-it marcado conta como lido. O aviso continua a sair sozinho quando o que diz acaba.
+- **«Marcar todos como lidos»** pede confirmação antes.
+
+## α.118.10 — 04/10/2026
+
+- **Quadro de avisos em cortiça:** uma cortiça nova, como a da imagem do utilizador (castanho médio, grão fino e
+  uniforme, com pintas claras e escuras), no 90's Boat (na moldura de madeira) e no 00's UK Cabrio (onde era pele
+  preta com pesponto).
+
+## α.118.9 — 04/10/2026
+
+- **Títulos novos das páginas,** no lugar dos antigos e na mesma letra, com o número de imóveis ativos (sem o de teste):
+  Painel «Centro de Controlo e de Gestão — Dashboard Executivo»; Emails «Leitura e Envio de emails aos clientes dos
+  n Imóveis»; Clientes «Sobre os Clientes que contactaram um dos n imóveis atuais»; Visitas «Gestão das Visitas de
+  Clientes aos n Imóveis»; Imóveis «Gestão de todos os Imóveis»; Proprietários «Centro de comunicação com os
+  proprietários dos n imóveis»; Settings «Gestão Avançada do Sistema ARIA!». Com um só imóvel, o singular («do Imóvel»).
+
+## α.118.8 — 04/10/2026
+
+- **Títulos das páginas:** saem os de Emails («Uma boa resposta começa aqui.»), Proprietários, Imóveis, Clientes, Visitas
+  e Settings, em todos os temas; fica o pequeno título por cima e o texto de explicação. Só fica o de Voz e estilo, que
+  passa a «As tuas palavras. O estilo da Agência.» (nos temas ricos, com o prefixo de cada um: «Afinação: as tuas
+  palavras, o estilo da Agência.»).
+
+## α.118.7 — 04/10/2026
+
+- **Clientes, a tabela:** a coluna «Respostas» passa para logo a seguir ao email e fica um pouco mais larga (o número e
+  «inativo» lado a lado, com espaço entre eles).
+
+## α.118.6 — 04/10/2026
+
+- **Clientes, a tabela:** o RGPD deixa de ser uma lista para escolher e passa a texto simples (o estado e, quando há, a
+  prova por baixo); «Guardar» grava o nome e o telefone.
+
+## α.118.5 — 04/10/2026
+
+- **Clientes, a tabela:** a coluna «Imóvel» sai; os contactos ficam agrupados por imóvel, com a referência (e a descrição
+  e quantos contactos são) como título de cada grupo.
+
+## α.118.4 — 04/10/2026
+
+- **Clientes, a tabela:** o email fica mais curto: no máximo 20 caracteres antes do «@» e 20 depois, com «…» onde foi
+  cortado (o endereço completo ao passar por cima).
+
+## α.118.3 — 04/10/2026
+
+- **Clientes, «Novo contacto»:** mais apertado na vertical: quatro campos por linha (dois em ecrãs estreitos), o botão
+  «Acrescentar contacto» no lugar do oitavo, e menos espaço à volta.
+
+## α.118.2 — 04/10/2026
+
+- **Visitas, a última ronda:** «+ N clientes» passa a ser uma lista fechada que se abre com um clique e mostra os
+  restantes com a mesma informação dos 10 primeiros (o nome ao passar por cima não aparecia bem).
+
+## α.118.1 — 04/10/2026
+
+- **Blacklist e Greylist voltam a Imóveis** (saem de Clientes): lado a lado, logo por baixo de «Quem já visitou ·
+  Finalistas» e de «Selecionados», tal como estavam (a lista, «Deixar de ignorar» e «Acrescentar»).
+
+## α.118.0 — 04/10/2026
+
+- **Imóveis, painel «Selecionados»:** ao lado de «Quem já visitou · Finalistas» (que fica como estava), um pouco mais
+  estreito: o selecionado, a dourado, com o email, o estado dos documentos (por pedir, completos ou quantos faltam, com
+  quais ao passar por cima) e a visita; por baixo, o suplente. Só mostra: a escolha faz-se em Clientes, na short list
+  (o link «Clientes →»).
+- **A «Última ronda de visitas» sai de Imóveis:** já estava em Visitas, no cartão da ronda, completa. Lá passa a mostrar
+  os 10 primeiros clientes e «+ N clientes», com os nomes ao passar por cima.
+
+## α.117.12 — 04/10/2026
+
+- **Barra lateral, nomes novos:** «Comunicações» passa a «Emails», «Contactos» a «Clientes» e «Oficina» a «Settings»
+  (também no topo da página e no título desses separadores). Os textos da página que mandavam para lá («na fila das
+  Comunicações», «Short list em Contactos →», «Muda-se na Oficina»…) e as mensagens do servidor que os nomeavam
+  passam a usar os nomes novos.
+
+## α.117.11 — 04/10/2026
+
+- **Blacklist e Greylist passam de Imóveis para Contactos,** tal como estavam (a lista, «Deixar de ignorar» e
+  «Acrescentar»), lado a lado por baixo das fichas, para o imóvel escolhido no topo de Contactos.
+- **Imóveis:** a «Última ronda de visitas» fica num cartão seu, da largura de «Quem já visitou».
+
+## α.117.10 — 04/10/2026
+
+- **Imóveis, «Última ronda de visitas»:** mostra só os 10 primeiros clientes; os outros ficam numa linha «+ N clientes»,
+  com os nomes ao passar por cima. Em Visitas a ronda continua com a lista toda.
+
+## α.117.9 — 04/10/2026
+
+- **Imóveis, «Relatório dos inquéritos»:** fica sempre aberto (já não fecha ao carregar no título), com ou sem respostas.
+
+## α.117.8 — 04/10/2026
+
+- **Emails em tratamento:** o selecionado passa a dourado e a negrito (sem moldura); o proprietário continua a vermelho e
+  a negrito.
+- **Imóveis, «Quem já visitou · Finalistas»:** a short list deixa de se mudar aqui: cada pessoa mostra só onde está
+  («★ Na short list», «★ Selecionado» a dourado, «★ Suplente» ou «☆ Fora da short list»), e o link «Short list em
+  Contactos →» leva onde se muda.
+
+## α.117.7 — 04/10/2026
+
+- **Barra lateral:** a versão e a data do arranque, por baixo de «AI for Real Estate», ficam com a mesma letra e o mesmo
+  tamanho dessa linha, em todos os temas (estavam grandes, com o tamanho do nome «ARIA»).
+
+## α.117.6 — 04/10/2026
+
+- **Imóveis, «Quem já visitou · Finalistas»:** o painel fica mais curto, a 60 % da largura (o espaço ao lado fica para o
+  que se decidir pôr lá); em ecrãs estreitos continua a toda a largura.
+
+## α.117.5 — 04/10/2026
+
+- **Ícone no separador do Safari:** o Safari não usa o ícone em SVG e mostrava um «1» cinzento; o ícone vai agora também
+  em PNG (32 px para o separador, 180 px para os favoritos).
+- **Emails em tratamento:** o proprietário que escreve como cliente deixa de ter moldura: fica a vermelho e a negrito,
+  como o selecionado (ao passar por cima: «Proprietário»).
+- **Emails em tratamento:** o painel «Selecionado» mostra-se sempre, mesmo sem ninguém selecionado, e nesse caso diz
+  como selecionar (Contactos, na short list, «Selecionar»).
+
+## α.117.4 — 04/10/2026
+
+- **Emails em tratamento:** cada grupo por baixo da tabela (Selecionado, Desistiu, Sem resposta, Greylist, Blacklist)
+  fica num pequeno painel seu, como o da tabela, quase sem aumentar a altura.
+
+## α.117.3 — 04/10/2026
+
+- **Barra lateral, em cima:** o logo do ARIA passa a ser o ícone novo (a colcheia numa casa), e a versão, com a data e a
+  hora do arranque, sobe para logo abaixo de «AI for Real Estate».
+- **Barra lateral, em baixo:** a conta fica numa só linha, com um «@» mais pequeno; «A tua conta» sai e passa para o
+  hover do «@».
+
+## α.117.2 — 04/10/2026
+
+- **Emails em tratamento:** «Selecionado» sai das colunas e passa a ser a primeira linha por baixo da tabela, como
+  «Desistiu», mas sempre aberta e ligeiramente a negrito. O cliente selecionado aparece aí sem moldura, só a vermelho e
+  a negrito.
+
+## α.117.1 — 04/10/2026
+
+- **Ícone do ARIA:** passa a ser uma colcheia só (uma nota com um tracinho), em vez das duas notas, e mais grossa para
+  se ler a 16 px. Sai a opção do «A».
+
+## α.117.0 — 04/10/2026
+
+- **Ícone do ARIA no separador do browser:** duas notas de música (a «ária» da ópera) dentro de uma casa, nas cores do
+  tema Âmbar. Fica também a outra opção, um «A» dentro de uma casa (`frontend/brand/icon-a.svg`).
+
+## α.116.0 — 04/10/2026
+
+- **«Escolhido» passa a «Selecionado»:** na short list de Contactos (o botão «Selecionar» e a etiqueta), no interruptor
+  da short list (Imóveis e Contactos), nos avisos do quadro e nos alertas do email, e no «Reconstruir a partir do Gmail». As instruções da IA também proíbem «selecionado» nos emails ao cliente,
+  como já proibiam «escolhido».
+- **Emails em tratamento:** nova última coluna, «Selecionado» (documentação pedida e recebida, contrato a preparar
+  noutro sistema), com o nome em dourado; o selecionado sai da coluna «Short list», que fica com os candidatos e os
+  suplentes. A etiqueta do selecionado na short list de Contactos também fica dourada.
+- **Emails em tratamento:** um proprietário da lista que também escreve como cliente aparece numa moldura avermelhada
+  (ao passar por cima: «Proprietário»).
+
+## α.115.0 — 04/10/2026
+
+- **Imóveis, o painel do imóvel de teste:** passa a mostrar-se como os outros («TABLIER · INSTRUMENTOS» no Cabrio): com
+  os números que o Painel já tem dele (fila, depósito, limite de resposta, visitas, contactos) e o resto a zero, com os
+  mostradores parados no zero.
+- **Imóveis:** os números do imóvel passam para cima dos instrumentos, e são oito, como no Painel (juntam-se
+  «Proprietários por responder» e «Visitas marcadas»).
+
+## α.114.10 — 04/10/2026
+
+- **Painel:** o cartão «PARA O PROPRIETÁRIO» fica 20 % mais largo, e o «PONTO DE SITUAÇÃO», ao lado, mais estreito. Em
+  todos os temas; em ecrãs estreitos continuam um por baixo do outro.
+
 ## α.114.9 — 04/10/2026
 
 - **00's UK Cabrio:** a alavanca das mudanças passa para cima e o painel das teclas e dos interruptores para baixo.

@@ -3,6 +3,24 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 04/10/2026: o que fica em Imóveis e o que se faz noutros separadores (α.117.8–α.118.2)
+
+**Decisão (conversa com o utilizador, 04/10).** Imóveis mostra o imóvel; o trabalho com as pessoas faz-se no separador
+de cada coisa.
+- **A short list e o selecionado escolhem-se só em Clientes** (antes «Contactos»). Em Imóveis, «Quem já visitou» mostra
+  só onde cada um está, e o painel «Selecionados», ao lado, mostra o escolhido (a dourado) e o suplente, com os
+  documentos; os dois levam a Clientes por um link.
+- **A Blacklist e a Greylist ficam em Imóveis**, por baixo de «Quem já visitou» e de «Selecionados». Passaram para
+  Clientes e voltaram no mesmo dia: não são trabalho do dia a dia com os clientes, são decisões definitivas sobre quem
+  fica de fora daquele imóvel.
+- **A última ronda de visitas está só em Visitas**, no cartão da ronda (em Imóveis era uma cópia): os 10 primeiros e
+  «+ N clientes», uma lista fechada que se abre. O nome ao passar por cima não aparecia bem, por isso não se usa aqui.
+- **Por decidir:** as outras ações de Imóveis que pertencem a outros separadores (chamadas do portal e consentimento
+  RGPD para Clientes, procurar chamadas para Emails, propostas e análise de visitas para Visitas, reconstruir a partir
+  do Gmail para Settings).
+- **Nomes na barra lateral:** «Comunicações» passa a «Emails», «Contactos» a «Clientes» e «Oficina» a «Settings» (os ids
+  internos `replies`, `contacts` e o da Oficina ficam iguais).
+
 ## 04/10/2026: o tema 00's UK Cabrio, e um plano para as skins (α.114.0)
 
 **Decisão (conversa com o utilizador, 04/10).**

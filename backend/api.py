@@ -72,7 +72,9 @@ ASSETS = {"app.js": "text/javascript", "style.css": "text/css",
           # A skin's recorded sounds (26/09: the 70's Scooter's engine, CC0 — see frontend/sounds/CREDITS.md).
           **{f"sounds/{clip.name}": "audio/mp4" for clip in sorted((FRONTEND / "sounds").glob("*.m4a"))},
           # The company's logo (27/09), big in the corner of Voz e estilo.
-          **{f"brand/{image.name}": "image/png" for image in sorted((FRONTEND / "brand").glob("*.png"))}}
+          **{f"brand/{image.name}": "image/png" for image in sorted((FRONTEND / "brand").glob("*.png"))},
+          # 04/10: ARIA's own icon, on the browser's tab.
+          **{f"brand/{image.name}": "image/svg+xml" for image in sorted((FRONTEND / "brand").glob("*.svg"))}}
 HEADERS = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
 # pyproject.toml is the one place the version is written; CHANGELOG.md logs what changed at each one.
 VERSION = tomllib.loads((Path(__file__).resolve().parents[1] / "pyproject.toml").read_text())["project"]["version"]
@@ -368,7 +370,7 @@ def web_app(folder, token):
     # 29/09: the Oficina — token prices and the test platform (only with "admin": true in config.json)
     def admin():
         if service.config().get("admin") is not True:
-            raise ValueError("A Oficina não está ligada nesta pasta.")
+            raise ValueError("Settings não está ligado nesta pasta.")
 
     def ai_price(body):
         admin()
@@ -607,6 +609,9 @@ def web_app(folder, token):
                 "visits/round-summary": ("POST", visit_round_summary), "visits/close": ("POST", visits_close),
                 "agenda/sync": ("POST", agenda_sync), "visits/check": ("POST", visit_check), "visits/thanks": ("POST", visit_thanks),
                 "active/write": ("POST", active_write), "active/remove": ("POST", active_remove),
+                # 04/10: «Escrever a todos»
+                "active/write-all": ("POST", lambda body: {**service.write_to_all(
+                    body.get("property_ref") or None, body.get("audience"), body.get("note")), "state": state()}),
                 "recipient": ("POST", lambda body: {**service.set_recipient(body.get("property_ref") or None, str(body.get("id") or ""),
                                                                             body.get("email")), "state": state()}),
                 "consent/request": ("POST", consent_request), "consent/confirm": ("POST", consent_confirm),
@@ -668,7 +673,8 @@ def web_app(folder, token):
                 # 02/10: the notice board (Painel): the system's important messages for the owner
                 "notices": ("GET", lambda body: service.notices()),
                 "notices/update": ("POST", lambda body: service.update_notices(
-                    body.get("ids") if isinstance(body.get("ids"), list) else None, body.get("action"), body.get("note"))),
+                    body.get("ids") if isinstance(body.get("ids"), list) else None, body.get("action"), body.get("note"),
+                    body.get("mark"))),
                 "digest/save": ("POST", digest_save), "digest/send": ("POST", digest_send),
                 "digest/send-all": ("POST", digest_send_all),
                 "digest/refresh": ("POST", lambda body: service.refresh_digest(body.get("property_ref") or None)),

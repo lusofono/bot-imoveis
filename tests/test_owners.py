@@ -147,3 +147,28 @@ def test_an_owner_with_no_property_has_an_inbox_and_is_answered_from_it(service)
     assert card["id"] == made["id"] and card["outbound"] and card["new_subject"] == "Visita ao T2"
     service.caixa_dismiss(card["id"])
     assert service.pending()["owners"]["inbox"] == []
+
+
+def test_the_owners_waiting_for_us_are_one_red_post_it_listing_them_all(service):
+    # 04/10: one post-it, red (urgent) and unread, naming every owner whose email waits for our answer — of a property
+    # or in the owners' inbox; kept true as they are answered; a new one brings it back unread; gone when none waits
+    set_owner(service)
+    service.add_owner("outro.dono@example.com", "Rita Dona")
+    rita = {**from_owner("r1", "Tenho um T2."), "from": [{"name": "Rita", "email": "outro.dono@example.com"}]}
+    read(service, [from_owner("o1"), rita])
+    [notice] = service.notices()["notices"]
+    assert service.notices()["notices"] == [notice]  # shown again: the same one
+    assert notice["mark"] == "urgent" and notice["level"] == "bad" and notice["tab"] == "owners" and not notice["read"]
+    assert notice["text"].startswith("2 proprietários à espera") and f"Rui Dono ({REF})" in notice["text"]
+    assert "Rita (sem imóvel na ARIA)" in notice["text"]
+    service.update_notices([notice["id"]], "mark", mark="calm")  # seen, not urgent
+    draft_and_send(service, "o1", "Bom dia, Rui.")  # Rui answered: off the list, the same post-it
+    [notice] = service.notices()["notices"]
+    assert notice["text"].startswith("1 proprietário à espera") and "Rui Dono" not in notice["text"] and notice["mark"] == "calm"
+    read(service, [from_owner("o2", "E a renda?")])  # Rui writes again: back to red and unread
+    [notice] = service.notices()["notices"]
+    assert "Rui Dono" in notice["text"] and notice["mark"] == "urgent" and not notice["read"]
+    draft_and_send(service, "o2", "Bom dia, Rui.")
+    [card] = service.pending()["owners"]["inbox"]
+    service.caixa_dismiss(card["id"])  # none waits: the post-it leaves by itself
+    assert service.notices()["notices"] == []

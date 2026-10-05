@@ -24,7 +24,8 @@ UNAVAILABLE = {"api/consent/confirm", "api/consent/request", "api/paste", "api/p
                "api/contact/farewell", "api/owners/generate", "api/owners/set", "api/owners/write",
                "api/backup", "api/backup/folder", "api/backup/now", "api/backup/choose", "api/portal", "api/portal/save", "api/calls", "api/calls/scan", "api/owners/add", "api/owners/drafts",
                "api/owners/preview", "api/owners/send", "api/owners/dismiss",
-               "api/context/add", "api/context/delete", "api/rebuild/scan", "api/rebuild/apply"}
+               "api/context/add", "api/context/delete", "api/rebuild/scan", "api/rebuild/apply",
+               "api/active/write-all"}  # 04/10: «Escrever a todos» needs the full version (the demo says so)
 
 
 @pytest.fixture(scope="module")

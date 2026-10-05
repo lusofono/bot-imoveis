@@ -199,7 +199,7 @@ def test_the_conversations_come_out_as_one_text_file_with_the_hidden_profile_and
     assert "1. Sergii Sviatokha · uk · owner+cd1@example.com" in text
     assert "Perfil escondido (o que a ARIA não sabe):\n  agregado: dois adultos\n  segredos: um gato" in text
     assert "ARIA\nOlá." in text  # our reply, in order after their first message
-    assert "CLIENTE — por responder, na fila das Comunicações\nSomos dois adultos e um gato." in text
+    assert "CLIENTE — por responder, na fila de Emails\nSomos dois adultos e um gato." in text
     assert "ARIA: 8.0 / 10 (factos 9 · voz 7) — Boa, mas sem a linha.\n    · esqueceu a linha 🏠" in text
     # a customer still without our first reply: their portal message, and the state says so
     assert "2. Ana Nova · owner+cd2@example.com" in text and "ainda sem resposta nossa" in text
@@ -401,3 +401,5 @@ def test_the_test_property_has_its_row_by_property_but_never_counts_in_the_total
     [row] = metrics["test_properties"]
     assert (row["property_ref"], row["test"], row["pending"]) == (TEST_REF, True, 1)
     assert "advertised_rent_eur" in row  # 04/10: the rent column, as for every property
+    # 04/10: and enough for its panel in Imóveis (the instruments show for it too)
+    assert {"customers", "visits_booked", "reply_hours_max", "ignored", "last_read_at"} <= set(row)

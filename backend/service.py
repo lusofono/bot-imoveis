@@ -83,7 +83,7 @@ VIEW_FIELDS = ("id", "kind", "date", "subject", "customer", "recipient", "blocke
                "reply_text", "reply_status", "reply_error", "reply_message_id", "visit_window", "visit_slot",
                "visit_status", "reminder", "closing", "consent_suggested", "consent_confirmed", "history", "merged",
                "merged_ids", "visit_done", "visit_reminder", "survey_reply", "docs_request", "visit_missed", "profile_url",
-               "round", "review", "attachments")
+               "round", "review", "attachments", "addition_note")
 # 30/09: the prompts common to every property that the Oficina edits (voice.json), with the code's own text; the
 # behaviour («Comportamento geral») lives at the root of voice.json, the others under style.
 COMMON_PROMPTS = {"application_instructions": "", "after_visit": AFTER_VISIT_RULE, "after_visit_template": AFTER_VISIT_TEMPLATE,
@@ -128,6 +128,8 @@ def owner_folder(folder, email):
 
 NOTICES_KEPT = 300  # 02/10: the notice board keeps the latest ones; the oldest finished ones fall off first
 NOTICE_NOTE_CHARS = 25  # 04/10: the owner's own short note on a notice
+# 04/10: the owner's own mark on a notice, the post-it's colour: urgent red, not urgent blue, dealt with green
+NOTICE_MARKS = ("urgent", "calm", "done")
 NOTICE_EVENT_DAYS = 7  # 04/10: a green or grey notice (news, nothing to do) leaves the board after a week
 # 04/10: five levels, the colour of the board's pin — ok (green, all well), info (grey), watch (yellow), warn (orange,
 # needs you), bad (red, urgent)
@@ -253,6 +255,30 @@ def message_key(item):
 
 def recipient_email(item):
     return ((item.get("recipient") or {}).get("email") or "").casefold()
+
+
+# 04/10, «Escrever a todos»: to every active customer of a property, or only to those who have not answered our last email
+WRITE_ALL_AUDIENCES = ("all", "unanswered")
+
+
+def write_all_targets(data):
+    """Who «Escrever a todos» reaches in a property: everyone we have written to (all), and those whose last turn is
+    ours (unanswered) — never the blacklist or the greylist, who said they do not want to visit, or a closed contact.
+    queued: those left out because an email of theirs is in the queue already (answered there, with step 2's extras)."""
+    busy = {recipient_email(item) for item in data.get("emails") or []}
+    targets = {"all": [], "unanswered": [], "queued": []}
+    for email, conversation in (data.get("conversations") or {}).items():
+        if (not conversation.get("sent_message_ids") or conversation.get("ignored") or conversation.get("visit") == "nao_quer"
+                or conversation.get("closed_at")):
+            continue
+        if email in busy:
+            targets["queued"].append(email)
+            continue
+        targets["all"].append(email)
+        history = conversation.get("history") or []
+        if history and history[-1].get("who") == "nos":
+            targets["unanswered"].append(email)
+    return targets
 
 
 def aware(value):
@@ -633,8 +659,9 @@ class MailService:
     # what it says is true, it stays; it leaves by itself once over (the customer answered, the tank filled, a read or a
     # backup that worked, the customer moved on), the green and grey news after a week. The owner may pin a short note.
 
-    def notify(self, key, text, ref=None, level="warn", tab=None):
-        """Puts a message on the board, once per key while the last one is on it; never fails what the caller was doing."""
+    def notify(self, key, text, ref=None, level="warn", tab=None, mark=None):
+        """Puts a message on the board, once per key while the last one is on it; never fails what the caller was doing.
+        04/10: mark, a post-it already coloured (NOTICE_MARKS), still unread."""
         try:
             with locked(self.folder, "notices", wait=SHORT_WAIT):
                 board = load_notices(self.folder)
@@ -642,7 +669,8 @@ class MailService:
                     return False
                 board["notices"].append({"id": secrets.token_hex(6), "key": key, "at": now(), "ref": ref,
                                          "level": level if level in NOTICE_LEVELS else "warn", "text": text[:600],
-                                         "tab": tab, "read": False, "archived": False})
+                                         "tab": tab, "read": False, "archived": False,
+                                         **({"mark": mark, "mark_at": now()} if mark in NOTICE_MARKS else {})})
                 self.trim_notices(board)
                 save_notices(self.folder, board)
                 return True
@@ -848,27 +876,94 @@ class MailService:
                           "phone_shown": (f"+351 {digits[:3]} {digits[3:6]} {digits[6:]}" if len(digits) == 9 else "+" + digits)})
         return {"calls": shown}
 
+    def owners_waiting(self):
+        """04/10: the owners whose emails wait for our answer (their own, not ours to them), in the properties' queues
+        and in the owners' inbox: email → {"name", "refs" (None: no property in the ARIA), "ids"}."""
+        waiting = {}
+        sources = [(ref, self.load(ref)) for ref in self.profiles() if self.queue_path(ref).exists()]
+        for ref, data in [*sources, (None, self.load_caixa())]:
+            for item in data.get("emails") or []:
+                if item.get("kind") != "owner" or item.get("outbound") or item.get("reply_status") not in (None, "pending", "draft"):
+                    continue
+                email = recipient_email(item) or str((item.get("customer") or {}).get("email") or "").casefold()
+                entry = waiting.setdefault(email, {"name": "", "refs": [], "ids": []})
+                entry["name"] = entry["name"] or (item.get("customer") or {}).get("name") or (item.get("recipient") or {}).get("name") or ""
+                if ref not in entry["refs"]:
+                    entry["refs"].append(ref)
+                entry["ids"].append(item.get("id"))
+        return waiting
+
+    def owners_notice(self, board, alert):
+        """04/10: one red post-it (urgent) for every owner waiting for our answer, named with their properties; its
+        list kept true. alert (at a read): an owner's new email brings it back unread and red. Over when none waits.
+        Works on a board already loaded (and locked) by the caller; says whether it changed it."""
+        try:
+            waiting = self.owners_waiting()
+        except Exception:
+            return False
+        notice = next((item for item in board["notices"] if item.get("key") == "proprietarios" and not item.get("over")), None)
+        if not waiting:
+            if notice:
+                notice["over"] = now()
+            return bool(notice)
+        names = [f"{entry['name'] or email} ({', '.join(ref or 'sem imóvel na ARIA' for ref in entry['refs'])}"
+                 + (f", {len(entry['ids'])} emails" if len(entry["ids"]) > 1 else "") + ")" for email, entry in waiting.items()]
+        count = len(waiting)
+        text = (f"{count} proprietário{'s' if count > 1 else ''} à espera da nossa resposta: " + "; ".join(names[:8])
+                + ("…" if len(names) > 8 else "") + ". Responde em Proprietários.")[:600]
+        ids = sorted(str(item_id) for entry in waiting.values() for item_id in entry["ids"])
+        if notice is None:
+            board["notices"].append({"id": secrets.token_hex(6), "key": "proprietarios", "at": now(), "ref": None,
+                                     "level": "bad", "text": text, "tab": "owners", "read": False, "archived": False,
+                                     "mark": "urgent", "mark_at": now(), "items": ids})
+            self.trim_notices(board)
+            return True
+        if notice.get("text") == text and notice.get("items") == ids:
+            return False
+        if alert and set(ids) - set(notice.get("items") or []):
+            notice.update(read=False, mark="urgent", mark_at=now())
+        notice.update(text=text, items=ids)
+        return True
+
+    def update_owners_notice(self):
+        """04/10, at the end of a read: the owners' post-it made or brought up to date (never fails the read)."""
+        try:
+            with locked(self.folder, "notices", wait=SHORT_WAIT):
+                board = load_notices(self.folder)
+                if self.owners_notice(board, alert=True):
+                    save_notices(self.folder, board)
+        except Exception:
+            pass
+
     def notices(self):
         """The board as the page shows it: the ones still true, newest first, and how many are unread. 04/10: the ones
-        whose news is over are marked so here, and leave (archived ones, from before 04/10, stay out)."""
+        whose news is over are marked so here, and leave (archived ones, from before 04/10, stay out); the owners'
+        post-it lists those still waiting."""
         with locked(self.folder, "notices", wait=SHORT_WAIT):
             board, queues = load_notices(self.folder), {}
             ended = [notice for notice in board["notices"] if not notice.get("over") and not notice.get("archived")
                      and self.notice_over(notice, board, queues)]
             for notice in ended:
                 notice["over"] = now()
-            if ended:
+            owners = self.owners_notice(board, alert=False)  # made here too: no need to wait for a read
+            if ended or owners:
                 save_notices(self.folder, board)
         shown = [notice for notice in reversed(board["notices"]) if not notice.get("archived") and not notice.get("over")]
         return {"notices": shown, "unread": sum(1 for notice in shown if not notice.get("read"))}
 
-    def update_notices(self, ids, action, note=None):
+    def update_notices(self, ids, action, note=None, mark=None):
         """Marks notices read (ids None: every one shown); 04/10: or pins the owner's note on one (up to
-        NOTICE_NOTE_CHARS; empty takes it off). No archiving: a notice leaves when what it says is over."""
-        if action not in ("read", "note"):
+        NOTICE_NOTE_CHARS; empty takes it off), or the owner's mark, the post-it's colour (NOTICE_MARKS; empty takes it
+        off; a marked one is read). No archiving: a notice leaves when what it says is over."""
+        if action not in ("read", "note", "mark"):
             raise ValueError("Ação desconhecida no quadro de avisos.")
         if action == "note" and (not ids or len(ids) != 1):
             raise ValueError("A nota vai num aviso de cada vez.")
+        if action == "mark" and (not ids or len(ids) != 1):
+            raise ValueError("A marca vai num aviso de cada vez.")
+        mark = str(mark or "")
+        if action == "mark" and mark and mark not in NOTICE_MARKS:
+            raise ValueError("Marca desconhecida: urgente, não urgente ou tratado.")
         text = " ".join(str(note or "").split())
         if action == "note" and len(text) > NOTICE_NOTE_CHARS:
             raise ValueError(f"A nota tem no máximo {NOTICE_NOTE_CHARS} caracteres.")
@@ -885,7 +980,12 @@ class MailService:
                     elif action == "note":
                         notice.pop("note", None)
                         notice.pop("note_at", None)
-            if action == "note" and not found:
+                    elif action == "mark" and mark:
+                        notice["mark"], notice["mark_at"] = mark, now()
+                    elif action == "mark":
+                        notice.pop("mark", None)
+                        notice.pop("mark_at", None)
+            if action in ("note", "mark") and not found:
                 raise ValueError("Esse aviso já não está no quadro.")
             save_notices(self.folder, board)
         return self.notices()
@@ -1051,7 +1151,9 @@ class MailService:
                   "read_from": None if data.get("last_read_at") else (
                       data.get("read_from") or (date.today() - timedelta(days=FIRST_READ_DAYS)).isoformat()),
                   "instructions": instructions(profile, voice, visits), "emails": emails, "active": active,
-                  "inactive": not property_active(profile)}
+                  "inactive": not property_active(profile),
+                  # 04/10: how many «Escrever a todos» reaches, for each choice
+                  "write_all": {key: len(value) for key, value in write_all_targets(data).items()} if ref else None}
         if added is not None:
             result["added"] = added
         return result
@@ -1288,6 +1390,7 @@ class MailService:
             # after it is answered or dismissed and leaves the queue. IDs and dates only, never an address.
             if profiles:
                 self.save_caixa(caixa)
+                self.update_owners_notice()  # 04/10: one red post-it with every owner waiting for our answer
                 self.auto_backup()  # 02/10: once a day, at the first read (the queue is saved and still locked: a clean copy)
             self.log("read", added=sum(added.values()), ambiguous=ambiguous, direct=sum(direct.values()),
                      pending=sum(len(data["emails"]) for data in queues.values()), received=received)
@@ -1648,7 +1751,7 @@ class MailService:
         import zipfile
         folder = str(self.config().get("backup_folder") or "")
         if not folder or not Path(folder).is_dir():
-            raise ValueError("Escolhe primeiro a pasta das cópias de segurança (Oficina).")
+            raise ValueError("Escolhe primeiro a pasta das cópias de segurança (Settings).")
         moment = moment or datetime.now()
         target = Path(folder) / f"{BACKUP_PREFIX}{moment:%Y-%m-%d-%H%M%S}.zip"
         partial = target.with_suffix(".zip.part")
@@ -2437,7 +2540,8 @@ class MailService:
         proposed (by a round or in the conversation), no time booked yet; por_confirmar: they accepted or asked for a
         time we have not confirmed yet (29/09: by phase, not by how many emails we sent — the 1.ª to «Mais de 3»
         columns said little); marcada, visitou,
-        shortlist and desistiu (declined the visit); and under the table, sem_resposta (our last email left unanswered
+        shortlist, selecionado (04/10: the one selected, golden; a line under the table, always open) and desistiu (declined
+        the visit); and under the table, sem_resposta (our last email left unanswered
         NO_REPLY_DAYS or more, whatever the step, or inactive), greylist and blacklist. waiting: a message of theirs is
         in the queue for us to answer. dots, as the owner set them: orange, that message has waited longer than
         our_turn_hours; red, they never answered us, or answered without any of what we asked; green, their file is
@@ -2458,6 +2562,10 @@ class MailService:
         slots, proposed = agenda["slots"], self.proposed_to(agenda) if ref else set()
         visited = {slot["customer"] for slot in slots if (slot.get("check") or {}).get("attended") is True}
         booked = {slot["customer"] for slot in slots if (slot.get("check") or {}).get("attended") is not False}
+        try:  # 04/10: a registered owner in the table gets a frame of their own
+            owners = {email.casefold() for email in self.owner_index(self.profiles())}
+        except Exception:
+            owners = set()
         customers = []
         for email in set(conversations) | set(new):
             conversation = conversations.get(email) or {}
@@ -2471,6 +2579,8 @@ class MailService:
                 column = "blacklist" if ignore_kind(conversation) == "black" else "greylist"
             elif conversation.get("visit") == "nao_quer":
                 column = "desistiu"
+            elif selection == "chosen":
+                column = "selecionado"  # 04/10: the one selected (documents in, a contract to prepare elsewhere)
             elif selection in SELECTION_STATES:
                 column = "shortlist"
             elif email in visited:
@@ -2516,6 +2626,7 @@ class MailService:
             dots = [color for color in (them, us) if color]
             last = history[-1].get("ts") or history[-1].get("at") if history else item.get("date")
             customers.append({"email": email, "column": column, "waiting": email in waiting, "selection": selection,
+                              "owner": email.casefold() in owners,
                               "dots": dots, "them": them, "us": us, "reason": (conversation.get("ignored_reason") or "")
                               if column in ("greylist", "blacklist") else "",
                               "name": conversation.get("name") or (item.get("customer") or {}).get("name") or "",
@@ -3285,6 +3396,32 @@ class MailService:
             self.log("addition_created", reference=ref)
             return {"id": key, "property_ref": ref}
 
+    def write_to_all(self, property_ref, audience, note):
+        """04/10, «Escrever a todos»: one addition draft for each customer of the property (write_all_targets), with
+        the owner's words (note) kept on it for the AI; then «Gerar respostas», review and send, like any other."""
+        if audience not in WRITE_ALL_AUDIENCES:
+            raise ValueError("Escolhe a quem escrever: todos os clientes ativos ou só os que não responderam.")
+        note = str(note or "").strip()[:2000]
+        if not note:
+            raise ValueError("Escreve o que queres dizer a todos.")
+        with locked(self.folder):
+            ref = self.pick(self.profiles(), property_ref)
+            if not ref:
+                raise ValueError("Escolhe um imóvel.")
+            data = self.load(ref)
+            targets = write_all_targets(data)[audience]
+            if not targets:
+                raise ValueError("Ninguém a quem escrever com esta escolha.")
+            stamp = now()
+            for email in targets:
+                conversation = data["conversations"][email]
+                key = f"acrescento-{hashlib.sha256((email + stamp).encode()).hexdigest()[:12]}"
+                data["emails"].append(self.aux_item(key, "addition", email, conversation, "", reply_status="pending",
+                                                    history=list(conversation.get("history") or []), addition_note=note))
+            self.save(data, ref)
+            self.log("addition_bulk", reference=ref, audience=audience, created=len(targets))
+            return {"created": len(targets), "property_ref": ref}
+
     def remove_active(self, property_ref, email):
         """Takes a sent card out of the queue; it comes back only when that conversation moves again."""
         email = str(email or "").strip().casefold()
@@ -3863,7 +4000,7 @@ class MailService:
             if not conversation or not (conversation.get("selection") or {}).get("status"):
                 raise ValueError("Só se pedem documentos a quem está na short list.")
             if any(recipient_email(item) == email and item.get("kind") == "docs_request" for item in data["emails"]):
-                raise ValueError("O pedido de documentos deste cliente já está na fila das Comunicações.")
+                raise ValueError("O pedido de documentos deste cliente já está na fila de Emails.")
             key = f"documentos-{hashlib.sha256((email + now()).encode()).hexdigest()[:12]}"
             data["emails"].append(self.aux_item(key, "docs_request", email, conversation, "", reply_status="pending",
                                                 docs_request={"fiador": bool(conversation["selection"].get("fiador"))},
@@ -4170,7 +4307,12 @@ class MailService:
                 "pending": len(emails), "drafts": status["draft"], "blocked": sum(1 for item in emails if item.get("blocked")),
                 "attention": status["uncertain"] + status["error"] + status["sending"],
                 "answered": sum(conversation.get("stage", 0) for conversation in (data.get("conversations") or {}).values()),
-                "reply_hours": None, "oldest_wait_hours": max([hours for hours in waits if hours is not None], default=None)}
+                "reply_hours": None, "oldest_wait_hours": max([hours for hours in waits if hours is not None], default=None),
+                # 04/10: enough for its panel in Imóveis (the instruments), the rest reads zero there
+                "customers": len(data.get("conversations") or {}), "last_read_at": data.get("last_read_at"),
+                "visits_booked": sum(1 for slot in load_visits(self.folder, ref)["slots"] if slot["at"][:10] >= date.today().isoformat()),
+                "reply_hours_max": self.panel(ref)["reply_hours_max"],
+                "ignored": dict(Counter(ignore_kind(c) for c in (data.get("conversations") or {}).values() if c.get("ignored")))}
 
     def todo(self):
         """«A fazer» (26/09), right under the dashboard's telemetry: what needs doing now, worked out from the data.

@@ -235,7 +235,7 @@ def survey_report(surveys):
 
 # The selection (26/09): 2 or 3 candidates on a short list; one chosen and one reserve (suplente). The documents are
 # asked only of the short list, and the program keeps a checklist of what arrived, never the files themselves.
-SELECTION_STATES = {"shortlist": "Short list", "chosen": "Escolhido", "suplente": "Suplente"}
+SELECTION_STATES = {"shortlist": "Short list", "chosen": "Selecionado", "suplente": "Suplente"}  # 04/10: «Escolhido» → «Selecionado»
 DOCUMENTS = {"recibos": ("Recibos de vencimento", True), "email_emprego": ("Email oficial do emprego (se tiver)", False),
              "contrato": ("Declaração ou contrato de trabalho (opcional)", False),
              "irs": ("IRS do ano anterior (ou dos dois anteriores)", True)}

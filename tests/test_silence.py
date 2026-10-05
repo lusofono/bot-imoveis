@@ -23,6 +23,12 @@ def test_without_a_phrase_the_assistant_writes_the_reminder(service):
     prompt = reply_prompt(queue, [reminder["id"]])
     assert "interação: lembrete aos 2 dias" in prompt and "Quem vai viver na casa?" in prompt  # the history goes too
     assert "Lembrete sem resposta (emails marcados" in queue["instructions"]
+    # 04/10: the owner's extra instructions reach the reminder too, questions included (they had been left out)
+    assert "leva também as instruções extra" not in prompt
+    prompt = reply_prompt(queue, [reminder["id"]], "Precisamos da disponibilidade para visitas entre 7 e 9 de outubro.")
+    assert "leva também as instruções extra do proprietário, de cima, perguntas incluídas" in prompt
+    assert "também os lembretes" in prompt and "entre 7 e 9 de outubro" in prompt
+    assert "a não ser as que as instruções extra do proprietário pedirem" in queue["instructions"]
 
 
 def test_no_reminder_for_a_customer_with_a_visit_booked(service):

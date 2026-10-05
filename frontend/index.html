@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ARIA</title>
+<!-- 04/10: the tab's icon, a note of an aria (a sixteenth) in a house -->
+<link rel="icon" type="image/png" sizes="32x32" href="brand/icon-32.png">
+<link rel="icon" type="image/svg+xml" sizes="any" href="brand/icon-nota.svg">
+<!-- Safari does not take the SVG: the PNGs, drawn from it (32 px for the tab, 180 px for the bookmarks) -->
+<link rel="apple-touch-icon" href="brand/icon-180.png">
 <link rel="stylesheet" href="style.css">
 <!-- Rich themes ("skins") keep their own stylesheet: 80's RacingCar now; a yacht or a grand-luxury one fits the same slot. -->
 <link rel="stylesheet" href="themes/racing.css">
@@ -17,22 +22,21 @@
 <body class="api-only">
 <a class="skip-link" href="#main">Saltar para o conteúdo</a>
 <header class="sidebar">
-  <div class="brand"><span class="brand-mark brand-brain" aria-hidden="true"><img src="brand/brain.png" alt="" width="44" height="44"></span><div class="brand-text"><strong class="brand-name" title="ARIA — AI Real Estate Inquiry Assistant, by BigLearn.pt">ARIA<sup class="brand-copyright" title="© 2026 BigLearn.pt — todos os direitos reservados">©</sup> <span>AI for Real Estate</span></strong></div></div>
+  <div class="brand"><span class="brand-mark brand-aria" aria-hidden="true"><img src="brand/icon-nota.svg" alt="" width="48" height="48"></span><div class="brand-text"><strong class="brand-name" title="ARIA — AI Real Estate Inquiry Assistant, by BigLearn.pt">ARIA<sup class="brand-copyright" title="© 2026 BigLearn.pt — todos os direitos reservados">©</sup> <span>AI for Real Estate</span><span class="brand-version" title="Versão da aplicação (ver CHANGELOG.md) e quando este processo arrancou com este código"><span class="status-dot" role="img" aria-label="Ambiente local"></span>v{{VERSION}} <span class="brand-build">{{BUILD_AT}}</span></span></strong></div></div>
   <p class="nav-label">ESPAÇO DE TRABALHO</p>
   <nav aria-label="Navegação principal">
     <button class="tab" data-tab="voice" data-gear="R"><span aria-hidden="true" class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7"/><circle cx="12" cy="12" r="6.6"/></svg></span>Voz e estilo</button>
     <button class="tab active" data-tab="dashboard" data-gear="1" aria-current="page"><span aria-hidden="true" class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17a8 8 0 1 1 16 0"/><path d="M6.3 12.2l1.2.7M12 7.5V9M17.7 12.2l-1.2.7"/><path d="M12 17l3.6-4.6"/><circle cx="12" cy="17" r="1.3" fill="currentColor" stroke="none"/></svg></span>Painel <span id="notice-count" class="nav-count" title="Avisos por ler" hidden>0</span></button>
-    <button class="tab" data-tab="replies" data-gear="2"><span aria-hidden="true" class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10.5 8.5 21.5M12 10.5l3.5 11M9.6 18h4.8M10.6 14.8h2.8"/><circle cx="12" cy="8.5" r="1.5" fill="currentColor" stroke="none"/><path d="M8.6 5.4a4.5 4.5 0 0 0 0 6.2M15.4 5.4a4.5 4.5 0 0 1 0 6.2M6 3a8 8 0 0 0 0 11M18 3a8 8 0 0 1 0 11"/></svg></span>Comunicações <span id="nav-count" class="nav-count">0</span></button>
-    <button class="tab" data-tab="contacts" data-gear="3"><span aria-hidden="true" class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20a7 7 0 0 1 14 0"/></svg></span>Contactos</button>
+    <button class="tab" data-tab="replies" data-gear="2"><span aria-hidden="true" class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 10.5 8.5 21.5M12 10.5l3.5 11M9.6 18h4.8M10.6 14.8h2.8"/><circle cx="12" cy="8.5" r="1.5" fill="currentColor" stroke="none"/><path d="M8.6 5.4a4.5 4.5 0 0 0 0 6.2M15.4 5.4a4.5 4.5 0 0 1 0 6.2M6 3a8 8 0 0 0 0 11M18 3a8 8 0 0 1 0 11"/></svg></span>Emails <span id="nav-count" class="nav-count">0</span></button>
+    <button class="tab" data-tab="contacts" data-gear="3"><span aria-hidden="true" class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20a7 7 0 0 1 14 0"/></svg></span>Clientes</button>
     <button class="tab" data-tab="agenda" data-gear="4"><span aria-hidden="true" class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/><path d="M8 13.5h2M12 13.5h2M16 13.5h.01M8 16.8h2M12 16.8h2"/></svg></span>Visitas</button>
     <button class="tab" data-tab="properties" data-gear="5"><span aria-hidden="true" class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 11L12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5h4v5"/><path d="M8.3 12h1.8M13.9 12h1.8"/></svg></span>Imóveis</button>
     <button class="tab" data-tab="owners" data-gear="6"><span aria-hidden="true" class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15.5" r="3.6"/><path d="M10.6 13 19.5 4.1M15.6 8l2.2 2.2M17.8 5.8 20 8"/></svg></span>Proprietários <span id="owner-count" class="nav-count" title="Mensagens de proprietários por responder" hidden>0</span></button>
   </nav>
   <!-- A skin's own tab selector (80's RacingCar: the gated gearbox); a copy of the nav above, for the mouse only. -->
   <div id="skin-selector" class="skin-selector" aria-hidden="true"></div>
-  <button id="workshop-link" class="workshop-link" type="button" hidden>Oficina</button>
-  <div class="sidebar-note"><span class="status-dot" role="img" aria-label="Ambiente local" title="Ambiente local"></span><span class="app-version" title="Versão da aplicação (ver CHANGELOG.md) e quando este processo arrancou com este código"><strong>v{{VERSION}}</strong><span class="app-build">{{BUILD_AT}}</span></span></div>
-  <div class="account-card"><span class="avatar" aria-hidden="true">@</span><div><span class="small muted">A tua conta</span><span id="account"></span></div></div>
+  <button id="workshop-link" class="workshop-link" type="button" hidden>Settings</button>
+  <div class="account-card"><span class="avatar" role="img" aria-label="A tua conta" title="A tua conta">@</span><span id="account"></span></div>
 </header>
 <div class="workspace">
 <div class="topbar"><span>Workspace <span class="breadcrumb">/</span> <strong id="page-label">Painel</strong></span><span id="busy" role="status" hidden><span class="shift-lights" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>A trabalhar…</span><button id="sound-toggle" class="sound-toggle" type="button" aria-pressed="false" hidden title="Sons deste tema: buzina ao enviar, sino quando chegam emails novos">Sons</button><label class="theme-control" for="theme-select"><span>Tema</span><select id="theme-select" aria-label="Tema visual"><option value="amber">Default</option><option value="apalace">APalace</option><option value="agentval">AgentVal</option><option value="night">Noite</option><option value="day">Dia</option><option value="indigo">Índigo</option><option value="racing">80's RacingCar</option><option value="boat">90's Boat</option><option value="scooter">70's Scooter</option><option value="cabrio">00's UK Cabrio</option><option value="kw">KW-Area</option></select></label><span class="local-label"><span class="status-dot"></span> Local</span></div>
@@ -41,7 +45,7 @@
   <p id="error" class="alert bad" role="alert" hidden></p>
 
   <section id="tab-dashboard" aria-label="Painel">
-    <div class="page-heading"><div><p class="eyebrow" data-word="dashboard.eyebrow">VISÃO GERAL</p><p class="step" data-word="dashboard.step">Contactos, respostas e imóveis. Tudo no mesmo lugar.</p><p id="dashboard-read" class="small dashboard-read"></p></div>
+    <div class="page-heading"><div><p class="eyebrow" data-word="dashboard.eyebrow">VISÃO GERAL</p><h1 data-title="dashboard">Centro de Controlo e de Gestão — Dashboard Executivo</h1><p class="step" data-word="dashboard.step">Contactos, respostas e imóveis. Tudo no mesmo lugar.</p><p id="dashboard-read" class="small dashboard-read"></p></div>
       <div class="retro-widget" aria-label="Relógio e calendário">
         <div class="retro-clock"><span id="clock-analog" class="clock-analog" aria-hidden="true"></span><span id="clock-time">--:--:--</span><span id="clock-date" class="retro-date"></span></div>
         <div class="retro-calendar">
@@ -80,7 +84,7 @@
   </section>
 
   <section id="tab-replies" hidden>
-    <div class="page-heading"><div><p class="eyebrow" data-word="replies.eyebrow">COMUNICAÇÃO</p><div class="title-row"><h1 data-word="replies.title">Uma boa resposta começa aqui.</h1><span id="test-badge" class="test-badge" hidden>IMÓVEL DE TESTE — o que se faz aqui só chega a clientes de teste</span></div><p class="step">Prepara em lote. Revê cada conversa. Envia quando estiver tudo certo.</p></div></div>
+    <div class="page-heading"><div><p class="eyebrow" data-word="replies.eyebrow">COMUNICAÇÃO</p><div class="title-row"><h1 data-title="replies">Leitura e Envio de emails aos clientes dos Imóveis</h1><span id="test-badge" class="test-badge" hidden>IMÓVEL DE TESTE — o que se faz aqui só chega a clientes de teste</span></div><p class="step">Prepara em lote. Revê cada conversa. Envia quando estiver tudo certo.</p></div></div>
     <!-- The steps bar (Selecionar · Preparar · Rever e enviar) left on 27/09: each card says its own step. -->
     <!-- 27/09, evening: on top, «Ler emails» (2/3) beside «Gerar respostas» (1/3); below, each email with its actions -->
     <!-- 27/09: the property first and apart, as in the other tabs (propertySwitcher draws over this row); then «Ler
@@ -165,7 +169,7 @@
   <!-- 02/10: each property's owner is the agency's client, not a customer: their messages apart, answered with the
        property's state and the agency's know-how for owners -->
   <section id="tab-owners" hidden>
-    <div class="page-heading"><div><p class="eyebrow">PROPRIETÁRIOS</p><h1>Falar com quem é dono do imóvel.</h1>
+    <div class="page-heading"><div><p class="eyebrow">PROPRIETÁRIOS</p><h1 data-title="owners">Centro de comunicação com os proprietários dos imóveis</h1>
       <p class="step">As mensagens do proprietário de cada imóvel, à parte das dos clientes. A IA responde com o estado do
         imóvel e o conhecimento para proprietários; tu revês antes de enviar.</p></div></div>
     <!-- 03/10: the owner on top (the owners' list, with or without properties) -->
@@ -179,7 +183,7 @@
       <div id="owners-knowledge"></div></details>
   </section>
   <section id="tab-properties" hidden>
-    <div class="page-heading"><div><p class="eyebrow" data-word="properties.eyebrow">CARTEIRA</p><h1 data-word="properties.title">Cada imóvel, o seu contexto.</h1><p class="step" data-word="properties.step">Anúncios, conhecimento e instruções para respostas mais úteis.</p></div>
+    <div class="page-heading"><div><p class="eyebrow" data-word="properties.eyebrow">CARTEIRA</p><h1 data-title="properties">Gestão de todos os Imóveis</h1><p class="step" data-word="properties.step">Anúncios, conhecimento e instruções para respostas mais úteis.</p></div>
       <div class="segmented" role="group" aria-label="Vista de Imóveis">
         <button id="view-properties" class="active" aria-pressed="true">Os teus imóveis</button>
         <button id="view-new-property" aria-pressed="false">+ Novo imóvel</button>
@@ -225,7 +229,7 @@
   </section>
 
   <section id="tab-contacts" hidden>
-    <div class="page-heading"><div><p class="eyebrow" data-word="contacts.eyebrow">CONTACTOS</p><h1 data-word="contacts.title">Quem te escreveu, num só registo.</h1><p class="step">É o <code>data/contactos.csv</code>: cada leitura acrescenta os clientes novos, e aqui corriges, acrescentas à mão ou apagas a pedido do cliente.</p></div></div>
+    <div class="page-heading"><div><p class="eyebrow" data-word="contacts.eyebrow">CLIENTES</p><h1 data-title="contacts">Sobre os Clientes que contactaram um dos imóveis atuais</h1><p class="step">É o <code>data/contactos.csv</code>: cada leitura acrescenta os clientes novos, e aqui corriges, acrescentas à mão ou apagas a pedido do cliente.</p></div></div>
     <p id="contacts-expired" class="alert warn" hidden></p>
     <div class="row contacts-property-row"><label class="muted">Imóvel <select id="fichas-property"></select></label></div>
     <article class="card selection-card">
@@ -251,7 +255,7 @@
       <a class="button contacts-csv" href="contactos.csv">Descarregar CSV</a>
     </div>
     <div class="table-wrap"><table class="contacts-table">
-      <thead><tr><th>Nome</th><th>Email</th><th>Telefone</th><th>Imóvel</th><th>1.º contacto</th><th>Respostas</th><th>RGPD</th><th><span class="sr-only">Ações</span></th></tr></thead>
+      <thead><tr><th>Nome</th><th>Email</th><th>Respostas</th><th>Telefone</th><th>1.º contacto</th><th>RGPD</th><th><span class="sr-only">Ações</span></th></tr></thead>
       <tbody id="contacts-body"></tbody>
     </table></div>
     <article class="card editor-card" id="contact-editor">
@@ -265,13 +269,13 @@
         <label class="field">Fonte<input id="c-fonte" placeholder="ex.: Telefone, Presencial"></label>
         <label class="field">Primeiro contacto<input id="c-primeiro" type="date"></label>
         <label class="field">RGPD<select id="c-rgpd"></select></label>
+        <div class="actions"><button id="contact-add" class="primary">Acrescentar contacto</button></div>
       </div>
-      <div class="actions"><button id="contact-add" class="primary">Acrescentar contacto</button></div>
     </article>
   </section>
 
   <section id="tab-agenda" hidden>
-    <div class="page-heading"><div><p class="eyebrow" data-word="agenda.eyebrow">VISITAS</p><h1 data-word="agenda.title">A semana, à moda de agenda de papel.</h1><p class="step">As visitas propostas e marcadas, dia a dia. Por agora gere-se aqui; a exportação para o teu calendário fica para depois.</p></div></div>
+    <div class="page-heading"><div><p class="eyebrow" data-word="agenda.eyebrow">VISITAS</p><h1 data-title="agenda">Gestão das Visitas de Clientes aos Imóveis</h1><p class="step">As visitas propostas e marcadas, dia a dia. Por agora gere-se aqui; a exportação para o teu calendário fica para depois.</p></div></div>
     <div class="row agenda-controls">
       <label class="muted">Imóvel <select id="agenda-property"><option value="">Todos</option></select></label>
       <button id="agenda-sync-here" type="button" title="A IA (API) lê as conversas e atualiza as Visitas.">Atualizar visitas</button>
@@ -299,7 +303,7 @@
   </section>
 
   <section id="tab-voice" hidden>
-    <div class="page-heading"><div><p class="eyebrow" data-word="voice.eyebrow">PERSONALIZAÇÃO</p><h1 data-word="voice.title">As tuas palavras. O teu estilo.</h1><p class="step">Define como te apresentas em cada resposta.</p></div>
+    <div class="page-heading"><div><p class="eyebrow" data-word="voice.eyebrow">PERSONALIZAÇÃO</p><h1 data-word="voice.title">As tuas palavras. O estilo da Agência.</h1><p class="step">Define como te apresentas em cada resposta.</p></div>
       <img class="brand-logo" src="brand/biglearn.png" alt="BigLearn.pt" width="336" height="95"></div>
     <!-- 27/09: «O teu espaço» left the Painel for the top of the settings, as their summary -->
     <div class="settings-top"><article class="card setup-card"><p class="eyebrow" data-word="setup.eyebrow">O TEU ESPAÇO</p><h2 data-word="setup.title">Pronto para trabalhar</h2><ul class="checks" id="dashboard-setup"></ul></article>
@@ -317,7 +321,7 @@
 
   <!-- 29/09: the Oficina — the AI engine, token prices and the test platform; only with "admin": true in config.json -->
   <section id="tab-workshop" hidden>
-    <div class="page-heading"><div><p class="eyebrow">OFICINA</p><h1>Oficina</h1><p class="step">Para quem afina a ARIA: o motor de IA, a plataforma de testes, os prompts e os preços dos tokens. Quem usa a página no dia a dia não a vê, nem vê os prompts: só os pode copiar.</p></div></div>
+    <div class="page-heading"><div><p class="eyebrow">SETTINGS</p><h1 data-title="workshop">Gestão Avançada do Sistema ARIA!</h1><p class="step">Para quem afina a ARIA: o motor de IA, a plataforma de testes, os prompts e os preços dos tokens. Quem usa a página no dia a dia não a vê, nem vê os prompts: só os pode copiar.</p></div></div>
     <article class="card" id="workshop-engine"></article>
     <!-- the test console inside its own card, titled like the engine's -->
     <article class="card" id="workshop-tests"><p class="eyebrow">TESTES &amp; DEBUG</p><div id="workshop-lab"></div></article>

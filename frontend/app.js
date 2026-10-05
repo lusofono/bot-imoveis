@@ -38,7 +38,8 @@ let activeTab = 'dashboard', skinSelector = null;
 // Voz e estilo first (27/09): the settings are «R», reverse, before the Painel's 1st gear, in every theme.
 // 02/10: in the menu's order (the scooter's drum follows it): Voz e estilo, Painel, Comunicações, Contactos, Visitas,
 // Imóveis, Proprietários
-const TAB_NAMES = {voice: 'Voz e estilo', dashboard: 'Painel', replies: 'Centro de Comunicações', contacts: 'Contactos',
+const TAB_NAMES = {voice: 'Voz e estilo', dashboard: 'Painel', replies: 'Emails', contacts: 'Clientes',  // 04/10: once «Centro de Comunicações», «Contactos»
+ 
   agenda: 'Visitas', properties: 'Imóveis', owners: 'Proprietários'};  // the tab is «Visitas» since 27/09 (id stays agenda)
 
 // Skins: a rich theme goes beyond colours. It may bring the words on the page headings, the instruments on
@@ -53,11 +54,11 @@ const SKINS = {
       'dashboard.eyebrow': 'O SEU DIA',
       'activity.eyebrow': 'PERCURSO', 'activity.title': 'Pedidos e respostas, lado a lado',
       'setup.eyebrow': 'PRÓXIMO PASSO', 'setup.title': 'Tudo pronto para acompanhar',
-      'replies.eyebrow': 'CONVERSAS', 'replies.title': 'Responder com cuidado, a cada pessoa.',
-      'properties.eyebrow': 'SELEÇÃO', 'properties.title': 'Cada imóvel, a sua história.',
-      'contacts.eyebrow': 'PESSOAS', 'contacts.title': 'Quem nos procurou, com nome e percurso.',
-      'agenda.eyebrow': 'VISITAS', 'agenda.title': 'A semana, visita a visita.',
-      'voice.eyebrow': 'A NOSSA VOZ', 'voice.title': 'As nossas palavras, o nosso cuidado.',
+      'replies.eyebrow': 'CONVERSAS',
+      'properties.eyebrow': 'SELEÇÃO',
+      'contacts.eyebrow': 'PESSOAS',
+      'agenda.eyebrow': 'VISITAS',
+      'voice.eyebrow': 'A NOSSA VOZ', 'voice.title': 'As tuas palavras. O estilo da Agência.',
     },
   },
   racing: {
@@ -66,12 +67,12 @@ const SKINS = {
       'dashboard.step': 'Contactos, respostas e imóveis: todos os instrumentos à vista.',
       'activity.eyebrow': 'ROAD BOOK', 'activity.title': 'Pedidos e respostas, volta a volta',
       'setup.eyebrow': 'CHECK-LIST DE PARTIDA', 'setup.title': 'Pronto para arrancar',
-      'replies.eyebrow': 'BOX', 'replies.title': 'Paragem na box: rápida, mas sem erros.',
-      'properties.eyebrow': 'GARAGEM', 'properties.title': 'Cada imóvel, o seu motor.',
+      'replies.eyebrow': 'BOX',
+      'properties.eyebrow': 'GARAGEM',
       'properties.step': 'Um quadro de instrumentos por imóvel: temperatura, rotação, velocidade e combustível.',
-      'contacts.eyebrow': 'PADDOCK', 'contacts.title': 'Quem já passou pela box, num só registo.',
-      'agenda.eyebrow': 'GRELHA DA SEMANA', 'agenda.title': 'A semana, prova a prova.',
-      'voice.eyebrow': 'AFINAÇÃO', 'voice.title': 'Afinação: as tuas palavras, o teu estilo.',
+      'contacts.eyebrow': 'PADDOCK',
+      'agenda.eyebrow': 'GRELHA DA SEMANA',
+      'voice.eyebrow': 'AFINAÇÃO', 'voice.title': 'Afinação: as tuas palavras, o estilo da Agência.',
       'cluster.eyebrow': 'QUADRO DE INSTRUMENTOS', 'cluster.chart': 'TELEMETRIA DESTE IMÓVEL',
       'lamp.heat': 'Sobreaquecido', 'heat.limit': 'H =', 'trip.title': 'Computador de bordo',
     },
@@ -85,12 +86,12 @@ const SKINS = {
       'dashboard.step': 'Contactos, respostas e imóveis: todos os instrumentos de bordo à vista.',
       'activity.eyebrow': 'DIÁRIO DE BORDO', 'activity.title': 'Pedidos e respostas, milha a milha',
       'setup.eyebrow': 'ANTES DE LARGAR', 'setup.title': 'Pronto para largar amarras',
-      'replies.eyebrow': 'RÁDIO DE BORDO', 'replies.title': 'Cada resposta, a bom porto.',
-      'properties.eyebrow': 'FROTA', 'properties.title': 'Cada imóvel, o seu barco.',
+      'replies.eyebrow': 'RÁDIO DE BORDO',
+      'properties.eyebrow': 'FROTA',
       'properties.step': 'Um posto de comando por imóvel: os instrumentos, o rumo e o combustível.',
-      'contacts.eyebrow': 'LISTA DE PASSAGEIROS', 'contacts.title': 'Quem já subiu a bordo, num só registo.',
-      'agenda.eyebrow': 'TÁBUA DE MARÉS', 'agenda.title': 'A semana, maré a maré.',
-      'voice.eyebrow': 'PAVILHÃO', 'voice.title': 'O teu pavilhão: as tuas palavras, o teu estilo.',
+      'contacts.eyebrow': 'LISTA DE PASSAGEIROS',
+      'agenda.eyebrow': 'TÁBUA DE MARÉS',
+      'voice.eyebrow': 'PAVILHÃO', 'voice.title': 'O teu pavilhão: as tuas palavras, o estilo da Agência.',
       'cluster.eyebrow': 'INSTRUMENTOS DE BORDO', 'cluster.chart': 'PLOTTER · O RITMO DESTE IMÓVEL',
       'lamp.heat': 'Tempestade', 'heat.limit': 'Tempestade às', 'trip.title': 'Computador de bordo',
     },
@@ -104,12 +105,12 @@ const SKINS = {
       'dashboard.step': 'Contactos, respostas e imóveis: tudo à vista, entre os punhos.',
       'activity.eyebrow': 'ROAD BOOK', 'activity.title': 'Pedidos e respostas, curva a curva',
       'setup.eyebrow': 'ANTES DO ARRANQUE', 'setup.title': 'Pronto para dar ao pedal',
-      'replies.eyebrow': 'CORREIO EXPRESSO', 'replies.title': 'Cada resposta, entregue de scooter.',
-      'properties.eyebrow': 'A FROTA', 'properties.title': 'Cada imóvel, a sua scooter.',
+      'replies.eyebrow': 'CORREIO EXPRESSO',
+      'properties.eyebrow': 'A FROTA',
       'properties.step': 'Um guiador por imóvel: velocímetro, conta-rotações, temperatura e depósito.',
-      'contacts.eyebrow': 'A PIAZZA', 'contacts.title': 'Quem já passou pela piazza, num só registo.',
-      'agenda.eyebrow': 'ROTEIRO', 'agenda.title': 'A semana, estrada a estrada.',
-      'voice.eyebrow': 'OFICINA', 'voice.title': 'Oficina: as tuas palavras, o teu estilo.',
+      'contacts.eyebrow': 'A PIAZZA',
+      'agenda.eyebrow': 'ROTEIRO',
+      'voice.eyebrow': 'OFICINA', 'voice.title': 'Oficina: as tuas palavras, o estilo da Agência.',
       'cluster.eyebrow': 'GUIADOR · INSTRUMENTOS', 'cluster.chart': 'O PERCURSO DESTE IMÓVEL',
       'lamp.heat': 'Motor quente', 'heat.limit': 'Quente às', 'trip.title': 'Diário de viagem',
     },
@@ -125,12 +126,12 @@ const SKINS = {
       'dashboard.step': 'Contactos, respostas e imóveis: tudo no velocímetro central.',
       'activity.eyebrow': 'ROAD TRIP', 'activity.title': 'Pedidos e respostas, milha a milha',
       'setup.eyebrow': 'ANTES DE ARRANCAR', 'setup.title': 'Capota aberta, pronto a sair',
-      'replies.eyebrow': 'A CONSOLA', 'replies.title': 'Cada resposta, num toque de interruptor.',
-      'properties.eyebrow': 'A GARAGEM', 'properties.title': 'Cada imóvel, o seu descapotável.',
+      'replies.eyebrow': 'A CONSOLA',
+      'properties.eyebrow': 'A GARAGEM',
       'properties.step': 'Um tablier por imóvel: o velocímetro central, o conta-rotações, a temperatura e o depósito.',
-      'contacts.eyebrow': 'O CLUBE', 'contacts.title': 'Quem já entrou no clube, num só registo.',
-      'agenda.eyebrow': 'ROTEIRO', 'agenda.title': 'A semana, curva a curva.',
-      'voice.eyebrow': 'AFINAÇÃO', 'voice.title': 'Afinação: as tuas palavras, o teu estilo.',
+      'contacts.eyebrow': 'O CLUBE',
+      'agenda.eyebrow': 'ROTEIRO',
+      'voice.eyebrow': 'AFINAÇÃO', 'voice.title': 'Afinação: as tuas palavras, o estilo da Agência.',
       'cluster.eyebrow': 'TABLIER · INSTRUMENTOS', 'cluster.chart': 'O PERCURSO DESTE IMÓVEL',
       'lamp.heat': 'Motor quente', 'heat.limit': 'Quente às', 'trip.title': 'Computador de bordo',
     },
@@ -1117,7 +1118,7 @@ function showWorkshop() {
   document.querySelectorAll('nav [data-tab]').forEach(button => { button.classList.remove('active'); button.removeAttribute('aria-current'); });
   for (const tab of Object.keys(TAB_NAMES)) $('tab-' + tab).hidden = true;
   $('tab-workshop').hidden = false; $('workshop-link').classList.add('active');
-  $('page-label').textContent = 'Oficina';
+  $('page-label').textContent = 'Settings';  // 04/10: once «Oficina»
   window.scrollTo({top: 0, behavior: 'instant'});
   renderWorkshop();
   run(async () => renderLab(await call('api/testlab/state', {})));
@@ -1204,7 +1205,7 @@ function renderWorkshop() {
     const context = el('input', {type: 'number', min: 4000, step: 1000, value: model.context_tokens, class: 'price-input',
       title: model.context_known ? '' : 'Por confirmar: vale 128.000 até indicares o que a OpenAI anuncia para este modelo.'});
     return el('tr', {},
-      el('td', {}, model.id, model.builtin ? '' : el('span', {class: 'tag'}, 'da Oficina'),
+      el('td', {}, model.id, model.builtin ? '' : el('span', {class: 'tag'}, 'de Settings'),
         model.edited && model.builtin ? el('span', {class: 'tag draft'}, 'alterado') : '',
         model.hidden ? el('span', {class: 'tag warn'}, 'fora da escolha') : ''),
       el('td', {}, input), el('td', {}, output),
@@ -1406,7 +1407,7 @@ function renderLab(lab) {
     el('p', {class: 'eyebrow', 'aria-label': 'Plataforma de testes'}),  // the console's own badge and cursor (CSS)
     el('p', {class: 'step'}, lab.property_ref
       ? `Imóvel de teste: ${lab.property_ref}. Cada cliente é inventado pela IA; o aviso dele sai mesmo pelo Gmail, desta conta `
-        + 'para ela própria, com o cliente no Reply-To (um endereço +cdN desta conta). Depois, «Ler emails» nas Comunicações traz-os.'
+        + 'para ela própria, com o cliente no Reply-To (um endereço +cdN desta conta). Depois, «Ler emails» em Emails traz-os.'
       : 'Ainda não há imóvel de teste (um profile.json com "test": true).'),
     // 02/10: in the order they are done — 1 the Human contest, 2 the customers, 3 a round —, each button numbered
     lab.property_ref && el('div', {class: 'row lab-row'},
@@ -1427,7 +1428,7 @@ function renderLab(lab) {
         const result = await call('api/testlab/clients', {count: Number(count.value),
           contest: settingsNow()});
         applyFuel(result.fuel, lab.property_ref); renderLab(result);
-        toast(`${result.created.length} cliente(s) de teste enviados: ${result.created.join(', ')}. Lê os emails nas Comunicações.`);
+        toast(`${result.created.length} cliente(s) de teste enviados: ${result.created.join(', ')}. Lê os emails em Emails.`);
       }, event.currentTarget)}, el('span', {class: 'step-num', 'aria-hidden': 'true'}, '2'), 'Gerar clientes de teste')),
     lab.property_ref && el('div', {class: 'row lab-row lab-advance'},
       el('button', {type: 'button', class: 'primary needs-fuel', 'data-ref': lab.property_ref, onclick: event => run(async () => {
@@ -1443,7 +1444,7 @@ function renderLab(lab) {
           + (result.consultant.length ? ` · consultor: ${result.consultant.join(', ')}` : '')
           + (result.new.length ? ` · novos: ${result.new.join(', ')}` : ''));
         renderLab(result);
-        toast(`Ronda de teste: ${said}. Lê os emails nas Comunicações.`);
+        toast(`Ronda de teste: ${said}. Lê os emails em Emails.`);
       }, event.currentTarget)}, el('span', {class: 'step-num', 'aria-hidden': 'true'}, '3'), 'Avançar o teste'),
       el('span', {class: 'muted small'}, 'Os clientes com um email nosso por responder respondem (à ARIA e, com o Human contest, '
         + 'ao consultor) ou ficam calados; entram os clientes novos da percentagem do passo 2.')),
@@ -1645,10 +1646,11 @@ function renderState() {
   $('emails').replaceChildren(...(emails.length ? emails.map(card)
     : [el('div', {class: 'empty-state'}, el('strong', {}, state.error ? 'Configuração pendente' : 'Tudo em dia.'), state.error ? 'Verifica o aviso acima para continuar.' : 'Não há emails em tratamento. Faz uma nova leitura quando quiseres.')]));
   const active = queue?.active || [];
+  const writeAll = writeAllPanel(queue);  // 04/10: «Escrever a todos», above the sent cards
   $('active-cards').replaceChildren(...(active.length ? [
     el('div', {class: 'section-heading active-heading'}, el('h2', {}, 'Enviados · clientes ativos'), el('span', {class: 'tag'}, String(active.length))),
     el('p', {class: 'step'}, 'Já respondidos, pela página ou no teu Gmail. Ficam aqui até haver visita marcada ou até os retirares; «Escrever mais» abre um rascunho na conversa do cliente.'),
-    ...active.map(activeCard)] : []));
+    writeAll, ...active.map(activeCard)] : [writeAll]).filter(Boolean));
   renderPipeline(queue);  // after the cards: its names go to them
   // 02/10: the test property's Comunicações on a light purple page, to be sure nothing is tried on a real one
   const testing = !!(settings?.properties || []).find(item => item.reference === queue?.property_ref)?.test;
@@ -1720,10 +1722,13 @@ const PIPELINE = [
   ['por_confirmar', 'Hora por confirmar', 'Aceitaram ou pediram uma hora que ainda não confirmámos na agenda.'],
   ['marcada', 'Visita marcada', 'Têm visita na agenda.'],
   ['visitou', 'Visitou', 'Já visitaram o imóvel.'],
-  ['shortlist', 'Short list', 'Na short list de Visitas (com os escolhidos e os suplentes).']];
+  ['shortlist', 'Short list', 'Na short list de Visitas (com os suplentes).']];
 const PIPELINE_SHOWN = 10;  // names shown per column; the rest counted in one line
-// 03/10: «Desistiu» left the columns: the first line under the table, open by default (the others closed)
+// 03/10: «Desistiu» left the columns: a line under the table, open by default (the others closed). 04/10: «Selecionado»
+// (the one selected, documents in, the contract prepared elsewhere) left them too: the first line, always open, a little
+// bold, the names in gold and bold (no frame).
 const PIPELINE_BELOW = [
+  ['selecionado', 'Selecionado', 'documentação pedida e recebida, contrato a preparar (noutro sistema)'],
   ['desistiu', 'Desistiu', 'recusaram a visita'],
   ['sem_resposta', 'Sem resposta', 'o nosso último email está sem resposta há 3 dias ou mais, seja qual for a interação'],
   ['greylist', 'Greylist', 'ignorados por agora: disseram que não têm interesse; se voltarem a escrever, entram com um aviso'],
@@ -1767,18 +1772,25 @@ function renderPipeline(queue) {
     // 29/09: no hover texts (they never showed well): the dots are explained in the legend under the table, and the
     // name is only the link to the customer's card
     const parts = [splitDot(customer.them, customer.us), shortName(customer.name) || customer.email];
-    return target ? el('button', {type: 'button', class: 'pipeline-name', onclick: () => {
+    // 04/10: a registered owner in red and bold, the one selected in gold and bold
+    const kind = 'pipeline-name' + (customer.owner ? ' owner' : '') + (customer.column === 'selecionado' ? ' selected' : '');
+    const hint = customer.owner ? 'Proprietário' : null;
+    return target ? el('button', {type: 'button', class: kind, title: hint, onclick: () => {
       target.scrollIntoView({behavior: 'smooth', block: 'center'});
       target.classList.add('flash'); setTimeout(() => target.classList.remove('flash'), 1600);
-    }}, ...parts) : el('span', {class: 'pipeline-name'}, ...parts);
+    }}, ...parts) : el('span', {class: kind, title: hint}, ...parts);
   };
   const below = PIPELINE_BELOW.map(([key, label, hint]) => {
     const list = customers.filter(customer => customer.column === key);
-    return list.length && el('details', {class: 'pipeline-below', open: key === 'desistiu' ? belowOpen[key] !== false : !!belowOpen[key],
-      ontoggle: event => { belowOpen[key] = event.currentTarget.open; }},
-      el('summary', {}, label + ' ', el('strong', {}, String(list.length)), el('span', {class: 'muted small'}, ' · ' + hint)),
+    const always = key === 'selecionado';  // 04/10: never closes, and shows even with no one selected yet
+    return (list.length || always) && el('details', {class: 'pipeline-below' + (always ? ' pipeline-selected' : ''),
+      open: always || (key === 'desistiu' ? belowOpen[key] !== false : !!belowOpen[key]),
+      ontoggle: event => { if (!always) belowOpen[key] = event.currentTarget.open; }},
+      el('summary', always ? {onclick: event => event.preventDefault()} : {}, label + ' ', el('strong', {}, String(list.length)), el('span', {class: 'muted small'}, ' · ' + hint)),
       // 27/09: on the greylist and the blacklist, the reason after the name, when there is one
-      el('div', {class: 'pipeline-below-names'}, list.map(customer => customer.reason
+      el('div', {class: 'pipeline-below-names'}, !list.length
+        ? el('span', {class: 'muted small'}, 'Ainda ninguém. Para selecionar: Clientes, na short list, «Selecionar».')
+        : list.map(customer => customer.reason
         ? el('span', {class: 'pipeline-entry'}, name(customer), el('span', {class: 'muted small'}, ' — ' + customer.reason))
         : name(customer))));
   });
@@ -1795,6 +1807,43 @@ function renderPipeline(queue) {
       el('p', {}, el('strong', {}, 'Nós (direita):'), ['ok', 'amber', 'late', 'blue'].map(color =>
         el('span', {}, splitDot(null, color, dotMeaning(color)), dotMeaning(color))))),
     ...below.filter(Boolean));
+}
+
+// 04/10, «Escrever a todos»: the owner's words to every active customer of the property, or only to those who have not
+// answered our last email — one addition draft each in the queue (the words kept on it for the AI), then «Gerar
+// respostas», review and send as always. What is being written survives the page's redraws.
+const writeAllDraft = {open: false, audience: 'all', note: ''};
+function writeAllPanel(queue) {
+  const counts = queue?.write_all;
+  if (!queue?.property_ref || !counts || !(counts.all || counts.queued)) return null;
+  const audience = el('select', {'aria-label': 'A quem escrever'},
+    el('option', {value: 'all'}, `Todos os clientes ativos (${counts.all})`),
+    el('option', {value: 'unanswered'}, `Só os que não responderam ao nosso último email (${counts.unanswered})`));
+  audience.value = writeAllDraft.audience;
+  audience.addEventListener('change', () => { writeAllDraft.audience = audience.value; });
+  const note = el('textarea', {rows: '3', 'aria-label': 'O que queres dizer a todos',
+    placeholder: 'O que queres dizer a todos. A IA escreve um email para cada um, na conversa dele (ex.: a casa fica livre '
+      + 'na terça; precisamos da disponibilidade para as visitas de 7 a 9 de outubro).'});
+  note.value = writeAllDraft.note;
+  note.addEventListener('input', () => { writeAllDraft.note = note.value; });
+  return el('details', {class: 'card write-all', open: writeAllDraft.open,
+    ontoggle: event => { writeAllDraft.open = event.currentTarget.open; }},
+    el('summary', {}, el('strong', {}, 'Escrever a todos'),
+      el('span', {class: 'muted small'}, ' · um email para cada cliente deste imóvel, com o que escreveres')),
+    audience, note,
+    el('p', {class: 'muted small'}, 'Ficam de fora a blacklist, a greylist, quem disse que não quer visitar e os contactos encerrados.'
+      + (counts.queued ? ` ${counts.queued} com um email na fila recebem-no quando lhes responderes: põe a mesma mensagem `
+        + 'nas instruções extra do passo 2.' : '')),
+    el('div', {class: 'actions'}, el('button', {type: 'button', class: 'primary', onclick: event => run(async () => {
+      const count = counts[audience.value];
+      if (!note.value.trim()) throw new Error('Escreve o que queres dizer a todos.');
+      if (!count) throw new Error('Ninguém a quem escrever com esta escolha.');
+      if (!confirm(`Criar ${count} rascunho(s), um por cliente? Nada é enviado: geras com a IA, revês e envias.`)) return;
+      const result = await call('api/active/write-all', {property_ref: queue.property_ref, audience: audience.value, note: note.value});
+      writeAllDraft.note = '';
+      state = result.state; renderState();
+      toast(`${result.created} rascunho(s) na fila, acima: gera-os com «Gerar respostas» (passo 2), revê e envia.`);
+    }, event.currentTarget)}, 'Criar os rascunhos')));
 }
 
 // A sent card: an active customer already answered, until a visit is booked or the owner takes it out.
@@ -2002,6 +2051,7 @@ function programNote(email) {
     ? `Proposta de visita: ${dayLabel(email.visit_window.day)}, das ${email.visit_window.start} às ${email.visit_window.end}.`
     : email.kind === 'visit_thanks' ? `(agradecimento pela visita de ${slotLabel(email.visit_done?.at || '')}, com o inquérito e a ficha de visita`
       + (email.visit_done?.public ? `; nota pública: «${email.visit_done.public}»)` : ')')
+    : email.kind === 'addition' && email.addition_note ? `(acrescento a todos: «${email.addition_note}»)`  // 04/10
     : email.kind === 'addition' ? '(acrescento teu a esta conversa: escreve-o abaixo, ou pede-o à IA nas instruções extra)'
     : AUX_KINDS.includes(email.kind) || email.closing ? '(sem mensagem nova do cliente: email preparado automaticamente, ver o rascunho abaixo)'
     : '';
@@ -2248,7 +2298,7 @@ function card(email, index, list) {
         : email.phase === 'booked' ? el('span', {class: 'tag visit', title: email.booked_at ? 'Visita: ' + slotLabel(email.booked_at) : ''}, 'visita marcada')
         // 02/10: from the 9th on, the closing — the reply says goodbye and the rounds leave them out
         : email.closing_reply ? el('span', {class: 'tag warn', title: 'Já trocámos muitos emails sem a visita avançar: a '
-          + 'resposta é o fecho (agradece e despede-se) e as rondas de visitas deixam de o incluir. Muda-se na Oficina.'},
+          + 'resposta é o fecho (agradece e despede-se) e as rondas de visitas deixam de o incluir. Muda-se em Settings.'},
           email.interaction + '.ª interação · fecho')
         : email.conclusive_reply ? el('span', {class: 'tag warn', title: 'A resposta é conclusiva e a próxima é o fecho: '
           + 'decide agora (lista cinzenta, propor visita ou deixar seguir).'}, email.interaction + '.ª interação · conclusiva')
@@ -2815,7 +2865,7 @@ function renderByProperty(properties) {
         el('th', {scope: 'col', class: 'num'}, title(['Tempo', 'médio'])),
         el('th', {scope: 'col', class: 'by-property-links'}, el('span', {class: 'sr-only'}, 'Abrir')))),
       el('tbody', {}, properties.map(item => el('tr', {class: item.test ? 'test-row' : ''},
-        el('th', {scope: 'row'}, dot(item), el('button', {type: 'button', class: 'link', title: 'Abrir nas Comunicações',
+        el('th', {scope: 'row'}, dot(item), el('button', {type: 'button', class: 'link', title: 'Abrir em Emails',
           onclick: () => openReplies(item)}, item.property_ref || 'Fila única'),
           item.test ? el('span', {class: 'tag test-tag', title: 'Fora dos totais e do ponto de situação'}, 'TESTE') : null,
           item.description ? el('span', {class: 'muted small by-property-desc', title: item.description}, ' · ' + short(item.description)) : null),
@@ -2823,7 +2873,7 @@ function renderByProperty(properties) {
         columns.map(([key, , tone]) => cell(item[key], tone)),
         el('td', {class: 'num'}, item.reply_hours == null ? '—' : hoursText(item.reply_hours)),
         el('td', {class: 'by-property-links'},
-          el('button', {type: 'button', class: 'link', onclick: () => openReplies(item)}, 'Comunicações'),
+          el('button', {type: 'button', class: 'link', onclick: () => openReplies(item)}, 'Emails'),
           item.property_ref ? el('button', {type: 'button', class: 'link', title: 'O painel do imóvel, em Imóveis',
             onclick: () => openPanel(item)}, 'Painel') : null)))))),
     // 04/10: the legend in short, on one line; the whole meaning on hover (as on the dots)
@@ -2916,10 +2966,17 @@ function renderNotices(data) {
       el('div', {class: 'notices-side'},
         el('p', {class: 'notice-legend'}, Object.entries(NOTICE_COLOURS).map(([level, label]) =>
           el('span', {}, el('span', {class: `notice-pin-key ${level}`, 'aria-hidden': 'true'}), label))),
+        // 04/10: asks first
         el('div', {class: 'notices-actions'},
-          unread ? el('button', {type: 'button', class: 'link', onclick: event => update(null, 'read', event.currentTarget)}, 'Marcar todos como lidos') : null))),
-    el('ul', {class: 'notice-list'}, notices.slice(0, 40).map(notice => el('li', {class: `notice ${notice.level}${notice.read ? '' : ' unread'}`,
+          unread ? el('button', {type: 'button', class: 'link', onclick: event => {
+            if (confirm(unread === 1 ? 'Marcar o aviso por ler como lido?' : `Marcar os ${unread} avisos por ler como lidos?`)) {
+              update(null, 'read', event.currentTarget);
+            }
+          }}, 'Marcar todos como lidos') : null))),
+    el('ul', {class: 'notice-list'}, notices.slice(0, 40).map(notice => el('li', {
+      class: `notice ${notice.level}${notice.read ? '' : ' unread'}${NOTICE_MARKS[notice.mark] ? ` marked mark-${notice.mark}` : ''}`,
       title: NOTICE_COLOURS[notice.level] ? `Pionés: ${NOTICE_COLOURS[notice.level]}` : ''},
+      noticePin(), noticeMarks(notice, update, renderNotices),
       el('span', {class: 'notice-when'}, stamp(notice.at)),
       el('span', {class: 'notice-text'}, notice.text),
       el('span', {class: 'notice-buttons'},
@@ -2928,6 +2985,46 @@ function renderNotices(data) {
           update([notice.id], 'read'); openTask({tab: notice.tab, property_ref: notice.ref}); }}, 'Ver →'))))));
 }
 const NOTICE_COLOURS = {ok: 'tudo bem', info: 'informação', watch: 'a vigiar', warn: 'precisa de atenção', bad: 'urgente'};
+// 04/10: the post-it's pin, a push pin drawn in 3D and tilted (as the owner showed it), in the level's colour (the CSS
+// gives it, «color: var(--pin)»): the plastic in currentColor with light and shade over it, a short metal needle.
+let pinCount = 0;
+function noticePin() {
+  const id = ++pinCount, shade = `pin-shade-${id}`, metal = `pin-metal-${id}`;
+  const body = 'M12 12.5c3.5 2 4.6 5 4.6 9.5V34h6.8V22c0-4.5 1.1-7.5 4.6-9.5z', cap = 'M11.5 8.5h17v4.5a8.5 2.8 0 0 1-17 0z';
+  return svg('svg', {class: 'notice-pin', viewBox: '-4 0 48 60', 'aria-hidden': 'true'},
+    svg('defs', {},
+      svg('linearGradient', {id: shade, gradientUnits: 'userSpaceOnUse', x1: 10, y1: 0, x2: 30, y2: 0},
+        svg('stop', {offset: 0, 'stop-color': '#fff', 'stop-opacity': .55}), svg('stop', {offset: .38, 'stop-color': '#fff', 'stop-opacity': .08}),
+        svg('stop', {offset: .62, 'stop-color': '#000', 'stop-opacity': 0}), svg('stop', {offset: 1, 'stop-color': '#000', 'stop-opacity': .38})),
+      svg('linearGradient', {id: metal, gradientUnits: 'userSpaceOnUse', x1: 18.6, y1: 0, x2: 21.4, y2: 0},
+        svg('stop', {offset: 0, 'stop-color': '#f2f2f2'}), svg('stop', {offset: .5, 'stop-color': '#a9adb2'}),
+        svg('stop', {offset: 1, 'stop-color': '#5d6166'}))),
+    svg('g', {transform: 'rotate(30 20 30)'},
+      svg('path', {d: 'M19 37h2l-1 10z', fill: `url(#${metal})`}),
+      svg('g', {fill: 'currentColor'}, svg('ellipse', {cx: 20, cy: 36, rx: 10, ry: 3}), svg('ellipse', {cx: 20, cy: 34.6, rx: 10, ry: 3}),
+        svg('path', {d: body}), svg('path', {d: cap}), svg('ellipse', {cx: 20, cy: 8.5, rx: 8.5, ry: 2.8})),
+      svg('g', {fill: `url(#${shade})`}, svg('ellipse', {cx: 20, cy: 36, rx: 10, ry: 3}), svg('path', {d: body}), svg('path', {d: cap})),
+      svg('ellipse', {cx: 20, cy: 34.6, rx: 10, ry: 3, fill: '#fff', 'fill-opacity': .18}),
+      svg('ellipse', {cx: 20, cy: 8.5, rx: 8.5, ry: 2.8, fill: '#fff', 'fill-opacity': .3}),
+      svg('ellipse', {cx: 17, cy: 8.1, rx: 3.6, ry: 1, fill: '#fff', 'fill-opacity': .45})));
+}
+// 04/10: in each post-it's top-right corner: «lido» (while unread) and our own mark, the post-it's colour — red urgent,
+// blue not urgent, green dealt with, and yellow back to the plain post-it (the mark on again takes it off too). A marked
+// notice is read.
+const NOTICE_MARKS = {urgent: 'Urgente: post-it vermelho', calm: 'Não urgente: post-it azul', done: 'Tratado: post-it verde'};
+function noticeMarks(notice, update, redraw) {
+  const mark = (value, button) => run(async () => redraw(await call('api/notices/update',
+    {ids: [notice.id], action: 'mark', mark: notice.mark === value ? '' : value})), button);
+  return el('span', {class: 'notice-marks'},
+    !notice.read && el('button', {type: 'button', class: 'link notice-mark read', title: 'Marcar como lido',
+      'aria-label': 'Marcar como lido', onclick: event => update([notice.id], 'read', event.currentTarget)}, '✓'),
+    Object.entries(NOTICE_MARKS).map(([value, label]) => el('button', {type: 'button', class: `link notice-mark ${value}`,
+      'aria-pressed': String(notice.mark === value), 'aria-label': label,
+      title: notice.mark === value ? `${label} (carrega para tirar)` : label, onclick: event => mark(value, event.currentTarget)})),
+    el('button', {type: 'button', class: 'link notice-mark plain', 'aria-pressed': String(!NOTICE_MARKS[notice.mark]),
+      'aria-label': 'Voltar ao post-it normal', title: 'Voltar ao post-it normal (sem marca)',
+      onclick: event => { if (NOTICE_MARKS[notice.mark]) mark(notice.mark, event.currentTarget); }}));
+}
 // 04/10: our own note on a notice, up to 25 characters: «+» to write it; written, a click changes it (empty takes it
 // off). Enter or leaving the field keeps it, Esc gives up.
 const NOTICE_NOTE_CHARS = 25;
@@ -2963,9 +3060,6 @@ function noticeNote(notice, save) {
 const TODO_URGENT = new Set(['survey_alert', 'visit_reminder', 'uncertain', 'blocked', 'reply', 'accepted', 'check']);
 function openTask(task) {
   const ref = task.property_ref;
-  if (ref && task.tab === 'replies' && [...$('queue').options].some(option => option.value === ref)) {
-    $('queue').value = ref; renderState();
-  }
   // A menu not drawn yet has no options: the value is kept by an option of its own, which the redraw keeps.
   const choose = select => {
     if (![...select.options].some(option => option.value === ref)) select.append(el('option', {value: ref}, ref));
@@ -2975,6 +3069,12 @@ function openTask(task) {
   if (ref && task.tab === 'contacts') { $('fichas-property').dataset.touched = '1'; choose($('fichas-property')); }
   if (ref && task.tab === 'properties') selectProperty(ref);
   showTab(task.tab);
+  // 04/10: Emails on the task's property, chosen once the tab is open and told to the page as a change of the menu
+  // (its slider and the queue redraw): setting the menu's value alone left Emails on the property it was on
+  if (ref && task.tab === 'replies' && [...$('queue').options].some(option => option.value === ref)) {
+    $('queue').value = ref;
+    $('queue').dispatchEvent(new Event('change'));
+  }
 }
 function renderTodo(data) {
   const tasks = data.tasks || [];
@@ -3158,20 +3258,29 @@ function renderOwnersDigest(view) {
 async function loadOwnersDigest() { renderOwnersDigest(await call('api/digest')); }
 
 // What a past round looked like: who it went to, and where each one stands now (booked and when, declined,
-// still an unsent draft, or sent and awaiting a reply) — otherwise a sent round leaves no trace to check.
-function roundSummaryContent(data) {
+// still an unsent draft, or sent and awaiting a reply) — otherwise a sent round leaves no trace to check. 04/10: shown
+// (in Visitas) only the first `shown`, then «+ N clientes», a closed list that opens to the rest, each as above (the hover
+// with the names did not show well); kept open or closed while the page redraws.
+let roundMoreOpen = false;
+function roundSummaryContent(data, shown = Infinity) {
   if (!data.window) return [el('p', {class: 'muted small'}, 'Ainda sem nenhuma ronda para este imóvel.')];
   const stateLabel = {...CLIENT_STATE_LABEL, nao_quer: 'não quer visitar', outra_data: 'só pode noutra data'};
   const note = person => person.state === 'ok' ? 'enviado, a aguardar resposta'
     : person.state === 'pending' ? 'ainda não foi enviado' : person.reason || '';
+  const row = person => el('div', {class: 'client-row'},
+    el('span', {}, shortName(person.name) || person.email),
+    el('span', {class: 'tag' + (person.state === 'booked' ? ' visit' : person.state === 'pending' ? ' draft' : '')},
+      person.visit_at ? slotLabel(person.visit_at) : (stateLabel[person.state] || person.state)),
+    el('span', {class: 'muted small'}, note(person)));
+  const rest = data.recipients.slice(shown);
   return [
     el('p', {class: 'muted small'},
       `Última ronda: ${dayLabel(data.window.day)}, das ${data.window.start} às ${data.window.end}`),
-    el('div', {class: 'client-list'}, data.recipients.map(person => el('div', {class: 'client-row'},
-      el('span', {}, shortName(person.name) || person.email),
-      el('span', {class: 'tag' + (person.state === 'booked' ? ' visit' : person.state === 'pending' ? ' draft' : '')},
-        person.visit_at ? slotLabel(person.visit_at) : (stateLabel[person.state] || person.state)),
-      el('span', {class: 'muted small'}, note(person)))))];
+    el('div', {class: 'client-list'}, data.recipients.slice(0, shown).map(row)),
+    rest.length && el('details', {class: 'round-more', open: roundMoreOpen,
+      ontoggle: event => { roundMoreOpen = event.currentTarget.open; }},
+      el('summary', {class: 'muted small'}, `+ ${rest.length} ${rest.length === 1 ? 'cliente' : 'clientes'}`),
+      el('div', {class: 'client-list'}, rest.map(row)))].filter(Boolean);
 }
 
 // One click, all of a property's active clients: skips the per-client picking in Imóveis → Visitas for
@@ -3188,7 +3297,7 @@ function roundCounts(data) {
     [by.ok || 0, n => plural(n, 'recebe o convite', 'recebem o convite')],
     [out.proposal, n => `${n} com a proposta de visita ainda por enviar`],
     [(by.pending || 0) - (out.proposal || 0) + (out.new || 0),
-      n => `${n} com email por responder nas Comunicações (entram depois de lhes responderes)`],
+      n => `${n} com email por responder em Emails (entram depois de lhes responderes)`],
     [by.booked, n => `${n} já com visita marcada`],
     [by.nao_quer, n => plural(n, 'não quer visitar', 'não querem visitar')],
     [by.outra_data, n => plural(n, 'só pode noutra data', 'só podem noutra data')],
@@ -3237,7 +3346,7 @@ function renderVisitsRound() {
     const data = await call('api/visits/candidates', {property_ref: ref});
     const emails = data.customers.filter(customer => customer.state === 'ok').map(customer => customer.email);
     if (!emails.length) throw new Error('Não há clientes elegíveis agora (por responder, já convidados ou recusaram).');
-    if (!common && !confirm(`Vais criar ${emails.length} proposta(s) de visita, uma por cliente de ${ref}, nas Comunicações: `
+    if (!common && !confirm(`Vais criar ${emails.length} proposta(s) de visita, uma por cliente de ${ref}, em Emails: `
         + `${dayLabel(day.value)}, das ${start.value} às ${end.value}. Nada é enviado antes de as reveres. Continuar?`)) return;
     const result = await call('api/visits/propose', {property_ref: ref, day: day.value, start: start.value, end: end.value,
       emails, note: note.value, common});
@@ -3251,7 +3360,7 @@ function renderVisitsRound() {
     }
     roundScroll = common;
     renderState(); renderSettings();
-    if (!common) toast(`${result.created} proposta(s) de visita na fila das Comunicações: ${apiOnly() ? 'gera-as com «Gerar respostas»' : 'prepara-as no ChatGPT ou via API'}, como as outras.`);
+    if (!common) toast(`${result.created} proposta(s) de visita na fila de Emails: ${apiOnly() ? 'gera-as com «Gerar respostas»' : 'prepara-as no ChatGPT ou via API'}, como as outras.`);
     else if (drafted) toast(`Rascunho da ronda pronto (${result.created} cliente(s)), logo abaixo: revê-o e depois «2 Enviar a todos». Nada foi enviado.`);
   }, event.currentTarget)}, startLabel());
   individual.addEventListener('change', () => { startButton.replaceChildren(...startLabel()); });
@@ -3261,18 +3370,18 @@ function renderVisitsRound() {
   const loadSummary = () => run(async () => {
     counts.textContent = 'Agora: ' + roundCounts(await call('api/visits/candidates', {property_ref: ref})) + '.';
     const data = await call('api/visits/round-summary', {property_ref: ref});
-    summaryBox.replaceChildren(...roundSummaryContent(data));
+    summaryBox.replaceChildren(...roundSummaryContent(data, 10));  // 04/10: the first 10, the rest on a hover
     renderRoundCommon(commonBox, await call('api/visits/round', {property_ref: ref}), loadSummary, roundActions);
   });
   card(
     el('p', {class: 'step'},
       'Um email a cada cliente ativo deste imóvel, a propor o dia e o intervalo e a perguntar a hora que lhe dá mais '
       + 'jeito dentro dele. O mesmo texto para todos (em português para quem escreve em português, em inglês para os '
-      + 'outros), que revês e envias aqui mesmo; individualizado, fica um por cliente na fila das Comunicações.'),
+      + 'outros), que revês e envias aqui mesmo; individualizado, fica um por cliente na fila de Emails.'),
     counts,
     el('div', {class: 'row'}, dateStepper(day), timeStepper(start, slot), timeStepper(end, slot)),
     note,
-    el('label', {class: 'check'}, individual, ' Individualizar: uma resposta por cliente, nas Comunicações'),
+    el('label', {class: 'check'}, individual, ' Individualizar: uma resposta por cliente, em Emails'),
     el('div', {class: 'actions'}, startButton, roundActions),
     commonBox, summaryBox);
   loadSummary();
@@ -3341,10 +3450,10 @@ function renderRoundCommon(box, data, reload, actions) {
         item.reply_status === 'error' ? `não saiu: ${item.reply_error || 'erro'}`
           : item.language ? (ROUND_LANGS[item.language] + (item.lang && item.lang !== item.language ? ` · escreve em ${item.lang}` : ''))
           : 'sem texto'),
-      el('button', {class: 'link', title: 'Tira-o da ronda: fica nas Comunicações, para escreveres e enviares só a ele.',
+      el('button', {class: 'link', title: 'Tira-o da ronda: fica em Emails, para escreveres e enviares só a ele.',
         onclick: event => run(async () => {
           redraw(await call('api/visits/round-individual', {property_ref: ref, id: item.id}));
-          toast(`${shortName(item.name) || item.email} passou para as Comunicações.`);
+          toast(`${shortName(item.name) || item.email} passou para Emails.`);
         }, event.currentTarget)}, 'Individualizar'))))));
   if (hasTexts) actions.replaceChildren(
       el('button', {onclick: event => run(async () => {
@@ -3357,7 +3466,7 @@ function renderRoundCommon(box, data, reload, actions) {
         const warned = check.replies.filter(reply => (reply.warnings || []).length).length;
         if (!confirm(`Enviar agora ${ids.length} email(s) reais, um a cada cliente da ronda, na conversa de cada um?`
             + `\n\nPara: ${check.replies.map(reply => reply.to).join(', ')}`
-            + (warned ? `\n\n${warned} com avisos: vê-os nas Comunicações antes, se quiseres.` : ''))) { redraw(saved); return; }
+            + (warned ? `\n\n${warned} com avisos: vê-os em Emails antes, se quiseres.` : ''))) { redraw(saved); return; }
         const result = await call('api/send', {property_ref: ref, preview_token: check.preview_token, confirmed: true});
         const sent = result.results.filter(item => item.status === 'sent').length;
         if (sent) playSound('send');
@@ -3383,25 +3492,33 @@ function fillSelect(select, options, first) {
   if ([...select.options].some(option => option.value === chosen)) select.value = chosen;
 }
 
+// 04/10: a long address cut for the table: at most 20 characters before the @ and 20 after, «…» where it was cut (the
+// whole address on the hover).
+const EMAIL_PART = 20;
+function shortEmail(email) {
+  const text = String(email || ''), at = text.lastIndexOf('@');
+  const cut = part => part.length > EMAIL_PART ? part.slice(0, EMAIL_PART - 1) + '…' : part;
+  return at < 0 ? cut(text) : cut(text.slice(0, at)) + '@' + cut(text.slice(at + 1));
+}
 function contactRow(contact) {
   const nome = el('input', {value: contact.nome, 'aria-label': 'Nome'});
   const telefone = el('input', {value: contact.telefone, 'aria-label': 'Telefone'});
-  const rgpd = el('select', {'aria-label': 'Estado RGPD'},
-    Object.entries(contactsData.rgpd_states).map(([value, label]) => el('option', {value}, label)));
-  rgpd.value = contact.rgpd;
+  // 04/10: the RGPD state only shown, as plain text (it changes by the consent emails, not here)
+  const rgpd = el('span', {}, contactsData.rgpd_states[contact.rgpd] || contact.rgpd || '—');
   // The proof of a «sim» confirmed from an email is its Message-ID; one changed here says so itself.
   const proof = contact.rgpd_data && el('div', {class: 'muted small'},
     fullDay(contact.rgpd_data) + ' · ' + (contact.rgpd_prova.startsWith('<') ? 'por email' : contact.rgpd_prova || '—'));
   return el('tr', {},
-    el('td', {}, nome), el('td', {class: 'email'}, contact.email), el('td', {}, telefone),
-    el('td', {class: 'mono small'}, contact.imovel), el('td', {class: 'nowrap'}, fullDay(contact.primeiro_contacto)),
-    el('td', {}, String(contact.interactions),
+    el('td', {}, nome), el('td', {class: 'email', title: contact.email}, shortEmail(contact.email)),
+    // 04/10: «Respostas» right after the email, a little wider (the count and «inativo» side by side)
+    el('td', {class: 'replies-cell'}, String(contact.interactions),
       contact.inactive && el('span', {class: 'tag warn', title: 'Dois emails nossos sem resposta: sai das rondas e dos lembretes até voltar a escrever.'}, 'inativo')),
+    el('td', {}, telefone),
+    el('td', {class: 'nowrap'}, fullDay(contact.primeiro_contacto)),  // 04/10: the property is the group's title, above
     el('td', {}, rgpd, proof),
     el('td', {class: 'actions-cell'},
       el('button', {onclick: event => run(async () => {
-        contactsData = await call('api/contacts/save', {contact: {...contact, nome: nome.value, telefone: telefone.value,
-          rgpd: rgpd.value}});
+        contactsData = await call('api/contacts/save', {contact: {...contact, nome: nome.value, telefone: telefone.value}});
         renderContacts(); toast('Contacto guardado no CSV.');
       }, event.currentTarget)}, 'Guardar'),
       el('button', {class: 'link danger', onclick: event => run(async () => {
@@ -3524,17 +3641,17 @@ function ejectChoose(item) {
   const guard = el('span', {class: 'eject-guard'});
   let timer = null;
   const disarm = () => { clearTimeout(timer); guard.classList.remove('armed'); guard.replaceChildren(closed()); };
-  const closed = () => el('button', {type: 'button', class: 'eject', title: 'Escolher o inquilino: carrega para levantar a tampa',
+  const closed = () => el('button', {type: 'button', class: 'eject', title: 'Selecionar o inquilino: carrega para levantar a tampa',
     onclick: () => {
       guard.classList.add('armed');
       guard.replaceChildren(
         el('button', {type: 'button', class: 'eject armed', onclick: event => run(async () => {
           clearTimeout(timer);
-          await selectionCall('set', item, {status: 'chosen'}, `${name} é o inquilino escolhido.`);
-        }, event.currentTarget)}, `Confirmar: ${name} é o inquilino`),
+          await selectionCall('set', item, {status: 'chosen'}, `${name} está selecionado(a).`);
+        }, event.currentTarget)}, `Confirmar: selecionar ${name}`),
         el('button', {type: 'button', class: 'link eject-cancel', onclick: disarm}, 'cancelar'));
       timer = setTimeout(disarm, 6000);
-    }}, 'Escolher');
+    }}, 'Selecionar');
   guard.append(closed());
   return guard;
 }
@@ -3547,7 +3664,7 @@ function selectionColumn(item) {
   const visit = item.visit, survey = item.survey;
   return el('article', {class: 'selection-column ' + item.status},
     el('div', {class: 'card-head'}, el('strong', {}, shortName(item.name) || item.email),
-      el('span', {class: 'tag ' + (item.status === 'chosen' ? 'draft' : item.status === 'suplente' ? 'visit' : '')}, item.label)),
+      el('span', {class: 'tag ' + (item.status === 'chosen' ? 'golden' : item.status === 'suplente' ? 'visit' : '')}, item.label)),
     el('div', {class: 'muted small ficha-email'}, item.email),
     el('p', {class: 'eyebrow'}, 'FICHA'),
     el('dl', {}, ['trabalho', 'agregado', 'datas', 'disponibilidade', 'empresa', 'animais']
@@ -3570,7 +3687,7 @@ function selectionColumn(item) {
       : 'Falta: ' + docs.missing.join(', ').toLowerCase() + '.'),
     el('div', {class: 'actions'},
       el('button', {type: 'button', onclick: event => run(async () => {
-        await selectionCall('request', item, {}, 'Pedido de documentos nas Comunicações: gera-o, revê e envia.');
+        await selectionCall('request', item, {}, 'Pedido de documentos em Emails: gera-o, revê e envia.');
       }, event.currentTarget)}, item.docs_requested_at ? 'Pedir de novo' : 'Pedir documentos'),
       item.status !== 'chosen' && ejectChoose(item),
       item.status !== 'suplente' && el('button', {type: 'button', onclick: event => run(() =>
@@ -3629,8 +3746,15 @@ function renderContacts() {
   const shown = contactsData.contacts.filter(contact => (!ref || contact.imovel === ref) && (!rgpd || contact.rgpd === rgpd)
     && (!text || [contact.nome, contact.email, contact.telefone].some(value => (value || '').toLowerCase().includes(text))));
   $('contacts-count').textContent = `${shown.length} de ${contactsData.contacts.length}`;
-  $('contacts-body').replaceChildren(...(shown.length ? shown.map(contactRow)
-    : [el('tr', {}, el('td', {colspan: 8, class: 'muted'}, contactsData.contacts.length
+  // 04/10: no «Imóvel» column: the contacts grouped by property, its reference (and description) as the group's title
+  const groups = new Map();
+  for (const contact of shown) groups.set(contact.imovel || '', [...(groups.get(contact.imovel || '') || []), contact]);
+  const title = (ref, count) => el('tr', {class: 'contacts-group'}, el('th', {colspan: 7, scope: 'colgroup'},
+    ref || 'Sem imóvel', el('span', {class: 'contacts-group-about'},
+      [settings?.properties?.find(property => property.reference === ref)?.description, `${count} contacto(s)`]
+        .filter(Boolean).join(' · '))));
+  $('contacts-body').replaceChildren(...(shown.length ? [...groups].flatMap(([ref, list]) => [title(ref, list.length), ...list.map(contactRow)])
+    : [el('tr', {}, el('td', {colspan: 7, class: 'muted'}, contactsData.contacts.length
       ? 'Nenhum contacto com estes filtros.' : 'Ainda não há contactos: entram aqui a cada leitura.'))]));
 }
 
@@ -3774,7 +3898,23 @@ function propertySwitcher(select) {
 }
 for (const id of ['queue', 'agenda-property', 'fichas-property']) propertySwitcher($(id));
 
+// 04/10: each page's title (where the old ones were, in the same type), with how many properties there are now (the
+// active ones, the test property left out); the same in every theme.
+function renderTitles() {
+  const n = activeProperties().filter(property => !property.test).length;
+  const of = (one, many) => n === 1 ? one : many.replace('{n}', n);
+  const titles = {
+    dashboard: 'Centro de Controlo e de Gestão — Dashboard Executivo',
+    replies: `Leitura e Envio de emails aos clientes ${of('do Imóvel', 'dos {n} Imóveis')}`,
+    contacts: `Sobre os Clientes que contactaram ${of('o imóvel atual', 'um dos {n} imóveis atuais')}`,
+    agenda: `Gestão das Visitas de Clientes ${of('ao Imóvel', 'aos {n} Imóveis')}`,
+    properties: 'Gestão de todos os Imóveis',
+    owners: `Centro de comunicação com os proprietários ${of('do imóvel', 'dos {n} imóveis')}`,
+    workshop: 'Gestão Avançada do Sistema ARIA!'};
+  for (const node of document.querySelectorAll('h1[data-title]')) node.textContent = titles[node.dataset.title] ?? node.textContent;
+}
 function renderSettings() {
+  renderTitles();
   SWITCHERS.forEach(render => render());  // the descriptions come with the settings
   updateSkinPanels();
   applyAiMode();
@@ -3848,17 +3988,18 @@ function activeSwitch(property) {
   }, event.currentTarget)}, active ? 'Marcar como inativo' : 'Voltar a ativar');
 }
 
-// The property's survey report: the three dials and every answer, the bad ones first to catch the eye.
+// The property's survey report: the three dials and every answer, the bad ones first to catch the eye. 04/10: always
+// open (its summary does not close it).
 function surveyReport(property) {
   const report = property.survey_report;
-  if (!report?.responses) return el('details', {class: 'visits-panel'},
-    el('summary', {class: 'muted small'}, 'Relatório dos inquéritos (0)'),
+  const summary = text => el('summary', {class: 'muted small', onclick: event => event.preventDefault()}, text);
+  if (!report?.responses) return el('details', {class: 'visits-panel always-open', open: true},
+    summary('Relatório dos inquéritos (0)'),
     report && qualityGauges(report, 'imovel:quality:' + property.reference, 'mini'),
     el('p', {class: 'muted small'}, 'Sem respostas ainda: o inquérito vai no agradecimento pós-visita.'));
   const answers = [...report.answers].sort((a, b) => (b.alerts.length > 0) - (a.alerts.length > 0));
-  return el('details', {class: 'visits-panel', open: report.alerts > 0},
-    el('summary', {class: 'muted small'}, `Relatório dos inquéritos (${report.responses})`
-      + (report.alerts ? ` · ${report.alerts} com alerta` : '')),
+  return el('details', {class: 'visits-panel always-open', open: true},
+    summary(`Relatório dos inquéritos (${report.responses})` + (report.alerts ? ` · ${report.alerts} com alerta` : '')),
     qualityGauges(report, 'imovel:quality:' + property.reference, 'mini'),
     el('p', {class: 'muted small'}, `Continua interessado: sim ${report.interest.sim} · talvez ${report.interest.talvez} · não ${report.interest['não']}`),
     el('div', {class: 'client-list'}, answers.map(answer => el('div', {class: 'client-row survey-row'},
@@ -3968,7 +4109,7 @@ function rebuildPanel(property) {
   const label = entry => entry.kind === 'visit' ? `Visita de ${shortName(entry.name)} a ${entry.at.slice(8, 10)}/${entry.at.slice(5, 7)} às ${entry.at.slice(11, 16)}`
       + (entry.at.slice(0, 10) < new Date().toLocaleDateString('sv-SE') ? ' (já passou: fica por registar)' : '')
     : entry.kind === 'survey' ? `Inquérito de ${shortName(entry.name)}: imóvel ${entry.survey?.imovel ?? '—'}, consultor ${entry.survey?.consultor ?? '—'}`
-    : entry.kind === 'shortlist' ? `${shortName(entry.name)} na short list (${entry.status === 'chosen' ? 'escolhido' : entry.status === 'suplente' ? 'suplente' : 'short list'})`
+    : entry.kind === 'shortlist' ? `${shortName(entry.name)} na short list (${entry.status === 'chosen' ? 'selecionado' : entry.status === 'suplente' ? 'suplente' : 'short list'})`
     : `Tirar da fila ${entry.count} email(s) já respondidos no Gmail`;
   const source = entry => entry.source === 'marca' ? 'pela marca do email' : entry.source === 'ia' ? 'lido pela IA'
     : entry.source ? entry.source : '';
@@ -4070,7 +4211,7 @@ function visitsPanel(property) {
         const result = await call('api/visits/propose', {property_ref: property.reference, day: day.value,
           start: start.value, end: end.value, emails});
         state = result.state; settings = result.settings; renderState(); renderSettings();
-        toast(`${result.created} proposta(s) de visita na fila das Comunicações: ${apiOnly() ? 'gera-as com «Gerar respostas»' : 'prepara-as no ChatGPT'} como as outras.`);
+        toast(`${result.created} proposta(s) de visita na fila de Emails: ${apiOnly() ? 'gera-as com «Gerar respostas»' : 'prepara-as no ChatGPT'} como as outras.`);
       }, event.currentTarget)}, 'Criar propostas')));
     toast(`${data.customers.length} cliente(s) encontrados.`);
   }, event.currentTarget);
@@ -4078,12 +4219,12 @@ function visitsPanel(property) {
     if (!confirm(`Fechar as visitas de ${property.reference}? Prepara um email de agradecimento para cada cliente (pendentes e já respondidos) e os pedidos novos deste imóvel passam a ser respondidos automaticamente.`)) return;
     const result = await call('api/visits/close', {property_ref: property.reference});
     state = result.state; settings = result.settings; renderState(); renderSettings();
-    toast(`Visitas fechadas: ${result.drafted} rascunho(s) na fila das Comunicações, prontos a rever e enviar.`);
+    toast(`Visitas fechadas: ${result.drafted} rascunho(s) na fila de Emails, prontos a rever e enviar.`);
   }, event.currentTarget)}, 'Fechar visitas e agradecer a todos');
   const requestConsent = el('button', {onclick: event => run(async () => {
     const result = await call('api/consent/request', {property_ref: property.reference});
     state = result.state; renderState();
-    toast(result.drafted ? `${result.drafted} pedido(s) de consentimento na fila das Comunicações.` : 'Ninguém por pedir: já foi pedido a todos os que responderam.');
+    toast(result.drafted ? `${result.drafted} pedido(s) de consentimento na fila de Emails.` : 'Ninguém por pedir: já foi pedido a todos os que responderam.');
   }, event.currentTarget)}, 'Pedir consentimento RGPD a quem respondeu');
   return el('details', {class: 'visits-panel'}, el('summary', {class: 'muted small'}, 'Visitas: propor e marcar' + (closed ? ' (fechadas)' : '')),
     closed && el('p', {class: 'alert warn'}, `Visitas fechadas em ${when(visits.closed_at)}. Novos pedidos deste imóvel recebem a resposta automática.`),
@@ -4395,7 +4536,7 @@ function openVisitCheck(entry) {
         if (await save() !== true) throw new Error('Marca «Apareceu» para criar o agradecimento.');
         const result = await call('api/visits/thanks', {property_ref: entry.ref, email: entry.customer});
         state = result.state; renderState();
-        toast(`Agradecimento nas Comunicações: gera-o com a IA (${apiOnly() ? '«Gerar respostas»' : 'Criar prompt ou via API'}), revê e envia.`);
+        toast(`Agradecimento em Emails: gera-o com a IA (${apiOnly() ? '«Gerar respostas»' : 'Criar prompt ou via API'}), revê e envia.`);
       }, event.currentTarget)}, 'Guardar e criar agradecimento'))));
   box.scrollIntoView({block: 'nearest', behavior: 'smooth'});
 }
@@ -4983,7 +5124,7 @@ function propertyCluster(property, data, metrics) {
     el('div', {class: 'cluster-odometers'},
       odometer(data.answered, 'Respostas enviadas'),
       odometer(data.clients.ok + data.clients.pending + data.clients.booked, 'Clientes ativos'),
-      odometer(data.customers, 'Contactos'),
+      odometer(data.customers, 'Clientes'),
       odometer(data.visits_booked, 'Visitas marcadas', 3)),
     el('div', {class: 'cluster-lamps'},
       lamp('Rascunhos', data.drafts, 'green'),
@@ -5015,16 +5156,18 @@ function propertyChartCard(property, data, metrics) {
     el('div', {class: 'legend'}, el('span', {class: 'requests'}, 'Pedidos recebidos'), el('span', {class: 'sent'}, 'Respostas enviadas')));
 }
 
-// The Painel's six numbers, for this property only (26/09), right under its instruments; like the Painel's, they only
-// inform (27/09).
+// The Painel's numbers, for this property only (26/09), above its instruments since 04/10 (eight, as on the Painel); like
+// the Painel's, they only inform (27/09).
 function propertyMetrics(data) {
   return el('div', {class: 'metrics property-metrics'},
     metricCard(data.pending, 'Pedidos por responder', null, {title: queueHover([data], QUEUE_SHOWS.pending)}),
     metricCard(data.drafts, 'Rascunhos prontos', 'ok', {title: queueHover([data], QUEUE_SHOWS.drafts)}),
     metricCard(data.blocked, 'Bloqueados', 'warn', {title: queueHover([data], QUEUE_SHOWS.blocked)}),
+    metricCard(data.owners_pending || 0, 'Proprietários por responder', 'warn'),  // 04/10: the Painel's fourth column too
     metricCard(data.attention, 'A precisar de atenção', 'bad', {title: queueHover([data], QUEUE_SHOWS.attention)}),
     metricCard(data.answered, 'Respostas enviadas'),
-    metricCard(hoursText(data.reply_hours), 'Tempo médio até resposta'));
+    metricCard(hoursText(data.reply_hours), 'Tempo médio até resposta'),
+    metricCard(data.visits_booked || 0, 'Visitas marcadas'));
 }
 
 // The customers' satisfaction with this property, always in view under its instruments (26/09): one dial per part of
@@ -5044,14 +5187,14 @@ function satisfactionCard(property) {
 
 // The short-list switch (26/09), the same in Imóveis and in the files of Contactos: lit when the customer is on the list
 // (short list, chosen or reserve); a click puts them on it or takes them off (asking first for the chosen and the reserve).
-const SELECTION_LABEL = {shortlist: 'Na short list', chosen: 'Escolhido', suplente: 'Suplente'};
+const SELECTION_LABEL = {shortlist: 'Na short list', chosen: 'Selecionado', suplente: 'Suplente'};
 function shortlistToggle(status, name, change) {
   return el('button', {type: 'button', class: 'shortlist-toggle' + (status ? ' on' : ''), 'aria-pressed': String(!!status),
-    title: status ? 'Carrega para tirar da short list' : 'Carrega para juntar à short list (no topo de Contactos)',
+    title: status ? 'Carrega para tirar da short list' : 'Carrega para juntar à short list (no topo de Clientes)',
     onclick: event => run(async () => {
       if (status && status !== 'shortlist' && !confirm(`Tirar ${name} da short list? Deixa de ser ${SELECTION_LABEL[status].toLowerCase()}.`)) return;
       await change(status ? null : 'shortlist');
-      toast(status ? `${name} saiu da short list.` : `${name} está na short list (vê-a no topo de Contactos).`);
+      toast(status ? `${name} saiu da short list.` : `${name} está na short list (vê-a no topo de Clientes).`);
     }, event.currentTarget)}, status ? `★ ${SELECTION_LABEL[status] || 'Na short list'}` : '☆ Short list');
 }
 
@@ -5069,19 +5212,41 @@ function visitorsCard(property) {
         `imóvel ${survey.imovel ?? '–'} · consultor ${survey.consultor ?? '–'} · marcação ${survey.marcacao ?? '–'}`
           + (survey.interesse ? ` · ${survey.interesse}` : '')) : el('span', {class: 'muted small'}, 'sem inquérito'),
       fichaTag(slot.ficha),
-      shortlistToggle(slot.selection, shortName(slot.name) || slot.customer, async status => {
-        await call('api/selection/set', {property_ref: property.reference, email: slot.customer, status});
-        settings = await call('api/settings');
-        renderPropertyDashboard(settings.properties.find(item => item.reference === property.reference) || property);
-      }));
+      // 04/10: here the short list is only shown; it changes in Contactos (the link above)
+      el('span', {class: 'tag ' + (slot.selection === 'chosen' ? 'golden' : slot.selection ? 'draft' : ''),
+        title: 'Muda-se em Clientes, na short list'},
+        slot.selection ? `★ ${SELECTION_LABEL[slot.selection] || 'Na short list'}` : '☆ Fora da short list'));
   };
   return el('article', {class: 'card visitors-card'},
     el('div', {class: 'section-heading'},
       el('div', {}, el('p', {class: 'eyebrow'}, 'QUEM JÁ VISITOU · FINALISTAS'), el('h2', {}, 'Os que vieram à visita')),
-      el('span', {class: 'tag'}, `${came.length} visitaram`)),
+      el('div', {class: 'row'}, el('button', {type: 'button', class: 'link', onclick: () => showTab('contacts')}, 'Short list em Clientes →'),
+        el('span', {class: 'tag'}, `${came.length} visitaram`))),
     came.length ? el('div', {class: 'client-list'}, came.map(row))
       : el('p', {class: 'muted small'}, 'Ainda ninguém registado como tendo vindo: marca-o em Visitas, depois de cada visita.'),
     missed.length ? el('p', {class: 'muted small'}, `Não apareceram: ${missed.map(slot => shortName(slot.name) || slot.customer).join(', ')}.`) : null);
+}
+
+// 04/10: beside «Quem já visitou», in Imóveis: the one selected (gold) and the reserve, with their documents — only shown;
+// the choice is made in Clientes, on the short list.
+function selectedCard(items) {
+  const chosen = items.find(item => item.status === 'chosen'), reserve = items.find(item => item.status === 'suplente');
+  const docs = item => !item.docs_requested_at ? el('span', {class: 'tag'}, 'documentos por pedir')
+    : item.documents?.complete ? el('span', {class: 'tag visit'}, 'documentos completos')
+    : el('span', {class: 'tag warn', title: 'Faltam: ' + (item.documents?.missing || []).join(', ')},
+      `faltam ${(item.documents?.missing || []).length} documento(s)`);
+  const person = (item, main) => el('div', {class: 'selected-person'},
+    el('strong', {class: main ? 'selected-name' : ''}, shortName(item.name) || item.email),
+    el('div', {class: 'muted small'}, item.email),
+    el('div', {class: 'row selected-tags'}, docs(item),
+      item.visit?.at && el('span', {class: 'muted small'}, (item.visit.attended ? 'visitou ' : 'visita ') + slotLabel(item.visit.at))));
+  return el('article', {class: 'card selected-card'},
+    el('div', {class: 'section-heading'},
+      el('div', {}, el('p', {class: 'eyebrow'}, 'SELECIONADOS'), el('h2', {}, 'A escolha final')),
+      el('button', {type: 'button', class: 'link', onclick: () => showTab('contacts')}, 'Clientes →')),
+    chosen ? person(chosen, true)
+      : el('p', {class: 'muted small'}, 'Ainda ninguém selecionado. Seleciona em Clientes, na short list.'),
+    reserve && el('div', {class: 'selected-reserve'}, el('p', {class: 'eyebrow'}, 'SUPLENTE'), person(reserve, false)));
 }
 
 // Black list (the owner decided): never queued again, whatever they write. Grey list (the customer opted out,
@@ -5097,7 +5262,7 @@ function ignoreListCard(property, kind, customers) {
       el('span', {class: 'tag'}, String(customers.length))),
     el('p', {class: 'step'}, grey
       ? 'Disseram que não têm interesse: não recebem mais nada nosso (lembretes, rondas, fecho). Se voltarem a escrever, o email entra na fila e podes responder.'
-      : 'Por decisão tua: nunca mais entram nas Comunicações, mesmo que escrevam, nem recebem envios automáticos.'),
+      : 'Por decisão tua: nunca mais entram em Emails, mesmo que escrevam, nem recebem envios automáticos.'),
     el('div', {class: 'client-list'}, customers.length ? customers.map(customer => el('div', {class: 'client-row'},
       el('span', {}, shortName(customer.name) || customer.email,
         customer.reason ? el('span', {class: 'muted small ignore-reason'}, customer.reason) : null),
@@ -5114,25 +5279,39 @@ function ignoreListCard(property, kind, customers) {
     }, event.currentTarget)}, 'Acrescentar')));
 }
 
+// 04/10: the test property is kept out of the Painel's numbers, but its panel in Imóveis still shows: what the Painel
+// knows of it (its queue in numbers, its tank, its reply-time limit) and zeros for the rest, the dials resting at zero.
+function testPropertyData(ref, metrics) {
+  const row = (metrics.test_properties || []).find(item => item.property_ref === ref);
+  const tank = (metrics.test_tanks || []).find(item => item.property_ref === ref);
+  if (!row && !tank) return null;
+  return {property_ref: ref, pending: 0, drafts: 0, blocked: 0, attention: 0, answered: 0, customers: 0, visits_booked: 0,
+    reply_hours: null, reply_hours_max: 24, queue: [], answered_customers: [], last_read_at: null, petrol: null,
+    by_day: (metrics.by_day || []).map(day => ({...day, requests: 0, sent: 0})),
+    api_fuel: tank?.api_fuel || fuelOf(ref) || metrics.api_fuel, openai_usage: tank?.openai_usage || null,
+    clients: {ok: 0, pending: 0, booked: 0, outra_data: 0, nao_quer: 0},
+    ...row, ignored: {black: 0, grey: 0, ...(row?.ignored || {})}, test: true};
+}
 async function renderPropertyDashboard(property, slide = '') {
   // Only the latest request draws: switching property mid-load must not be overwritten by the older one.
   const token = renderPropertyDashboard.token = (renderPropertyDashboard.token || 0) + 1;
   await run(async () => {
     const ref = property.reference;
     const metrics = await call('api/metrics', {days: chartDays()});
+    const selection = ((await call('api/contacts')).selection || []).filter(item => item.property_ref === ref);
     const ignored = await call('api/contacts/ignored', {property_ref: ref});
-    const round = property.visits?.closed_at ? null : await call('api/visits/round-summary', {property_ref: ref});
-    const data = metrics.properties.find(item => item.property_ref === ref);
+    const data = metrics.properties.find(item => item.property_ref === ref) || testPropertyData(ref, metrics);
     if (token !== renderPropertyDashboard.token || !data) return;
-    const wrap = el('div', {class: slide}, propertyCluster(property, data, metrics),
-      propertyMetrics(data),
+    // 04/10: the numbers first, above the instruments
+    const wrap = el('div', {class: slide}, propertyMetrics(data),
+      propertyCluster(property, data, metrics),
       satisfactionCard(property),
-      visitorsCard(property),
-      el('div', {class: 'dashboard-lists'},
+      // 04/10: «Quem já visitou» and, beside it, a little narrower, the selected; under them, side by side, the blacklist
+      // and the greylist; the last round went to Visitas (where it already was, in full)
+      el('div', {class: 'finalists-row'}, visitorsCard(property), selectedCard(selection)),
+      el('div', {class: 'dashboard-lists ignore-lists'},
         ignoreListCard(property, 'black', ignored.customers.filter(customer => customer.kind === 'black')),
-        ignoreListCard(property, 'grey', ignored.customers.filter(customer => customer.kind === 'grey')),
-        el('article', {class: 'card'}, el('p', {class: 'eyebrow'}, 'ÚLTIMA RONDA DE VISITAS'),
-          round ? roundSummaryContent(round) : el('p', {class: 'muted small'}, 'Visitas fechadas neste imóvel.'))),
+        ignoreListCard(property, 'grey', ignored.customers.filter(customer => customer.kind === 'grey'))),
       propertyChartCard(property, data, metrics));
     $('property-dashboard').replaceChildren(wrap);
   });
@@ -5195,7 +5374,7 @@ function renderVoice() {
     el('label', {class: 'field'}, 'Pedido de consentimento RGPD, para quem já respondeu', consentRequest),
     el('p', {class: 'eyebrow voice-section'}, 'BOLINHAS DA TABELA DE CLIENTES'),
     el('p', {class: 'step voice-section'},
-      'Em Comunicações, ao lado de cada nome. Vermelha: nunca nos respondeu, ou respondeu sem nada do que pedimos. '
+      'Em Emails, ao lado de cada nome. Vermelha: nunca nos respondeu, ou respondeu sem nada do que pedimos. '
       + 'Verde: ficha completa. As outras duas contam horas:'),
     el('div', {class: 'grid'},
       el('label', {class: 'field'}, 'Laranja: à espera de resposta nossa há mais de … horas', ourTurnHours),

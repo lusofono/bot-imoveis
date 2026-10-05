@@ -55,6 +55,20 @@ def test_the_page_is_served_as_its_own_files(page):
     logo = client.get("/brand/biglearn.png")
     assert logo.headers["content-type"] == "image/png" and logo.content.startswith(b"\x89PNG")
     assert 'src="brand/biglearn.png"' in html.text and "by BigLearn PT" not in html.text
+    # 04/10: ARIA's icon on the browser's tab, an SVG in brand/
+    assert '<link rel="icon" type="image/svg+xml" sizes="any" href="brand/icon-nota.svg">' in html.text
+    icon = client.get("/brand/icon-nota.svg")
+    assert icon.headers["content-type"].startswith("image/svg+xml") and icon.text.lstrip().startswith("<svg")
+    for name in ("icon-32.png", "icon-180.png"):  # for Safari, which does not take the SVG
+        assert f'href="brand/{name}"' in html.text
+        png = client.get(f"/brand/{name}")
+        assert png.headers["content-type"] == "image/png" and png.content.startswith(b"\x89PNG")
+    # the same icon is ARIA's mark in the sidebar, the version right under the name, the account on one line
+    assert '<img src="brand/icon-nota.svg" alt="" width="48" height="48">' in html.text and "brain.png" not in html.text
+    assert html.text.index("AI for Real Estate") < html.text.index('class="brand-version"') < html.text.index('id="skin-selector"')
+    assert 'aria-label="A tua conta" title="A tua conta">@</span><span id="account">' in html.text
+    # 04/10: the blacklist and the greylist went to Clientes and came back to Imóveis (drawn there with the property)
+    assert 'id="ignore-lists"' not in html.text
     # «ARIA»'s hover says what the name means; the © beside it keeps the copyright (α.58.3).
     assert '<strong class="brand-name" title="ARIA — AI Real Estate Inquiry Assistant, by BigLearn.pt">' in html.text
     assert 'title="© 2026 BigLearn.pt — todos os direitos reservados">©</sup>' in html.text
