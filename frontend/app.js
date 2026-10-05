@@ -1105,6 +1105,7 @@ function showTab(name) {
   if (name === 'dashboard') { run(loadMetrics); run(loadDigest); }
   if (name === 'voice') run(loadMetrics);  // «O teu espaço» (27/09) lives at the top of the settings now
   if (name === 'contacts') run(loadContacts);
+  if (name === 'replies') refreshQueueMetrics(true);  // 05/10: the numbers above «Emails em tratamento»
   if (name === 'owners') { renderOwners(); run(loadOwnersDigest); }
   if (name === 'agenda') renderAgenda();
   // Sends, refills and reads elsewhere change its numbers: the cluster is never shown out of date.
@@ -1631,11 +1632,10 @@ function renderState() {
   if ([...select.options].some(option => option.value === chosen)) select.value = chosen;
   const queue = currentQueue();
   // 27/09: no «Dias para trás» — each read goes on from the last one; a new property's first one from the day it chose.
-  // 29/09: «Última leitura: terça-feira, 29/09/26, 18:40» bigger and bold, the rest as before
+  // 29/09: «Última leitura: terça-feira, 29/09/26, 18:40» bigger and bold. 05/10: only that (no «A próxima traz…»)
   $('last-read').replaceChildren(...(queue?.last_read_at
     ? [el('strong', {class: 'last-read-when'}, `Última leitura: ${daysAgo(queue.last_read_at)}`
-        + `${new Date(queue.last_read_at).toLocaleDateString('pt-PT', {weekday: 'long'})}, ${when(queue.last_read_at)}.`),
-       ' A próxima traz o que chegou desde então.']
+        + `${new Date(queue.last_read_at).toLocaleDateString('pt-PT', {weekday: 'long'})}, ${when(queue.last_read_at)}`)]
     : queue?.read_from ? [`Ainda por ler: a primeira leitura traz os emails desde ${dayLabel(queue.read_from)}.`] : []));
   // 29/09: a round with one text for all is reviewed and sent in its own panel (Agenda), not card by card here.
   const emails = sortCards((queue?.emails || []).filter(email => !email.round && !email.owner), queue);
@@ -1643,6 +1643,7 @@ function renderState() {
   $('round-notice').hidden = !inRound;
   $('round-notice').textContent = inRound ? `${inRound} proposta(s) de visita da ronda com texto comum: revê-as e envia-as `
     + 'no painel «Ronda de visitas», na Agenda.' : '';
+  renderQueueBoard(queue);
   $('emails').replaceChildren(...(emails.length ? emails.map(card)
     : [el('div', {class: 'empty-state'}, el('strong', {}, state.error ? 'Configuração pendente' : 'Tudo em dia.'), state.error ? 'Verifica o aviso acima para continuar.' : 'Não há emails em tratamento. Faz uma nova leitura quando quiseres.')]));
   const active = queue?.active || [];
@@ -1655,7 +1656,8 @@ function renderState() {
   // 02/10: the test property's Comunicações on a light purple page, to be sure nothing is tried on a real one
   const testing = !!(settings?.properties || []).find(item => item.reference === queue?.property_ref)?.test;
   $('tab-replies').classList.toggle('test-mode', testing);
-  $('test-badge').hidden = !testing;  // on the title's line, on the right
+  $('test-badge').hidden = !testing;  // 05/10: in the place of «Prepara em lote…», on the same line
+  $('replies-step-text').hidden = testing;
   $('instructions').textContent = queue?.instructions || '';
   preview = null; $('preview-box').replaceChildren();
   // 29/09: «3 Enviar todos» follows the approvals of the selected emails (refreshSendButton, from updateSelection)
@@ -1773,7 +1775,8 @@ function renderPipeline(queue) {
     // name is only the link to the customer's card
     const parts = [splitDot(customer.them, customer.us), shortName(customer.name) || customer.email];
     // 04/10: a registered owner in red and bold, the one selected in gold and bold
-    const kind = 'pipeline-name' + (customer.owner ? ' owner' : '') + (customer.column === 'selecionado' ? ' selected' : '');
+    const kind = 'pipeline-name' + (customer.owner ? ' owner' : '') + (customer.column === 'selecionado' ? ' selected' : '')
+      + (customer.column === 'shortlist' ? ' short' : '');  // 05/10: the short list in silver
     const hint = customer.owner ? 'Proprietário' : null;
     return target ? el('button', {type: 'button', class: kind, title: hint, onclick: () => {
       target.scrollIntoView({behavior: 'smooth', block: 'center'});
@@ -1807,6 +1810,46 @@ function renderPipeline(queue) {
       el('p', {}, el('strong', {}, 'Nós (direita):'), ['ok', 'amber', 'late', 'blue'].map(color =>
         el('span', {}, splitDot(null, color, dotMeaning(color)), dotMeaning(color))))),
     ...below.filter(Boolean));
+}
+
+// 05/10: above «Emails em tratamento», the property's numbers, eight as in Imóveis: how many wait for an answer (big;
+// those answered straight in Gmail apart), without a draft yet, with a draft to review and send, blocked, the owners'
+// emails waiting (they have their own tab), and — from the Painel's metrics, asked in the background at most every 20
+// seconds while Emails is open — the replies sent, the average time to answer and the visits booked.
+let queueMetrics = null, queueMetricsAt = 0;
+function refreshQueueMetrics(force = false) {
+  if (!force && Date.now() - queueMetricsAt < 20000) return;
+  queueMetricsAt = Date.now();
+  call('api/metrics', {days: chartDays()}).then(data => {
+    queueMetrics = data;
+    if (activeTab === 'replies' && state) renderQueueBoard(currentQueue());
+  }).catch(() => {});
+}
+function renderQueueBoard(queue) {
+  const box = $('queue-board');
+  if (!queue || state.error) { box.hidden = true; return; }
+  box.hidden = false;
+  if (activeTab === 'replies') refreshQueueMetrics();
+  const emails = (queue.emails || []).filter(email => !email.round && !email.owner);
+  const open = emails.filter(email => !email.answered_direct), direct = emails.length - open.length;
+  const drafted = open.filter(email => !email.blocked && (email.reply_text || '').trim()).length;
+  const blocked = open.filter(email => email.blocked).length;
+  const owners = (queue.emails || []).filter(email => email.owner && !email.outbound
+    && ['pending', 'draft', undefined, null].includes(email.reply_status)).length;
+  const numbers = [...(queueMetrics?.properties || []), ...(queueMetrics?.test_properties || [])]
+    .find(item => item.property_ref === queue.property_ref);
+  box.replaceChildren(
+    el('article', {class: 'metric queue-main' + (open.length ? ' bad' : ' ok')},
+      el('div', {class: 'value'}, String(open.length)),
+      el('div', {class: 'label'}, open.length ? 'Por responder neste imóvel' : 'Tudo respondido neste imóvel'),
+      direct ? el('div', {class: 'label muted'}, `+ ${direct} já respondido${direct === 1 ? '' : 's'} no Gmail, por retirar`) : null),
+    metricCard(open.length - drafted - blocked, 'Sem rascunho: «Gerar respostas»', 'warn'),
+    metricCard(drafted, 'Rascunhos prontos: rever e enviar', 'ok'),
+    metricCard(blocked, 'Bloqueados: tratar à mão', 'bad'),
+    metricCard(owners, 'Proprietários por responder', 'warn'),
+    metricCard(numbers ? numbers.answered : '—', 'Respostas enviadas'),
+    metricCard(numbers ? hoursText(numbers.reply_hours) : '—', 'Tempo médio até resposta'),
+    metricCard(numbers ? numbers.visits_booked || 0 : '—', 'Visitas marcadas'));
 }
 
 // 04/10, «Escrever a todos»: the owner's words to every active customer of the property, or only to those who have not
@@ -1851,21 +1894,51 @@ function activeCard(active) {
   const act = (path, message) => run(async () => {
     state = (await call(path, {property_ref: queueRef(), email: active.email})).state; renderState(); toast(message);
   });
+  // 05/10: «Escrever mais» opens a box here, and nothing is saved until there is something in it: what to add, which
+  // the AI writes into an email («Gerar com a IA»), or the email itself («Guardar como rascunho»); «Cancelar» closes it.
+  const more = el('textarea', {rows: '3', 'aria-label': 'O que queres acrescentar',
+    placeholder: 'O que queres acrescentar. «Gerar com a IA»: a IA escreve o email a partir disto. «Guardar como rascunho»: '
+      + 'isto já é o email.'});
+  const writeOne = (body, button) => run(async () => {
+    const made = await call('api/active/write', {property_ref: queueRef(), email: active.email, ...body});
+    state = made.state;
+    if (body.note) {
+      const result = await call('api/prompt/generate', {property_ref: queueRef(), ids: [made.id], extra: '', only_extra: false});
+      state = result.state; applyFuel(result.fuel, queueRef());
+      toast(result.saved ? 'Acrescento escrito pela IA, na fila, acima: revê-o e envia.'
+        : 'A IA não escreveu o acrescento: ficou na fila com a tua nota; escreve-o tu ou cancela-o.', result.saved ? 'ok' : 'warn');
+    } else toast('Acrescento na fila, acima: revê-o e envia.');
+    renderState();
+  }, button);
+  const generate = el('button', {type: 'button', class: 'primary needs-fuel', disabled: true,
+    onclick: event => writeOne({note: more.value.trim()}, event.currentTarget)}, 'Gerar com a IA');
+  const keep = el('button', {type: 'button', disabled: true,
+    onclick: event => writeOne({text: more.value.trim()}, event.currentTarget)}, 'Guardar como rascunho');
+  more.addEventListener('input', () => {
+    for (const button of [generate, keep]) button.disabled = !more.value.trim() || button.dataset.hold === '1';
+  });
+  const editor = el('div', {class: 'write-more', hidden: true}, more, el('div', {class: 'actions'}, generate, keep,
+    el('button', {type: 'button', class: 'link', onclick: () => { editor.hidden = true; more.value = '';
+      generate.disabled = keep.disabled = true; }}, 'Cancelar')));
   return el('article', {class: 'card email-card sent-card', 'data-customer': active.email},
     el('div', {class: 'card-head'},
       el('span', {class: 'who'}, el('strong', {}, shortName(active.name) || active.email)),
+      el('span', {class: 'muted small contact-line head-contact'}, el('span', {}, active.email, copyButton(active.email, 'Copiar o email'))),
       el('span', {class: 'tag sent'}, 'enviado'),
       el('span', {class: 'tag'}, active.stage + '.ª interação'),
       active.visit_accepted && el('span', {class: 'tag visit'}, 'aceite ' + slotLabel(active.visit_accepted)),
       active.visit && el('span', {class: 'tag warn'}, VISIT_STATES[active.visit] || active.visit),
       el('span', {class: 'muted small'}, when(active.last_sent_at))),
-    el('div', {class: 'muted small'}, active.email),
     // 27/09: the whole conversation always in view, newest first, in a box of its own height (our last email on top)
     (active.history || []).length ? el('div', {class: 'conversation-box'}, conversationTurns(active.history, null))
       : active.last_text && el('blockquote', {}, active.last_text),
     el('div', {class: 'actions'},
-      el('button', {type: 'button', onclick: () => act('api/active/write', 'Rascunho de acrescento criado na fila, acima.')}, 'Escrever mais'),
-      el('button', {type: 'button', class: 'link', onclick: () => act('api/active/remove', 'Retirado da fila até a conversa voltar a mexer.')}, 'Retirar da fila')));
+      el('button', {type: 'button', onclick: () => {
+        editor.hidden = !editor.hidden;
+        if (!editor.hidden) more.focus();
+      }}, 'Escrever mais'),
+      el('button', {type: 'button', class: 'link', onclick: () => act('api/active/remove', 'Retirado da fila até a conversa voltar a mexer.')}, 'Retirar da fila')),
+    editor);
 }
 
 function updateSelection() {
@@ -2046,13 +2119,22 @@ function conversationTurns(turns, current, dates) {
     el('pre', {}, turn.text)));
 }
 
+// 05/10: an addition's card says when it was made and what was added (or, an old empty one, what to do with it)
+function additionNote(email) {
+  const moment = email.date ? new Date(email.date) : null;
+  const at = moment ? `${moment.toLocaleDateString('pt-PT', {day: '2-digit', month: '2-digit'})} às `
+    + moment.toLocaleTimeString('pt-PT', {hour: '2-digit', minute: '2-digit'}) : '';
+  const who = email.addition_scope === 'all' ? 'Acrescento a todos' : 'Acrescento teu';
+  if (email.addition_note) return `(${who}, de ${at}: «${email.addition_note}»)`;
+  if ((email.reply_text || '').trim()) return `(${who}, de ${at}: o texto está no rascunho, abaixo)`;
+  return `(${who}, aberto a ${at} e ainda vazio: escreve-o abaixo, pede-o à IA, ou cancela-o)`;
+}
 function programNote(email) {
   return email.visit_window
     ? `Proposta de visita: ${dayLabel(email.visit_window.day)}, das ${email.visit_window.start} às ${email.visit_window.end}.`
     : email.kind === 'visit_thanks' ? `(agradecimento pela visita de ${slotLabel(email.visit_done?.at || '')}, com o inquérito e a ficha de visita`
       + (email.visit_done?.public ? `; nota pública: «${email.visit_done.public}»)` : ')')
-    : email.kind === 'addition' && email.addition_note ? `(acrescento a todos: «${email.addition_note}»)`  // 04/10
-    : email.kind === 'addition' ? '(acrescento teu a esta conversa: escreve-o abaixo, ou pede-o à IA nas instruções extra)'
+    : email.kind === 'addition' ? additionNote(email)
     : AUX_KINDS.includes(email.kind) || email.closing ? '(sem mensagem nova do cliente: email preparado automaticamente, ver o rascunho abaixo)'
     : '';
 }
@@ -2192,12 +2274,15 @@ function card(email, index, list) {
   // 27/09: a reply from the API for this email alone (the same call as «Gerar respostas», with its extra instructions),
   // after what was written in «Acrescentar ao conhecimento»: saved to the knowledge first, or for this reply only.
   const noteField = noteBox(queueRef(), null, true, writable);
+  // 05/10: made here, so «Atualizar resposta» saves what was written in it first (it has no «Juntar» any more)
+  const context = address && contextBox(email, address);
   const generateOne = writable && el('button', {class: 'needs-fuel',
     title: settings?.openai_configured ? 'O prompt leva as instruções e a mensagem, sem o email nem o telefone do cliente.'
       : 'Sem chave OpenAI configurada: o clique explica como.',
     onclick: event => run(async () => {
       if (draft.value.trim() && !sameText(draft.value, saved)
           && !confirm('O rascunho tem alterações por guardar, e a resposta nova substitui-as. Continuar?')) return;
+      if (context) await context.beforeGenerate();  // 05/10: the customer's context first, so this reply reads it
       const fact = await noteField.beforeGenerate();
       const extra = [$('extra').value.trim(), fact.extra].filter(Boolean).join('\n');
       const result = await call('api/prompt/generate', {property_ref: queueRef(), ids: [email.id], extra, only_extra: fact.only});
@@ -2221,7 +2306,14 @@ function card(email, index, list) {
   // from the API, a fact for the knowledge, and, last, taking it out of the queue.
   // 27/09: taking it out of the queue sits on the left, under the customer's name and tags, as pills with a hover
   const exits = el('div', {class: 'exit-actions'},
-    el('button', {class: 'pill-action remove', title: 'Tira este email da fila sem responder. O Gmail não muda, e se o cliente '
+    // 05/10: an addition («Escrever mais», «Escrever a todos») is cancelled here: it leaves the queue, nothing is sent
+    email.kind === 'addition' ? el('button', {class: 'pill-action remove', title: 'Tira este acrescento da fila sem o enviar. '
+        + 'O Gmail não muda; podes abrir outro com «Escrever mais».', onclick: event => run(async () => {
+      if ((draft.value || '').trim() && !confirm('Cancelar este acrescento? O que está escrito no rascunho perde-se e nada é enviado.')) return;
+      state = await call('api/dismiss', {property_ref: queueRef(), ids: [email.id]});
+      renderState(); toast('Acrescento cancelado: saiu da fila, nada foi enviado.');
+    }, event.currentTarget)}, 'Cancelar acrescento')
+    : el('button', {class: 'pill-action remove', title: 'Tira este email da fila sem responder. O Gmail não muda, e se o cliente '
         + 'voltar a escrever, a mensagem nova entra normalmente.', onclick: event => run(async () => {
       if (!confirm('Este email não precisa de resposta? Sai da fila sem resposta; o Gmail não é alterado e este email não '
           + 'volta a entrar (se o cliente voltar a escrever, a mensagem nova entra normalmente).')) return;
@@ -2280,6 +2372,12 @@ function card(email, index, list) {
       el('label', {class: 'who'}, el('input', {type: 'checkbox', class: 'pick', 'data-id': email.id,
         checked: !email.blocked && !email.answered_direct, disabled: !!email.blocked}),
         el('strong', {}, shortName(customer.name || sender.name) || sender.email || 'Sem nome')),
+      // 05/10: the email (and phone, and profile) on the name's line, after it: one line less
+      (address || phoneShown || profileUrl) && el('span', {class: 'muted small contact-line head-contact'},
+        address && el('span', {}, address, copyButton(address, 'Copiar o email')),
+        phoneShown && el('span', {}, phoneShown, copyButton(phoneShown, 'Copiar o telefone')),
+        profileUrl && el('a', {href: profileUrl, target: '_blank', rel: 'noopener noreferrer', title: 'Abre o perfil do cliente no Idealista'},
+          'Perfil no Idealista ↗')),
       // 02/10: «Encerrar contacto»: the reply is a cordial goodbye
       email.farewell ? el('span', {class: 'tag warn', title: 'A resposta é uma despedida cordial (o prompt do fecho). Depois de '
         + 'enviada, deixamos de lhe escrever primeiro (rondas e lembretes), sem lista cinzenta.'}, 'encerrar contacto · despedida')
@@ -2318,11 +2416,6 @@ function card(email, index, list) {
       el('span', {class: 'muted small'}, when(email.date)),
       approve),
     exits,
-    (address || phoneShown || profileUrl) && el('div', {class: 'muted small contact-line'},
-      address && el('span', {}, address, copyButton(address, 'Copiar o email')),
-      phoneShown && el('span', {}, phoneShown, copyButton(phoneShown, 'Copiar o telefone')),
-      profileUrl && el('a', {href: profileUrl, target: '_blank', rel: 'noopener noreferrer', title: 'Abre o perfil do cliente no Idealista'},
-        'Perfil no Idealista ↗')),
     email.recipient_editable && recipientEditor(email),
     email.blocked && (email.phone_only
       ? el('p', {class: 'alert warn'}, 'Sem email do cliente no aviso: a resposta não segue por email. Gera-a com «Atualizar resposta» e envia-a por WhatsApp ou SMS.')
@@ -2351,7 +2444,7 @@ function card(email, index, list) {
       renderState(); toast('Consentimento confirmado e registado em contactos.csv.');
     }, event.currentTarget)}, 'Confirmar consentimento (RGPD)'),
     generateOne && !firstEmail && quickReplies(noteField),
-    address && contextBox(email, address),
+    context,
     noteField,
     generateOne && el('div', {class: 'email-generate'},
       generateOne),
@@ -2371,7 +2464,10 @@ function knowledgeView(ref) {
   return box;
 }
 
-// 27/09: quick replies — switches over «+ Acrescentar ao conhecimento», any number of them at once: each on writes its
+// 05/10: the open/closed triangle at the start of a title drawn as the theme's eyebrow (the band in the rich themes hides
+// the browser's own): an element of its own, so a theme's eyebrow ::before (AgentVal's line) stays as it is
+function foldMark() { return el('span', {class: 'fold-mark', 'aria-hidden': 'true'}); }
+// 27/09: quick replies — switches over «Acrescentar ao conhecimento», any number of them at once: each on writes its
 // line in that box (for this reply only, unless another place is chosen there), and «Atualizar resposta» uses it.
 const QUICK_REPLIES = [
   ['Agradecer o email e as informações', 'Agradece o email e as informações que o cliente nos enviou.'],
@@ -2393,24 +2489,37 @@ function contactCounts(counts) {
 }
 function contextBox(email, address) {
   const entries = email.context || [];
-  const input = el('input', {placeholder: 'Ex.: prefere ser contactado depois das 18h', 'aria-label': 'Contexto deste cliente'});
+  const input = el('input', {placeholder: 'Ex.: prefere ser contactado depois das 18h', 'aria-label': 'Contexto deste cliente',
+    title: 'Fica guardado ao carregar em «Atualizar resposta» (ou já, com Enter)'});
   const stamp = at => at ? `${at.slice(8, 10)}/${at.slice(5, 7)} ${at.slice(11, 16)}` : '';
   const change = (path, body, button) => run(async () => { state = (await call(path, {property_ref: queueRef(), email: address, ...body})).state; renderState(); }, button);
-  return el('details', {class: 'context-box', open: entries.length > 0},
-    el('summary', {class: 'eyebrow'}, 'CONTEXTO DESTE CLIENTE' + (entries.length ? ` · ${entries.length}` : '')),
-    el('p', {class: 'muted small'}, 'Só entra nas respostas a este cliente.'),
+  // 05/10: closed by default (its title says how many entries there are)
+  const box = el('details', {class: 'context-box'},
+    el('summary', {class: 'eyebrow'}, foldMark(), 'CONTEXTO DESTE CLIENTE' + (entries.length ? ` · ${entries.length}` : '')),
+    el('p', {class: 'muted small'}, 'Só entra nas respostas a este cliente. O que escreveres fica guardado com «Atualizar resposta» (ou já, com Enter).'),
     entries.length ? el('ul', {class: 'context-list'}, entries.slice().reverse().map(entry => el('li', {class: 'context-entry ' + entry.source},
       el('span', {class: 'muted small'}, stamp(entry.at)), el('span', {}, entry.text),
       el('button', {type: 'button', class: 'link', title: entry.source === 'call' ? 'Tirar esta chamada do contexto' : 'Apagar',
         onclick: event => change('api/context/delete', {id: entry.id}, event.currentTarget)}, '✕'))))
       : null,
-    el('div', {class: 'row context-add'}, input, el('button', {type: 'button', onclick: event => {
-      if (!input.value.trim()) return;
-      change('api/context/add', {text: input.value.trim(), source: 'manual'}, event.currentTarget);
-    }}, 'Juntar')),
+    // 05/10: no «Juntar»: «Atualizar resposta» saves it first (box.beforeGenerate), or Enter saves it now
+    el('div', {class: 'row context-add'}, input),
     entries.length > 1 && el('button', {type: 'button', class: 'link', onclick: event => {
       if (confirm('Apagar todo o contexto deste cliente?')) change('api/context/delete', {}, event.currentTarget);
     }}, 'Apagar tudo'));
+  input.addEventListener('keydown', event => {
+    if (event.key === 'Enter' && input.value.trim()) {
+      event.preventDefault();
+      change('api/context/add', {text: input.value.trim(), source: 'manual'});
+    }
+  });
+  box.beforeGenerate = async () => {
+    const text = input.value.trim();
+    if (!text) return;
+    state = (await call('api/context/add', {property_ref: queueRef(), email: address, text, source: 'manual'})).state;
+    input.value = '';
+  };
+  return box;
 }
 
 function quickReplies(noteField) {
@@ -2423,17 +2532,21 @@ function quickReplies(noteField) {
       event.currentTarget.setAttribute('aria-pressed', String(on));
       noteField.onlyThese = on;
     }}, 'Ignorar os emails anteriores');
+  const count = el('span', {});  // 04/10: how many are on, in the closed box's title
   const toggles = QUICK_REPLIES.map(([label, line]) => el('button', {type: 'button', class: 'quick-reply', 'aria-pressed': 'false', title: line,
     onclick: event => {
       const on = event.currentTarget.getAttribute('aria-pressed') !== 'true';
       event.currentTarget.setAttribute('aria-pressed', String(on));
       noteField.setLine(line, on);
       noteField.open = true;
-      const any = toggles.some(toggle => toggle.getAttribute('aria-pressed') === 'true');
-      only.disabled = !any;
-      if (!any) { only.setAttribute('aria-pressed', 'false'); noteField.onlyThese = false; }
+      const pressed = toggles.filter(toggle => toggle.getAttribute('aria-pressed') === 'true').length;
+      count.textContent = pressed ? ` · ${pressed}` : '';
+      only.disabled = !pressed;
+      if (!pressed) { only.setAttribute('aria-pressed', 'false'); noteField.onlyThese = false; }
     }}, label));
-  return el('div', {class: 'quick-replies', role: 'group', 'aria-label': 'Respostas rápidas'}, toggles, only);
+  // 05/10: in a box of their own, «MENSAGENS RÁPIDAS», closed until opened, titled like «CONTEXTO DESTE CLIENTE»
+  return el('details', {class: 'quick-box', open: true}, el('summary', {class: 'eyebrow'}, foldMark(), 'MENSAGENS RÁPIDAS', count),
+    el('div', {class: 'quick-replies', role: 'group', 'aria-label': 'Mensagens rápidas'}, toggles, only));
 }
 
 // One more fact while reviewing a reply: it goes to notas.md and the next prompt already carries it.
@@ -2464,7 +2577,9 @@ function noteBox(ref, onSaved, inCard = false, withGenerate = false) {
     toast((result.scope === 'agency' ? 'Guardado no know-how da agência.' : 'Guardado no conhecimento do imóvel.')
       + (inCard ? ' «Atualizar resposta» já o usa.' : ' O próximo prompt já o leva.'));
   }, event.currentTarget)}, 'Guardar no conhecimento');
-  const box = el('details', {class: 'note-box', open: inCard}, el('summary', {class: 'muted small'}, '+ Acrescentar ao conhecimento'),
+  // 05/10: titled like «CONTEXTO DESTE CLIENTE» (the theme's eyebrow, its coloured band in the rich themes), and closed
+  // by default (a quick reply switched on opens it, to show its line)
+  const box = el('details', {class: 'note-box'}, el('summary', {class: 'eyebrow'}, foldMark(), 'ACRESCENTAR AO CONHECIMENTO'),
     text, el('div', {class: 'actions'}, scope, !withGenerate && save));
   // 27/09: a quick reply switched on writes its line in the box; switched off, takes it out again
   box.setLine = (line, on) => {
@@ -3571,23 +3686,33 @@ function whatsappNumber(phone) {
   if (digits.length === 9 && /^[29]/.test(digits)) digits = '351' + digits;
   return digits.length >= 10 ? digits : '';
 }
+// 05/10: «dados N/M», coloured by how much came in: red nothing yet, yellow halfway, green complete (as the dots)
 function fichaTag(summary) {
   if (!summary) return false;
   const missing = summary.falta.map(key => FICHA_LABELS[key] || key).join(', ');
-  return el('span', {class: 'tag ' + (summary.complete ? 'draft' : 'warn'),
-    title: summary.complete ? 'Ficha completa: pronto para proposta de visita.' : 'Falta: ' + missing},
-    summary.complete ? 'ficha completa' : `ficha ${summary.known}/${summary.total}`);
+  return el('span', {class: 'tag ' + (summary.complete ? 'data-full' : summary.known ? 'data-some' : 'data-none'),
+    title: summary.complete ? 'Dados completos: pronto para proposta de visita.' : 'Falta: ' + missing},
+    `dados ${summary.known}/${summary.total}`);
 }
 
 let fichasPage = 0;
-function fichasPerPage() {  // one row: 3 to 5 cards, as many as the width fits
-  return Math.max(3, Math.min(5, Math.floor(($('fichas-list').clientWidth || 960) / 250)));
+function fichasPerPage() {  // 05/10: always 3 side by side (it was 3 to 5, as the width fitted)
+  return 3;
 }
+// 05/10: a long text kept to a few lines, «…» at the end; a click opens it whole and another closes it again
+const CLAMP_HINT = 'Carrega para ver tudo (ou para encolher)';
+function clampClass(lines) { return `clamp clamp-${lines}`; }
+document.addEventListener('click', event => {
+  const box = event.target.closest('.clamp');
+  if (box && !event.target.closest('a, button, input, select, textarea')) box.classList.toggle('open');
+});
 function fichaCard(item) {
   const optional = ['empresa', 'animais'].filter(key => item.ficha[key] || item.falta.includes(key));
   const rows = ['trabalho', 'agregado', 'datas', 'disponibilidade', ...optional].flatMap(key => [
     el('dt', {}, FICHA_LABELS[key]),
-    el('dd', {class: item.ficha[key] ? '' : 'ficha-missing'}, item.ficha[key] || 'falta')]);
+    // 05/10: known, dark green; at most 3 lines (5 for the work and income), «…» opening the rest on a click
+    el('dd', {class: item.ficha[key] ? 'ficha-known ' + clampClass(key === 'trabalho' ? 5 : 3) : 'ficha-missing',
+      title: item.ficha[key] ? CLAMP_HINT : null}, item.ficha[key] || 'falta')]);
   return el('article', {class: 'ficha-card'},
     el('div', {class: 'card-head'}, el('strong', {}, shortName(item.name) || item.email),
       fichaTag({falta: item.falta, complete: item.complete, known: item.known, total: item.total})),
@@ -3656,6 +3781,7 @@ function ejectChoose(item) {
   return guard;
 }
 
+const docsOpen = new Set();  // 05/10: whose «DOCUMENTOS» is open, kept while the page redraws
 function selectionColumn(item) {
   const docs = item.documents, labels = contactsData.documents || {};
   const tick = (who, key) => el('label', {class: 'doc-tick'},
@@ -3664,43 +3790,67 @@ function selectionColumn(item) {
   const visit = item.visit, survey = item.survey;
   return el('article', {class: 'selection-column ' + item.status},
     el('div', {class: 'card-head'}, el('strong', {}, shortName(item.name) || item.email),
-      el('span', {class: 'tag ' + (item.status === 'chosen' ? 'golden' : item.status === 'suplente' ? 'visit' : '')}, item.label)),
+      el('span', {class: 'tag ' + (item.status === 'chosen' ? 'golden' : item.status === 'suplente' ? 'visit' : 'silver')}, item.label),
+      // 05/10: in the card's top right corner (it was at the foot, on the left)
+      el('button', {type: 'button', class: 'link danger selection-out', onclick: event => run(() =>
+        selectionCall('set', item, {status: null}, 'Saiu da short list.'), event.currentTarget)}, 'Tirar da short list')),
     el('div', {class: 'muted small ficha-email'}, item.email),
     el('p', {class: 'eyebrow'}, 'FICHA'),
     el('dl', {}, ['trabalho', 'agregado', 'datas', 'disponibilidade', 'empresa', 'animais']
       .filter(key => item.ficha[key] || ['trabalho', 'agregado', 'datas'].includes(key))
-      .flatMap(key => [el('dt', {}, FICHA_LABELS[key]), el('dd', {class: item.ficha[key] ? '' : 'ficha-missing'}, item.ficha[key] || 'falta')])),
+      .flatMap(key => [el('dt', {}, FICHA_LABELS[key]), el('dd', {class: item.ficha[key] ? clampClass(key === 'trabalho' ? 5 : 3)
+        : 'ficha-missing', title: item.ficha[key] ? CLAMP_HINT : null}, item.ficha[key] || 'falta')])),
     el('p', {class: 'eyebrow'}, 'VISITA'),
     el('p', {class: 'small'}, visit.at ? `${slotLabel(visit.at)} · ${visit.attended === true ? 'veio' : visit.attended === false ? 'não veio' : 'por registar'}` : 'Sem visita marcada.'),
-    visit.private && el('p', {class: 'small'}, el('span', {class: 'muted'}, 'Nota privada: '), visit.private),
-    visit.public && el('p', {class: 'small'}, el('span', {class: 'muted'}, 'Nota pública: '), visit.public),
+    visit.private && el('p', {class: 'small ' + clampClass(3), title: CLAMP_HINT}, el('span', {class: 'muted'}, 'Nota privada: '), visit.private),
+    visit.public && el('p', {class: 'small ' + clampClass(3), title: CLAMP_HINT}, el('span', {class: 'muted'}, 'Nota pública: '), visit.public),
     el('p', {class: 'eyebrow'}, 'INQUÉRITO'),
-    el('p', {class: 'small'}, survey ? Object.entries(SCORE_LABELS).map(([key, label]) => `${label} ${survey[key] ?? '–'}`).join(' · ')
+    el('p', {class: 'small' + (survey ? ' ' + clampClass(3) : ''), title: survey ? CLAMP_HINT : null}, survey ? Object.entries(SCORE_LABELS).map(([key, label]) => `${label} ${survey[key] ?? '–'}`).join(' · ')
       + (survey.interesse ? ` · interesse: ${survey.interesse}` : '') + (survey.comentario ? ` · «${survey.comentario}»` : '') : 'Sem resposta.'),
-    el('p', {class: 'eyebrow'}, 'DOCUMENTOS'),
-    el('div', {class: 'doc-list'}, Object.keys(labels).map(key => tick('candidato', key))),
-    el('label', {class: 'doc-tick'}, el('input', {type: 'checkbox', checked: docs.fiador, onchange: event => run(() =>
-      selectionCall('doc', item, {fiador: event.target.checked}))}), 'Tem fiador'),
-    docs.fiador && el('div', {class: 'doc-list fiador'}, el('span', {class: 'muted small'}, 'Do fiador:'),
-      Object.keys(labels).map(key => tick('fiador', key))),
-    el('p', {class: 'small ' + (docs.complete ? 'ficha-ok' : 'ficha-missing')}, docs.complete ? 'Documentos obrigatórios completos.'
-      : 'Falta: ' + docs.missing.join(', ').toLowerCase() + '.'),
-    el('div', {class: 'actions'},
-      el('button', {type: 'button', onclick: event => run(async () => {
-        await selectionCall('request', item, {}, 'Pedido de documentos em Emails: gera-o, revê e envia.');
-      }, event.currentTarget)}, item.docs_requested_at ? 'Pedir de novo' : 'Pedir documentos'),
-      item.status !== 'chosen' && ejectChoose(item),
-      item.status !== 'suplente' && el('button', {type: 'button', onclick: event => run(() =>
-        selectionCall('set', item, {status: 'suplente'}, `${shortName(item.name) || item.email} fica como suplente.`), event.currentTarget)}, 'Suplente'),
-      el('button', {type: 'button', class: 'link danger', onclick: event => run(() =>
-        selectionCall('set', item, {status: null}, 'Saiu da short list.'), event.currentTarget)}, 'Tirar da short list')));
+    // 05/10: «DOCUMENTOS» opens and closes (closed at first), the ticks and the buttons
+    // («Pedir documentos», «Selecionar», «Suplente») inside; no limit of lines
+    el('details', {class: 'docs-box', open: docsOpen.has(item.email),
+      ontoggle: event => { if (event.currentTarget.open) docsOpen.add(item.email); else docsOpen.delete(item.email); }},
+      // 05/10: the title says what is inside: «DOCUMENTOS · Pedir, Selecionar, Suplente» (the actions this candidate has);
+      // on its line, at the right, a pill with what is missing (or that they are complete)
+      el('summary', {class: 'docs-summary'},
+        el('span', {class: 'eyebrow'}, foldMark(), 'DOCUMENTOS · ' + ['Pedir', item.status !== 'chosen' && 'Selecionar',
+          item.status !== 'suplente' && 'Suplente'].filter(Boolean).join(', ')),
+        el('span', {class: 'tag docs-state ' + (docs.complete ? 'data-full' : Object.values(docs.received || {}).some(Boolean)
+          ? 'data-some' : 'data-none')}, docs.complete ? 'Documentos completos'
+          : 'Falta: ' + docs.missing.join(', ').toLowerCase())),
+      el('div', {class: 'doc-list'}, Object.keys(labels).map(key => tick('candidato', key))),
+      el('label', {class: 'doc-tick'}, el('input', {type: 'checkbox', checked: docs.fiador, onchange: event => run(() =>
+        selectionCall('doc', item, {fiador: event.target.checked}))}), 'Tem fiador'),
+      docs.fiador && el('div', {class: 'doc-list fiador'}, el('span', {class: 'muted small'}, 'Do fiador:'),
+        Object.keys(labels).map(key => tick('fiador', key))),
+      el('div', {class: 'actions'},
+        el('button', {type: 'button', onclick: event => run(async () => {
+          await selectionCall('request', item, {}, 'Pedido de documentos em Emails: gera-o, revê e envia.');
+        }, event.currentTarget)}, item.docs_requested_at ? 'Pedir de novo' : 'Pedir documentos'),
+        item.status !== 'chosen' && ejectChoose(item),
+        item.status !== 'suplente' && el('button', {type: 'button', onclick: event => run(() =>
+          selectionCall('set', item, {status: 'suplente'}, `${shortName(item.name) || item.email} fica como suplente.`), event.currentTarget)}, 'Suplente'))));
 }
+// 05/10: one candidate, the whole width; two, half each; three or more, three a page with «Anteriores» and «Seguintes»
+let selectionPage = 0;
 function renderSelection(ref, inactive) {
   const board = (contactsData.selection || []).filter(item => ref ? item.property_ref === ref : !inactive.has(item.property_ref));
-  $('shortlist-count').textContent = board.length ? `${board.length} candidato(s)` : 'vazia';
-  $('selection-board').replaceChildren(...(board.length ? board.map(selectionColumn)
+  const size = 3, pages = Math.max(1, Math.ceil(board.length / size));
+  selectionPage = Math.min(selectionPage, pages - 1);
+  const shown = board.slice(selectionPage * size, selectionPage * size + size);
+  $('shortlist-count').replaceChildren(el('strong', {}, !board.length ? 'vazia'
+    : pages > 1 ? `${selectionPage * size + 1}–${selectionPage * size + shown.length} de ${board.length} candidatos`
+    : `${board.length} candidato${board.length === 1 ? '' : 's'}`));
+  $('selection-board').style.setProperty('--selection-columns', Math.max(1, Math.min(size, board.length)));
+  $('selection-board').replaceChildren(...(board.length ? shown.map(selectionColumn)
     : [el('p', {class: 'muted small'}, 'A short list está vazia: junta 2 ou 3 clientes com «+ Short list» nas fichas abaixo.')]));
+  $('selection-pager').hidden = pages <= 1;
+  $('selection-prev').disabled = selectionPage === 0;
+  $('selection-next').disabled = selectionPage >= pages - 1;
 }
+$('selection-prev').addEventListener('click', () => { selectionPage--; renderFichas(); });
+$('selection-next').addEventListener('click', () => { selectionPage++; renderFichas(); });
 function renderFichas() {
   const inactive = new Set(contactsData.inactive || []);
   const refs = contactsData.properties.filter(ref => !inactive.has(ref));
@@ -3713,14 +3863,19 @@ function renderFichas() {
   const size = fichasPerPage(), pages = Math.max(1, Math.ceil(all.length / size));
   fichasPage = Math.min(fichasPage, pages - 1);
   const shown = all.slice(fichasPage * size, fichasPage * size + size);
-  $('fichas-list').style.setProperty('--fichas-columns', size);
+  // 05/10: one customer, the whole width; two, half each; three or more, three a page with «Anteriores» and «Seguintes»
+  $('fichas-list').style.setProperty('--fichas-columns', Math.max(1, Math.min(size, all.length)));
   $('fichas-list').replaceChildren(...(shown.length ? shown.map(fichaCard)
     : [el('p', {class: 'muted small'}, 'Ainda não há fichas: enchem-se a cada resposta preparada pela IA.')]));
-  $('fichas-count').textContent = all.length ? `${fichasPage * size + 1}–${fichasPage * size + shown.length} de ${all.length}` : '0';
+  // 05/10: «1–3 de 15 clientes», in bold
+  $('fichas-count').replaceChildren(el('strong', {}, all.length
+    ? `${fichasPage * size + 1}–${fichasPage * size + shown.length} de ${all.length} cliente${all.length === 1 ? '' : 's'}` : '0'));
   $('fichas-prev').disabled = fichasPage === 0;
   $('fichas-next').disabled = fichasPage >= pages - 1;
+  $('fichas-pager').hidden = pages <= 1;  // 05/10: only when there is more than one page, «2 de 5» between the buttons
+  $('fichas-page').textContent = `${fichasPage + 1} de ${pages}`;
 }
-$('fichas-property').addEventListener('change', event => { event.target.dataset.touched = '1'; fichasPage = 0; renderFichas(); });
+$('fichas-property').addEventListener('change', event => { event.target.dataset.touched = '1'; fichasPage = 0; selectionPage = 0; renderFichas(); });
 $('fichas-prev').addEventListener('click', () => { fichasPage--; renderFichas(); });
 $('fichas-fill').addEventListener('click', event => run(async () => {
   const ref = $('fichas-property').value || null;
@@ -3906,7 +4061,7 @@ function renderTitles() {
   const titles = {
     dashboard: 'Centro de Controlo e de Gestão — Dashboard Executivo',
     replies: `Leitura e Envio de emails aos clientes ${of('do Imóvel', 'dos {n} Imóveis')}`,
-    contacts: `Sobre os Clientes que contactaram ${of('o imóvel atual', 'um dos {n} imóveis atuais')}`,
+    contacts: `Sobre os Clientes que contactaram ${of('o nosso imóvel', 'um dos nossos ({n}) imóveis')}`,  // 05/10
     agenda: `Gestão das Visitas de Clientes ${of('ao Imóvel', 'aos {n} Imóveis')}`,
     properties: 'Gestão de todos os Imóveis',
     owners: `Centro de comunicação com os proprietários ${of('do imóvel', 'dos {n} imóveis')}`,
@@ -4464,10 +4619,8 @@ function renderAgenda() {
       el('div', {class: 'filofax-head'},
         el('span', {class: 'filofax-weekday'}, weekday(index)),
         el('span', {class: 'filofax-date'}, dayMonth(date)),
-        el('span', {class: 'muted small filofax-summary', title: shown}, shown),
-        el('button', {type: 'button', class: 'link filofax-off', onclick: () => toggleAgendaDay(index),
-          title: off ? `Voltar a pôr ${weekday(index)} como disponível`
-            : `Pôr ${weekday(index)} em blackout: sai da semana e os outros dias alargam`}, off ? 'Disponível' : 'Blackout')),
+        // 05/10: no «Blackout» / «Disponível» on each day: the «Dias» buttons above do it
+        el('span', {class: 'muted small filofax-summary', title: shown}, shown)),
       day);
   }));
   if (!week.length) box.replaceChildren(el('p', {class: 'empty-state filofax-none'}, 'Todos os dias estão em blackout. Liga um dia em «Dias».'));
@@ -5189,7 +5342,8 @@ function satisfactionCard(property) {
 // (short list, chosen or reserve); a click puts them on it or takes them off (asking first for the chosen and the reserve).
 const SELECTION_LABEL = {shortlist: 'Na short list', chosen: 'Selecionado', suplente: 'Suplente'};
 function shortlistToggle(status, name, change) {
-  return el('button', {type: 'button', class: 'shortlist-toggle' + (status ? ' on' : ''), 'aria-pressed': String(!!status),
+  // 05/10: on, silver on the short list, gold when selected
+  return el('button', {type: 'button', class: 'shortlist-toggle' + (status ? ' on ' + status : ''), 'aria-pressed': String(!!status),
     title: status ? 'Carrega para tirar da short list' : 'Carrega para juntar à short list (no topo de Clientes)',
     onclick: event => run(async () => {
       if (status && status !== 'shortlist' && !confirm(`Tirar ${name} da short list? Deixa de ser ${SELECTION_LABEL[status].toLowerCase()}.`)) return;
@@ -5213,7 +5367,7 @@ function visitorsCard(property) {
           + (survey.interesse ? ` · ${survey.interesse}` : '')) : el('span', {class: 'muted small'}, 'sem inquérito'),
       fichaTag(slot.ficha),
       // 04/10: here the short list is only shown; it changes in Contactos (the link above)
-      el('span', {class: 'tag ' + (slot.selection === 'chosen' ? 'golden' : slot.selection ? 'draft' : ''),
+      el('span', {class: 'tag ' + (slot.selection === 'chosen' ? 'golden' : slot.selection === 'shortlist' ? 'silver' : slot.selection ? 'draft' : ''),
         title: 'Muda-se em Clientes, na short list'},
         slot.selection ? `★ ${SELECTION_LABEL[slot.selection] || 'Na short list'}` : '☆ Fora da short list'));
   };

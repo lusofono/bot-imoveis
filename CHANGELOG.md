@@ -15,6 +15,225 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.124.5 — 05/10/2026
+
+- **Clientes, fichas:** «Preencher fichas com a IA (lê as conversas)» passa para o canto superior direito, por baixo da
+  contagem; «‹ Anteriores» e «Seguintes ›» vão para o centro, por cima das fichas, com a página entre eles («2 de 5»),
+  só quando há mais de uma página.
+
+## α.124.4 — 05/10/2026
+
+- **Short list, «DOCUMENTOS»:** o que falta («Falta: recibos de vencimento do fiador») passa para a linha do título,
+  encostado à direita numa etiqueta: verde «Documentos completos», amarela quando faltam alguns, vermelha quando ainda
+  não chegou nenhum. Sai a linha que o dizia lá dentro.
+
+## α.124.3 — 05/10/2026
+
+- **Short list:** o título da secção passa de «DOCUMENTOS · faltam N» a «DOCUMENTOS · Pedir, Selecionar, Suplente» (o
+  que se faz lá dentro; sem «Selecionar» para o selecionado e sem «Suplente» para o suplente). O que falta continua
+  escrito lá dentro.
+
+## α.124.2 — 05/10/2026
+
+- **Clientes, fichas e short list:** o texto de explicação passa para a coluna do título e acaba 25 px antes da contagem e
+  dos botões «‹ Anteriores» / «Seguintes ›» (ia até à margem direita).
+
+## α.124.1 — 05/10/2026
+
+- **Short list, «DOCUMENTOS»:** abre e fecha (começa fechado, sem limite de linhas), com o triângulo e o estado no
+  título («· completos» ou «· faltam N»); lá dentro as caixas a marcar e os botões «Pedir documentos», «Selecionar» e
+  «Suplente».
+
+## α.124.0 — 05/10/2026
+
+- **Short list, documentos:** junta-se o «Documento de identificação (CC, passaporte ou título de residência)», em primeiro lugar e obrigatório, para o candidato e para o fiador:
+  nas caixas a marcar, no que falta e no pedido de documentos que a IA escreve.
+
+## α.123.12 — 05/10/2026
+
+- **Clientes, fichas e short list:** os textos longos ficam com no máximo 3 linhas (5 na situação profissional e
+  rendimentos), com «…» no fim; um clique abre o texto todo, outro volta a encolher. Também as notas da visita (privada
+  e pública) e o inquérito, nos candidatos da short list.
+
+## α.123.11 — 05/10/2026
+
+- **Clientes, fichas e short list:** «‹ Anteriores» e «Seguintes ›» passam para o canto superior direito, por baixo da
+  contagem, e mais pequenos (estavam em baixo).
+- **Clientes, short list:** «Tirar da short list» a preto (a cor do texto), sem negrito.
+
+## α.123.10 — 05/10/2026
+
+- **Clientes, short list:** «Tirar da short list» passa para o canto superior direito de cada candidato (estava em baixo,
+  à esquerda).
+
+## α.123.9 — 05/10/2026
+
+- **Clientes, short list:** com um só candidato, ocupa a largura toda; com dois, metade cada; com três ou mais, três por
+  página, com «‹ Anteriores» e «Seguintes ›» (só então aparecem). A contagem, em cima, a negrito.
+
+## α.123.8 — 05/10/2026
+
+- **«Short list» em prata,** como o selecionado em ouro: a etiqueta (quadro da short list em Clientes, «Quem já
+  visitou») passa a uma placa de prata polida; os nomes da coluna «Short list» de «Emails em tratamento», a prata; o
+  interruptor «★ Na short list» das fichas, prateado quando ligado (dourado quando a pessoa é a selecionada).
+
+## α.123.7 — 05/10/2026
+
+- **«Selecionado» em dourado, não amarelo:** a etiqueta (short list de Clientes, «Quem já visitou») passa a uma placa de
+  ouro polido, e o nome (a linha «Selecionado» de «Emails em tratamento», o painel «Selecionados» de Imóveis) a letra a
+  negrito com um gradiente de ouro, em todos os temas.
+
+## α.123.6 — 05/10/2026
+
+- **Clientes, fichas:** com um só cliente, a ficha ocupa a largura toda; com dois, metade cada; com três ou mais, três por
+  página, e só então aparecem «‹ Anteriores» e «Seguintes ›».
+
+## α.123.5 — 05/10/2026
+
+- **Clientes, RGPD:** o estado «por pedir» passa a dizer «Pedir» (só o nome que se vê; o CSV guarda o mesmo de sempre).
+
+## α.123.4 — 05/10/2026
+
+- **Clientes, fichas:** sempre 3 clientes lado a lado por página (eram 3 a 5, conforme a largura), e em cima a contagem
+  a negrito, com «clientes»: «1–3 de 15 clientes».
+
+## α.123.3 — 05/10/2026
+
+- **Fichas dos clientes:** a etiqueta «ficha N/M» passa a «dados N/M», com cor pelo que já chegou: vermelha sem nada,
+  amarela a meio, verde completa (como as bolinhas da tabela); em Clientes, os dados que o cliente deu ficam a
+  verde-escuro (o que falta continua a laranja). A mesma etiqueta em Emails e em «Quem já visitou».
+
+## α.123.2 — 05/10/2026
+
+- **Fichas dos clientes sempre em português:** a resposta já o pedia, mas a IA deixava em espanhol o que o cliente
+  escrevia em espanhol. Agora diz-se também que o que o cliente disse noutra língua vai traduzido e que o que já está na
+  ficha noutra língua passa a português; «Preencher fichas com a IA» e o perfil colado do Idealista passam a ter a mesma
+  regra.
+
+## α.123.1 — 05/10/2026
+
+- **Visitas, a agenda:** sai a palavra «Blackout» (e «Disponível») de cada dia; os botões dos dias, por cima, já o fazem.
+
+## α.123.0 — 05/10/2026
+
+- **«Escrever mais» já não grava um acrescento vazio:** abre uma caixa no próprio cartão do cliente; escreves o que
+  queres acrescentar e escolhes «Gerar com a IA» (a IA escreve o email a partir disso) ou «Guardar como rascunho» (isso
+  já é o email); só então o acrescento vai para a fila. «Cancelar» fecha a caixa sem gravar nada.
+- **O cartão de um acrescento diz quando foi criado e o que foi acrescentado:** «Acrescento teu, de 05/10 às 16:32:
+  «…»», ou «Acrescento a todos, …» quando veio de «Escrever a todos».
+- A limpeza de acrescentos vazios ultrapassados por um email no Gmail deixa os que têm uma nota tua.
+
+## α.122.17 — 05/10/2026
+
+- **Emails, acrescentos:** no cartão de um acrescento («Escrever mais» ou «Escrever a todos»), o botão «Não precisa de
+  resposta» passa a «Cancelar acrescento»: tira-o da fila sem enviar nada (pergunta antes, se já houver texto no
+  rascunho).
+
+## α.122.16 — 05/10/2026
+
+- **Emails, os cartões:** o email do cliente (e o telefone e o perfil, quando há) passa para a linha do nome, logo a
+  seguir a ele, nos cartões dos emails por responder e nos «Enviados · clientes ativos»: uma linha a menos em cada
+  cartão.
+
+## α.122.15 — 05/10/2026
+
+- **Emails, acrescento ultrapassado:** um rascunho de «Escrever mais» aberto e ainda vazio sai da fila quando a leitura
+  encontra um email teu a esse cliente escrito no Gmail depois (o que tinhas a acrescentar foi por lá). Um acrescento em
+  que já escreveste fica.
+
+## α.122.14 — 05/10/2026
+
+- **Emails, «Contexto deste cliente»:** sai o botão «Juntar». O que se escreve no campo fica guardado ao carregar em
+  «Atualizar resposta», antes de a IA escrever (e a resposta já o tem em conta), como o «Acrescentar ao conhecimento»;
+  ou logo, com Enter.
+
+## α.122.13 — 05/10/2026
+
+- **Emails, imóvel de teste:** «IMÓVEL DE TESTE — o que se faz aqui só chega a clientes de teste» aparece no lugar de
+  «Prepara em lote. Revê cada conversa. Envia quando estiver tudo certo.», na mesma linha e com a mesma altura: não cria
+  linha nova nem mexe o ecrã.
+
+## α.122.12 — 05/10/2026
+
+- **A barra «IMÓVEL»** (por cima do imóvel escolhido em Emails, Clientes, Visitas e Imóveis) fica 50 % mais alta em todos
+  os temas: nos que a desenham como faixa, mais espaço em cima e em baixo (a mesma largura); nos que só têm a palavra,
+  a palavra 50 % maior.
+
+## α.122.11 — 05/10/2026
+
+- **Emails:** o título «CAIXA DE CORREIO» sobe para o alto do painel, à altura de «PASSO 01» ao lado (os dois painéis
+  com o mesmo espaço em cima e em baixo, em todos os temas).
+
+## α.122.10 — 05/10/2026
+
+- **Emails, painel «PASSO 01»:** o botão «Ler emails do Gmail» ocupa toda a largura do painel, mais baixo, por baixo de
+  «PASSO 01»; o painel mantém o tamanho.
+
+## α.122.9 — 05/10/2026
+
+- **Emails, «Caixa de correio»:** «PASSO 01» passa para o painel da direita, em cima à esquerda, e o botão «Ler emails do
+  Gmail» fica quadrado e mais estreito, à direita desse painel; à esquerda, o título volta a ser só «CAIXA DE CORREIO».
+
+## α.122.8 — 05/10/2026
+
+- **Emails, «Caixa de correio»:** o botão «Ler emails do Gmail» passa para o painel da direita (1/3), no lugar do logo do
+  tema (a bandeira do Reino Unido no Cabrio sai daí; fica a da barra lateral), e enche esse painel; à esquerda ficam
+  «PASSO 01 · CAIXA DE CORREIO», a última leitura e o progresso da leitura.
+
+## α.122.7 — 05/10/2026
+
+- **Emails, «Caixa de correio»:** o título passa a «PASSO 01 · CAIXA DE CORREIO», como o «PASSO 02» de «Gerar respostas».
+
+## α.122.6 — 05/10/2026
+
+- **Emails, «Caixa de correio»:** cerca de 25 % mais baixa (o botão quadrado mais pequeno e menos espaço em cima e em
+  baixo); «Última leitura…» alinhada à esquerda, por baixo do título.
+
+## α.122.5 — 05/10/2026
+
+- **Emails, «Caixa de correio»:** sai o título «Ler emails» (o botão já o diz) e o «. A próxima traz o que chegou desde
+  então.»; fica só «Última leitura: …».
+
+## α.122.4 — 05/10/2026
+
+- **Emails, o painel por baixo do imóvel:** «Noutros imóveis» sai; passam a ser oito números deste imóvel, em duas
+  linhas de quatro, como em Imóveis: por responder, sem rascunho, rascunhos prontos, bloqueados, proprietários por
+  responder, respostas enviadas, tempo médio até resposta e visitas marcadas (estes três vêm das contas do Painel, pedidas
+  ao abrir Emails).
+
+## α.122.3 — 05/10/2026
+
+- **Emails, «Caixa de correio»:** fica com 2/3 da largura: o título, «Última leitura…» por baixo e o progresso da
+  leitura à esquerda, o botão «Ler emails do Gmail» quadrado e mais alto à direita. Ao lado, um painel de 1/3 com o
+  logo do tema (a bandeira do Reino Unido no 00's UK Cabrio; o ícone da ARIA nos outros, por agora).
+- **«Noutros imóveis»** (painel «Por responder») deixa de contar o imóvel de teste, como no Painel.
+
+## α.122.2 — 05/10/2026
+
+- **Clientes, o título:** «Sobre os Clientes que contactaram um dos nossos (n) imóveis» (com um só, «o nosso imóvel»).
+
+## α.122.1 — 05/10/2026
+
+- **Emails, o painel ao lado de cada email:** o triângulo de abrir e fechar no início de «MENSAGENS RÁPIDAS», «CONTEXTO
+  DESTE CLIENTE» e «ACRESCENTAR AO CONHECIMENTO» (as faixas dos temas ricos escondiam-no), em todos os temas. As
+  mensagens rápidas vêm abertas; o contexto e o conhecimento, fechados (ligar uma mensagem rápida abre o conhecimento,
+  para se ver a linha).
+
+## α.122.0 — 05/10/2026
+
+- **Emails, painel «Por responder»:** por baixo do imóvel escolhido, em números grandes: quantos emails deste imóvel
+  esperam resposta (os já respondidos no Gmail à parte), quantos ainda sem rascunho («Gerar respostas»), quantos com
+  rascunho pronto para rever e enviar, quantos bloqueados (tratar à mão), e quantos esperam nos outros imóveis, cada um
+  um link que abre esse imóvel. Com tudo respondido, diz «Tudo respondido neste imóvel». Os emails dos proprietários
+  ficam em Proprietários.
+
+## α.121.1 — 05/10/2026
+
+- **Emails, o painel ao lado de cada email:** as mensagens rápidas («Agradecer o email e as informações»… «Ignorar os
+  emails anteriores») passam para uma caixa «MENSAGENS RÁPIDAS», fechada até se abrir (o título diz quantas estão
+  ligadas). «Acrescentar ao conhecimento» passa a ter o título como «CONTEXTO DESTE CLIENTE» (a faixa colorida de cada
+  tema), em todos os temas e também em Imóveis.
+
 ## α.121.0 — 04/10/2026
 
 - **Emails, «Escrever a todos»:** por cima de «Enviados · clientes ativos», um painel (fechado até se abrir) para

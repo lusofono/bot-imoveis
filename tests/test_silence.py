@@ -49,7 +49,7 @@ def test_two_unanswered_emails_and_four_days_make_a_customer_inactive_until_they
     data = service.load(REF)
     moment = datetime.now(timezone.utc) + timedelta(days=5)
     assert service.mark_inactive(REF, data, moment) == 0  # one email of ours: not yet
-    draft_and_send(service, service.write_more(REF, CUSTOMER)["id"], "Ainda tem interesse?")
+    draft_and_send(service, service.write_more(REF, CUSTOMER, text="Ainda tem interesse?")["id"], "Ainda tem interesse?")
     data = service.load(REF)
     assert service.mark_inactive(REF, data, datetime.now(timezone.utc) + timedelta(days=3)) == 0  # too soon
     assert service.mark_inactive(REF, data, moment) == 1

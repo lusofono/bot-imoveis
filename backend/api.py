@@ -297,7 +297,8 @@ def web_app(folder, token):
         return service.analyze_visits(body.get("property_ref") or None)
 
     def active_write(body):
-        return {**service.write_more(body.get("property_ref") or None, body.get("email")), "state": state()}
+        return {**service.write_more(body.get("property_ref") or None, body.get("email"), body.get("note"), body.get("text")),
+                "state": state()}
 
     def active_remove(body):
         return {**service.remove_active(body.get("property_ref") or None, body.get("email")), "state": state()}

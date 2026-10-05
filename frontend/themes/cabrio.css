@@ -48,6 +48,8 @@
 :root[data-theme="cabrio"] .ignore-list.black .eyebrow{color:#fff;background:#1d1d1d;text-shadow:none}
 :root[data-theme="cabrio"] .ignore-list.grey .eyebrow{color:#fff;background:#6b7570;text-shadow:none}
 
+/* 05/10: the Union flag, once (the decal at the sidebar's foot) */
+:root[data-theme="cabrio"]{--union-flag:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 30'%3E %3CclipPath id='t'%3E%3Cpath d='M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z'/%3E%3C/clipPath%3E %3Cpath d='M0,0 v30 h60 v-30 z' fill='%23012169'/%3E %3Cpath d='M0,0 L60,30 M60,0 L0,30' stroke='%23fff' stroke-width='6'/%3E %3Cpath d='M0,0 L60,30 M60,0 L0,30' clip-path='url(%23t)' stroke='%23C8102E' stroke-width='4'/%3E %3Cpath d='M30,0 v30 M0,15 h60' stroke='%23fff' stroke-width='10'/%3E %3Cpath d='M30,0 v30 M0,15 h60' stroke='%23C8102E' stroke-width='6'/%3E%3C/svg%3E")}
 /* The sidebar is the seat: black leather with a touch of brown, two lines of tan stitching down its edge, the Union
    flag decal at its foot */
 :root[data-theme="cabrio"] .sidebar{background:var(--leather);border-right:0;box-shadow:inset -10px 0 18px #0000002e,inset 1px 0 0 #ffffff22}
@@ -55,7 +57,7 @@
   background:repeating-linear-gradient(180deg,#b88a58 0 6px,#0000 6px 11px) 0 0/1.5px 100% no-repeat,
     repeating-linear-gradient(180deg,#b88a58 0 6px,#0000 6px 11px) 5.5px 3px/1.5px 100% no-repeat}
 :root[data-theme="cabrio"] .sidebar::after{content:"";position:absolute;left:calc(50% - 28px);bottom:14px;width:56px;height:28px;pointer-events:none;border-radius:3px;
-  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 30'%3E %3CclipPath id='t'%3E%3Cpath d='M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z'/%3E%3C/clipPath%3E %3Cpath d='M0,0 v30 h60 v-30 z' fill='%23012169'/%3E %3Cpath d='M0,0 L60,30 M60,0 L0,30' stroke='%23fff' stroke-width='6'/%3E %3Cpath d='M0,0 L60,30 M60,0 L0,30' clip-path='url(%23t)' stroke='%23C8102E' stroke-width='4'/%3E %3Cpath d='M30,0 v30 M0,15 h60' stroke='%23fff' stroke-width='10'/%3E %3Cpath d='M30,0 v30 M0,15 h60' stroke='%23C8102E' stroke-width='6'/%3E%3C/svg%3E") center/cover no-repeat;box-shadow:0 0 0 2px #fff,0 0 0 3.5px #8d969d,0 3px 8px #0006}
+  background:var(--union-flag) center/cover no-repeat;box-shadow:0 0 0 2px #fff,0 0 0 3.5px #8d969d,0 3px 8px #0006}
 :root[data-theme="cabrio"] .sidebar{padding-bottom:56px;overflow-y:auto;scrollbar-width:thin}
 :root[data-theme="cabrio"] .brand-mark{border:0;box-shadow:0 0 0 2px #fbf4e6,0 0 0 3.5px #8d969d,0 4px 10px #0005}
 :root[data-theme="cabrio"] .brand .brand-name{font-family:var(--display);font-weight:600;color:#fffaf0;text-shadow:0 1px 2px #0008}

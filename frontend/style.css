@@ -169,6 +169,17 @@ button.stepper-arrow{min-height:0;height:22px;min-width:30px;padding:0 6px;borde
 .ficha-card dt{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-top:6px}
 .ficha-card dd{margin:0;font-size:12px;overflow-wrap:anywhere}
 .ficha-card dd.ficha-missing{color:var(--warn)}
+/* 05/10: long texts of the fichas and the short list kept to 3 lines (5 for the work and income), «…» at the end; a
+   click opens them */
+.clamp{display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer}
+.clamp-3{-webkit-line-clamp:3;line-clamp:3}
+.clamp-5{-webkit-line-clamp:5;line-clamp:5}
+.clamp.open{display:block;-webkit-line-clamp:unset;line-clamp:none;overflow:visible}
+/* 05/10: what the customer gave, in dark green (what is missing stays orange); «dados N/M» coloured by how much came in */
+:root .ficha-card dd.ficha-known{color:light-dark(#1f6b3c,#8fdcaa)}
+:root .tag.data-none.data-none{color:light-dark(#a8231a,#ffb3ab);border-color:#e8a59f;background:light-dark(#fdecea,#4a1f1c)}
+:root .tag.data-some.data-some{color:light-dark(#7a5200,#ffd98a);border-color:#e6c46a;background:light-dark(#fff4d6,#4a3a12)}
+:root .tag.data-full.data-full{color:light-dark(#1d6b3a,#9ff0c0);border-color:#8fcca3;background:light-dark(#e3f4e8,#173a26)}
 @media (max-width:760px){.fichas-grid{grid-template-columns:minmax(0,1fr)}}
 .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--card)}
 .contacts-table{width:100%;border-collapse:collapse;font-size:13px}
@@ -244,9 +255,6 @@ button.stepper-arrow{min-height:0;height:22px;min-width:30px;padding:0 6px;borde
 .filofax-page.today{background-color:var(--accent-soft)}
 .filofax-head{position:relative;display:flex;flex-direction:column;margin-bottom:12px;padding-bottom:8px;
   border-bottom:2px solid var(--text)}
-.filofax-off{position:absolute;top:-4px;right:0;min-height:0;padding:2px 0;font-size:10px;font-weight:600;
-  letter-spacing:.3px;opacity:.7}
-.filofax-off:hover{opacity:1}
 .filofax-page.blackout{background-image:repeating-linear-gradient(135deg,color-mix(in srgb,currentColor 7%,transparent) 0 6px,
   transparent 6px 12px)}
 .filofax-none{grid-column:1/-1;margin:0}
@@ -338,6 +346,13 @@ button.stepper-arrow{min-height:0;height:22px;min-width:30px;padding:0 6px;borde
 .ignore-list.black .eyebrow{color:var(--bad)}
 .ignore-list.grey .eyebrow{color:var(--muted)}
 @media(max-width:1150px){.property-slide,.dashboard-lists{grid-template-columns:1fr}}
+/* 05/10: Emails, the property's eight numbers under the property, two rows of four, the first one bigger */
+.metrics.queue-board{grid-template-columns:repeat(4,minmax(0,1fr));margin:0 0 22px}
+.queue-board .queue-main .value{font-size:52px}
+@media(max-width:1150px){.metrics.queue-board{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* 05/10: «Escrever mais» opens a box in the sent card */
+.write-more{margin-top:12px}
+.write-more .actions{margin-top:8px}
 /* 04/10: «Escrever a todos» (Emails), above the sent cards: closed until opened */
 .card.write-all{margin:12px 0 16px;padding:14px 18px}
 .write-all summary{cursor:pointer}
@@ -362,7 +377,7 @@ button.stepper-arrow{min-height:0;height:22px;min-width:30px;padding:0 6px;borde
 @media(min-width:1151px){.finalists-row{grid-template-columns:minmax(0,3fr) minmax(0,2fr)}}
 .finalists-row>.card{margin:0;width:auto}
 .selected-person{display:grid;gap:2px;padding:10px 0}
-.selected-card .selected-name{font-size:17px;color:light-dark(#9a7300,#e6bd43)}
+.selected-card .selected-name{font-size:17px}
 .selected-tags{gap:8px;margin-top:6px}
 .selected-reserve{border-top:1px solid var(--line);margin-top:8px;padding-top:10px}
 .selected-reserve .eyebrow{margin:0}
@@ -553,7 +568,20 @@ body:not(.api-only) .api-only-show{display:none!important}
 .survey-comment{flex-basis:100%}
 .contacts-property-row{margin-bottom:12px}
 .selection-card{margin:0 0 22px}
-.selection-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:6px}
+/* 05/10: the short list's and the fichas' count, and under it their pages' buttons, small, in the top right corner */
+.pager-side{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex:none}
+/* 05/10: the title's column (with its explanation) beside them, ending 25 px before them */
+.section-heading.pager-heading{align-items:flex-start;gap:25px}
+.section-heading.pager-heading>div:first-child{flex:1;min-width:0}
+.section-heading.pager-heading .step{margin:6px 0 0}
+.pager{display:flex;gap:8px}
+.pager button{min-height:30px;padding:4px 12px;font-size:12px}
+/* 05/10: the fichas' pages centred above them, the page between the buttons; «Preencher fichas» small, top right */
+.pager.pager-center{justify-content:center;align-items:center;gap:14px;margin:6px 0 12px}
+.pager-side #fichas-fill{min-height:30px;padding:4px 12px;font-size:12px}
+.selection-column .card-head .selection-out{margin-left:auto;padding:0;min-height:0;font-size:12px}  /* 05/10: top right */
+:root .selection-column .card-head .selection-out.danger{color:var(--text);font-weight:400}  /* 05/10: in the text's colour (black), not bold */
+.selection-grid{display:grid;grid-template-columns:repeat(var(--selection-columns,3),minmax(0,1fr));gap:14px;margin-top:6px}  /* 05/10: 1, 2 or 3 columns, as many as candidates */
 @media(max-width:1000px){.selection-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){.selection-grid{grid-template-columns:minmax(0,1fr)}}
 .selection-column{border:1px solid var(--line);border-radius:12px;padding:16px;background:var(--card);min-width:0}
@@ -580,6 +608,10 @@ body:not(.api-only) .api-only-show{display:none!important}
 /* 27/09: under the customer's name: email, phone (each with its copy icon) and the portal profile's link */
 .contact-line{display:flex;flex-wrap:wrap;align-items:center;gap:2px 16px}
 .contact-line>span{display:inline-flex;align-items:center}
+/* 05/10: the contact on the name's line (the emails' and the sent cards): the name keeps its place, the contact right
+   after it, the tags pushed to the right */
+.card-head .who:has(+ .head-contact){margin-right:0}
+.card-head .head-contact{margin-right:auto}
 /* 27/09: the small copy icon (a customer's email, one message of a conversation) */
 .copy-icon{display:inline-flex;vertical-align:middle;min-height:0;margin-left:6px;padding:2px;border:0;background:none;
   color:var(--muted);cursor:pointer}
@@ -685,6 +717,21 @@ body:not(.api-only) .api-only-show{display:none!important}
 .email-actions .note-box select{width:100%}
 /* 27/09: quick replies, switches over the knowledge box: on, they carry a tick and the accent */
 .quick-replies{display:flex;flex-direction:column;gap:6px}
+/* 05/10: «MENSAGENS RÁPIDAS» in a closed box and «ACRESCENTAR AO CONHECIMENTO», both titled like «CONTEXTO DESTE CLIENTE» */
+.quick-box{margin:0 0 10px}
+.quick-box summary,.note-box summary.eyebrow{margin:0}
+/* 05/10: their own triangle at the start (▸ closed, ▾ open), the browser's taken away so there is never two */
+:is(.quick-box,.context-box,.note-box)>summary.eyebrow{list-style:none;cursor:pointer}
+:is(.quick-box,.context-box,.note-box)>summary.eyebrow::-webkit-details-marker{display:none}
+/* 05/10: the short list's «DOCUMENTOS»: the title (the theme's eyebrow) and, at the right of its line, what is missing */
+.docs-box>summary.docs-summary{display:flex;align-items:center;gap:10px;list-style:none;cursor:pointer;margin:14px 0 8px}
+.docs-box>summary.docs-summary::-webkit-details-marker{display:none}
+.docs-summary>.eyebrow{margin:0}
+.docs-summary>.docs-state{margin-left:auto;max-width:60%;white-space:normal;text-align:right;line-height:1.35}
+.fold-mark::before{content:"▸";display:inline-block;width:1.1em;letter-spacing:0}
+details[open]>summary .fold-mark::before{content:"▾"}  /* also inside the title (the short list's «DOCUMENTOS») */
+.quick-box[open] summary{margin-bottom:8px}
+.email-actions .note-box summary.eyebrow{margin-top:8px}
 .email-actions .quick-reply{justify-content:flex-start;min-height:0;padding:7px 12px;font-size:12px;font-weight:600;text-align:left;
   border-radius:10px;background:none;border:1px solid var(--control-border);color:var(--text)}
 .quick-reply::before{content:"";flex:none;width:14px;height:14px;border:1.5px solid var(--control-border);border-radius:4px}
@@ -832,6 +879,13 @@ body.api-only .reply-layout>.batch-column{grid-template-columns:minmax(0,1fr)}
 /* 02/10: «Ler emails» went above the property; with the API only, this column (the ChatGPT import) is empty */
 body.api-only .reply-layout>.batch-column{display:none}
 #tab-replies>.read-card{margin:0 0 18px}
+/* 05/10: «Caixa de correio» (2/3) and, beside it (1/3), the «Ler emails do Gmail» button filling its panel; one under
+   the other on a narrow screen */
+.read-row{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:18px;margin:0 0 18px}
+.read-row>.card{margin:0}
+@media(max-width:900px){.read-row{grid-template-columns:minmax(0,1fr)}}
+.read-button-card{display:flex;flex-direction:column;align-items:stretch;justify-content:space-between;gap:10px;padding:14px 18px}
+.read-button-card .eyebrow{align-self:flex-start;margin:0}
 .step-num{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;flex:none;font-size:16px;
   font-weight:800;line-height:1;background:var(--accent);color:var(--accent-text)}
 button.primary .step-num{background:var(--accent-text);color:var(--accent)}
@@ -1076,14 +1130,27 @@ body:not(.admin) .prompt-view{display:none!important}
 #property-slider,.property-switcher{padding:16px 16px}
 #property-slider,.property-switcher{flex-wrap:wrap}
 :is(#property-slider,.property-switcher) .switcher-label{flex:0 0 100%;order:-1;margin:0 0 2px}
+/* 05/10: the «IMÓVEL» bar 50 % taller, in every theme: where it is a band, more air above and below its word (the same
+   width); where it is only a word, the word half as big again */
+:root:is([data-theme="cabrio"],[data-theme="boat"]) :is(#property-slider,.property-switcher) .switcher-label{padding-top:8.5px;padding-bottom:8.5px}
+:root[data-theme="racing"] :is(#property-slider,.property-switcher) .switcher-label{padding-top:7px;padding-bottom:7px}
+:root:is([data-theme="scooter"],[data-theme="kw"]) :is(#property-slider,.property-switcher) .switcher-label{padding-top:10px;padding-bottom:10px}
+:root:is([data-theme="amber"],[data-theme="day"],[data-theme="night"],[data-theme="indigo"],[data-theme="apalace"],[data-theme="agentval"],:not([data-theme]))
+  :is(#property-slider,.property-switcher) .switcher-label{font-size:15px}
 :is(#property-slider,.property-switcher) .property-ref{font-size:12px;letter-spacing:.14em}
 :is(#property-slider,.property-switcher) .slider-title strong{font-size:21px}
 .read-card h2{margin-bottom:4px}
-.read-card .read-actions{align-items:center;margin-top:10px}
-/* 02/10: «Última leitura…» on the title's line, justified right (it wraps under the title on a narrow card) */
-.read-card .read-title{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 16px}
-.read-card .read-title h2{margin-right:auto}
-.read-card .read-title #last-read{margin:0 0 0 auto;text-align:right}
+/* 05/10: the card's text from the top (its title level with «PASSO 01» beside it): the title, «Última leitura…» under
+   it, the read's progress; little air above and below */
+.read-card{display:flex;flex-direction:column;justify-content:flex-start}
+.read-card .read-main{min-width:0}
+.read-card .read-title #last-read{margin:6px 0 0;text-align:left}  /* 05/10: under the eyebrow, at its left */
+.read-card .read-progress{margin-top:10px}
+/* the two panels with the same air above and below, in every theme, so their titles line up */
+:root .read-row>.card.card{padding-top:14px;padding-bottom:14px}
+/* 05/10: «PASSO 01» at the panel's top left and, under it, the button the whole width of the panel, low (the panel keeps
+   its height) */
+#read{flex:none;width:100%;height:auto;min-height:64px;padding:10px 16px;gap:12px;white-space:normal;line-height:1.2;font-size:15px}
 /* 30/09: the Painel's property tiles, apart from the numbers above and «A fazer» below (they sat glued to both) */
 #dashboard-properties{margin:22px 0}
 /* 30/09: the agency's know-how in three groups that open */
@@ -1142,6 +1209,8 @@ body:not(.admin) .prompt-view{display:none!important}
 #tab-replies .title-row h1{margin-right:auto}
 .test-badge{padding:8px 14px;border-radius:10px;font-size:11px;font-weight:700;line-height:1.4;letter-spacing:.14em;
   color:color-mix(in srgb,#7c3aed 80%,var(--text));background:color-mix(in srgb,#8b5cf6 18%,var(--card))}
+/* 05/10: in the line of «Prepara em lote…», as high as that text, so the page never moves */
+.replies-step .test-badge{display:inline-block;padding:0 10px;border-radius:6px;line-height:inherit;vertical-align:baseline}
 /* 02/10: in the test property's Comunicações, the sending buttons («3 Enviar todos», «Enviar já este por email») in
    green — a test send, at a glance. The id outranks every theme's own send button (hazard frames and the like). */
 :root #tab-replies.test-mode button.send-action{background:#2e9e5b;border-color:#2e9e5b;color:#fff;box-shadow:0 0 0 3px #2e9e5b33}
@@ -1360,5 +1429,23 @@ body:not(.admin) .prompt-view{display:none!important}
    (documents in, a contract to prepare elsewhere, in the «Selecionado» line under the table) in gold and bold, no frame; golden on the short list
    board of Contactos */
 #pipeline .pipeline-name.owner{color:#e02b2b;font-weight:700}
-#pipeline .pipeline-name.selected{color:light-dark(#9a7300,#e6bd43);font-weight:700}
-:root .tag.golden.golden{color:#4a3a05;border-color:#c9a227;background:linear-gradient(180deg,#fff6c9,#f3d36b);font-weight:700}
+/* 05/10: the selected in metallic gold, not yellow: the name in a gold gradient (the table's line, Imóveis' panel), the
+   tag (the short list board, «Quem já visitou») a polished gold plate */
+:is(#pipeline .pipeline-name.selected,.selected-card .selected-name){font-weight:700;color:#9c7408;
+  background:linear-gradient(90deg,light-dark(#7a5a00,#c9971c),light-dark(#c9971c,#f1d37a) 40%,light-dark(#e2b53a,#fff0b8) 50%,
+    light-dark(#c9971c,#f1d37a) 60%,light-dark(#7a5a00,#c9971c));-webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent}
+/* 05/10: the short list in silver, as the selected in gold: the tag a polished silver plate, the names in the table's
+   «Short list» column in a silver gradient, the short list switch silver when on (gold when selected) */
+:root .tag.silver.silver{color:#2c3136;border-color:#8d969d;font-weight:700;text-shadow:0 1px 0 #fff8;
+  background:linear-gradient(135deg,#f6f8f9 0%,#cfd4d9 38%,#aab1b8 52%,#e6e9ec 70%,#bcc3c9 100%);box-shadow:inset 0 1px 0 #fff9}
+#pipeline .pipeline-name.short{font-weight:700;color:#6b737b;
+  background:linear-gradient(90deg,light-dark(#4c535a,#9aa3ab),light-dark(#8d969d,#d3d9de) 40%,light-dark(#b4bcc3,#f4f6f8) 50%,
+    light-dark(#8d969d,#d3d9de) 60%,light-dark(#4c535a,#9aa3ab));-webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent}
+:root :is(#tab-contacts,#tab-properties) .shortlist-toggle.on.shortlist{color:#2c3136;border-color:#8d969d;text-shadow:0 1px 0 #fff8;
+  background:linear-gradient(135deg,#f6f8f9 0%,#cfd4d9 38%,#aab1b8 52%,#e6e9ec 70%,#bcc3c9 100%)}
+:root :is(#tab-contacts,#tab-properties) .shortlist-toggle.on.chosen{color:#3d2a00;border-color:#b8860b;text-shadow:0 1px 0 #fff7;
+  background:linear-gradient(135deg,#fbe9a6 0%,#e2b93b 38%,#c99a1e 52%,#f3d77a 70%,#d4a62a 100%)}
+:root .tag.golden.golden{color:#3d2a00;border-color:#b8860b;font-weight:700;text-shadow:0 1px 0 #fff7;
+  background:linear-gradient(135deg,#fbe9a6 0%,#e2b93b 38%,#c99a1e 52%,#f3d77a 70%,#d4a62a 100%);box-shadow:inset 0 1px 0 #fff8}

@@ -236,7 +236,9 @@ def survey_report(surveys):
 # The selection (26/09): 2 or 3 candidates on a short list; one chosen and one reserve (suplente). The documents are
 # asked only of the short list, and the program keeps a checklist of what arrived, never the files themselves.
 SELECTION_STATES = {"shortlist": "Short list", "chosen": "Selecionado", "suplente": "Suplente"}  # 04/10: «Escolhido» → «Selecionado»
-DOCUMENTS = {"recibos": ("Recibos de vencimento", True), "email_emprego": ("Email oficial do emprego (se tiver)", False),
+# 05/10: the identification document first, and required (for the guarantor too)
+DOCUMENTS = {"identificacao": ("Documento de identificação (CC, passaporte ou título de residência)", True),
+             "recibos": ("Recibos de vencimento", True), "email_emprego": ("Email oficial do emprego (se tiver)", False),
              "contrato": ("Declaração ou contrato de trabalho (opcional)", False),
              "irs": ("IRS do ano anterior (ou dos dois anteriores)", True)}
 
@@ -520,7 +522,8 @@ KNOWLEDGE_FILE = re.compile(r"[A-Za-z0-9_-]{1,40}\.md")
 VISIT_STATES = {"nao_quer": "não quer visitar", "outra_data": "só pode noutra data"}
 DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
 CLOCK = re.compile(r"([01]\d|2[0-3]):[0-5]\d")
-RGPD_STATES = {"por_pedir": "por pedir", "pedido": "pedido", "sim": "sim", "nao": "não"}
+# 05/10: «por pedir» shown as «Pedir» (only the label: the CSV keeps the key)
+RGPD_STATES = {"por_pedir": "Pedir", "pedido": "pedido", "sim": "sim", "nao": "não"}
 # A reply to the consent request: the customer's own words, checked only for a leading yes.
 CONSENT_YES = re.compile(r"^\s*(sim|yes|oui)\b", re.I)
 

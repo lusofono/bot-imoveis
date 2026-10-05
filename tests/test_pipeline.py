@@ -158,7 +158,7 @@ def test_one_dot_in_two_halves_what_they_gave_and_what_we_have_to_do(service):
 def test_an_almost_empty_addition_goes_when_the_customer_writes_again_and_a_gmail_answer_is_greyed(service):
     read(service, [lead("1")])
     draft_and_send(service, "1")
-    service.write_more(REF, CUSTOMER)  # «Escrever mais»: an «acrescento» in their conversation
+    service.write_more(REF, CUSTOMER, text="p")  # «Escrever mais»: an «acrescento» in their conversation
     queue = service.load(REF)
     [addition] = [item for item in queue["emails"] if item.get("kind") == "addition"]
     addition["reply_text"] = "pdf"

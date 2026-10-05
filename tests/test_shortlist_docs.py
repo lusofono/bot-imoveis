@@ -14,7 +14,7 @@ def test_the_short_list_reply_asks_for_the_documents_then_reads_what_came(servic
     [card] = queue["emails"]
     assert (card["phase"], card["docs_requested"]) == ("shortlist", False)
     prompt = reply_prompt(queue, ["c2"])
-    assert "interação: short list · pedir documentos |" in prompt and "Documentos a pedir: Recibos de vencimento" in prompt
+    assert "interação: short list · pedir documentos |" in prompt and f"Documentos a pedir: Documento de identificação (CC, passaporte ou título de residência); Recibos de vencimento" in prompt
     draft_and_send(service, "c2", "Gostaríamos de passar à fase seguinte: envie-nos, por favor, os documentos.")
     assert service.load(REF)["conversations"][CUSTOMER]["selection"]["docs_requested_at"]
 

@@ -83,7 +83,7 @@ VIEW_FIELDS = ("id", "kind", "date", "subject", "customer", "recipient", "blocke
                "reply_text", "reply_status", "reply_error", "reply_message_id", "visit_window", "visit_slot",
                "visit_status", "reminder", "closing", "consent_suggested", "consent_confirmed", "history", "merged",
                "merged_ids", "visit_done", "visit_reminder", "survey_reply", "docs_request", "visit_missed", "profile_url",
-               "round", "review", "attachments", "addition_note")
+               "round", "review", "attachments", "addition_note", "addition_scope")
 # 30/09: the prompts common to every property that the Oficina edits (voice.json), with the code's own text; the
 # behaviour («Comportamento geral») lives at the root of voice.json, the others under style.
 COMMON_PROMPTS = {"application_instructions": "", "after_visit": AFTER_VISIT_RULE, "after_visit_template": AFTER_VISIT_TEMPLATE,
@@ -1536,6 +1536,14 @@ class MailService:
                 item.setdefault("warnings", []).append(
                     f"Já respondeste a este email diretamente no Gmail em {local:%d/%m} às {local:%H:%M}. "
                     "Envia outro só se quiseres acrescentar algo; senão, retira-o da fila.")
+            # 05/10: an «Escrever mais» draft opened before this reply and still empty: what the owner had to add went in
+            # Gmail, so it leaves the queue (one with a text of the owner's stays, for them to decide)
+            stale = [item for item in data["emails"] if recipient_email(item) == email and item.get("kind") == "addition"
+                     and not (item.get("reply_text") or "").strip() and not item.get("addition_note")
+                     and item.get("reply_status") in (None, "pending")
+                     and (aware(item.get("date")) or sent_at) <= sent_at]
+            if stale:
+                data["emails"] = [item for item in data["emails"] if not any(item is gone for gone in stale)]
             if answered:
                 # The reply written in Gmail is that step of the conversation.
                 conversation["stage"] = conversation.get("stage", 0) + 1
@@ -3374,11 +3382,15 @@ class MailService:
                        if (conversation.get(field) or {}).get("at", "")[:10] >= today
                        and email not in booked and not conversation.get("ignored")), key=lambda visit: visit["at"])
 
-    def write_more(self, property_ref, email):
+    def write_more(self, property_ref, email, note="", text=""):
         """«Escrever mais»: one more email to an active customer, a draft in their own conversation (Re: our
         last email). It goes through the queue like any other — prompt or by hand, preview, send — and, being
-        an addition, spends no step of the conversation."""
+        an addition, spends no step of the conversation. 05/10: never saved empty — note, what to add (the AI writes
+        the email from it), or text, the email itself (a draft)."""
         email = str(email or "").strip().casefold()
+        note, text = str(note or "").strip()[:2000], str(text or "").strip()[:20000]
+        if not note and not text:
+            raise ValueError("Escreve o que queres acrescentar.")
         with locked(self.folder):
             ref = self.pick(self.profiles(), property_ref)
             data = self.load(ref)
@@ -3390,8 +3402,10 @@ class MailService:
             if any(recipient_email(item) == email for item in data["emails"]):
                 raise ValueError("Este cliente já tem um email na fila: escreve nesse.")
             key = f"acrescento-{hashlib.sha256((email + now()).encode()).hexdigest()[:12]}"
-            data["emails"].append(self.aux_item(key, "addition", email, conversation, "", reply_status="pending",
-                                                history=list(conversation.get("history") or [])))
+            data["emails"].append(self.aux_item(key, "addition", email, conversation, text,
+                                                reply_status="draft" if text else "pending",
+                                                history=list(conversation.get("history") or []),
+                                                **({"addition_note": note} if note else {})))
             self.save(data, ref)
             self.log("addition_created", reference=ref)
             return {"id": key, "property_ref": ref}
@@ -3417,7 +3431,8 @@ class MailService:
                 conversation = data["conversations"][email]
                 key = f"acrescento-{hashlib.sha256((email + stamp).encode()).hexdigest()[:12]}"
                 data["emails"].append(self.aux_item(key, "addition", email, conversation, "", reply_status="pending",
-                                                    history=list(conversation.get("history") or []), addition_note=note))
+                                                    history=list(conversation.get("history") or []), addition_note=note,
+                                                    addition_scope="all"))
             self.save(data, ref)
             self.log("addition_bulk", reference=ref, audience=audience, created=len(targets))
             return {"created": len(targets), "property_ref": ref}

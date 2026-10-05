@@ -37,16 +37,19 @@ def test_documents_are_ticks_and_asked_only_of_the_short_list(service):
         service.request_documents(REF, "a@example.com")
     service.set_selection(REF, "a@example.com", "shortlist")
     [candidate] = service.contacts()["selection"]
-    assert candidate["documents"]["missing"] == ["Recibos de vencimento", "IRS do ano anterior (ou dos dois anteriores)"]
+    assert candidate["documents"]["missing"] == ["Documento de identificação (CC, passaporte ou título de residência)", "Recibos de vencimento",
+                                                 "IRS do ano anterior (ou dos dois anteriores)"]
     service.set_document(REF, "a@example.com", fiador=True)
+    service.set_document(REF, "a@example.com", "candidato:identificacao", True)
     service.set_document(REF, "a@example.com", "candidato:recibos", True)
     service.set_document(REF, "a@example.com", "candidato:irs", True)
     with pytest.raises(ValueError, match="Documento desconhecido"):
         service.set_document(REF, "a@example.com", "candidato:passaporte", True)
     [candidate] = service.contacts()["selection"]
-    assert candidate["documents"]["missing"] == ["Recibos de vencimento do fiador",
+    assert candidate["documents"]["missing"] == ["Documento de identificação (CC, passaporte ou título de residência) do fiador", "Recibos de vencimento do fiador",
                                                  "IRS do ano anterior (ou dos dois anteriores) do fiador"]
-    assert documents_summary({"docs": {"candidato:recibos": True, "candidato:irs": True}})["complete"]
+    assert not documents_summary({"docs": {"candidato:recibos": True, "candidato:irs": True}})["complete"]  # 05/10: and the ID
+    assert documents_summary({"docs": {"candidato:identificacao": True, "candidato:recibos": True, "candidato:irs": True}})["complete"]
 
     key = service.request_documents(REF, "a@example.com")["id"]
     with pytest.raises(ValueError, match="já está na fila"):

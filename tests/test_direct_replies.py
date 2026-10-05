@@ -101,3 +101,24 @@ def test_mail_to_someone_the_page_does_not_know_is_left_alone(service):
     stranger = direct("d3", 1, "Olá.", thread="t999", to="outra.pessoa@example.com")
     assert read_with_sent(service, [], [stranger])["direct"] == 0
     assert len(service.pending()["properties"][0]["emails"]) == 1
+
+
+def test_an_empty_addition_opened_before_a_reply_written_in_gmail_leaves_the_queue(service):
+    # 05/10: «Escrever mais» opened a draft, then the owner wrote to the customer straight in Gmail: the empty draft goes
+    # (what they had to add went there); one the owner had written in stays
+    read(service, [dict(lead("1"), date=at(30))])
+    draft_and_send(service, "1", "Olá, Ana.")
+    data = service.load(REF)  # an empty one, as «Escrever mais» left them before 05/10
+    first = "acrescento-vazio"
+    data["emails"].append(service.aux_item(first, "addition", CUSTOMER, data["conversations"][CUSTOMER], "",
+                                           reply_status="pending", date=at(3)))
+    service.save(data, REF)
+    read_with_sent(service, [], [direct("d1", 1, "Seguem os meus contactos.")])
+    assert [item["id"] for item in service.pending()["properties"][0]["emails"]] == []
+    second = service.write_more(REF, CUSTOMER, text="Esqueci-me de dizer que a casa tem garagem.")["id"]
+    data = service.load(REF)
+    for item in data["emails"]:
+        item["date"] = at(0.5)
+    service.save(data, REF)
+    read_with_sent(service, [], [direct("d2", 0.2, "Outra coisa.")])
+    assert [item["id"] for item in service.pending()["properties"][0]["emails"]] == [second] and second != first

@@ -725,7 +725,8 @@ def record_actions(base, stage):
 
     for queue in state["properties"]:
         for active in queue.get("active") or []:
-            attempt("api/active/write", {"property_ref": queue["property_ref"], "email": active["email"]}, active["email"])
+            attempt("api/active/write", {"property_ref": queue["property_ref"], "email": active["email"],
+                                         "note": "Lembra que o estacionamento está incluído."}, active["email"])
     for key in ("mariana", "sophie"):
         attempt("api/visits/thanks", {"property_ref": lisboa, "email": PEOPLE[key][1]}, PEOPLE[key][1])
     attempt("api/visits/analyze", {"property_ref": lisboa})

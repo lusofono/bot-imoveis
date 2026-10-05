@@ -30,7 +30,8 @@ nunca como um bloco de frases seguidas. Não escrevas assinatura: o programa acr
 mensagem, em frases curtas e só com o que ele disse (nunca inventes nem avalies); null no que ainda não se sabe. Se não deves responder a um email
 (por exemplo, uma interação sem prompt configurada), deixa reply_text vazio e explica em nota.
 "nota" e "ficha" são para o proprietário, não para o cliente: escreve-as sempre em português de Portugal, seja qual for
-a língua do cliente e da resposta (só o reply_text vai na língua do cliente).
+a língua do cliente e da resposta (só o reply_text vai na língua do cliente); o que o cliente disse noutra língua vai
+traduzido, e o que já estiver na ficha noutra língua passa a português.
 "alerta": só quando a mensagem do cliente pede que o proprietário a leia já — importante (uma reclamação séria, um
 problema no imóvel, dinheiro, um prazo, um pedido que só ele pode decidir), dramatica (aflição, urgência pessoal,
 ameaça) ou insulto (ofensas, desrespeito); escreve então "alerta_motivo", em português de Portugal. Numa mensagem
@@ -427,9 +428,10 @@ def reply_prompt(queue, ids, extra="", only_extra=False, now=None):
         addition = email.get("kind") == "addition"
         if addition and str(email.get("addition_note") or "").strip():
             # 04/10, «Escrever a todos»: the owner's words come with the draft
-            message = ("(sem mensagem nova do cliente: é um acrescento do proprietário a esta conversa, escrito a todos "
-                       "os clientes; escreve só isto, por palavras tuas e no tom da conversa, sem repetir o que já foi "
-                       "dito) " + str(email["addition_note"]).strip())
+            message = ("(sem mensagem nova do cliente: é um acrescento do proprietário a esta conversa"
+                       + (", escrito a todos os clientes" if email.get("addition_scope") == "all" else "")
+                       + "; escreve só isto, por palavras tuas e no tom da conversa, sem repetir o que já foi dito) "
+                       + str(email["addition_note"]).strip())
         elif addition:
             message = ("(sem mensagem nova do cliente: é um acrescento do proprietário a esta conversa; escreve só o "
                        "que as instruções extra pedirem, sem repetir o que já foi dito)")
@@ -936,7 +938,8 @@ def fichas_prompt(profile, people):
     prop = profile.get("property", {})
     parts = [f"Lê as conversas destes clientes sobre o imóvel «{prop.get('description') or prop.get('reference')}» e "
              "preenche a ficha de cada um só com o que o cliente disse (nunca inventes nem avalies); null no que não "
-             "se sabe. Empresa e animais só se o cliente falou disso.",
+             "se sabe. Empresa e animais só se o cliente falou disso. Escreve a ficha sempre em português de Portugal, "
+             "seja qual for a língua do cliente: o que ele disse noutra língua vai traduzido.",
              'Responde só com JSON: {"clientes": [{"id": "c1", "ficha": {"trabalho": "<situação profissional e '
              'rendimentos>", "agregado": "<quem vai viver na casa>", "datas": "<data de entrada e duração>", '
              '"disponibilidade": "<disponibilidade para visitas>", "empresa": null, "animais": null}}]}',
@@ -967,7 +970,8 @@ def ficha_profile_prompt(text):
     """The tenant profile the portal shows behind «Ver perfil», pasted by the owner, into the customer's file."""
     return "\n".join([
         "Este é o perfil de um interessado num arrendamento, copiado da página do portal. Preenche a ficha do cliente "
-        "só com o que está no texto (nunca inventes nem avalies); null no que não estiver.",
+        "só com o que está no texto (nunca inventes nem avalies); null no que não estiver. Escreve-a sempre em "
+        "português de Portugal, traduzindo o que estiver noutra língua.",
         'Responde só com um objeto JSON: {"ficha": {"trabalho": "<situação profissional e rendimentos>", '
         '"agregado": "<quem vai viver na casa>", "datas": "<data de entrada e duração>", "disponibilidade": null, '
         '"empresa": "<só se arrenda por uma empresa>", "animais": "<só se tem animais: qual, tamanho, quantos>"}}',

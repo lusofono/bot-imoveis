@@ -34,13 +34,18 @@ def test_write_more_is_a_draft_in_the_conversation_that_spends_no_step(service):
     read(service, [lead("1")])
     draft_and_send(service, "1", "Olá, Ana.")
     email = queue(service)["active"][0]["email"]
-    key = service.write_more(REF, email)["id"]
+    import pytest
+    with pytest.raises(ValueError, match="o que queres acrescentar"):  # 05/10: never saved empty
+        service.write_more(REF, email)
+    key = service.write_more(REF, email, note="O estacionamento está incluído.")["id"]
     current = queue(service)
     [item] = current["emails"]
     assert item["id"] == key and item["kind"] == "addition" and item["interaction"] == 1
+    assert item["addition_note"] == "O estacionamento está incluído." and not item["reply_text"]
     assert current["active"] == []  # the customer now has an email in the queue
-    prompt = reply_prompt(current, [key], "Diz que o estacionamento está incluído.")
-    assert "interação: acrescento" in prompt and "estacionamento" in prompt
+    prompt = reply_prompt(current, [key])
+    assert "interação: acrescento" in prompt and "O estacionamento está incluído." in prompt
+    assert "escrito a todos" not in prompt  # one customer's, not «Escrever a todos»
     draft_and_send(service, key, "Acrescento: o estacionamento está incluído.")
     conversation = service.load(REF)["conversations"][email]
     assert conversation["stage"] == 1 and conversation["last_text"] == "Acrescento: o estacionamento está incluído."
