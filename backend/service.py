@@ -30,7 +30,7 @@ from .mail import build_digest, build_reply, read_messages
 from .openai_client import (BUILTIN_CONTEXT, BUILTIN_PRICES, CONTEXT_FALLBACK, EFFORTS, MODEL_DEFAULT, PRICE_PER_1K_USD,
                             REASONING, apply_context, apply_effort, apply_hidden, apply_prices, complete, context_of,
                             estimate_cost_usd, models, HIDDEN)
-from .rules import (DAY, DEALS, EMAIL, KNOWLEDGE_FILE, deal_of, RGPD_STATES, SUBJECT_DEFAULT, VISIT_SLOT_DEFAULT, VISIT_STATES,
+from .rules import (after_workdays, DAY, DEALS, EMAIL, KNOWLEDGE_FILE, deal_of, RGPD_STATES, SUBJECT_DEFAULT, VISIT_SLOT_DEFAULT, VISIT_STATES,
                     DOCUMENTS, FICHA_FIELDS, SELECTION_STATES, build_profile, check_profile, clean_ficha, documents_summary, draft_checks,
                     ficha_summary, merge_ficha,
                     survey_alerts, survey_report, check_slot, check_window, clean_property, consent_yes, free_times,
@@ -58,13 +58,18 @@ FICHAS_BATCH = 10  # customers per call in «Preencher fichas com a IA»
 CONTACT_RETENTION_DAYS = 183  # 6 months without consent (decided 21/09); erased on the owner's click
 FIRST_READ_DAYS = 45  # 27/09: how far back a property's first read goes, unless chosen when it was created
 FIRST_READ_RANGE = (1, 365)
+REPLY_TIME_DAYS = 5  # 06/10: the two average reply times count only the last five days (the owner's choice)
 NO_REPLY_DAYS = 3  # 27/09: our last email unanswered this long puts the customer in «Sem resposta», at any step
 # 27/09: the dots in the customers table, in hours, set in Voz e estilo: orange, a message of theirs waiting for us
 # longer than this; blue, their file complete this long and still no visit date from us.
 ALERT_HOURS = {"our_turn_hours": 48, "no_visit_hours": 96}
 ALERT_HOURS_RANGE = (1, 720)
 SURVEY_NOTICE = "Resposta ao inquérito pós-visita registada (vê-a em Visitas e no relatório do imóvel)."
-INACTIVE_AFTER_EMAILS, INACTIVE_AFTER_HOURS = 2, 96  # 26/09: two of ours unanswered, the last four days ago
+# 06/10: silence in two steps (the owner's rule; until then, inactive after two unanswered, the last four days old):
+# «ausente» when the 3rd email of ours in a row is 48 hours without an answer — only marked, still in the rounds and the
+# reminders; «inativo» when the 4th is two working days without one — out of them. Their next email brings them back.
+ABSENT_AFTER_EMAILS, ABSENT_AFTER_HOURS = 3, 48
+INACTIVE_AFTER_EMAILS, INACTIVE_AFTER_WORKDAYS = 4, 2
 HISTORY_LIMIT = 20  # turns kept per conversation, oldest dropped first; also what the prompt gets
 REPORT_SIGNATURE = f"{APP_NAME} Assistente"  # how the ponto de situação signs (27/09), not the agency's voice
 INTERACTION_MARGIN = 0.20  # 27/09: the safety margin on the average cost of an interaction, for quoting a client
@@ -239,6 +244,35 @@ def waited_hours(item):
     if arrived.tzinfo is None:
         arrived = arrived.replace(tzinfo=timezone.utc)
     return round((datetime.now(timezone.utc) - arrived).total_seconds() / 3600, 1)
+
+
+def client_reply_hours(conversations, since=None):
+    """06/10: how long the customers take to answer us, on average: from our email they answered (the last of ours before
+    their message) to their message, in hours. Only turns with their exact time (ts), and since: their answers from then
+    on; None without any."""
+    hours = []
+    for conversation in (conversations or {}).values():
+        history = conversation.get("history") or []
+        for before, turn in zip(history, history[1:]):
+            if before.get("who") == "nos" and turn.get("who") == "cliente":
+                ours, theirs = aware(before.get("ts") or ""), aware(turn.get("ts") or "")
+                if ours and theirs and theirs > ours and (since is None or theirs >= since):
+                    hours.append((theirs - ours).total_seconds() / 3600)
+    return round(sum(hours) / len(hours), 1) if hours else None
+
+
+def no_reply_share(conversations):
+    """06/10: of the customers we wrote to, how many never answered any email of ours (they never count in the average
+    above: it only has answers): {"written", "never"}."""
+    written = never = 0
+    for conversation in (conversations or {}).values():
+        history = conversation.get("history") or []
+        first = next((index for index, turn in enumerate(history) if turn.get("who") == "nos"), None)
+        if first is None:
+            continue
+        written += 1
+        never += not any(turn.get("who") == "cliente" for turn in history[first + 1:])
+    return {"written": written, "never": never}
 
 
 def contact_day(item):
@@ -1372,6 +1406,7 @@ class MailService:
                         item["history"] = list(conversation.get("history") or [])
                         self.append_history(conversation, "cliente", item["customer"].get("message"),
                                             contact_day(item), item.get("date"))
+                        conversation.pop("absent", None)  # 06/10: they wrote again: no longer absent
                         if conversation.get("inactive") and property_active(profiles[ref]):
                             conversation.pop("inactive")  # they wrote again: active again (26/09)
                     else:
@@ -1546,6 +1581,9 @@ class MailService:
             created = email not in data["conversations"]
             conversation = data["conversations"].setdefault(email, {"stage": 0, "sent_message_ids": [], "thread_ids": []})
             mine = [item for item in data["emails"] if recipient_email(item) == email and item.get("kind") not in PROGRAM_KINDS]
+            for item in mine:  # 06/10: the language chosen on the portal (its flag)
+                if (item.get("customer") or {}).get("portal_lang"):
+                    conversation.setdefault("portal_lang", item["customer"]["portal_lang"])
             if created:
                 # A first email answered straight in Gmail: the conversation starts with what the customer wrote.
                 for item in sorted(mine, key=lambda item: aware(item.get("date")) or sent_at):
@@ -2197,6 +2235,8 @@ class MailService:
         conversation = data["conversations"].setdefault(
             item["recipient"]["email"].casefold(), {"stage": 0, "sent_message_ids": [], "thread_ids": []})
         message = (item.get("customer") or {}).get("message")
+        if (item.get("customer") or {}).get("portal_lang"):  # 06/10: the language chosen on the portal (its flag)
+            conversation.setdefault("portal_lang", item["customer"]["portal_lang"])
         if created and item.get("kind") == "lead" and message:
             # 26/09: the portal notice that started it all goes into the history too, before our first reply (until
             # then only later messages were kept, and the file and the prompts lost what the customer first said).
@@ -2408,26 +2448,33 @@ class MailService:
         return found
 
     def mark_inactive(self, ref, data, moment=None):
-        """Silence (26/09): a customer who left at least two of our emails in a row unanswered, the last one four
-        days ago or more, becomes inactive: no rounds, reminders or active card. Nothing is sent to them, and
-        nothing is deleted; their next email brings them back while the property is ATIVO."""
+        """Silence, in two steps (06/10, the owner's rule). Counting our emails since the customer's last message:
+        the 3rd one 48 hours unanswered makes them «ausente» (absent: only marked — still in the rounds and the
+        reminders); the 4th one two working days unanswered makes them inactive: no rounds, reminders or active card.
+        Nothing is sent to them, and nothing is deleted; their next email brings them back while the property is ATIVO.
+        A message of theirs waiting in the queue stops the count; an email of ours waiting there (a proposal, a
+        reminder) does not. Returns how many changed."""
         moment = moment or datetime.now(timezone.utc)
-        waiting = {recipient_email(item) for item in data["emails"]}
+        waiting = {recipient_email(item) for item in data["emails"] if item.get("kind") not in PROGRAM_KINDS}
         count = 0
         for email, conversation in data.get("conversations", {}).items():
             if conversation.get("inactive") or conversation.get("ignored") or email in waiting:
                 continue
-            history = conversation.get("history") or []
-            ours = 0
-            for turn in reversed(history):
+            ours = []  # our emails since their last message, the oldest first
+            for turn in reversed(conversation.get("history") or []):
                 if turn.get("who") != "nos":
                     break
-                ours += 1
-            if ours < INACTIVE_AFTER_EMAILS:
-                continue
-            last = aware(history[-1].get("ts") or history[-1].get("at") or "")
-            if last and (moment - last).total_seconds() >= INACTIVE_AFTER_HOURS * 3600:
-                conversation["inactive"] = {"at": moment.isoformat(), "reason": f"{ours} emails nossos sem resposta"}
+                ours.insert(0, turn)
+            sent = lambda number: aware(ours[number - 1].get("ts") or ours[number - 1].get("at") or "") \
+                if len(ours) >= number else None
+            fourth, third = sent(INACTIVE_AFTER_EMAILS), sent(ABSENT_AFTER_EMAILS)
+            reason = f"{len(ours)} emails nossos sem resposta"
+            if fourth and moment >= after_workdays(fourth, INACTIVE_AFTER_WORKDAYS):
+                conversation.pop("absent", None)
+                conversation["inactive"] = {"at": moment.isoformat(), "reason": reason}
+                count += 1
+            elif third and not conversation.get("absent") and moment - third >= timedelta(hours=ABSENT_AFTER_HOURS):
+                conversation["absent"] = {"at": moment.isoformat(), "reason": reason}
                 count += 1
         return count
 
@@ -2484,6 +2531,16 @@ class MailService:
             address = recipient_email(email)
             if not address or email.get("owner"):
                 continue
+            # 06/10: the language the customer chose on the portal (its flag), until they write in another one
+            portal_lang = ((data.get("conversations") or {}).get(address) or {}).get("portal_lang") \
+                or (email.get("customer") or {}).get("portal_lang")
+            if portal_lang:
+                email["portal_lang"] = portal_lang
+            # 06/10: silent customers, marked on their cards too
+            talk = (data.get("conversations") or {}).get(address) or {}
+            if talk.get("inactive") or talk.get("absent"):
+                email["silence"] = {"state": "inativo" if talk.get("inactive") else "ausente",
+                                    "reason": (talk.get("inactive") or talk.get("absent") or {}).get("reason") or ""}
             context = self.context_of(data, address, calls.get(address, []))
             email["context"] = context
             email["contact_counts"] = {"calls": sum(1 for entry in context if entry["source"] == "call"),
@@ -2619,7 +2676,7 @@ class MailService:
                 column = "visitou"
             elif email in booked:
                 column = "marcada"
-            elif email not in waiting and stage and (conversation.get("inactive") or silent):
+            elif email not in waiting and stage and (conversation.get("inactive") or conversation.get("absent") or silent):
                 column = "sem_resposta"
             else:
                 complete = ficha_summary(conversation.get("ficha") or (new.get(email) or {}).get("ficha"))["complete"]
@@ -3177,21 +3234,38 @@ class MailService:
             windows = [w for w in agenda["windows"] if w.get("recipients")]
             if not windows:
                 return {"property_ref": ref, "window": None, "recipients": []}
-            window = next((w for w in windows if w["id"] == window_id), None) if window_id else None
-            if window is None:
-                window = max(windows, key=lambda w: w.get("created_at") or "")
             data = self.load(ref)
+            # 06/10: a window's proposals still in the queue, not sent
+            unsent_of = lambda w: {(recipient_email(item) or "").casefold() for item in data["emails"]
+                                   if (item.get("visit_window") or {}).get("id") == w["id"]}
+            went_out = lambda w: any(person["email"].casefold() not in unsent_of(w) for person in w["recipients"])
+            created = lambda w: w.get("created_at") or ""
+            window = next((w for w in windows if w["id"] == window_id), None) if window_id else None
+            newest = max(windows, key=created)
+            if window is None:
+                # 06/10: the last round that went out; a newer one prepared and not sent is said apart (it showed alone,
+                # everyone «por enviar», as if the round sent the day before had gone nowhere)
+                window = max([w for w in windows if went_out(w)] or windows, key=created)
+            waiting_round = newest if newest is not window and not went_out(newest) else None
             states = {c["email"]: c for c in self.candidates(ref, data)}
             booked_at = {slot["customer"]: slot["at"] for slot in agenda["slots"]}
+            # this round's proposal still in the queue: «por enviar», not «por responder» (an email of theirs waiting)
+            unsent = unsent_of(window)
+            theirs = {(recipient_email(item) or "").casefold() for item in data["emails"] if item.get("kind") not in PROGRAM_KINDS}
             recipients = []
             for person in window["recipients"]:
                 info = states.get(person["email"], {})
                 state = info.get("state", "ok")
+                if state == "pending" and person["email"].casefold() in unsent:
+                    state = "unsent"
+                elif state == "pending" and person["email"].casefold() not in theirs:
+                    state = "ok"  # only an email of ours waits for them (another round's): this one went, no answer yet
                 recipients.append({"email": person["email"], "name": person.get("name") or info.get("name") or "",
                                    "state": state, "reason": info.get("reason", ""),
                                    "visit_at": booked_at.get(person["email"]) if state == "booked" else None})
             return {"property_ref": ref, "window": {key: window[key] for key in ("day", "start", "end", "created_at")},
-                    "recipients": recipients}
+                    "recipients": recipients,
+                    "unsent_round": {key: waiting_round[key] for key in ("day", "start", "end")} if waiting_round else None}
 
     def visit_analysis_prompt(self, property_ref=None):
         """Read-only prompt: what active clients have said, for the owner to read (via ChatGPT or the API)
@@ -3985,7 +4059,8 @@ class MailService:
             conversations = {(email, ref): conversation for ref in profiles
                              for email, conversation in self.load(ref).get("conversations", {}).items()}
             rows = sorted(({**row, "interactions": (conversations.get((row["email"], row["imovel"])) or {}).get("stage", 0),
-                            "inactive": bool((conversations.get((row["email"], row["imovel"])) or {}).get("inactive"))}
+                            "inactive": bool((conversations.get((row["email"], row["imovel"])) or {}).get("inactive")),
+                            "absent": bool((conversations.get((row["email"], row["imovel"])) or {}).get("absent"))}
                            for row in load_contacts(self.folder).values()),
                           key=lambda row: (row["imovel"], (row["nome"] or row["email"]).casefold()))
             return {"contacts": rows, "properties": list(profiles), "rgpd_states": RGPD_STATES,
@@ -4412,6 +4487,9 @@ class MailService:
                 "attention": status["uncertain"] + status["error"] + status["sending"],
                 "answered": sum(conversation.get("stage", 0) for conversation in (data.get("conversations") or {}).values()),
                 "reply_hours": None, "oldest_wait_hours": max([hours for hours in waits if hours is not None], default=None),
+                "client_reply_hours": client_reply_hours(data.get("conversations"),  # 06/10
+                                                         datetime.now(timezone.utc) - timedelta(days=REPLY_TIME_DAYS)),
+                "no_reply": no_reply_share(data.get("conversations")),
                 # 04/10: enough for its panel in Imóveis (the instruments), the rest reads zero there
                 "customers": len(data.get("conversations") or {}), "last_read_at": data.get("last_read_at"),
                 "visits_booked": sum(1 for slot in load_visits(self.folder, ref)["slots"] if slot["at"][:10] >= date.today().isoformat()),
@@ -4569,6 +4647,10 @@ class MailService:
             # Which property each message ID belongs to: the queue, and the replied and dismissed IDs every
             # queue keeps for good. Old log events carry no property; this is how they are attributed.
             owner = {}
+            # 06/10: the two reply times from the last REPLY_TIME_DAYS only (all time, the start-up's backlog — emails of
+            # two weeks before, answered on 21–24/09 — made ours 163 h)
+            recent = datetime.now(timezone.utc) - timedelta(days=REPLY_TIME_DAYS)
+            test_waited = {}  # the test property's own, never in the totals
             today_iso = today.isoformat()
             for ref in refs:
                 data = self.load(ref)
@@ -4620,6 +4702,8 @@ class MailService:
                                    "blocked": blocked, "answered": answered, "customers": len(conversations),
                                    "attention": status["uncertain"] + status["error"] + status["sending"],
                                    "visits_booked": visits_booked, "owners_pending": owners_pending,
+                                   "client_reply_hours": client_reply_hours(conversations, recent),  # 06/10
+                                   "no_reply": no_reply_share(conversations),
                                    "reply_hours_max": self.panel(ref)["reply_hours_max"],
                                    "api_fuel": self.api_fuel(ref, events),
                                    "petrol": self.visit_petrol(self.panel(ref), slots),
@@ -4644,6 +4728,11 @@ class MailService:
                     arrived.update({key: day for key, day in event["received"].items() if str(key) not in test_ids})
                 elif event.get("event") == "send" and (event.get("reference") in test_refs
                                                        or str(event.get("message_id")) in test_ids):
+                    # 06/10: never in the Painel's numbers, but the test property shows its own reply time
+                    hours, sent_at = event.get("waited_hours"), aware(event.get("at") or "")
+                    if (event.get("status") == "sent" and event.get("reference") in test_refs and sent_at and sent_at >= recent
+                            and isinstance(hours, (int, float)) and event.get("kind") not in PROGRAM_KINDS):
+                        test_waited.setdefault(event["reference"], []).append(hours)
                     continue
                 elif event.get("event") == "send" and event.get("status") == "sent" and event.get("kind") != "owner":
                     sent[bucket(event.get("at"))] += 1
@@ -4652,9 +4741,11 @@ class MailService:
                         per[ref]["sent"][bucket(event.get("at"))] += 1
                     hours = event.get("waited_hours")
                     if isinstance(hours, (int, float)) and event.get("kind") not in PROGRAM_KINDS:
-                        waited.append(hours)
-                        if ref in per:
-                            per[ref]["waited"].append(hours)
+                        sent_at = aware(event.get("at") or "")
+                        if sent_at and sent_at >= recent:  # 06/10: the last REPLY_TIME_DAYS
+                            waited.append(hours)
+                            if ref in per:
+                                per[ref]["waited"].append(hours)
                         try:
                             day = (datetime.fromisoformat(event["at"]) - timedelta(hours=hours)).date().isoformat()
                         except (KeyError, TypeError, ValueError):
@@ -4721,7 +4812,9 @@ class MailService:
                                      "unattributed": usage_of(unattributed)},
                     "api_fuel": self.api_fuel(None, events),
                     # 04/10: the test property's row for «Por imóvel» (never in the totals nor the ponto de situação)
-                    "test_properties": [self.queue_numbers(ref, profiles[ref]) for ref in sorted(test_refs & set(profiles))],
+                    "test_properties": [{**self.queue_numbers(ref, profiles[ref]), "reply_hours": round(
+                        sum(test_waited[ref]) / len(test_waited[ref]), 1) if test_waited.get(ref) else None}
+                        for ref in sorted(test_refs & set(profiles))],
                     # 02/10: the test property's tank, apart from the properties (it never counts in the Painel)
                     "test_tanks": [{"property_ref": ref, "api_fuel": self.api_fuel(ref, events),
                                     "openai_usage": {"period": usage_of(mine["period"]), "all_time": usage_of(mine["all_time"])}}

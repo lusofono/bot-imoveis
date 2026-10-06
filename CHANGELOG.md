@@ -15,6 +15,91 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.134.2 — 06/10/2026
+
+- **Imóveis: os tempos de resposta e quem nunca respondeu:** nos números por cima dos instrumentos do imóvel, «Tempo
+  médio até resposta» dá lugar aos três cartões dos Emails: «O nosso tempo médio de resposta (5 dias)», «Tempo médio
+  de resposta dos clientes (5 dias)» e «Clientes que nunca responderam», com o gauge. Ficam 10 números, em duas linhas
+  de cinco. O imóvel de teste também os mostra.
+
+## α.134.1 — 06/10/2026
+
+- **Os tempos de resposta só dos últimos 5 dias:** as 163 h de um dos imóveis vinham quase todas do arranque da aplicação. De
+  21 a 24/09 foram respondidos emails que esperavam há duas semanas, alguns há 439 h, porque o programa ainda não existia.
+  Os dois tempos médios, o nosso e o dos clientes, passam a contar só as respostas dos últimos 5 dias, e o nome do
+  cartão diz «(5 dias)».
+- **Imóvel de teste:** mostra o seu próprio tempo de resposta no painel dos Emails, mas continua de fora dos números
+  globais do Painel.
+
+## α.134.0 — 06/10/2026
+
+- **Clientes que nunca responderam:** um cartão novo no painel dos Emails, com a percentagem e um gauge por baixo. Mostra,
+  dos clientes a quem escrevemos, quantos nunca responderam a nenhum email nosso. Passar o rato mostra «N de M». Fica
+  laranja a partir de 50 %. Esses clientes já não contam para o «Tempo médio de resposta dos clientes», que só usa as
+  respostas que houve. O painel fica com 10 números, em duas linhas de cinco.
+
+## α.133.0 — 06/10/2026
+
+- **Os dois tempos de resposta, separados:** «Tempo médio até resposta» era só o nosso (desde que o email do cliente
+  chega até lhe respondermos) e passa a chamar-se «O nosso tempo médio de resposta». Ao lado, um cartão novo, «Tempo
+  médio de resposta dos clientes»: desde o nosso email até o cliente responder, só com os que responderam. Passar o
+  rato por cima explica cada um. O painel dos Emails fica com 9 números, em 5 colunas, com o número grande a ocupar
+  duas linhas.
+
+## α.132.0 — 06/10/2026
+
+- **Ausente e inativo:** contam-se os nossos emails desde a última mensagem do cliente. Quando o 3.º fica 48 horas sem
+  resposta, o cliente fica «ausente»: continua nas rondas e nos lembretes, mas aparece marcado em Clientes, no cartão
+  e em «Sem resposta». Quando o 4.º fica 2 dias úteis sem resposta (sem fins de semana nem feriados nacionais), fica
+  «inativo» e sai das rondas e dos lembretes. Volta a ativo quando escreve. Antes bastavam dois emails sem resposta e
+  4 dias, e um email nosso à espera na fila (como a proposta de uma ronda) travava a contagem.
+- **Clientes:** os ausentes ficam no fim dos ativos, antes dos inativos.
+- **Última ronda = a que saiu:** a lista «Última ronda» mostrava a ronda de 07/10, preparada por engano e nunca enviada,
+  com todos «por enviar». Passa a mostrar a última ronda enviada, com cada cliente «enviado, a aguardar resposta», e
+  avisa à parte que há uma ronda mais recente ainda por enviar.
+
+## α.131.0 — 06/10/2026
+
+- **Clientes: os inativos no fim e listas mais curtas:** em cada imóvel aparecem primeiro os clientes ativos e no fim os
+  inativos. Dos ativos mostram-se os primeiros 20 e dos inativos os primeiros 5. O resto fica numa linha «▸ Mais N…» que
+  abre e fecha, e continua aberta quando a página se redesenha. O título do imóvel diz também quantos são inativos.
+  Ao pesquisar, aparece tudo o que for encontrado.
+- **Emails: «Por responder» só conta o que os clientes escreveram:** um email nosso preparado para enviar (uma proposta
+  tirada da ronda com «Individualizar», um lembrete, um email extra, um agradecimento) contava como «1 Por
+  responder neste imóvel». Passa a aparecer à parte, por baixo do número: «+ 1 email nosso por enviar (não são
+  mensagens de clientes)».
+
+## α.130.2 — 06/10/2026
+
+- **A nossa proposta, não a do cliente:** num cartão de proposta de visita, a nota dizia só «Proposta de visita: quarta-feira,
+  07/10, das 10:00 às 13:00.», e parecia que o cliente tinha proposto a data. Agora diz «A nossa proposta de visita
+  (ronda): … Não há mensagem nova do cliente: este email é nosso.»
+- **O som que fica preso no Safari:** o separador mostrava o altifalante, mas não se ouvia nada até fechar o browser
+  (o som ia para uma saída que já não estava lá, como auscultadores ou um ecrã). Agora, ao ligar «Sons», o som da página
+  recomeça do zero, e o mesmo acontece sozinho quando as saídas de som mudam.
+- **O som diz o que falha:** se o browser não conseguir abrir um som gravado, ou não deixar tocar som na página, aparece
+  um aviso uma vez (e fica na consola), em vez de ficar tudo em silêncio sem pista nenhuma.
+
+## α.130.1 — 06/10/2026
+
+- **O som depois de recarregar:** o browser só deixa tocar depois do primeiro gesto na página, e só um clique num botão o desbloqueava. Agora qualquer clique ou tecla (uma alavanca, um interruptor, uma lista) desbloqueia o som, e o ralenti da garagem começa a tocar.
+
+## α.130.0 — 06/10/2026
+
+- **A bandeira do Idealista:** o aviso de um pedido traz uma bandeira antes do nome do cliente (um emoji, por exemplo
+  🇬🇧), que é a língua que ele escolheu no portal. Passa a ser lida e guardada no cliente. A IA escreve-lhe nessa língua
+  e, se ele escrever noutra, continua na dele. Na ronda de visitas, quem ainda não escreveu nada recebe o texto da língua
+  da bandeira. Vale para os pedidos que chegarem a partir de agora.
+- **Ronda: línguas com nome:** «inglês · escreve em espanhol» em vez de «escreve em es». «und» (indeterminada, a IA
+  não sabia a língua) passa a «língua desconhecida», com a explicação ao passar o rato.
+- **Última ronda: «por enviar»:** enquanto a proposta da ronda não sai, o cliente aparece «por enviar» («a proposta
+  ainda não saiu»), e não «por responder», como se nos devesse uma resposta. Se ainda ninguém a recebeu, o título diz
+  «ainda por enviar». «Por responder» fica só para quem nos escreveu e espera a nossa resposta.
+- **A mensagem do cliente em primeiro:** na conversa de um cartão, a última mensagem do cliente aparece sempre no topo.
+  Antes, quando depois dela só havia emails nossos (uma ronda, um lembrete), ficava no fundo, por baixo de todos os
+  nossos. Uma conversa sem nenhuma mensagem do cliente passa a dizê-lo.
+- **Visitas:** sem «PASSO 01» por cima do botão «Atualizar visitas» (menos uma linha).
+
 ## α.129.0 — 06/10/2026
 
 - **Visitas: o cartão do topo como nos Emails:** à esquerda, «AGENDA DE VISITAS» com a última atualização («Última atualização: HOJE, terça-feira, …») e até quantos dias para trás; à direita, «PASSO 01» com o botão «Atualizar visitas». A hora fica guardada em cada imóvel sempre que a IA lê as conversas.

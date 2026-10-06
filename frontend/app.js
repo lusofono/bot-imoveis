@@ -2,6 +2,8 @@
 // TOKEN is written into index.html by the server at each start and goes with every API call.
 const STATUS ={pending: 'por responder', draft: 'rascunho', error: 'erro no envio', sending: 'a enviar', uncertain: 'envio incerto'};
 const AUX_KINDS = ['reminder', 'consent_request', 'visits_closed', 'addition'];
+// 06/10: every email the program prepares (backend PROGRAM_KINDS): ours to send, never a customer's message to answer
+const OUR_KINDS = new Set([...AUX_KINDS, 'visit_thanks', 'visit_reminder', 'docs_request', 'visit_missed', 'visit_proposal']);
 const FIELDS = ['reference', 'sender', 'deal', 'listing_id', 'listing_url', 'advertiser', 'advertised_rent_eur', 'description',
   'owner_email'];
 const $ = id => document.getElementById(id);
@@ -206,12 +208,31 @@ function renderSoundSwitch() {
   toggle.hidden = !available;
   toggle.setAttribute('aria-pressed', String(available && soundsOn()));
 }
+// 06/10: after a reload the browser keeps the sound locked until the first gesture on the page, and only a button's
+// click unlocked it: a lever, a switch, a list or a key left the garage's idle (started at load) silent. Any of them now.
+['pointerdown', 'keydown'].forEach(type => document.addEventListener(type, () => {
+  if (audio?.state === 'suspended' && soundsOn()) audio.resume().catch(() => {});
+}, {capture: true}));
+// 06/10: Safari can leave the page's audio «playing» to an output that is gone (headphones, a screen): the tab shows the
+// speaker and nothing is heard until the browser closes. Turning «Sons» on, or the outputs changing, starts it anew.
+function freshAudio() {
+  try { audio?.close(); } catch { /* already closed */ }
+  audio = null; ambientLoop = null;
+  for (const cache of [SAMPLES, PLAYING]) for (const key of Object.keys(cache)) delete cache[key];
+}
+navigator.mediaDevices?.addEventListener?.('devicechange', () => { if (audio) { freshAudio(); updateAmbient(); } });
 $('sound-toggle').addEventListener('click', () => {
   const on = !soundsOn();
+  if (on) freshAudio();
   try { localStorage.setItem('bot-mail-sounds', on ? 'on' : 'off'); } catch { /* Storage may be unavailable. */ }
   renderSoundSwitch();
   if (on) playSound('read');  // this click unlocks the audio, and the bell (or the radio) says what turned on
   updateAmbient();  // 06/10: the garage's idle starts or stops with the switch
+  // 06/10: the browser may still hold the sound (a muted tab, a policy): said, not silent
+  if (on) setTimeout(() => {
+    if (audio && audio.state !== 'running') soundTrouble(`O browser não deixou tocar som nesta página (estado: ${audio.state}). `
+      + 'Vê se o separador não está em silêncio e carrega outra vez em «Sons».');
+  }, 800);
 });
 // Every button clicks in a skin that has a click — before its own action runs (capture), so a button that
 // disables itself while working still sounds. The Sons switch plays its own sound.
@@ -354,8 +375,19 @@ function shipBell(context) {
 // as a fallback while a clip loads or if it cannot be played.
 const SAMPLES = {}, PLAYING = {};
 function loadSample(context, name) {
-  return SAMPLES[name] ??= fetch(`sounds/${name}.m4a`).then(response => response.arrayBuffer())
-    .then(bytes => context.decodeAudioData(bytes)).catch(() => null);
+  return SAMPLES[name] ??= fetch(`sounds/${name}.m4a`).then(response => {
+    if (!response.ok) throw new Error(`o servidor respondeu ${response.status}`);
+    return response.arrayBuffer();
+  }).then(bytes => context.decodeAudioData(bytes)).catch(error => {
+    // 06/10: said once, not silent: a sound that never plays left no clue
+    soundTrouble(`O browser não conseguiu abrir o som gravado «${name}» (${error?.message || error}): toca um som sintetizado.`);
+    return null;
+  });
+}
+let soundWarned = false;
+function soundTrouble(text) {
+  console.warn(text);
+  if (!soundWarned) { soundWarned = true; toast(text, 'warn'); }
 }
 function playSample(context, name, fallback, rate = 1, level = 0.8) {
   loadSample(context, name).then(buffer => {
@@ -1941,6 +1973,9 @@ function renderQueueBoard(queue) {
   if (activeTab === 'replies') refreshQueueMetrics();
   const emails = (queue.emails || []).filter(email => !email.round && !email.owner);
   const open = emails.filter(email => !email.answered_direct), direct = emails.length - open.length;
+  // 06/10: «por responder» is what customers wrote; an email of ours prepared to send (a proposal taken out of the round,
+  // a reminder, an extra email, a thanks) is not, and is counted apart
+  const ours = open.filter(email => email.visit_window || OUR_KINDS.has(email.kind)).length, theirs = open.length - ours;
   const drafted = open.filter(email => !email.blocked && (email.reply_text || '').trim()).length;
   const blocked = open.filter(email => email.blocked).length;
   const owners = (queue.emails || []).filter(email => email.owner && !email.outbound
@@ -1948,16 +1983,24 @@ function renderQueueBoard(queue) {
   const numbers = [...(queueMetrics?.properties || []), ...(queueMetrics?.test_properties || [])]
     .find(item => item.property_ref === queue.property_ref);
   box.replaceChildren(
-    el('article', {class: 'metric queue-main' + (open.length ? ' bad' : ' ok')},
-      el('div', {class: 'value'}, String(open.length)),
-      el('div', {class: 'label'}, open.length ? 'Por responder neste imóvel' : 'Tudo respondido neste imóvel'),
+    el('article', {class: 'metric queue-main' + (theirs ? ' bad' : ' ok')},
+      el('div', {class: 'value'}, String(theirs)),
+      el('div', {class: 'label'}, theirs ? 'Por responder neste imóvel' : 'Tudo respondido neste imóvel'),
+      ours ? el('div', {class: 'label muted'}, `+ ${ours} ${ours === 1 ? 'email nosso' : 'emails nossos'} por enviar `
+        + '(não são mensagens de clientes)') : null,
       direct ? el('div', {class: 'label muted'}, `+ ${direct} já respondido${direct === 1 ? '' : 's'} no Gmail, por retirar`) : null),
     metricCard(open.length - drafted - blocked, 'Sem rascunho: «Gerar respostas»', 'warn'),
     metricCard(drafted, 'Rascunhos prontos: rever e enviar', 'ok'),
     metricCard(blocked, 'Bloqueados: tratar à mão', 'bad'),
     metricCard(owners, 'Proprietários por responder', 'warn'),
     metricCard(numbers ? numbers.answered : '—', 'Respostas enviadas'),
-    metricCard(numbers ? hoursText(numbers.reply_hours) : '—', 'Tempo médio até resposta'),
+    // 06/10: the two times apart: ours (the customer's email to our reply) and theirs (our email to their answer)
+    metricCard(numbers ? hoursText(numbers.reply_hours) : '—', 'O nosso tempo médio de resposta (5 dias)', null,
+      {title: 'Desde que o email do cliente chega até lhe enviarmos a resposta, nas respostas dos últimos 5 dias.'}),
+    metricCard(numbers ? hoursText(numbers.client_reply_hours) : '—', 'Tempo médio de resposta dos clientes (5 dias)', null,
+      {title: 'Desde que lhes enviamos um email até eles responderem, nas respostas dos últimos 5 dias. Só conta quem '
+        + 'respondeu: quem nunca respondeu está no número ao lado.'}),
+    noReplyCard(numbers?.no_reply),
     metricCard(numbers ? numbers.visits_booked || 0 : '—', 'Visitas marcadas'));
 }
 
@@ -2218,14 +2261,23 @@ function ownerCard(email, ref) {
 
 function conversationTurns(turns, current, dates) {
   const newest = [...turns].reverse();
+  // 06/10: the customer's last message always first: after it only ours (a round, a reminder), it sat at the bottom of
+  // the box, under all of ours, and the card seemed to have only our emails
+  const theirs = newest.findIndex(turn => turn.who === 'cliente');
+  if (theirs > 0) newest.unshift(...newest.splice(theirs, 1));
+  const ourLast = theirs > 0 ? 1 : 0;
   // 01/10: «ours» or «theirs», so ours can be greyed and theirs stand out on the theme's own background
-  return newest.map((turn, index) => el('div', {class: 'history-turn ' + (turn.who === 'cliente' ? 'theirs' : 'ours')
+  return [
+    theirs < 0 && turns.length && el('p', {class: 'muted small history-none'},
+      'Nenhuma mensagem escrita pelo cliente nesta conversa: o pedido do portal veio sem texto, ou só temos os nossos emails.'),
+    ...newest.map((turn, index) => el('div', {class: 'history-turn ' + (turn.who === 'cliente' ? 'theirs' : 'ours')
       + (current?.has(turn) ? ' current' : '')},
     el('p', {class: 'muted small'}, turn.who === 'cliente' ? 'Cliente' : 'Nós', ' · ' + turnWhen(turn, dates),
       current?.has(turn) ? ' · por responder' : '',
-      index === 0 && turn.who !== 'cliente' ? ' · a nossa última resposta, ainda sem resposta do cliente' : '',
+      index === 0 && theirs > 0 ? ' · a última mensagem do cliente; depois dela, só emails nossos (abaixo)' : '',
+      index === ourLast && turn.who !== 'cliente' ? ' · a nossa última resposta, ainda sem resposta do cliente' : '',
       copyButton(turn.text, 'Copiar esta mensagem')),
-    el('pre', {}, turn.text)));
+    el('pre', {}, turn.text)))].filter(Boolean);
 }
 
 // 05/10: an addition's card says, in plain words, what it is (an extra email of ours, not a message of the customer's),
@@ -2244,8 +2296,10 @@ function additionNote(email) {
     + 'foi enviado. Se já não precisas dele, carrega em «Cancelar email extra»)';
 }
 function programNote(email) {
+  // 06/10: «Proposta de visita: …» read as if the customer had proposed it: it is ours, and nothing new came from them
   return email.visit_window
-    ? `Proposta de visita: ${dayLabel(email.visit_window.day)}, das ${email.visit_window.start} às ${email.visit_window.end}.`
+    ? `A nossa proposta de visita${email.round ? ' (ronda)' : ''}: ${dayLabel(email.visit_window.day)}, das `
+      + `${email.visit_window.start} às ${email.visit_window.end}. Não há mensagem nova do cliente: este email é nosso.`
     : email.kind === 'visit_thanks' ? `(agradecimento pela visita de ${slotLabel(email.visit_done?.at || '')}, com o inquérito e a ficha de visita`
       + (email.visit_done?.public ? `; nota pública: «${email.visit_done.public}»)` : ')')
     : email.kind === 'addition' ? additionNote(email)
@@ -2518,6 +2572,10 @@ function card(email, index, list) {
           + 'decide agora (lista cinzenta, propor visita ou deixar seguir).'}, email.interaction + '.ª interação · conclusiva')
         : email.interaction && el('span', {class: 'tag'}, email.interaction + '.ª interação'),
       contactCounts(email.contact_counts),
+      // 06/10: a silent customer, on the card too
+      email.silence && el('span', {class: 'tag ' + (email.silence.state === 'inativo' ? 'warn' : 'draft'),
+        title: email.silence.reason + (email.silence.state === 'inativo' ? ': fora das rondas e dos lembretes até voltar a escrever.'
+          : ': continua nas rondas e nos lembretes; ao 4.º sem resposta, 2 dias úteis depois, fica inativo.')}, email.silence.state),
       email.merged?.length > 1 && el('span', {class: 'tag visit', title: 'Vários emails deste cliente juntos: uma só resposta responde a todos.'},
         email.merged.length + ' mensagens'),
       el('span', {class: 'tag' + (email.reply_status === 'draft' ? ' draft' : '')}, STATUS[email.reply_status] || email.reply_status || ''),
@@ -2858,6 +2916,17 @@ function ago(value) {
 
 // A number that only informs (27/09): no click, no jump to another tab; what to do is in «A fazer».
 // title: what is behind it, on hover.
+// 06/10: of the customers we wrote to, the share who never answered any email of ours, with a gauge under the number
+function noReplyCard(share) {
+  const pct = share?.written ? Math.round(100 * share.never / share.written) : null;
+  const fill = el('span', {class: 'gauge-fill'});
+  if (pct != null) fill.style.setProperty('--fill', pct + '%');
+  return el('article', {class: 'metric gauge-card' + (pct >= 50 ? ' warn' : ''), title: share?.written
+      ? `${share.never} de ${share.written} clientes a quem escrevemos nunca responderam a nenhum email nosso.` : ''},
+    el('div', {class: 'value'}, pct == null ? '—' : pct + '%'),
+    el('div', {class: 'gauge', 'aria-hidden': 'true'}, fill),
+    el('div', {class: 'label'}, 'Clientes que nunca responderam'));
+}
 function metricCard(value, label, kind, {title} = {}) {
   return el('article', {class: 'metric' + (kind && value ? ' ' + kind : ''), title},
     el('div', {class: 'value'}, String(value)), el('div', {class: 'label'}, label));
@@ -2967,7 +3036,7 @@ function activitySummary(data) {
   return [
     stat('requests', 'Pedidos recebidos', requests.toLocaleString('pt-PT'),
       `≈ ${(requests / span).toLocaleString('pt-PT', {maximumFractionDigits: 1})} por dia`),
-    stat('sent', 'Respostas enviadas', sent.toLocaleString('pt-PT'), `tempo médio até resposta: ${hoursText(data.reply_hours)}`),
+    stat('sent', 'Respostas enviadas', sent.toLocaleString('pt-PT'), `o nosso tempo médio de resposta (5 dias): ${hoursText(data.reply_hours)}`),
     stat(null, (data.bucket_days || 1) > 1 ? 'Período com mais pedidos' : 'Dia com mais pedidos',
       peak && peak.requests ? peak.requests.toLocaleString('pt-PT') : '—',
       peak && peak.requests ? bucketLabel(peak, data.bucket_days || 1) : 'ainda sem pedidos')];
@@ -3502,18 +3571,27 @@ async function loadOwnersDigest() { renderOwnersDigest(await call('api/digest'))
 let roundMoreOpen = false;
 function roundSummaryContent(data, shown = Infinity) {
   if (!data.window) return [el('p', {class: 'muted small'}, 'Ainda sem nenhuma ronda para este imóvel.')];
-  const stateLabel = {...CLIENT_STATE_LABEL, nao_quer: 'não quer visitar', outra_data: 'só pode noutra data'};
+  // 06/10: «por enviar» while the round's proposal to them has not gone out (it said «por responder», as if they owed
+  // us an answer); «por responder» only for an email of theirs waiting for ours
+  const stateLabel = {...CLIENT_STATE_LABEL, nao_quer: 'não quer visitar', outra_data: 'só pode noutra data', unsent: 'por enviar'};
   const note = person => person.state === 'ok' ? 'enviado, a aguardar resposta'
-    : person.state === 'pending' ? 'ainda não foi enviado' : person.reason || '';
+    : person.state === 'unsent' ? 'a proposta ainda não saiu' : person.state === 'pending' ? 'escreveu e espera a nossa resposta'
+    : person.reason || '';
   const row = person => el('div', {class: 'client-row'},
     el('span', {}, shortName(person.name) || person.email),
-    el('span', {class: 'tag' + (person.state === 'booked' ? ' visit' : person.state === 'pending' ? ' draft' : '')},
+    el('span', {class: 'tag' + (person.state === 'booked' ? ' visit' : person.state === 'unsent' ? ' draft' : '')},
       person.visit_at ? slotLabel(person.visit_at) : (stateLabel[person.state] || person.state)),
     el('span', {class: 'muted small'}, note(person)));
   const rest = data.recipients.slice(shown);
+  const unsent = data.recipients.length && data.recipients.every(person => person.state === 'unsent');
   return [
     el('p', {class: 'muted small'},
-      `Última ronda: ${dayLabel(data.window.day)}, das ${data.window.start} às ${data.window.end}`),
+      `Última ronda: ${dayLabel(data.window.day)}, das ${data.window.start} às ${data.window.end}`
+      + (unsent ? ' · ainda por enviar' : '')),
+    // 06/10: a newer round prepared and not sent, said apart (the last round is the one that went out)
+    data.unsent_round && el('p', {class: 'alert warn round-unsent'}, `Há uma ronda mais recente ainda por enviar: `
+      + `${dayLabel(data.unsent_round.day)}, das ${data.unsent_round.start} às ${data.unsent_round.end}. Está preparada acima; `
+      + 'se foi por engano, «Cancelar esta ronda».'),
     el('div', {class: 'client-list'}, data.recipients.slice(0, shown).map(row)),
     rest.length && el('details', {class: 'round-more', open: roundMoreOpen,
       ontoggle: event => { roundMoreOpen = event.currentTarget.open; }},
@@ -3542,7 +3620,7 @@ function roundGroups(data) {
     [of('outra_data'), n => plural(n, 'só pode noutra data', 'só podem noutra data')],
     [of('closed'), n => plural(n, 'já levou o email de fecho', 'já levaram o email de fecho')],
     [names.ignored || [], n => `${n} na lista de ignorados`],
-    [names.inactive || [], n => plural(n, 'inativo', 'inativos') + ' (dois emails nossos sem resposta)']]
+    [names.inactive || [], n => plural(n, 'inativo', 'inativos') + ' (o 4.º email nosso 2 dias úteis sem resposta)']]
     .filter(([list], index) => index === 0 || list.length).map(([list, text]) => ({text: text(list.length), names: list}));
 }
 // 05/10: «Agora: …», a line that opens to the names of each group (kept open or closed while the panel redraws)
@@ -3656,6 +3734,11 @@ function renderVisitsRound() {
 // text, each customer's greeting and the short summaries in other languages, then send them all — each customer gets
 // it in their own conversation. «Individualizar» takes one customer to Comunicações, to be answered on their own.
 const ROUND_LANGS = {pt: 'português', en: 'inglês', es: 'espanhol'};  // 06/10: Spanish a text of its own
+// 06/10: a language by its name, not its code («escreve em und» said nothing); «und» is no language: the AI could not tell
+function langName(code) {
+  if (!code || code === 'und') return '';
+  try { return new Intl.DisplayNames(['pt-PT'], {type: 'language'}).of(code) || code; } catch { return ROUND_LANGS[code] || code; }
+}
 let roundScroll = false;  // after «Preparar o texto da ronda»: show the draft, right under the buttons
 const roundOff = new Set();  // 06/10: the round's customers switched off (left out when the others are sent)
 const stepNum2 = () => el('span', {class: 'step-num', 'aria-hidden': 'true'}, '2');
@@ -3716,9 +3799,12 @@ function renderRoundCommon(box, data, reload, actions) {
           if (event.target.checked) roundOff.delete(item.id); else roundOff.add(item.id);
           sendLabel();
         }}), el('span', {}, shortName(item.name) || item.email)),
-      el('span', {class: 'tag' + (item.reply_status === 'error' ? ' warn' : '')},
+      el('span', {class: 'tag' + (item.reply_status === 'error' ? ' warn' : ''), title: item.lang === 'und'
+          ? 'Não há nenhuma mensagem escrita por este cliente nem bandeira no aviso do portal: a IA não sabe a língua dele '
+            + '(«und», indeterminada) e manda-lhe o texto em inglês.' : ''},
         item.reply_status === 'error' ? `não saiu: ${item.reply_error || 'erro'}`
-          : item.language ? (ROUND_LANGS[item.language] + (item.lang && item.lang !== item.language ? ` · escreve em ${item.lang}` : ''))
+          : item.language ? (ROUND_LANGS[item.language] + (item.lang === 'und' ? ' · língua desconhecida'
+            : item.lang && item.lang !== item.language ? ` · escreve em ${langName(item.lang)}` : ''))
           : 'sem texto'),
       el('button', {class: 'link', title: 'Tira-o da ronda: fica em Emails, para escreveres e enviares só a ele.',
         onclick: event => run(async () => {
@@ -3805,7 +3891,11 @@ function contactRow(contact) {
     el('td', {}, nome), el('td', {class: 'email', title: contact.email}, shortEmail(contact.email)),
     // 04/10: «Respostas» right after the email, a little wider (the count and «inativo» side by side)
     el('td', {class: 'replies-cell'}, String(contact.interactions),
-      contact.inactive && el('span', {class: 'tag warn', title: 'Dois emails nossos sem resposta: sai das rondas e dos lembretes até voltar a escrever.'}, 'inativo')),
+      contact.inactive && el('span', {class: 'tag warn', title: 'O 4.º email nosso seguido ficou 2 dias úteis sem resposta: sai das '
+        + 'rondas e dos lembretes até voltar a escrever.'}, 'inativo'),
+      // 06/10: a step before: still in the rounds and the reminders, only marked
+      contact.absent && !contact.inactive && el('span', {class: 'tag draft', title: 'O 3.º email nosso seguido ficou 48 horas '
+        + 'sem resposta: continua nas rondas e nos lembretes; ao 4.º sem resposta, 2 dias úteis depois, fica inativo.'}, 'ausente')),
     el('td', {}, telefone),
     el('td', {class: 'nowrap'}, fullDay(contact.primeiro_contacto)),  // 04/10: the property is the group's title, above
     el('td', {}, rgpd, proof),
@@ -4067,6 +4157,7 @@ $('fichas-fill').addEventListener('click', event => run(async () => {
 }, event.currentTarget));
 $('fichas-next').addEventListener('click', () => { fichasPage++; renderFichas(); });
 
+const contactsOpen = new Set();  // 06/10: the groups whose «Mais N…» line is open: "<ref>|active" or "<ref>|inactive"
 function renderContacts() {
   renderExpired();
   renderFichas();
@@ -4085,11 +4176,32 @@ function renderContacts() {
   // 04/10: no «Imóvel» column: the contacts grouped by property, its reference (and description) as the group's title
   const groups = new Map();
   for (const contact of shown) groups.set(contact.imovel || '', [...(groups.get(contact.imovel || '') || []), contact]);
-  const title = (ref, count) => el('tr', {class: 'contacts-group'}, el('th', {colspan: 7, scope: 'colgroup'},
+  const title = (ref, list) => el('tr', {class: 'contacts-group'}, el('th', {colspan: 7, scope: 'colgroup'},
     ref || 'Sem imóvel', el('span', {class: 'contacts-group-about'},
-      [settings?.properties?.find(property => property.reference === ref)?.description, `${count} contacto(s)`]
+      [settings?.properties?.find(property => property.reference === ref)?.description, `${list.length} contacto(s)`,
+        list.some(contact => contact.inactive) && `${list.filter(contact => contact.inactive).length} inativo(s)`]
         .filter(Boolean).join(' · '))));
-  $('contacts-body').replaceChildren(...(shown.length ? [...groups].flatMap(([ref, list]) => [title(ref, list.length), ...list.map(contactRow)])
+  // 06/10: in each property the active first and the inactive at the end; of the active the first 20 and of the inactive
+  // the first 5, the rest behind a line that opens (kept open while the page redraws). A search shows everything found.
+  const part = (ref, people, kind, limit, words) => {
+    const key = `${ref}|${kind}`, open = text || contactsOpen.has(key), rest = people.length - limit;
+    const rows = people.map((contact, index) => {
+      const row = contactRow(contact);
+      if (index >= limit && !open) row.hidden = true;
+      return row;
+    });
+    if (rest > 0 && !text) rows.push(el('tr', {class: 'contacts-more'}, el('td', {colspan: 7},
+      el('button', {type: 'button', class: 'link', 'aria-expanded': String(open), onclick: () => {
+        if (open) contactsOpen.delete(key); else contactsOpen.add(key);
+        renderContacts();
+      }}, open ? `▾ Esconder os últimos ${rest} ${words[rest === 1 ? 0 : 1]}` : `▸ Mais ${rest} ${words[rest === 1 ? 0 : 1]}`))));
+    return rows;
+  };
+  const groupRows = (ref, list) => [title(ref, list),
+    ...part(ref, [...list.filter(contact => !contact.inactive && !contact.absent),
+      ...list.filter(contact => !contact.inactive && contact.absent)], 'active', 20, ['cliente ativo', 'clientes ativos']),
+    ...part(ref, list.filter(contact => contact.inactive), 'inactive', 5, ['inativo', 'inativos'])];
+  $('contacts-body').replaceChildren(...(shown.length ? [...groups].flatMap(([ref, list]) => groupRows(ref, list))
     : [el('tr', {}, el('td', {colspan: 7, class: 'muted'}, contactsData.contacts.length
       ? 'Nenhum contacto com estes filtros.' : 'Ainda não há contactos: entram aqui a cada leitura.'))]));
 }
@@ -5520,7 +5632,7 @@ function propertyChartCard(property, data, metrics) {
     el('div', {class: 'legend'}, el('span', {class: 'requests'}, 'Pedidos recebidos'), el('span', {class: 'sent'}, 'Respostas enviadas')));
 }
 
-// The Painel's numbers, for this property only (26/09), above its instruments since 04/10 (eight, as on the Painel); like
+// The Painel's numbers, for this property only (26/09), above its instruments since 04/10 (ten since 06/10); like
 // the Painel's, they only inform (27/09).
 function propertyMetrics(data) {
   return el('div', {class: 'metrics property-metrics'},
@@ -5530,7 +5642,13 @@ function propertyMetrics(data) {
     metricCard(data.owners_pending || 0, 'Proprietários por responder', 'warn'),  // 04/10: the Painel's fourth column too
     metricCard(data.attention, 'A precisar de atenção', 'bad', {title: queueHover([data], QUEUE_SHOWS.attention)}),
     metricCard(data.answered, 'Respostas enviadas'),
-    metricCard(hoursText(data.reply_hours), 'Tempo médio até resposta'),
+    // 06/10: the two reply times apart and the share who never answered, as in Emails
+    metricCard(hoursText(data.reply_hours), 'O nosso tempo médio de resposta (5 dias)', null,
+      {title: 'Desde que o email do cliente chega até lhe enviarmos a resposta, nas respostas dos últimos 5 dias.'}),
+    metricCard(hoursText(data.client_reply_hours), 'Tempo médio de resposta dos clientes (5 dias)', null,
+      {title: 'Desde que lhes enviamos um email até eles responderem, nas respostas dos últimos 5 dias. Só conta quem '
+        + 'respondeu: quem nunca respondeu está no número ao lado.'}),
+    noReplyCard(data.no_reply),
     metricCard(data.visits_booked || 0, 'Visitas marcadas'));
 }
 

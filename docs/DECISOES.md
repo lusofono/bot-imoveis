@@ -3,6 +3,19 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 06/10/2026: o silêncio em dois passos, ausente e inativo, e a bandeira do portal (α.130.0–α.132.0)
+
+**Decisão (do utilizador, 06/10).** Um cliente que escreveu uma vez e deixou quatro emails nossos sem resposta é
+«claramente um cliente não ativo, ou quase». Contam-se os nossos emails desde a última mensagem dele:
+- **Ausente:** o 3.º email nosso fica 48 horas sem resposta. Só fica marcado: continua nas rondas e nos lembretes, e
+  aparece em «Sem resposta» na tabela do imóvel e com a etiqueta «ausente» em Clientes e no cartão.
+- **Inativo:** o 4.º email nosso fica 2 dias úteis sem resposta (de segunda a sexta, sem os feriados nacionais). Sai das
+  rondas e dos lembretes. Substitui a regra de 26/09 (dois emails sem resposta e 4 dias desde o último).
+- Volta a ativo, sem nenhum dos dois, quando escreve outra vez. Um email nosso à espera na fila (uma proposta, um lembrete)
+  não trava a contagem; só uma mensagem dele por responder a trava (um cliente com um email dele e quatro nossos nunca era contado por causa da proposta da ronda).
+
+**A bandeira do Idealista** antes do nome é a língua que o cliente escolheu no portal: a IA usa-a até ele escrever noutra.
+
 ## 04/10/2026: o que fica em Imóveis e o que se faz noutros separadores (α.117.8–α.118.2)
 
 **Decisão (conversa com o utilizador, 04/10).** Imóveis mostra o imóvel; o trabalho com as pessoas faz-se no separador
@@ -462,7 +475,7 @@ dois consultores cada um tem a sua caixa de correio.
   mão, e o Idealista já avisa quando o anúncio fica inativo.
 - **Documentos só da short list**, como lista de verificação: os ficheiros nunca entram na pasta de dados.
 - **Inativo:** dois emails nossos seguidos sem resposta e 4 dias desde o último. Reativa-se quando o cliente
-  escreve, se o imóvel estiver ativo. Não se apaga nada.
+  escreve, se o imóvel estiver ativo. Não se apaga nada. (Substituída a 06/10: ausente e inativo, acima.)
 - **Lembretes de 2 e 4 dias escritos pela IA** quando não há frase em Voz e estilo (antes: sem frase, nenhum).
   Decisão da IA, a partir da proposta feita ao utilizador e da regra dos «dois emails sem resposta»; a frase fixa
   continua a mandar quando existe. Deixam de sair para quem tem visita marcada ou feita.

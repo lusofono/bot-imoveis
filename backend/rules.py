@@ -5,6 +5,7 @@ on profiles, voice and listing data. Pure functions: no files, network or clock.
 store.py; the instructions for the assistant are in ai.py.
 """
 import base64
+from datetime import date, timedelta
 import copy
 import re
 from urllib.parse import urlsplit
@@ -451,6 +452,32 @@ def route(item, profiles, queues):
     return (None, "ambiguous", None) if found else (None, None, None)
 
 
+# 06/10: the portal's notice puts a flag before the customer's name (an emoji: «🇬🇧 Nome»), the language they chose on the
+# portal. The flag is a country; its language, for the replies, until the customer writes in another one.
+FLAG = re.compile("([\U0001F1E6-\U0001F1FF]{2})")
+FLAG_LANGUAGES = {
+    **dict.fromkeys(("GB", "US", "IE", "AU", "NZ", "CA", "ZA", "IN", "PK", "NG", "GH", "KE", "SG", "PH", "UK"), "en"),
+    **dict.fromkeys(("ES", "MX", "AR", "CO", "CL", "PE", "VE", "UY", "EC", "BO", "PY", "CR", "PA", "DO", "CU", "GT"), "es"),
+    **dict.fromkeys(("PT", "BR", "AO", "MZ", "CV", "GW", "ST", "TL"), "pt"),
+    **dict.fromkeys(("FR", "BE", "LU", "MC", "SN", "CI", "MA", "TN", "DZ"), "fr"),
+    **dict.fromkeys(("DE", "AT", "CH", "LI"), "de"), "IT": "it", "SM": "it", "NL": "nl", "PL": "pl", "RO": "ro", "MD": "ro",
+    "RU": "ru", "UA": "uk", "CN": "zh", "TW": "zh", "HK": "zh", "JP": "ja", "KR": "ko", "SE": "sv", "DK": "da", "NO": "no",
+    "FI": "fi", "GR": "el", "TR": "tr", "CZ": "cs", "SK": "sk", "HU": "hu", "BG": "bg", "HR": "hr", "RS": "sr", "SI": "sl",
+    "IL": "he", "SA": "ar", "AE": "ar", "EG": "ar", "IR": "fa", "NP": "ne", "BD": "bn", "VN": "vi", "TH": "th", "ID": "id",
+    "LT": "lt", "LV": "lv", "EE": "et", "GE": "ka", "AM": "hy", "AL": "sq", "IS": "is"}
+
+
+def flag_language(text):
+    """06/10: the language of the flag that starts a line of the portal's notice (the one before the customer's name):
+    an ISO code such as "en", or None (no flag, or a country not on the list)."""
+    for line in str(text or "").splitlines():
+        found = FLAG.match(line.strip())
+        if found:
+            country = "".join(chr(ord(c) - 0x1F1E6 + ord("A")) for c in found[1])
+            return FLAG_LANGUAGES.get(country)
+    return None
+
+
 def prepare(item, kind, customer, profile, account):
     """Extract the customer and fix the only allowed recipient, once, at READ time."""
     reply = profile.get("reply", {})
@@ -481,7 +508,7 @@ def prepare(item, kind, customer, profile, account):
     if name:
         name = name[1].strip()
     elif contact and min(contact) > 0 and not re.search(r"[\d@]", head[min(contact) - 1]):
-        name = head[min(contact) - 1]
+        name = FLAG.sub("", head[min(contact) - 1]).strip() or None  # 06/10: without the portal's flag
     else:
         name = None
     message = "\n".join(head[max(contact) + 1:]) if contact and end is not None else ""
@@ -513,7 +540,44 @@ def prepare(item, kind, customer, profile, account):
         warnings.append("Não identifiquei a mensagem do cliente; lê body_text.")
     fields = {"name": name, "email": recipient["email"] if recipient else None,
               "phone": head[phone_at] if phone_at is not None else None, "message": message or None}
+    language = flag_language("\n".join(head))
+    if language:
+        fields["portal_lang"] = language  # 06/10: the language chosen on the portal (its flag)
     return {"customer": fields, "recipient": recipient, "blocked": blocked, "warnings": warnings}
+
+
+# 06/10: working days, for the silence rule (a customer «inativo» two working days after our 4th email unanswered):
+# Monday to Friday, without Portugal's national holidays (the fixed ones, Good Friday and Corpus Christi).
+def easter(year):
+    """Easter Sunday (the Gregorian computus)."""
+    a, b, c = year % 19, year // 100, year % 100
+    d, e = b // 4, b % 4
+    g = (8 * b + 13) // 25
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = c // 4, c % 4
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 19 * l) // 433
+    month = (h + l - 7 * m + 90) // 25
+    return date(year, month, (h + l - 7 * m + 33 * month + 19) % 32)
+
+
+def holidays(year):
+    sunday = easter(year)
+    fixed = [(1, 1), (4, 25), (5, 1), (6, 10), (8, 15), (10, 5), (11, 1), (12, 1), (12, 8), (12, 25)]
+    return {date(year, month, day) for month, day in fixed} | {sunday - timedelta(days=2), sunday + timedelta(days=60)}
+
+
+def is_workday(day):
+    return day.weekday() < 5 and day not in holidays(day.year)
+
+
+def after_workdays(moment, days):
+    """moment plus `days` working days, at the same time of day (in the computer's time zone, Lisbon's)."""
+    local = moment.astimezone()
+    while days > 0:
+        local += timedelta(days=1)
+        days -= is_workday(local.date())
+    return local
 
 
 # Visits: the owner proposes a day and a time window; slots start every `slot` minutes from its start.

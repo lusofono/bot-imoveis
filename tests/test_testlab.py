@@ -403,3 +403,7 @@ def test_the_test_property_has_its_row_by_property_but_never_counts_in_the_total
     assert "advertised_rent_eur" in row  # 04/10: the rent column, as for every property
     # 04/10: and enough for its panel in Imóveis (the instruments show for it too)
     assert {"customers", "visits_booked", "reply_hours_max", "ignored", "last_read_at"} <= set(row)
+    # 06/10: its own reply time shows on its board, never in the Painel's
+    service.log("send", message_id="t-envio", status="sent", kind="lead", reference=TEST_REF, waited_hours=0.5)
+    metrics = service.metrics()
+    assert metrics["test_properties"][0]["reply_hours"] == 0.5 and metrics["reply_hours"] is None

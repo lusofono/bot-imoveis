@@ -85,8 +85,8 @@ def test_the_round_summary_shows_who_it_went_to_and_where_each_one_stands(servic
     assert summary["window"]["day"] == DAY and summary["window"]["start"] == "17:00"
     by_email = {r["email"]: r for r in summary["recipients"]}
     assert set(by_email) == {"a@example.com", "b@example.com"}
-    # Not sent yet: the proposal itself is the "email por responder" candidates() sees.
-    assert by_email["a@example.com"]["state"] == "pending" and by_email["a@example.com"]["visit_at"] is None
+    # Not sent yet: «por enviar» (06/10: it said «por responder», as if the customer owed us an answer)
+    assert by_email["a@example.com"]["state"] == "unsent" and by_email["a@example.com"]["visit_at"] is None
 
     proposal = next(e for e in service.pending()["properties"][0]["emails"]
                     if e.get("kind") == "visit_proposal" and e["recipient"]["email"] == "a@example.com")
@@ -101,8 +101,8 @@ def test_the_round_summary_shows_who_it_went_to_and_where_each_one_stands(servic
     by_email = {r["email"]: r for r in summary["recipients"]}
     assert by_email["a@example.com"] == {"email": "a@example.com", "name": "Ana Exemplo", "state": "booked",
                                          "reason": "já tem visita marcada", "visit_at": f"{DAY} 17:30"}
-    # B's own proposal is still an unsent draft: candidates() still sees it as "tem um email por responder".
-    assert by_email["b@example.com"]["state"] == "pending"
+    # B's own proposal is still an unsent draft: «por enviar»
+    assert by_email["b@example.com"]["state"] == "unsent"
 
 
 def test_the_round_card_counts_who_is_left_out(service):
@@ -403,3 +403,21 @@ def test_some_customers_of_a_round_are_left_out_without_cancelling_the_rest(serv
     assert [e["recipient"]["email"] for e in service.load(REF)["emails"] if e.get("round")] == ["a@example.com"]
     [window] = [w for w in load_visits(service.folder, REF)["windows"] if w["day"] == DAY and w["start"] == "17:00"]
     assert [person["email"] for person in window["recipients"]] == ["a@example.com"]
+
+
+def test_the_last_round_is_the_one_that_went_out_and_a_newer_one_unsent_is_said_apart(service):
+    # 06/10: a second round prepared by mistake and never sent showed alone, everyone «por enviar»
+    from datetime import date, timedelta
+    for key, email in (("1", "a@example.com"), ("2", "b@example.com")):
+        read(service, [customer(key, email)])
+        draft_and_send(service, key, "Olá.")
+    service.propose_visits(REF, DAY, "17:00", "19:00", ["a@example.com", "b@example.com"])
+    for proposal in [e for e in service.pending()["properties"][0]["emails"] if e.get("kind") == "visit_proposal"]:
+        draft_and_send(service, proposal["id"], "Propomos a visita.")
+    later = (date.fromisoformat(DAY) + timedelta(days=1)).isoformat()
+    service.propose_visits(REF, later, "10:00", "13:00", ["a@example.com", "b@example.com"])
+
+    summary = service.visit_round_summary(REF)
+    assert summary["window"]["day"] == DAY  # the one that went out
+    assert {r["state"] for r in summary["recipients"]} == {"ok"}  # sent, awaiting an answer (not «por responder»)
+    assert summary["unsent_round"] == {"day": later, "start": "10:00", "end": "13:00"}

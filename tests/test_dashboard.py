@@ -161,3 +161,40 @@ def test_each_property_spends_only_its_own_tank_starting_from_the_old_shared_one
     assert tanks == {REF: 3.5, "OUTRO": 1.75}
     with pytest.raises(ValueError, match="Indica o imóvel"):
         service.fill_fuel(None, 2)  # with two properties, a fill must say which
+
+
+def test_the_customers_reply_time_is_apart_from_ours():
+    # 06/10: «Tempo médio até resposta» is ours (their email to our reply); theirs (our email to their answer) is apart
+    from backend.service import client_reply_hours
+    conversations = {
+        "a@example.com": {"history": [
+            {"who": "cliente", "text": "Olá", "ts": "2026-10-01T09:00:00+00:00"},
+            {"who": "nos", "text": "Bom dia", "ts": "2026-10-01T10:00:00+00:00"},
+            {"who": "nos", "text": "Ainda tem interesse?", "ts": "2026-10-02T10:00:00+00:00"},
+            {"who": "cliente", "text": "Sim", "ts": "2026-10-02T16:00:00+00:00"}]},  # 6 h after the last of ours
+        "b@example.com": {"history": [
+            {"who": "nos", "text": "Bom dia", "ts": "2026-10-01T10:00:00+00:00"},
+            {"who": "cliente", "text": "Olá", "at": "2026-10-03"}]},  # no exact time: left out
+        "c@example.com": {"history": [
+            {"who": "nos", "text": "Bom dia", "ts": "2026-10-01T10:00:00+00:00"},
+            {"who": "cliente", "text": "Olá", "ts": "2026-10-01T12:00:00+00:00"}]}}  # 2 h
+    assert client_reply_hours(conversations) == 4.0
+    assert client_reply_hours({}) is None
+
+
+def test_the_share_who_never_answered():
+    # 06/10: those who never answered do not count in the average; their share is a gauge of its own
+    from backend.service import no_reply_share
+    conversations = {
+        "a@example.com": {"history": [{"who": "cliente", "text": "Olá"}, {"who": "nos", "text": "Bom dia"}]},  # never again
+        "b@example.com": {"history": [{"who": "cliente", "text": "Olá"}, {"who": "nos", "text": "Bom dia"},
+                                      {"who": "cliente", "text": "Obrigado"}]},
+        "c@example.com": {"history": [{"who": "cliente", "text": "Olá"}]}}  # not written to yet: not counted
+    assert no_reply_share(conversations) == {"written": 2, "never": 1}
+
+
+def test_our_reply_time_counts_only_the_last_five_days(service):
+    # 06/10: all time, the start-up's backlog (emails of two weeks before answered on 21–24/09) made it 163 h
+    sent_event(service, 0, message_id="hoje", waited_hours=6.0)
+    sent_event(service, 6, message_id="antigo", waited_hours=330.0)
+    assert service.metrics()["reply_hours"] == 6.0

@@ -210,6 +210,8 @@ button.stepper-arrow{min-height:0;height:22px;min-width:30px;padding:0 6px;borde
 .contacts-table tr.contacts-group th{padding:16px 8px 6px;font-size:11px;border-bottom:1px solid var(--line)}
 .contacts-table tr.contacts-group:first-child th{padding-top:6px}
 .contacts-group-about{margin-left:10px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--muted)}
+.contacts-table tr.contacts-more td{padding:4px 8px 12px;border-bottom:1px solid var(--line)}  /* 06/10: «Mais N…» */
+.contacts-table tr.contacts-more button.link{min-height:0;padding:4px 0;font-size:12px}
 .mono{font-family:ui-monospace,SFMono-Regular,monospace}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
@@ -379,6 +381,12 @@ button.stepper-arrow{min-height:0;height:22px;min-width:30px;padding:0 6px;borde
 @media(max-width:1150px){.property-slide,.dashboard-lists{grid-template-columns:1fr}}
 /* 05/10: Emails, the property's eight numbers under the property, two rows of four, the first one bigger */
 .metrics.queue-board{grid-template-columns:repeat(4,minmax(0,1fr));margin:0 0 22px}
+/* 06/10: ten numbers, two rows of five */
+.metrics.queue-board{grid-template-columns:repeat(5,minmax(0,1fr))}
+/* 06/10: «Clientes que nunca responderam»: the share as a gauge under the number */
+.gauge-card .gauge{height:6px;margin:8px 0 4px;border-radius:999px;background:var(--line);overflow:hidden}
+.gauge-card .gauge-fill{display:block;width:var(--fill,0%);height:100%;border-radius:inherit;background:var(--accent)}
+.gauge-card.warn .gauge-fill{background:var(--warn)}
 .queue-board .queue-main .value{font-size:52px}
 @media(max-width:1150px){.metrics.queue-board{grid-template-columns:repeat(2,minmax(0,1fr))}}
 /* 05/10: the owner's instruction for one reply, in the card, with «tirar» */
@@ -929,6 +937,8 @@ button.primary .step-num{background:var(--accent-text);color:var(--accent)}
 .notes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:10px}
 .notes-grid .alert{margin:0}
 .property-metrics{margin:18px 0}
+.metrics.property-metrics{grid-template-columns:repeat(5,minmax(0,1fr))}  /* 06/10: ten numbers, two rows of five */
+@media(max-width:1150px){.metrics.property-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 /* The trip computer first, above the instruments, in one tight line: title, distance, consumption, save, reading (26/09) */
 .cluster .trip-computer{flex-wrap:wrap;align-items:center;gap:6px 14px;margin:4px 0 14px;padding:7px 14px}
 .cluster .trip-computer label{gap:5px}
@@ -1190,6 +1200,7 @@ body:not(.admin) .prompt-view{display:none!important}
 #agenda-synced{margin:6px 0 0}
 .agenda-sync-days{display:flex;align-items:center;gap:10px;margin-top:10px}
 .agenda-sync-days select{width:auto;padding:6px 10px}
+.agenda-sync-row .read-button-card{justify-content:center}  /* only the button: in the middle of its panel */
 /* 30/09: the Painel's property tiles, apart from the numbers above and «A fazer» below (they sat glued to both) */
 #dashboard-properties{margin:22px 0}
 /* 30/09: the agency's know-how in three groups that open */
@@ -1494,3 +1505,4 @@ body:not(.admin) .prompt-view{display:none!important}
 main{padding-left:57px;padding-right:54px}
 @media(max-width:1150px){main{padding-left:33px;padding-right:36px}}
 @media(max-width:760px){main{padding-left:18px;padding-right:18px}}
+.history-none{margin:0 0 10px}  /* 06/10: a conversation with only our emails says so */
