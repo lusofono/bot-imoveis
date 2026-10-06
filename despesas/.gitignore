@@ -1,0 +1,6 @@
+# Os dados reais (configuração com a App Password, imóveis, estado, sessões, faturas) nunca entram no Git.
+/dados/
+# PDFs reais trazidos para afinar as regras com o Claude: ficam só neste Mac.
+/amostras/
+*.eml.real
+.DS_Store

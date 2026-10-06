@@ -1,0 +1,27 @@
+{
+  "_leia": "Exemplo FICTÍCIO da pasta de um imóvel. A verdadeira fica em dados/imoveis/<REF>/imovel.json (fora do Git). «remetentes»: emails extra cujas faturas contam para este imóvel (o do proprietário já conta). «apelidos»: palavras que identificam o imóvel no assunto quando é o administrador a reencaminhar. «identificadores»: o que aparece nas faturas deste imóvel e o distingue (CPE, n.º de cliente, n.º de contrato, NIF e nome do titular do contrato, código postal); compara-se sem acentos, espaços nem pontuação. «partilha»: percentagem de cada tipo que o inquilino paga (100 se nada for dito). O inquilino paga ao proprietário por transferência para o «iban» (o do contrato de arrendamento) e/ou por MB WAY para o «mbway»; a mensagem mostra as que estiverem preenchidas.",
+  "ref": "EXEMPLO-1",
+  "nome": "T2 Exemplo — Edifício Fictício",
+  "morada": "Rua do Exemplo, 1, 1.º Esq., 1000-000 Lisboa",
+  "apelidos": ["T2 Exemplo", "Fictício"],
+  "proprietario": {
+    "nome": "Proprietário Exemplo",
+    "email": "proprietario1@example.com",
+    "iban": "PT50 0000 0000 9988 7766 5543 5",
+    "titular": "Proprietário Exemplo",
+    "mbway": "+351 900 000 000"
+  },
+  "inquilino": {
+    "nome": "Inquilina Exemplo",
+    "email": "inquilina@example.com",
+    "whatsapp": "+351 900 000 000"
+  },
+  "remetentes": [],
+  "identificadores": [
+    { "fornecedor": "epal", "valor": "9900112233" },
+    { "fornecedor": "climaespaco", "valor": "CT-000777" },
+    { "tipo": "nif", "valor": "999999990", "nota": "o proprietário; os contratos podem estar em nome de outra pessoa da casa" }
+  ],
+  "partilha": { "agua": 100, "eletricidade": 100, "internet": 100, "aquecimento": 50 },
+  "mensagem": { "assinatura": "Gestão de Contas" }
+}

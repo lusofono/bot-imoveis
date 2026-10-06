@@ -1,0 +1,578 @@
+{
+  "versao": "2026-10-06b",
+  "_leia": "Regras dos fornecedores (sem dados pessoais). Escritas com o Claude e afinadas com faturas reais; «verificado»: true quer dizer que a regra já leu bem uma fatura real (ver «_verificado_com»); false quer dizer que a regra ainda não foi confirmada com uma fatura verdadeira, e as faturas lidas com ela ficam «por confirmar». Identificar: «fortes» valem 3 pontos, «fracos» 1, «nif» 5; ganha quem tiver 3 ou mais e mais do que os outros. Textos em maiúsculas com até 5 letras (MEO, NOS, EDP…) comparam-se com maiúsculas e minúsculas exatas. «excluir»: se aparecer, o fornecedor não conta. «rotulos»: substituem os rótulos padrão desse campo, pela ordem. «gas»: true quando o fornecedor também vende gás (avisa se a fatura falar em gás natural).",
+  "tipos": {
+    "agua": {
+      "nome": "Água",
+      "sinais": [
+        "agua",
+        "m3",
+        "m³",
+        "saneamento",
+        "abastecimento"
+      ]
+    },
+    "eletricidade": {
+      "nome": "Eletricidade",
+      "sinais": [
+        "kwh",
+        "eletricidade",
+        "electricidade",
+        "energia",
+        "cpe",
+        "potencia"
+      ]
+    },
+    "gas": {
+      "nome": "Gás",
+      "sinais": [
+        "gas natural",
+        "gas",
+        "m3",
+        "m³",
+        "kwh"
+      ]
+    },
+    "internet": {
+      "nome": "Internet",
+      "sinais": [
+        "internet",
+        "fibra",
+        "telecomunicacoes",
+        "comunicacoes",
+        "router",
+        "tv",
+        "mbps"
+      ]
+    },
+    "aquecimento": {
+      "nome": "Aquecimento",
+      "sinais": [
+        "calor",
+        "termica",
+        "aquecimento",
+        "climatizacao",
+        "kwh"
+      ]
+    }
+  },
+  "rotulos_padrao": {
+    "total": [
+      "total a pagar",
+      "valor a pagar",
+      "montante a pagar",
+      "valor total a pagar",
+      "total da fatura",
+      "total da factura",
+      "total desta fatura",
+      "total fatura",
+      "importancia a pagar"
+    ],
+    "data_limite": [
+      "data limite de pagamento",
+      "data-limite de pagamento",
+      "data limite",
+      "data-limite",
+      "a pagar ate",
+      "pague ate",
+      "pagar ate",
+      "pagamento ate",
+      "data de vencimento",
+      "vencimento"
+    ],
+    "periodo": [
+      "periodo de faturacao",
+      "periodo de facturacao",
+      "periodo faturado",
+      "periodo de consumo",
+      "periodo de servico",
+      "periodo de referencia",
+      "periodo"
+    ]
+  },
+  "fornecedores": [
+    {
+      "id": "epal",
+      "nome": "EPAL",
+      "tipo": "agua",
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "EPAL",
+          "Empresa Portuguesa das Águas Livres",
+          "epal.pt"
+        ],
+        "fracos": [],
+        "nif": []
+      }
+    },
+    {
+      "id": "simas-oeiras-amadora",
+      "nome": "SIMAS Oeiras e Amadora",
+      "tipo": "agua",
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "SIMAS de Oeiras e Amadora",
+          "SIMAS Oeiras",
+          "simas.pt"
+        ],
+        "fracos": [
+          "SIMAS"
+        ],
+        "nif": []
+      }
+    },
+    {
+      "id": "simar-loures-odivelas",
+      "nome": "SIMAR Loures e Odivelas",
+      "tipo": "agua",
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "SIMAR de Loures e Odivelas",
+          "SIMAR Loures",
+          "simar-louresodivelas.pt"
+        ],
+        "fracos": [
+          "SIMAR"
+        ],
+        "nif": []
+      }
+    },
+    {
+      "id": "smas-sintra",
+      "nome": "SMAS de Sintra",
+      "tipo": "agua",
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "SMAS de Sintra",
+          "smas-sintra.pt"
+        ],
+        "fracos": [
+          "SMAS"
+        ],
+        "nif": []
+      }
+    },
+    {
+      "id": "smas-almada",
+      "nome": "SMAS de Almada",
+      "tipo": "agua",
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "SMAS de Almada",
+          "smasalmada.pt"
+        ],
+        "fracos": [
+          "SMAS"
+        ],
+        "nif": []
+      }
+    },
+    {
+      "id": "aguas-cascais",
+      "nome": "Águas de Cascais",
+      "tipo": "agua",
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "Águas de Cascais",
+          "aguasdecascais.pt"
+        ],
+        "fracos": [],
+        "nif": []
+      }
+    },
+    {
+      "id": "edp-comercial",
+      "nome": "EDP Comercial",
+      "tipo": "eletricidade",
+      "gas": true,
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "EDP Comercial",
+          "edp.pt"
+        ],
+        "fracos": [
+          "EDP"
+        ],
+        "nif": []
+      }
+    },
+    {
+      "id": "su-eletricidade",
+      "nome": "SU Eletricidade",
+      "tipo": "eletricidade",
+      "verificado": true,
+      "identificar": {
+        "fortes": [
+          "SU Eletricidade",
+          "SU Electricidade",
+          "sueletricidade.pt"
+        ],
+        "fracos": [],
+        "nif": [
+          "507846044"
+        ]
+      },
+      "_verificado_com": "fatura real de setembro de 2026 (MacRoman, texto rodado, bloco Multibanco)"
+    },
+    {
+      "id": "endesa",
+      "nome": "Endesa",
+      "tipo": "eletricidade",
+      "gas": true,
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "Endesa Energía",
+          "Endesa Energia",
+          "endesa.pt"
+        ],
+        "fracos": [
+          "Endesa"
+        ],
+        "nif": []
+      }
+    },
+    {
+      "id": "iberdrola",
+      "nome": "Iberdrola",
+      "tipo": "eletricidade",
+      "gas": true,
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "Iberdrola Clientes Portugal",
+          "iberdrola.pt"
+        ],
+        "fracos": [
+          "Iberdrola"
+        ],
+        "nif": []
+      }
+    },
+    {
+      "id": "galp",
+      "nome": "Galp",
+      "tipo": "eletricidade",
+      "gas": true,
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "Galp Power",
+          "Petrogal",
+          "galp.com",
+          "galp.pt"
+        ],
+        "fracos": [
+          "Galp"
+        ],
+        "nif": []
+      }
+    },
+    {
+      "id": "goldenergy",
+      "nome": "Goldenergy",
+      "tipo": "eletricidade",
+      "gas": true,
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "Goldenergy",
+          "goldenergy.pt"
+        ],
+        "fracos": [],
+        "nif": []
+      }
+    },
+    {
+      "id": "repsol",
+      "nome": "Repsol",
+      "tipo": "eletricidade",
+      "gas": true,
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "Repsol Comercializadora",
+          "repsol.pt"
+        ],
+        "fracos": [
+          "Repsol"
+        ],
+        "nif": []
+      }
+    },
+    {
+      "id": "plenitude",
+      "nome": "Plenitude",
+      "tipo": "eletricidade",
+      "gas": true,
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "Plenitude",
+          "eniplenitude.pt"
+        ],
+        "fracos": [],
+        "nif": []
+      }
+    },
+    {
+      "id": "meo-energia",
+      "nome": "MEO Energia",
+      "tipo": "eletricidade",
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "MEO Energia"
+        ],
+        "fracos": [],
+        "nif": []
+      }
+    },
+    {
+      "id": "luzboa",
+      "nome": "Luzboa",
+      "tipo": "eletricidade",
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "Luzboa",
+          "luzboa.pt"
+        ],
+        "fracos": [],
+        "nif": []
+      }
+    },
+    {
+      "id": "coopernico",
+      "nome": "Coopérnico",
+      "tipo": "eletricidade",
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "Coopérnico",
+          "coopernico.org"
+        ],
+        "fracos": [],
+        "nif": []
+      }
+    },
+    {
+      "id": "ezu",
+      "nome": "EZU Energia",
+      "tipo": "eletricidade",
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "EZU Energia",
+          "ezuenergia.pt"
+        ],
+        "fracos": [
+          "EZU"
+        ],
+        "nif": []
+      }
+    },
+    {
+      "id": "g9",
+      "nome": "G9 Energy",
+      "tipo": "eletricidade",
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "G9 Energy",
+          "g9.pt"
+        ],
+        "fracos": [],
+        "nif": []
+      }
+    },
+    {
+      "id": "audax",
+      "nome": "Audax Renováveis",
+      "tipo": "eletricidade",
+      "gas": true,
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "Audax Renováveis",
+          "Audax Renovables",
+          "audaxrenovaveis.pt"
+        ],
+        "fracos": [
+          "Audax"
+        ],
+        "nif": []
+      }
+    },
+    {
+      "id": "muon",
+      "nome": "Muon",
+      "tipo": "eletricidade",
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "Muon Electric",
+          "muon.pt"
+        ],
+        "fracos": [],
+        "nif": []
+      }
+    },
+    {
+      "id": "yes-energy",
+      "nome": "YES Energy",
+      "tipo": "eletricidade",
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "YES Energy",
+          "yesenergy.pt"
+        ],
+        "fracos": [],
+        "nif": []
+      }
+    },
+    {
+      "id": "meo",
+      "nome": "MEO",
+      "tipo": "internet",
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "MEO - Serviços de Comunicações e Multimédia",
+          "Serviços de Comunicações e Multimédia",
+          "meo.pt"
+        ],
+        "fracos": [
+          "MEO"
+        ],
+        "nif": [],
+        "excluir": [
+          "MEO Energia"
+        ]
+      }
+    },
+    {
+      "id": "nos",
+      "nome": "NOS",
+      "tipo": "internet",
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "NOS Comunicações",
+          "nos.pt"
+        ],
+        "fracos": [
+          "NOS"
+        ],
+        "nif": []
+      }
+    },
+    {
+      "id": "vodafone",
+      "nome": "Vodafone",
+      "tipo": "internet",
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "Vodafone Portugal",
+          "vodafone.pt"
+        ],
+        "fracos": [
+          "Vodafone"
+        ],
+        "nif": []
+      }
+    },
+    {
+      "id": "digi",
+      "nome": "DIGI",
+      "tipo": "internet",
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "DIGI Portugal",
+          "digi.pt"
+        ],
+        "fracos": [
+          "DIGI"
+        ],
+        "nif": []
+      }
+    },
+    {
+      "id": "nowo",
+      "nome": "NOWO",
+      "tipo": "internet",
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "NOWO Communications",
+          "nowo.pt"
+        ],
+        "fracos": [
+          "NOWO"
+        ],
+        "nif": []
+      }
+    },
+    {
+      "id": "climaespaco",
+      "nome": "Climaespaço",
+      "tipo": "aquecimento",
+      "verificado": false,
+      "identificar": {
+        "fortes": [
+          "Climaespaço",
+          "Climaespaco",
+          "climaespaco.pt"
+        ],
+        "fracos": [],
+        "nif": []
+      }
+    },
+    {
+      "id": "lisboagas",
+      "nome": "Lisboagás Comercialização",
+      "tipo": "gas",
+      "verificado": true,
+      "_verificado_com": "fatura real de agosto de 2026 (comercializador de último recurso do gás natural, curgasnatural.pt)",
+      "identificar": {
+        "fortes": [
+          "Lisboagás Comercialização",
+          "curgasnatural.pt"
+        ],
+        "fracos": [
+          "Lisboagás"
+        ],
+        "nif": [
+          "508156661"
+        ]
+      }
+    },
+    {
+      "id": "verdai",
+      "nome": "VERDAI",
+      "tipo": "aquecimento",
+      "verificado": true,
+      "_verificado_com": "fatura real de agosto de 2026 (calor do Parque das Nações)",
+      "identificar": {
+        "fortes": [
+          "VERDAI",
+          "verdai.pt"
+        ],
+        "fracos": [],
+        "nif": [
+          "518925498"
+        ]
+      }
+    }
+  ]
+}

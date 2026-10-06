@@ -1,0 +1,27 @@
+# Despesas — a pasta pública (raiz do subdomínio). Só tem a página, o estilo e o motor JavaScript.
+Options -Indexes
+DirectoryIndex index.php
+
+# HTTPS sempre (o PHP também o verifica). A segunda condição evita ciclos atrás do nginx do cPanel.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+    RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+</IfModule>
+
+# Nada de ficheiros escondidos, cópias ou lixo de editores.
+<FilesMatch "(^\.|\.(bak|tmp|orig|swp|log)$|~$)">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+</FilesMatch>
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "no-referrer"
+    Header always set Strict-Transport-Security "max-age=31536000"
+</IfModule>
+
+AddType application/json .json
+AddType image/svg+xml .svg
