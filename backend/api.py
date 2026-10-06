@@ -364,6 +364,10 @@ def web_app(folder, token):
                                     body.get("common") or {})
         return {**result, "state": state()}
 
+    def visit_round_cancel(body):  # 05/10
+        ids = body.get("ids") if isinstance(body.get("ids"), list) else None  # 06/10: only some of its customers
+        return {**service.cancel_round(body.get("property_ref") or None, body.get("window_id") or None, ids), "state": state()}
+
     def visit_round_individual(body):
         result = service.individual_round_item(body.get("property_ref") or None, str(body.get("id") or ""))
         return {**result, "state": state()}
@@ -583,6 +587,8 @@ def web_app(folder, token):
                 "ai/price": ("POST", ai_price),
                 "ai/hidden": ("POST", lambda body: (admin(), service.set_hidden(str(body.get("model") or ""), body.get("hidden") is True))[1]),
                 "ai/effort": ("POST", lambda body: (admin(), service.set_effort(str(body.get("effort") or "")))[1]),
+                # 06/10: Settings — Emails reads by itself when opened (on/off, after how many minutes)
+                "auto-read": ("POST", lambda body: (admin(), service.set_auto_read(body.get("on") is True, body.get("minutes")))[1]),
                 "ai/reviewer": ("POST", lambda body: (admin(), service.set_reviewer(str(body.get("model") or ""),
                                                                                   body.get("auto") is True))[1]),
                 "review": ("POST", lambda body: {**service.review_drafts(body.get("property_ref") or None, ids_of(body)),
@@ -606,6 +612,7 @@ def web_app(folder, token):
                 "visits/round": ("POST", visit_round), "visits/round-prompt": ("POST", visit_round_prompt),
                 "visits/round-generate": ("POST", visit_round_generate), "visits/round-paste": ("POST", visit_round_paste),
                 "visits/round-save": ("POST", visit_round_save), "visits/round-individual": ("POST", visit_round_individual),
+                "visits/round-cancel": ("POST", visit_round_cancel),
                 "visits/analysis-prompt": ("POST", visit_analysis_prompt), "visits/analyze": ("POST", visit_analyze),
                 "visits/round-summary": ("POST", visit_round_summary), "visits/close": ("POST", visits_close),
                 "agenda/sync": ("POST", agenda_sync), "visits/check": ("POST", visit_check), "visits/thanks": ("POST", visit_thanks),
@@ -621,6 +628,9 @@ def web_app(folder, token):
                 "contacts/ignore": ("POST", contact_ignore),
                 "selection/set": ("POST", selection("set")), "selection/doc": ("POST", selection("doc")),
                 "selection/request": ("POST", selection("request")),
+                # 05/10: the owner's instruction for one reply only (taken off with an empty note)
+                "reply-note": ("POST", lambda body: {**service.set_reply_note(
+                    body.get("property_ref") or None, str(body.get("id") or ""), body.get("note")), "state": state()}),
                 "contacts/purge": ("POST", lambda body: {**service.purge_expired(), **service.contacts(), "state": state()}),
                 "fichas/fill": ("POST", lambda body: {**service.fill_fichas(body.get("property_ref") or None),
                                                       **service.contacts()}),

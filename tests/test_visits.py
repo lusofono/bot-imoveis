@@ -120,6 +120,10 @@ def test_the_round_card_counts_who_is_left_out(service):
     result = service.visit_candidates()
     assert {c["email"]: c["state"] for c in result["customers"]} == {"a@example.com": "ok"}
     assert result["left_out"] == {"ignored": 1, "inactive": 1, "new": 1, "proposal": 0}
+    # 05/10: and who they are, for the line that opens to the names (a name, or the address when there is none)
+    names = result["left_out_names"]
+    assert [len(names[key]) for key in ("ignored", "inactive", "new", "proposal")] == [1, 1, 1, 0]
+    assert all(isinstance(name, str) and name for group in names.values() for name in group)
 
     # A round prepared and not sent: A waits for our proposal, not for an answer to something they wrote.
     service.propose_visits(REF, DAY, "17:00", "19:00", ["a@example.com"], common=True)
@@ -368,3 +372,34 @@ def test_the_prompt_gets_the_history_in_order_and_whole_and_never_contradicts_wh
     assert "FIM DA MENSAGEM" in prompt
     assert prompt.index("Somos cinco.") < prompt.index("Proposta de visita.")
     assert "nunca o contradigas" in current["instructions"]
+
+
+
+def test_a_round_prepared_by_mistake_is_cancelled_without_sending_anything(service):
+    # 05/10: «Cancelar esta ronda»: its proposals still to send leave the queue and its window leaves the agenda
+    for key, email in (("1", "a@example.com"), ("2", "b@example.com")):
+        read(service, [customer(key, email)])
+        draft_and_send(service, key, "Olá.")
+    service.propose_visits(REF, DAY, "17:00", "19:00", ["a@example.com", "b@example.com"], common=True)
+    assert len([e for e in service.load(REF)["emails"] if e.get("round")]) == 2
+    import pytest
+    from backend.store import load_visits
+    assert service.cancel_round(REF)["cancelled"] == 2
+    assert [e for e in service.load(REF)["emails"] if e.get("round")] == []
+    assert not any(w["day"] == DAY and w["start"] == "17:00" for w in load_visits(service.folder, REF)["windows"])
+    with pytest.raises(ValueError, match="nenhuma ronda por enviar"):
+        service.cancel_round(REF)
+
+
+def test_some_customers_of_a_round_are_left_out_without_cancelling_the_rest(service):
+    # 06/10: switched off in the panel: only those leave the round (and its window), the others stay to be sent
+    for key, email in (("1", "a@example.com"), ("2", "b@example.com")):
+        read(service, [customer(key, email)])
+        draft_and_send(service, key, "Olá.")
+    service.propose_visits(REF, DAY, "17:00", "19:00", ["a@example.com", "b@example.com"], common=True)
+    from backend.store import load_visits
+    off = next(e["id"] for e in service.load(REF)["emails"] if e.get("round") and e["recipient"]["email"] == "b@example.com")
+    assert service.cancel_round(REF, ids=[off])["cancelled"] == 1
+    assert [e["recipient"]["email"] for e in service.load(REF)["emails"] if e.get("round")] == ["a@example.com"]
+    [window] = [w for w in load_visits(service.folder, REF)["windows"] if w["day"] == DAY and w["start"] == "17:00"]
+    assert [person["email"] for person in window["recipients"]] == ["a@example.com"]

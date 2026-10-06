@@ -290,13 +290,24 @@
 
   <section id="tab-agenda" hidden>
     <div class="page-heading"><div><p class="eyebrow" data-word="agenda.eyebrow">VISITAS</p><h1 data-title="agenda">Gestão das Visitas de Clientes aos Imóveis</h1><p class="step">As visitas propostas e marcadas, dia a dia. Por agora gere-se aqui; a exportação para o teu calendário fica para depois.</p></div></div>
+    <!-- 06/10: on top, as the mailbox in Emails: «AGENDA DE VISITAS» at 2/3 — the last update and how far back it reads —
+         and, at 1/3, «PASSO 01» with the button -->
+    <div class="read-row agenda-sync-row">
+    <article class="card read-card">
+      <div class="read-main">
+        <p class="eyebrow">AGENDA DE VISITAS</p>
+        <div class="read-title"><p id="agenda-synced" class="muted small"></p></div>
+        <!-- 03/10: how far back: 0 = the visits to come (as before); more = also those gone by, «por registar» -->
+        <label class="muted small agenda-sync-days">Atualizar <select id="agenda-sync-days" aria-label="Até quantos dias para trás">
+          <option value="0">só as próximas</option><option value="30">e as dos últimos 30 dias</option>
+          <option value="60">e as dos últimos 60 dias</option><option value="90">e as dos últimos 90 dias</option></select></label>
+      </div>
+    </article>
+    <article class="card read-button-card"><p class="eyebrow">PASSO 01</p>
+      <button id="agenda-sync-here" class="primary" type="button" title="A IA (API) lê as conversas e atualiza as Visitas."><span class="step-num" aria-hidden="true">1</span>Atualizar visitas</button></article>
+    </div>
     <div class="row agenda-controls">
       <label class="muted">Imóvel <select id="agenda-property"><option value="">Todos</option></select></label>
-      <button id="agenda-sync-here" type="button" title="A IA (API) lê as conversas e atualiza as Visitas.">Atualizar visitas</button>
-      <!-- 03/10: how far back: 0 = the visits to come (as before); more = also those gone by, «por registar» -->
-      <select id="agenda-sync-days" aria-label="Até quantos dias para trás">
-        <option value="0">só as próximas</option><option value="30">e as dos últimos 30 dias</option>
-        <option value="60">e as dos últimos 60 dias</option><option value="90">e as dos últimos 90 dias</option></select>
       <div class="agenda-nav">
         <strong id="agenda-range" class="agenda-range"></strong>
         <div class="agenda-nav-buttons">
@@ -337,6 +348,8 @@
   <section id="tab-workshop" hidden>
     <div class="page-heading"><div><p class="eyebrow">SETTINGS</p><h1 data-title="workshop">Gestão Avançada do Sistema ARIA!</h1><p class="step">Para quem afina a ARIA: o motor de IA, a plataforma de testes, os prompts e os preços dos tokens. Quem usa a página no dia a dia não a vê, nem vê os prompts: só os pode copiar.</p></div></div>
     <article class="card" id="workshop-engine"></article>
+    <!-- 06/10: Emails reads the mailbox by itself when opened (on/off, minutes) -->
+    <article class="card" id="workshop-auto-read"></article>
     <!-- the test console inside its own card, titled like the engine's -->
     <article class="card" id="workshop-tests"><p class="eyebrow">TESTES &amp; DEBUG</p><div id="workshop-lab"></div></article>
     <article class="card" id="workshop-prompts"></article>

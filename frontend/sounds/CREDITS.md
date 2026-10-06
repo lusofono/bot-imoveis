@@ -29,3 +29,19 @@ normalizados, com saída suave:
 | `boat-bell.m4a` | chegam emails (inteira) | «Ship Bell Two Chimes», *Sojan*, n.º 353232 |
 | `boat-horn.m4a` | enviar (inteira) | «Boat Horn», *PearceWilsonKing*, n.º 346108 |
 | `boat-engine.m4a` | mudar de separador (3 a 6 s) | «Lobster Boat Starting and Stopping», *bone666138*, n.º 398416 |
+
+## 00's UK Cabrio (06/10/2026)
+
+O motor de um compacto britânico (o tema não usa o nome da marca), gravado num iPhone 11 pelo utilizador *aharris4455*
+do Freesound; licença Creative Commons 0 (domínio público, uso comercial livre, sem atribuição obrigatória — fica o
+crédito por cortesia). Cortes a partir das pré-visualizações MP3 públicas, em mono, normalizados (cerca de −1 dBFS),
+com entrada e saída suaves, em AAC (`.m4a`):
+
+| Ficheiro | Para quê | Gravação de origem |
+|---|---|---|
+| `cabrio-idle.m4a` | chegam emails (0,1 a 4,6 s) | o motor ao ralenti, n.º 714173 — https://freesound.org/people/aharris4455/sounds/714173/ |
+| `cabrio-rev.m4a` | enviar (0,3 a 6,1 s) | duas aceleradas, n.º 714174 — https://freesound.org/people/aharris4455/sounds/714174/ |
+| `cabrio-gear.m4a` | mudar de separador (2,9 a 4,3 s), um pouco mais agudo a cada separador | a segunda acelerada da mesma gravação, n.º 714174 |
+| `cabrio-loop.m4a` | na garagem (Settings), em ciclo (0,4 a 4,4 s, com o fim fundido no início para não se notar a volta) | o ralenti, n.º 714173 |
+
+A buzina e o pisca não têm gravação livre deste carro: continuam sintetizados, e são o que toca se um corte não carregar.

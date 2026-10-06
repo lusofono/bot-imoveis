@@ -83,7 +83,7 @@ VIEW_FIELDS = ("id", "kind", "date", "subject", "customer", "recipient", "blocke
                "reply_text", "reply_status", "reply_error", "reply_message_id", "visit_window", "visit_slot",
                "visit_status", "reminder", "closing", "consent_suggested", "consent_confirmed", "history", "merged",
                "merged_ids", "visit_done", "visit_reminder", "survey_reply", "docs_request", "visit_missed", "profile_url",
-               "round", "review", "attachments", "addition_note", "addition_scope")
+               "round", "review", "attachments", "addition_note", "addition_scope", "reply_note")
 # 30/09: the prompts common to every property that the Oficina edits (voice.json), with the code's own text; the
 # behaviour («Comportamento geral») lives at the root of voice.json, the others under style.
 COMMON_PROMPTS = {"application_instructions": "", "after_visit": AFTER_VISIT_RULE, "after_visit_template": AFTER_VISIT_TEMPLATE,
@@ -128,6 +128,7 @@ def owner_folder(folder, email):
 
 NOTICES_KEPT = 300  # 02/10: the notice board keeps the latest ones; the oldest finished ones fall off first
 NOTICE_NOTE_CHARS = 25  # 04/10: the owner's own short note on a notice
+AUTO_READ_MINUTES = 10  # 06/10: Emails reads by itself when the last read is older than this (Settings changes it)
 # 04/10: the owner's own mark on a notice, the post-it's colour: urgent red, not urgent blue, dealt with green
 NOTICE_MARKS = ("urgent", "calm", "done")
 NOTICE_EVENT_DAYS = 7  # 04/10: a green or grey notice (news, nothing to do) leaves the board after a week
@@ -429,6 +430,29 @@ class MailService:
     def voice_signature(self):
         """02/10: the signature the program puts under every AI draft (Voz e estilo), one or more lines."""
         return str(((load_json(self.folder / "voice.json", {}).get("style") or {}).get("signature") or {}).get("text") or "")
+
+    def auto_read_settings(self, cfg=None):
+        """06/10, Settings: Emails reads the mailbox by itself when it is opened and there was no read yet, or the last one
+        is more than «minutes» old (10 by default); on unless switched off."""
+        cfg = cfg if cfg is not None else load_json(self.folder / "config.json", {})
+        auto = cfg.get("auto_read") or {}
+        minutes = auto.get("minutes")
+        return {"on": auto.get("on") is not False,
+                "minutes": minutes if isinstance(minutes, int) and 1 <= minutes <= 720 else AUTO_READ_MINUTES}
+
+    def set_auto_read(self, on, minutes):
+        try:
+            minutes = int(minutes)
+        except (TypeError, ValueError):
+            raise ValueError("Os minutos têm de ser um número inteiro.") from None
+        if not 1 <= minutes <= 720:
+            raise ValueError("Os minutos vão de 1 a 720.")
+        with locked(self.folder):
+            cfg = load_json(self.folder / "config.json", {})
+            cfg["auto_read"] = {"on": bool(on), "minutes": minutes}
+            save_json(self.folder / "config.json", cfg)
+            self.log("auto_read_set", on=bool(on), minutes=minutes)
+        return self.auto_read_settings()
 
     def reviewer_settings(self, cfg=None):
         """30/09, Oficina: the evaluator's model (stronger than the one that writes) and whether it reviews the real
@@ -3130,11 +3154,17 @@ class MailService:
             proposals = {address(item) for item in data["emails"] if item.get("kind") == "visit_proposal"}
             others = {address(item) for item in data["emails"] if item.get("kind") != "visit_proposal"}
             customers = self.candidates(ref, data)
-            left_out = {"ignored": sum(1 for c in conversations.values() if c.get("ignored")),
-                        "inactive": sum(1 for c in conversations.values() if c.get("inactive") and not c.get("ignored")),
-                        "new": len(waiting - set(conversations)),
-                        "proposal": sum(1 for c in customers if c["state"] == "pending" and c["email"] in proposals - others)}
-            return {"property_ref": ref, "customers": customers, "left_out": left_out}
+            # 05/10: and who they are, for the line's names when it is opened
+            named = lambda email: (conversations.get(email) or {}).get("name") or next(
+                ((item.get("customer") or {}).get("name") for item in data["emails"]
+                 if address(item) == email and (item.get("customer") or {}).get("name")), "") or email
+            names = {"ignored": [named(e) for e, c in conversations.items() if c.get("ignored")],
+                     "inactive": [named(e) for e, c in conversations.items() if c.get("inactive") and not c.get("ignored")],
+                     "new": [named(e) for e in sorted(waiting - set(conversations))],
+                     "proposal": [named(c["email"]) for c in customers
+                                  if c["state"] == "pending" and c["email"] in proposals - others]}
+            left_out = {key: len(value) for key, value in names.items()}
+            return {"property_ref": ref, "customers": customers, "left_out": left_out, "left_out_names": names}
 
     def visit_round_summary(self, property_ref=None, window_id=None):
         """Who a visit round went to, and where each one stands now: booked (and when), declined, or still
@@ -3536,8 +3566,9 @@ class MailService:
                             result["unbooked"] += 1
                         conversation["visit_accepted" if state == "aceite" else "visit_offered"] = pending
                         result["accepted" if state == "aceite" else "offered"] += 1
-                    save_visits(self.folder, ref, agenda)
                     self.save(data, ref)
+                agenda["synced_at"] = now()  # 06/10: «Última atualização» on top of Visitas
+                save_visits(self.folder, ref, agenda)
                 self.log("agenda_synced", reference=ref, **{k: v for k, v in result.items() if k != "property_ref"})
                 results.append({**result, "fuel": self.api_fuel(ref)})
             return {"properties": results}
@@ -3759,6 +3790,32 @@ class MailService:
             if not ref:
                 raise ValueError("As visitas só existem com imóveis.")
             return self.round_view(ref, self.load(ref))
+
+    def cancel_round(self, property_ref, window_id=None, ids=None):
+        """05/10, «Cancelar esta ronda»: a round prepared and not sent (one clicked by mistake, a wrong day) leaves the
+        queue — its proposals still to send — and its window leaves the agenda (or only those customers, when some
+        of it went out before); nothing is sent."""
+        with locked(self.folder):
+            ref = self.pick(self.profiles(), property_ref)
+            data = self.load(ref)
+            window_id, items = self.round_items(data, window_id)
+            items = [item for item in items if item.get("reply_status") in (None, "pending", "draft")
+                     and (ids is None or item["id"] in set(ids))]  # 06/10: or only these (switched off in the panel)
+            if not items:
+                raise ValueError("Não há nenhuma ronda por enviar neste imóvel.")
+            gone = {recipient_email(item) for item in items}
+            data["emails"] = [item for item in data["emails"] if not any(item is cancelled for cancelled in items)]
+            agenda = load_visits(self.folder, ref)
+            for window in agenda["windows"]:
+                if window.get("id") == window_id:
+                    window["recipients"] = [person for person in window.get("recipients") or []
+                                            if str(person.get("email") or "").casefold() not in gone]
+            agenda["windows"] = [window for window in agenda["windows"]
+                                 if window.get("id") != window_id or window.get("recipients")]
+            save_visits(self.folder, ref, agenda)
+            self.save(data, ref)
+            self.log("round_cancelled", reference=ref, count=len(items))
+            return {"cancelled": len(items), "property_ref": ref}
 
     def round_view(self, ref, data):
         window_id, items = self.round_items(data)
@@ -4016,6 +4073,21 @@ class MailService:
                 raise ValueError("Só se pedem documentos a quem está na short list.")
             if any(recipient_email(item) == email and item.get("kind") == "docs_request" for item in data["emails"]):
                 raise ValueError("O pedido de documentos deste cliente já está na fila de Emails.")
+            # 05/10: one card per customer: with one in the queue already, the request goes into it, as an instruction for
+            # that reply only (the documents still missing), never a second card
+            theirs = [item for item in data["emails"] if recipient_email(item) == email and item.get("kind") != "owner"
+                      and item.get("reply_status") in (None, "pending", "draft")]
+            if theirs:
+                target = max(theirs, key=lambda item: str(item.get("date") or ""))
+                missing = documents_summary(conversation["selection"])["missing"]
+                target["reply_note"] = ("Pede os documentos da candidatura que ainda faltam: " + "; ".join(missing)
+                                        + ", a enviar em anexo em resposta a este email; diz que servem só para avaliar "
+                                          "a candidatura e são apagados no fim do processo.") if missing else (
+                                       "Confirma que recebemos os documentos da candidatura e que os vamos analisar.")
+                conversation["selection"]["docs_requested_at"] = now()
+                self.save(data, ref)
+                self.log("docs_request_attached", reference=ref)
+                return {"id": target["id"], "property_ref": ref, "attached": True}
             key = f"documentos-{hashlib.sha256((email + now()).encode()).hexdigest()[:12]}"
             data["emails"].append(self.aux_item(key, "docs_request", email, conversation, "", reply_status="pending",
                                                 docs_request={"fiador": bool(conversation["selection"].get("fiador"))},
@@ -4024,6 +4096,23 @@ class MailService:
             self.save(data, ref)
             self.log("docs_request_created", reference=ref)
             return {"id": key, "property_ref": ref}
+
+    def set_reply_note(self, property_ref, item_id, note):
+        """05/10: the owner's instruction for one reply only (as «Pedir documentos» leaves in a card already in the
+        queue); empty takes it off."""
+        note = " ".join(str(note or "").split())[:2000]
+        with locked(self.folder):
+            ref = self.pick(self.profiles(), property_ref)
+            data = self.load(ref)
+            item = next((item for item in data["emails"] if item.get("id") == item_id), None)
+            if item is None:
+                raise ValueError("Esse email já não está na fila.")
+            if note:
+                item["reply_note"] = note
+            else:
+                item.pop("reply_note", None)
+            self.save(data, ref)
+            return {"property_ref": ref, "id": item_id}
 
     def fichas(self, ref, data):
         """Each active customer's file (the ignored ones are left out), the most recent conversation first."""
@@ -4693,6 +4782,7 @@ class MailService:
                                                                if window["day"] < today],
                                               "slots": self.agenda_slots(ref, today, back_days=None),
                                               "closed_at": load_visits(self.folder, ref)["closed_at"],
+                                              "synced_at": load_visits(self.folder, ref).get("synced_at"),  # 06/10
                                               # Accepted by the customer, not yet confirmed (found by «Atualizar agenda»).
                                               "accepted": self.pending_visits(ref, today, "visit_accepted"),
                                               "offered": self.pending_visits(ref, today, "visit_offered")},
@@ -4700,6 +4790,7 @@ class MailService:
                                        "reference", "listing_id", "listing_url", "advertiser", "description",
                                        "advertised_rent_eur", "owner_email", "owner_name")}, "deal": deal_of(profile)})
             return {"account": account, "voice": voice, "properties": properties, "ai": self.ai_settings(events),
+                    "auto_read": self.auto_read_settings(),  # 06/10
                     "portal_sender": portals.merged(self.config().get("portal"))["remetente_pedidos"],  # 02/10
                     "admin": self.config().get("admin") is True,  # 29/09: the Oficina shows only with "admin": true
                     "first_read_days": FIRST_READ_DAYS,

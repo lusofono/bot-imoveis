@@ -25,7 +25,10 @@ UNAVAILABLE = {"api/consent/confirm", "api/consent/request", "api/paste", "api/p
                "api/backup", "api/backup/folder", "api/backup/now", "api/backup/choose", "api/portal", "api/portal/save", "api/calls", "api/calls/scan", "api/owners/add", "api/owners/drafts",
                "api/owners/preview", "api/owners/send", "api/owners/dismiss",
                "api/context/add", "api/context/delete", "api/rebuild/scan", "api/rebuild/apply",
-               "api/active/write-all"}  # 04/10: «Escrever a todos» needs the full version (the demo says so)
+               "api/active/write-all",  # 04/10: «Escrever a todos» needs the full version (the demo says so)
+               "api/reply-note",  # 05/10: the instruction for one reply, taken off
+               "api/visits/round-cancel",  # 05/10: a round prepared by mistake
+               "api/auto-read"}  # 06/10: Settings, the automatic read
 
 
 @pytest.fixture(scope="module")

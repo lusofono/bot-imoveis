@@ -137,7 +137,10 @@ const SKINS = {
     },
     instruments: cabrioInstruments,
     selector: cabrioConsole,
-    sounds: {send: cabrioHorn, read: cabrioIndicator, click: cabrioToggle, shift: cabrioFlick},
+    // 06/10: a real engine (CC0, credits in frontend/sounds/CREDITS.md), the synthesised sounds as a fallback
+    sounds: {send: cabrioRev, read: cabrioIdle, click: cabrioToggle, shift: cabrioGear},
+    // 06/10: in the garage — Settings, where the car is tuned (the owner's word) — the engine ticking over, in a loop
+    ambient: {tab: 'workshop', clip: 'cabrio-loop', level: 0.22},  // the level the owner liked (in Imóveis, at first)
   },
 };
 function skin() { return SKINS[document.documentElement.dataset.theme] || null; }
@@ -153,6 +156,7 @@ function applySkin() {
   skinSelector = current?.selector ? current.selector($('skin-selector')) : null;
   skinSelector?.update(activeTab);
   renderSoundSwitch();
+  updateAmbient();  // 06/10: another theme, another loop (or none)
 }
 
 // A skin's sounds, made on the spot with the Web Audio API: no files. 90's Boat: a ship's horn when emails go out,
@@ -172,6 +176,31 @@ function playSound(name, ...details) {
     sound(audio, ...details);
   } catch { /* No audio in this browser: the page works the same without it. */ }
 }
+// 06/10: a skin's ambient sound, in a loop while one of its tabs is open (00's UK Cabrio: the engine ticking over in the
+// garage, Settings); it fades out on leaving it, turning the sounds off or changing the theme.
+let ambientLoop = null;
+function updateAmbient() {
+  const want = soundsOn() && skin()?.ambient?.tab === activeTab ? skin().ambient : null;
+  if (ambientLoop && ambientLoop.clip !== want?.clip) {
+    const {source, gain} = ambientLoop;
+    if (source) { gain.gain.setTargetAtTime(0, audio.currentTime, 0.15); source.stop(audio.currentTime + 0.8); }
+    ambientLoop = null;
+  }
+  if (!want || ambientLoop) return;
+  try {
+    audio ??= new AudioContext();
+    if (audio.state === 'suspended') audio.resume();
+    const entry = ambientLoop = {clip: want.clip};
+    loadSample(audio, want.clip).then(buffer => {
+      if (!buffer || ambientLoop !== entry) return;
+      const source = audio.createBufferSource(), gain = audio.createGain();
+      source.buffer = buffer; source.loop = true;
+      gain.gain.setValueAtTime(0, audio.currentTime); gain.gain.linearRampToValueAtTime(want.level, audio.currentTime + 0.8);
+      source.connect(gain).connect(audio.destination); source.start();
+      Object.assign(entry, {source, gain});
+    });
+  } catch { /* No audio in this browser: the page works the same without it. */ }
+}
 function renderSoundSwitch() {
   const toggle = $('sound-toggle'), available = !!skin()?.sounds;
   toggle.hidden = !available;
@@ -182,6 +211,7 @@ $('sound-toggle').addEventListener('click', () => {
   try { localStorage.setItem('bot-mail-sounds', on ? 'on' : 'off'); } catch { /* Storage may be unavailable. */ }
   renderSoundSwitch();
   if (on) playSound('read');  // this click unlocks the audio, and the bell (or the radio) says what turned on
+  updateAmbient();  // 06/10: the garage's idle starts or stops with the switch
 });
 // Every button clicks in a skin that has a click — before its own action runs (capture), so a button that
 // disables itself while working still sounds. The Sons switch plays its own sound.
@@ -323,10 +353,12 @@ function shipBell(context) {
 // (CC0, credits there). Each clip is fetched once, decoded, and played from memory; the synthesised sounds below stay
 // as a fallback while a clip loads or if it cannot be played.
 const SAMPLES = {}, PLAYING = {};
-function playSample(context, name, fallback, rate = 1, level = 0.8) {
-  SAMPLES[name] ??= fetch(`sounds/${name}.m4a`).then(response => response.arrayBuffer())
+function loadSample(context, name) {
+  return SAMPLES[name] ??= fetch(`sounds/${name}.m4a`).then(response => response.arrayBuffer())
     .then(bytes => context.decodeAudioData(bytes)).catch(() => null);
-  SAMPLES[name].then(buffer => {
+}
+function playSample(context, name, fallback, rate = 1, level = 0.8) {
+  loadSample(context, name).then(buffer => {
     if (!buffer) return fallback?.();
     // The clips are a few seconds long: a new one of the same kind fades the one still playing (tabs clicked in a row).
     const playing = PLAYING[name];
@@ -360,6 +392,15 @@ function racingGear(context, gear, from = 0) {
 }
 function boatBell(context) { playSample(context, 'boat-bell', () => shipBell(context), 1, 0.7); }
 function boatHorn(context) { playSample(context, 'boat-horn', () => shipHorn(context), 1, 0.7); }
+// 06/10: 00's UK Cabrio's recorded engine, a compact British car's (CC0): ticking over (new emails), revved twice
+// (emails out), one short rev a little higher at each tab, after the switch's click (tabs); each falls back on its
+// synthesised sound (the horn, the indicator, the flick)
+function cabrioIdle(context) { playSample(context, 'cabrio-idle', () => cabrioIndicator(context), 1, 0.7); }
+function cabrioRev(context) { playSample(context, 'cabrio-rev', () => cabrioHorn(context), 1, 0.8); }
+function cabrioGear(context, gear, from = 0) {
+  cabrioToggle(context);
+  playSample(context, 'cabrio-gear', () => cabrioFlick(context, gear), 0.92 + Math.max(1, gear) * 0.04, 0.55);
+}
 function boatEngine(context, gear) { playSample(context, 'boat-engine', () => brassTick(context), 0.9 + Math.max(1, gear) * 0.04, 0.5); }
 
 // 70's Scooter, emails out: the horn — two short, bright honks from a twin-tone buzzer.
@@ -574,16 +615,47 @@ function toggleBank(box) {
   const tabs = ['voice', 'properties', 'owners'], places = [34, 78, 122], light_at = 168, loops = [12, 56, 100, 145, 186], y = 46;
   const gradient = (tag, id, attrs, colours) => svg(tag, {id, ...attrs},
     colours.map(([offset, colour]) => svg('stop', {offset, 'stop-color': colour})));
-  const barrel = turn => svg('g', {class: 'bank-lever ' + (turn > 90 ? 'up' : 'down'), transform: `rotate(${turn})`},
-    svg('rect', {x: -4.6, y: -1, width: 9.2, height: 19, rx: 4.6}),
-    svg('ellipse', {cy: 16.6, rx: 4.1, ry: 2.5, class: 'bank-tip'}),
-    svg('path', {d: 'M-1.8 1.5V14', class: 'bank-shine'}));
-  const lever = (x, label, extra = '') => svg('g', {class: 'bank-toggle' + extra, transform: `translate(${x} ${y})`},
-    svg('rect', {x: -18, y: -22, width: 36, height: 52, class: 'bank-hit'}),
-    svg('circle', {r: 11.5, class: 'bank-socket'}),
-    svg('circle', {r: 7.4, class: 'bank-ring'}),
-    barrel(-28), barrel(208),
-    svg('text', {y: 33, class: 'bank-label'}, label));
+  // 06/10: seen from the front and upright, one lever that really moves: down (off) or up (on); on the way it shortens
+  // (pointing at you, only its round end showing) and grows the other way, as a real toggle flipped — drawn per frame
+  const LENGTH = 16;
+  const lever = (x, label, extra = '') => {
+    const arm = svg('g', {class: 'bank-arm'},
+      svg('rect', {x: -3.2, y: 0, width: 6.4, height: LENGTH, rx: 3.2, class: 'bank-shaft'}),
+      svg('path', {d: `M-1.1 2V${LENGTH - 2}`, class: 'bank-shine'}));
+    const shadow = svg('ellipse', {rx: 4.8, ry: 2.2, class: 'bank-shadow'});
+    const head = svg('g', {class: 'bank-head'},
+      svg('ellipse', {rx: 4.9, ry: 4.9, class: 'bank-tip'}),
+      svg('ellipse', {cx: -1.5, cy: -1.4, rx: 1.7, ry: 1.2, class: 'bank-tip-shine'}));
+    const node = svg('g', {class: 'bank-toggle' + extra, transform: `translate(${x} ${y})`},
+      svg('rect', {x: -18, y: -22, width: 36, height: 52, class: 'bank-hit'}),
+      svg('circle', {r: 11.5, class: 'bank-socket'}),
+      svg('circle', {r: 7.6, class: 'bank-ring'}),
+      svg('circle', {r: 3.4, class: 'bank-hole'}),
+      shadow, arm, head,
+      svg('text', {y: 33, class: 'bank-label'}, label));
+    // s: 1 down, -1 up; the round end squashed while the lever lies along the panel, round while it points at you
+    const draw = s => {
+      arm.setAttribute('transform', `scale(1 ${s})`);
+      head.setAttribute('transform', `translate(0 ${LENGTH * s}) scale(1 ${0.62 + 0.38 * (1 - Math.abs(s))})`);
+      shadow.setAttribute('transform', `translate(2.2 ${LENGTH * s + 3.2})`);
+      shadow.setAttribute('opacity', String(0.18 + 0.2 * Math.abs(s)));
+    };
+    let current = 1, frame = 0;
+    node.flip = on => {
+      const target = on ? -1 : 1;
+      if (target === current && !frame) return draw(current);
+      cancelAnimationFrame(frame);
+      const from = current, start = performance.now(), quick = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const step = now => {
+        const t = quick ? 1 : Math.min(1, (now - start) / 200), eased = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
+        current = from + (target - from) * eased; draw(current);
+        frame = t < 1 ? requestAnimationFrame(step) : 0;
+      };
+      frame = requestAnimationFrame(step);
+    };
+    draw(current);
+    return node;
+  };
   const toggles = tabs.map((tab, i) => {
     const node = lever(places[i], tab === 'voice' ? 'R' : String(gearOf(tab)));
     node.append(svg('title', {}, TAB_NAMES[tab]));
@@ -595,6 +667,7 @@ function toggleBank(box) {
   light.append(title);
   const paintLight = () => {
     light.classList.toggle('on', ambient() === 'night');
+    light.flip(ambient() === 'night');
     title.textContent = ambient() === 'night' ? 'Luz ambiente: noite (clica para dia)' : 'Luz ambiente: dia (clica para noite)';
   };
   light.addEventListener('click', () => { applyAmbient(ambient() === 'night' ? 'day' : 'night'); playSound('click'); paintLight(); });
@@ -607,13 +680,15 @@ function toggleBank(box) {
         [[0, '#fff'], [0.3, '#d6dce0'], [0.52, '#8d969d'], [0.62, '#eef1f3'], [1, '#9aa3aa']]),
       gradient('linearGradient', 'bank-barrel', {x1: 0, y1: 0, x2: 1, y2: 0},
         [[0, '#5f676d'], [0.28, '#eef1f3'], [0.45, '#ffffff'], [0.7, '#b9c1c6'], [1, '#4f565c']]),
-      gradient('radialGradient', 'bank-socket', {cx: 0.5, cy: 0.45, r: 0.55}, [[0, '#000'], [0.75, '#0d0d0d'], [1, '#2e2e2e']])),
+      gradient('radialGradient', 'bank-socket', {cx: 0.5, cy: 0.45, r: 0.55}, [[0, '#000'], [0.75, '#0d0d0d'], [1, '#2e2e2e']]),
+      // 06/10: the lever's round chrome end, lit from the top left
+      gradient('radialGradient', 'bank-tip', {cx: 0.38, cy: 0.34, r: 0.7}, [[0, '#ffffff'], [0.45, '#d9dee2'], [0.8, '#8d969d'], [1, '#5f676d']])),
     svg('rect', {x: 2, y: 12, width: 194, height: 76, rx: 13, class: 'bank-panel'}),
     loops.map(loop),
     toggles, light));
   paintLight();
   return {update(tab) {
-    tabs.forEach((name, i) => toggles[i].classList.toggle('on', name === tab));
+    tabs.forEach((name, i) => { toggles[i].classList.toggle('on', name === tab); toggles[i].flip(name === tab); });
   }};
 }
 
@@ -1099,6 +1174,8 @@ function showTab(name) {
     else button.removeAttribute('aria-current');
   });
   $('page-label').textContent = TAB_NAMES[name];
+  applySharedProperty(name);  // 05/10: the property chosen in any tab
+  updateAmbient();  // 06/10: a skin's loop while its tab is open (the Cabrio's garage)
   for (const tab of Object.keys(TAB_NAMES)) $('tab-' + tab).hidden = tab !== name;
   $('tab-workshop').hidden = true; $('workshop-link').classList.remove('active');
   window.scrollTo({top: 0, behavior: 'instant'});
@@ -1106,6 +1183,7 @@ function showTab(name) {
   if (name === 'voice') run(loadMetrics);  // «O teu espaço» (27/09) lives at the top of the settings now
   if (name === 'contacts') run(loadContacts);
   if (name === 'replies') refreshQueueMetrics(true);  // 05/10: the numbers above «Emails em tratamento»
+  if (name === 'replies') maybeAutoRead();  // 06/10: reads by itself when the last read is old (Settings)
   if (name === 'owners') { renderOwners(); run(loadOwnersDigest); }
   if (name === 'agenda') renderAgenda();
   // Sends, refills and reads elsewhere change its numbers: the cluster is never shown out of date.
@@ -1120,6 +1198,7 @@ function showWorkshop() {
   for (const tab of Object.keys(TAB_NAMES)) $('tab-' + tab).hidden = true;
   $('tab-workshop').hidden = false; $('workshop-link').classList.add('active');
   $('page-label').textContent = 'Settings';  // 04/10: once «Oficina»
+  updateAmbient();  // 06/10: the Cabrio's garage: the engine ticking over while Settings is open
   window.scrollTo({top: 0, behavior: 'instant'});
   renderWorkshop();
   run(async () => renderLab(await call('api/testlab/state', {})));
@@ -1187,6 +1266,35 @@ function backupCard(info) {
       : info.folder ? 'Ainda sem cópias nesta pasta: a primeira faz-se na próxima leitura, ou agora.' : 'Sem pasta escolhida: não há cópias.'));
 }
 
+// 06/10, Settings: Emails reads the mailbox by itself when it is opened and there was no read yet, or the last one is
+// older than the minutes chosen here (10 by default); on or off.
+function autoReadCard() {
+  const auto = settings?.auto_read || {on: true, minutes: 10};
+  const on = el('input', {type: 'checkbox', checked: auto.on});
+  const minutes = el('input', {type: 'number', min: 1, max: 720, step: 1, value: auto.minutes, class: 'price-input',
+    'aria-label': 'Minutos desde a última leitura'});
+  return [el('p', {class: 'eyebrow'}, 'LEITURA AUTOMÁTICA'),
+    el('p', {class: 'step'}, 'Ao abrir Emails, lê o Gmail sozinha se ainda não houver leitura ou se a última tiver sido há '
+      + 'mais do que estes minutos. Nada é enviado: só lê.'),
+    el('div', {class: 'row'}, el('label', {class: 'check'}, on, ' Ligada'),
+      el('label', {}, 'Ler de novo passados ', minutes, ' minutos'),
+      el('button', {type: 'button', onclick: event => run(async () => {
+        settings.auto_read = await call('api/auto-read', {on: on.checked, minutes: minutes.value});
+        toast(settings.auto_read.on ? `Leitura automática ligada: ao abrir Emails, se a última leitura tiver mais de `
+          + `${settings.auto_read.minutes} minutos.` : 'Leitura automática desligada.');
+      }, event.currentTarget)}, 'Guardar'))];
+}
+// 06/10: opening Emails reads by itself, when that is on (Settings) and the last read is missing or old enough — as a
+// click on «Ler emails do Gmail» (its progress, its rest), never while it rests, is held or is busy
+function maybeAutoRead() {
+  const auto = settings?.auto_read;
+  if (!auto?.on || !state?.properties || state.error) return;
+  const last = Math.max(0, ...state.properties.map(queue => Date.parse(queue.last_read_at || '') || 0));
+  if (last && Date.now() - last < auto.minutes * 60000) return;
+  const button = $('read');
+  if (button.disabled || button.dataset.busy === '1' || button.dataset.lock === '1') return;
+  button.click();
+}
 function renderWorkshop() {
   $('workshop-link').hidden = !settings?.admin;
   // 30/09: without "admin", the prompts are never shown (with the customers' data in them): only «Copiar»
@@ -1194,6 +1302,7 @@ function renderWorkshop() {
   if (!settings?.admin) return;
   $('workshop-prompts').replaceChildren(...promptsCard());
   $('workshop-engine').replaceChildren(el('p', {class: 'eyebrow'}, 'MOTOR DE IA · API OPENAI'), engineConsole(), effortRow());
+  $('workshop-auto-read').replaceChildren(...autoReadCard());
   run(async () => backupCard(await call('api/backup', {})));
   run(async () => portalCard(await call('api/portal', {})));
   // Token prices, US$ per 1M tokens as OpenAI writes them: change one, add a model, or put the table's own back
@@ -2119,15 +2228,20 @@ function conversationTurns(turns, current, dates) {
     el('pre', {}, turn.text)));
 }
 
-// 05/10: an addition's card says when it was made and what was added (or, an old empty one, what to do with it)
+// 05/10: an addition's card says, in plain words, what it is (an extra email of ours, not a message of the customer's),
+// when it was made and what was added — or, an old empty one, that nothing was sent and how to drop it. «Email extra»
+// on the page: «acrescento» said nothing to the owner.
 function additionNote(email) {
   const moment = email.date ? new Date(email.date) : null;
   const at = moment ? `${moment.toLocaleDateString('pt-PT', {day: '2-digit', month: '2-digit'})} às `
     + moment.toLocaleTimeString('pt-PT', {hour: '2-digit', minute: '2-digit'}) : '';
-  const who = email.addition_scope === 'all' ? 'Acrescento a todos' : 'Acrescento teu';
-  if (email.addition_note) return `(${who}, de ${at}: «${email.addition_note}»)`;
-  if ((email.reply_text || '').trim()) return `(${who}, de ${at}: o texto está no rascunho, abaixo)`;
-  return `(${who}, aberto a ${at} e ainda vazio: escreve-o abaixo, pede-o à IA, ou cancela-o)`;
+  const how = email.addition_scope === 'all' ? 'com «Escrever a todos»' : 'com «Escrever mais»';
+  if (email.addition_note) return `(Email extra teu a este cliente, criado a ${at} ${how}. Não é uma mensagem do cliente. `
+    + `O que quiseste dizer: «${email.addition_note}»)`;
+  if ((email.reply_text || '').trim()) return `(Email extra teu a este cliente, criado a ${at} ${how}. Não é uma mensagem `
+    + 'do cliente: o texto é o rascunho, abaixo)';
+  return `(Email extra teu a este cliente, aberto a ${at} ${how} e ainda vazio. Não é uma mensagem do cliente e nada `
+    + 'foi enviado. Se já não precisas dele, carrega em «Cancelar email extra»)';
 }
 function programNote(email) {
   return email.visit_window
@@ -2309,10 +2423,10 @@ function card(email, index, list) {
     // 05/10: an addition («Escrever mais», «Escrever a todos») is cancelled here: it leaves the queue, nothing is sent
     email.kind === 'addition' ? el('button', {class: 'pill-action remove', title: 'Tira este acrescento da fila sem o enviar. '
         + 'O Gmail não muda; podes abrir outro com «Escrever mais».', onclick: event => run(async () => {
-      if ((draft.value || '').trim() && !confirm('Cancelar este acrescento? O que está escrito no rascunho perde-se e nada é enviado.')) return;
+      if ((draft.value || '').trim() && !confirm('Cancelar este email extra? O que está escrito no rascunho perde-se e nada é enviado.')) return;
       state = await call('api/dismiss', {property_ref: queueRef(), ids: [email.id]});
-      renderState(); toast('Acrescento cancelado: saiu da fila, nada foi enviado.');
-    }, event.currentTarget)}, 'Cancelar acrescento')
+      renderState(); toast('Email extra cancelado: saiu da fila, nada foi enviado.');
+    }, event.currentTarget)}, 'Cancelar email extra')
     : el('button', {class: 'pill-action remove', title: 'Tira este email da fila sem responder. O Gmail não muda, e se o cliente '
         + 'voltar a escrever, a mensagem nova entra normalmente.', onclick: event => run(async () => {
       if (!confirm('Este email não precisa de resposta? Sai da fila sem resposta; o Gmail não é alterado e este email não '
@@ -2366,11 +2480,13 @@ function card(email, index, list) {
     `${index + 1} / ${list.length}`);
   const reviewer = reviewNote(email, draft, saved);  // 30/09: the reviewer's marks and warnings, under the draft
   // 30/09: already answered straight in Gmail: greyed out and not ticked (it stays, for something to add)
-  const article = el('article', {class: 'card email-card' + (email.blocked ? ' blocked' : '') + (email.answered_direct ? ' answered-direct' : '')},
+  // 05/10: an instruction left for this reply makes a card answered in Gmail a live one again
+  const greyed = email.answered_direct && !email.reply_note;
+  const article = el('article', {class: 'card email-card' + (email.blocked ? ' blocked' : '') + (greyed ? ' answered-direct' : '')},
     position,
     el('div', {class: 'card-head'},
       el('label', {class: 'who'}, el('input', {type: 'checkbox', class: 'pick', 'data-id': email.id,
-        checked: !email.blocked && !email.answered_direct, disabled: !!email.blocked}),
+        checked: !email.blocked && !greyed, disabled: !!email.blocked}),
         el('strong', {}, shortName(customer.name || sender.name) || sender.email || 'Sem nome')),
       // 05/10: the email (and phone, and profile) on the name's line, after it: one line less
       (address || phoneShown || profileUrl) && el('span', {class: 'muted small contact-line head-contact'},
@@ -2388,7 +2504,7 @@ function card(email, index, list) {
         : email.kind === 'visit_reminder' ? el('span', {class: 'tag visit'},
           (email.visit_reminder?.when === 'vespera' ? 'lembrete de visita · amanhã ' : 'lembrete de visita · hoje ')
           + String(email.visit_reminder?.at || '').slice(11))
-        : email.kind === 'addition' ? el('span', {class: 'tag visit'}, 'acrescento')
+        : email.kind === 'addition' ? el('span', {class: 'tag visit'}, 'email extra')
         : email.phase === 'shortlist' ? el('span', {class: 'tag visit', title: email.docs_requested
           ? 'Já lhe pedimos os documentos: a resposta diz o que chegou e o que falta.' : 'A resposta pede os documentos.'},
           email.docs_requested ? 'short list · documentos' : 'short list · pedir documentos')
@@ -2422,9 +2538,15 @@ function card(email, index, list) {
       : el('p', {class: 'alert bad'}, email.blocked)),
     (email.warnings || []).map(warning => el('p', {class: 'alert warn'}, warning)),
     // 03/10: the attached files, by name (nothing is opened here); on the short list they tell what came
-    email.attachments?.length && el('p', {class: 'muted small attachments-line'}, '📎 ' + email.attachments.join(' · ')),
-    email.phase === 'shortlist' && email.docs_requested && email.docs_missing?.length
+    // 05/10: «> 0», or an empty list printed a «0»
+    email.attachments?.length > 0 && el('p', {class: 'muted small attachments-line'}, '📎 ' + email.attachments.join(' · ')),
+    email.phase === 'shortlist' && email.docs_requested && email.docs_missing?.length > 0
       && el('p', {class: 'muted small'}, 'Ainda faltam: ' + email.docs_missing.join('; ') + '.'),
+    // 05/10: the owner's instruction for this reply only (as «Pedir documentos» leaves here), with «tirar»
+    email.reply_note && el('p', {class: 'alert ok reply-note'}, el('strong', {}, 'Só para esta resposta: '), email.reply_note, ' ',
+      el('button', {type: 'button', class: 'link', onclick: event => run(async () => {
+        state = (await call('api/reply-note', {property_ref: queueRef(), id: email.id, note: ''})).state; renderState();
+      }, event.currentTarget)}, 'tirar')),
     email.reply_error && el('p', {class: 'alert bad'}, email.reply_error),
     (email.draft_checks || []).map(check => el('p', {class: 'alert warn'}, 'Verificação do rascunho: ' + check)),
     email.consent_suggested && el('p', {class: 'alert warn'}, 'O cliente parece ter dito que sim: confirma para gravar em contactos.csv.'),
@@ -2748,7 +2870,7 @@ const QUEUE_SHOWS = {pending: () => true, drafts: item => item.status === 'draft
   attention: item => ['uncertain', 'error', 'sending'].includes(item.status)};
 const QUEUE_KINDS = {reminder: 'lembrete', visit_proposal: 'proposta de visita', visit_reminder: 'lembrete de visita',
   visit_thanks: 'agradecimento', visit_missed: 'visita falhada', consent_request: 'pedido de consentimento',
-  visits_closed: 'visitas fechadas', addition: 'acrescento', docs_request: 'pedido de documentos'};
+  visits_closed: 'visitas fechadas', addition: 'email extra', docs_request: 'pedido de documentos'};
 function queueHover(properties, shows, header) {
   const items = properties.flatMap(property => (property.queue || []).filter(shows)
     .map(item => ({...item, ref: property.property_ref || 'Fila única'})))
@@ -3175,6 +3297,7 @@ function noticeNote(notice, save) {
 const TODO_URGENT = new Set(['survey_alert', 'visit_reminder', 'uncertain', 'blocked', 'reply', 'accepted', 'check']);
 function openTask(task) {
   const ref = task.property_ref;
+  shareProperty(ref);  // 05/10: the task's property, then, in every tab
   // A menu not drawn yet has no options: the value is kept by an option of its own, which the redraw keeps.
   const choose = select => {
     if (![...select.options].some(option => option.value === ref)) select.append(el('option', {value: ref}, ref));
@@ -3403,27 +3526,39 @@ function roundSummaryContent(data, shown = Infinity) {
 // 02/10: who this round reaches now, and who stays out and why (5 of 20 was a surprise). Those still waiting for our
 // answer include the new requests, which have no conversation until the first reply goes out; those whose only
 // email waiting is our visit proposal (a round prepared, not sent) are counted apart.
-function roundCounts(data) {
-  const by = {};
-  for (const customer of data.customers || []) by[customer.state] = (by[customer.state] || 0) + 1;
-  const out = data.left_out || {};
+// 05/10: each group with its names too, for the line to open: [count, its words, the names]
+function roundGroups(data) {
+  const customers = data.customers || [], out = data.left_out || {}, names = data.left_out_names || {};
+  const of = state => customers.filter(customer => customer.state === state).map(customer => customer.name || customer.email);
+  const proposal = new Set(names.proposal || []);
+  const waiting = [...of('pending').filter(name => !proposal.has(name)), ...(names.new || [])];
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
   return [
-    [by.ok || 0, n => plural(n, 'recebe o convite', 'recebem o convite')],
-    [out.proposal, n => `${n} com a proposta de visita ainda por enviar`],
-    [(by.pending || 0) - (out.proposal || 0) + (out.new || 0),
-      n => `${n} com email por responder em Emails (entram depois de lhes responderes)`],
-    [by.booked, n => `${n} já com visita marcada`],
-    [by.nao_quer, n => plural(n, 'não quer visitar', 'não querem visitar')],
-    [by.outra_data, n => plural(n, 'só pode noutra data', 'só podem noutra data')],
-    [by.closed, n => plural(n, 'já levou o email de fecho', 'já levaram o email de fecho')],
-    [out.ignored, n => `${n} na lista de ignorados`],
-    [out.inactive, n => plural(n, 'inativo', 'inativos') + ' (dois emails nossos sem resposta)']]
-    .filter(([n], index) => index === 0 || n).map(([n, text]) => text(n)).join(' · ');
+    [of('ok'), n => plural(n, 'recebe o convite', 'recebem o convite')],
+    [names.proposal || [], n => `${n} com a proposta de visita ainda por enviar`],
+    [waiting, n => `${n} com email por responder em Emails (entram depois de lhes responderes)`],
+    [of('booked'), n => `${n} já com visita marcada`],
+    [of('nao_quer'), n => plural(n, 'não quer visitar', 'não querem visitar')],
+    [of('outra_data'), n => plural(n, 'só pode noutra data', 'só podem noutra data')],
+    [of('closed'), n => plural(n, 'já levou o email de fecho', 'já levaram o email de fecho')],
+    [names.ignored || [], n => `${n} na lista de ignorados`],
+    [names.inactive || [], n => plural(n, 'inativo', 'inativos') + ' (dois emails nossos sem resposta)']]
+    .filter(([list], index) => index === 0 || list.length).map(([list, text]) => ({text: text(list.length), names: list}));
+}
+// 05/10: «Agora: …», a line that opens to the names of each group (kept open or closed while the panel redraws)
+let roundCountsOpen = false;
+function roundCountsBox(box, data) {
+  const groups = roundGroups(data);
+  box.open = roundCountsOpen;
+  box.replaceChildren(el('summary', {}, 'Agora: ' + groups.map(group => group.text).join(' · ') + '.'),
+    el('ul', {class: 'round-groups'}, groups.map(group => el('li', {},
+      el('strong', {}, group.text.replace(/ \(.*\)$/, '') + ': '),
+      group.names.length ? group.names.map(name => shortName(name) || name).join(', ') : '—'))));
 }
 
 // 02/10: the property is the one chosen at the top of Visitas (the switcher), not a menu of its own down here.
-let roundPanelProperty = null;  // the property the panel was drawn for: renderAgenda redraws it when the top one changes
+let roundPanelProperty = null;
+const roundDraft = {};  // 06/10: property → the day, times and note being chosen in «Ronda de visitas»  // the property the panel was drawn for: renderAgenda redraws it when the top one changes
 function renderVisitsRound() {
   const box = $('visits-round-panel');
   const ref = $('agenda-property').value;
@@ -3440,14 +3575,22 @@ function renderVisitsRound() {
     return;
   }
   const slot = settings.voice.visits?.slot_minutes || 30;
-  const day = el('input', {type: 'date', 'aria-label': 'Dia das visitas'});
-  const start = el('input', {type: 'time', value: '17:00', step: slot * 60, 'aria-label': 'Hora de início'});
-  const end = el('input', {type: 'time', value: '19:00', step: slot * 60, 'aria-label': 'Hora de fim'});
+  // 06/10: the day opens on tomorrow (a round for today was a date left as it came: 05/10 went out for the 6th), and the
+  // day, the times and the note chosen survive the page's redraws, per property
+  const draft = roundDraft[ref] ||= {};
+  const tomorrow = new Date(Date.now() + 86400000).toLocaleDateString('sv-SE');
+  const day = el('input', {type: 'date', 'aria-label': 'Dia das visitas',
+    value: draft.day && draft.day >= new Date().toLocaleDateString('sv-SE') ? draft.day : tomorrow});
+  const start = el('input', {type: 'time', value: draft.start || '17:00', step: slot * 60, 'aria-label': 'Hora de início'});
+  const end = el('input', {type: 'time', value: draft.end || '19:00', step: slot * 60, 'aria-label': 'Hora de fim'});
   linkTimes(start, end);
   // 29/09: what this round's emails should say, and one text for everyone unless the owner individualizes
   const note = el('textarea', {rows: 3, 'aria-label': 'Conhecimento desta ronda',
     placeholder: 'Conhecimento desta ronda (opcional): o que estes emails devem dizer — por exemplo, que o inquilino '
-      + 'ainda lá está, onde estacionar ou quanto dura a visita.'});
+      + 'ainda lá está, onde estacionar ou quanto dura a visita.'}, draft.note || '');
+  for (const [key, field] of Object.entries({day, start, end, note})) {
+    for (const type of ['input', 'change']) field.addEventListener(type, () => { draft[key] = field.value; });
+  }
   const individual = el('input', {type: 'checkbox'});
   // 29/09: nothing is sent at this click. With one text for all, it prepares the round and writes the draft at once
   // (via API), shown at the end of this panel to review; only «Enviar a todos», there, sends.
@@ -3457,6 +3600,8 @@ function renderVisitsRound() {
   const roundActions = el('span', {class: 'round-actions'});
   const startButton = el('button', {class: 'primary', onclick: event => run(async () => {
     if (!day.value) throw new Error('Escolhe o dia das visitas.');
+    if (day.value === new Date().toLocaleDateString('sv-SE')
+        && !confirm(`A ronda é para hoje, ${dayLabel(day.value)}, das ${start.value} às ${end.value}. É mesmo para hoje?`)) return;
     const common = !individual.checked;
     const data = await call('api/visits/candidates', {property_ref: ref});
     const emails = data.customers.filter(customer => customer.state === 'ok').map(customer => customer.email);
@@ -3481,23 +3626,28 @@ function renderVisitsRound() {
   individual.addEventListener('change', () => { startButton.replaceChildren(...startLabel()); });
   const summaryBox = el('div', {class: 'round-summary'});
   const commonBox = el('div', {class: 'round-common'});
-  const counts = el('p', {class: 'muted small round-counts'});
+  const counts = el('details', {class: 'muted small round-counts', ontoggle: event => { roundCountsOpen = event.currentTarget.open; }});
   const loadSummary = () => run(async () => {
-    counts.textContent = 'Agora: ' + roundCounts(await call('api/visits/candidates', {property_ref: ref})) + '.';
+    roundCountsBox(counts, await call('api/visits/candidates', {property_ref: ref}));
     const data = await call('api/visits/round-summary', {property_ref: ref});
     summaryBox.replaceChildren(...roundSummaryContent(data, 10));  // 04/10: the first 10, the rest on a hover
     renderRoundCommon(commonBox, await call('api/visits/round', {property_ref: ref}), loadSummary, roundActions);
   });
+  // 05/10: the whole width again, in two columns: what the round says on the left, «Agora: …», «Individualizar» and the
+  // buttons on the right
   card(
-    el('p', {class: 'step'},
-      'Um email a cada cliente ativo deste imóvel, a propor o dia e o intervalo e a perguntar a hora que lhe dá mais '
-      + 'jeito dentro dele. O mesmo texto para todos (em português para quem escreve em português, em inglês para os '
-      + 'outros), que revês e envias aqui mesmo; individualizado, fica um por cliente na fila de Emails.'),
-    counts,
-    el('div', {class: 'row'}, dateStepper(day), timeStepper(start, slot), timeStepper(end, slot)),
-    note,
-    el('label', {class: 'check'}, individual, ' Individualizar: uma resposta por cliente, em Emails'),
-    el('div', {class: 'actions'}, startButton, roundActions),
+    el('div', {class: 'round-layout'},
+      el('div', {class: 'round-main'},
+        el('p', {class: 'step'},
+          // 05/10: the owner's own words
+          'Um email a cada cliente ativo deste imóvel, a propor o dia e o intervalo e a perguntar a hora que lhe dá mais '
+          + 'jeito dentro dele. Ficará um email por cliente preparado.'),
+        el('div', {class: 'row'}, dateStepper(day), timeStepper(start, slot), timeStepper(end, slot)),
+        note),
+      // 05/10: «Agora: …» (who gets the invitation and who is left out) at the top of the right column
+      el('div', {class: 'round-side'}, counts,
+        el('label', {class: 'check'}, individual, ' Individualizar: uma resposta por cliente, em Emails'),
+        el('div', {class: 'actions'}, startButton, roundActions))),
     commonBox, summaryBox);
   loadSummary();
 }
@@ -3505,8 +3655,9 @@ function renderVisitsRound() {
 // 29/09: the round with one text for everyone: generate it (API, or copy/paste), review the Portuguese and the English
 // text, each customer's greeting and the short summaries in other languages, then send them all — each customer gets
 // it in their own conversation. «Individualizar» takes one customer to Comunicações, to be answered on their own.
-const ROUND_LANGS = {pt: 'português', en: 'inglês'};
+const ROUND_LANGS = {pt: 'português', en: 'inglês', es: 'espanhol'};  // 06/10: Spanish a text of its own
 let roundScroll = false;  // after «Preparar o texto da ronda»: show the draft, right under the buttons
+const roundOff = new Set();  // 06/10: the round's customers switched off (left out when the others are sent)
 const stepNum2 = () => el('span', {class: 'step-num', 'aria-hidden': 'true'}, '2');
 function renderRoundCommon(box, data, reload, actions) {
   actions.replaceChildren();
@@ -3518,11 +3669,10 @@ function renderRoundCommon(box, data, reload, actions) {
     [lang, el('textarea', {rows: 12, 'aria-label': `Texto em ${ROUND_LANGS[lang]}`}, data.texts[lang])]));
   const summaries = Object.fromEntries(Object.entries(data.summaries || {}).map(([lang, text]) =>
     [lang, el('textarea', {rows: 4, 'aria-label': `Resumo em ${lang}`}, text)]));
-  const greetings = Object.fromEntries(items.map(item =>
-    [item.id, el('input', {type: 'text', value: item.greeting || '', 'aria-label': `Saudação de ${shortName(item.name) || item.email}`})]));
   const common = () => ({texts: Object.fromEntries(Object.entries(texts).map(([lang, box]) => [lang, box.value])),
     summaries: Object.fromEntries(Object.entries(summaries).map(([lang, box]) => [lang, box.value])),
-    clients: Object.fromEntries(items.map(item => [item.id, {language: item.language, lang: item.lang, greeting: greetings[item.id].value}]))});
+    // 06/10: each customer's greeting as the AI wrote it (no box to change it any more: the name is what it is)
+    clients: Object.fromEntries(items.map(item => [item.id, {language: item.language, lang: item.lang, greeting: item.greeting || ''}]))});
   const save = () => call('api/visits/round-save', {property_ref: ref, window_id: data.window_id, common: common()});
   const promptText = el('pre', {}, '');
   const promptBox = el('details', {class: 'copy-only prompt-view'}, el('summary', {class: 'muted small'}, 'Prompt da ronda'), promptText);
@@ -3552,15 +3702,20 @@ function renderRoundCommon(box, data, reload, actions) {
         toast('Texto comum pronto: revê-o abaixo antes de enviar.');
       }, event.currentTarget)}, 'Usar a resposta colada')),
     promptBox, pasted,
-    Object.entries(texts).map(([lang, textarea]) => el('label', {class: 'round-text'},
-      el('span', {class: 'muted small'}, `Texto em ${ROUND_LANGS[lang]} (${count(lang)} cliente(s))`
-        + (lang === 'en' ? ' — o completo e oficial para quem não escreve em português' : '')), textarea)),
-    Object.entries(summaries).map(([lang, textarea]) => el('label', {class: 'round-text'},
-      el('span', {class: 'muted small'}, `Resumo em «${lang}», a seguir ao texto em inglês (`
+    // 06/10: the Portuguese open, the other texts and the translations closed, each under its title
+    Object.entries(texts).map(([lang, textarea]) => el('details', {class: 'round-text', open: lang === 'pt'},
+      el('summary', {class: 'muted small'}, `Texto em ${ROUND_LANGS[lang]} (${count(lang)} cliente(s))`
+        + (lang === 'en' ? ' — o completo e oficial para quem não escreve em português nem em espanhol' : '')), textarea)),
+    Object.entries(summaries).map(([lang, textarea]) => el('details', {class: 'round-text'},
+      el('summary', {class: 'muted small'}, `Tradução em «${lang}», a seguir ao texto em inglês (`
         + `${items.filter(item => item.lang === lang).length} cliente(s))`), textarea)),
     el('div', {class: 'client-list'}, items.map(item => el('div', {class: 'client-row'},
-      el('span', {}, shortName(item.name) || item.email),
-      hasTexts && greetings[item.id],
+      // 06/10: on (sent) or off (left out of the round when the others go); all on at first
+      el('label', {class: 'round-pick', title: 'Desliga para o deixar fora desta ronda'},
+        el('input', {type: 'checkbox', checked: !roundOff.has(item.id), onchange: event => {
+          if (event.target.checked) roundOff.delete(item.id); else roundOff.add(item.id);
+          sendLabel();
+        }}), el('span', {}, shortName(item.name) || item.email)),
       el('span', {class: 'tag' + (item.reply_status === 'error' ? ' warn' : '')},
         item.reply_status === 'error' ? `não saiu: ${item.reply_error || 'erro'}`
           : item.language ? (ROUND_LANGS[item.language] + (item.lang && item.lang !== item.language ? ` · escreve em ${item.lang}` : ''))
@@ -3570,25 +3725,48 @@ function renderRoundCommon(box, data, reload, actions) {
           redraw(await call('api/visits/round-individual', {property_ref: ref, id: item.id}));
           toast(`${shortName(item.name) || item.email} passou para Emails.`);
         }, event.currentTarget)}, 'Individualizar'))))));
-  if (hasTexts) actions.replaceChildren(
-      el('button', {onclick: event => run(async () => {
-        redraw(await save()); toast('Alterações guardadas em todos os emails da ronda.');
-      }, event.currentTarget)}, 'Guardar alterações'),
-      el('button', {class: 'primary send-action', onclick: event => run(async () => {
+  const sendButton = el('button', {class: 'primary send-action', onclick: event => run(async () => {
         const saved = await save();
-        const ids = saved.items.map(item => item.id);
+        const off = saved.items.filter(item => roundOff.has(item.id)).map(item => item.id);
+        const ids = saved.items.map(item => item.id).filter(id => !off.includes(id));
+        if (!ids.length) throw new Error('Liga pelo menos um cliente para enviar.');
         const check = await call('api/preview', {property_ref: ref, ids});
         const warned = check.replies.filter(reply => (reply.warnings || []).length).length;
-        if (!confirm(`Enviar agora ${ids.length} email(s) reais, um a cada cliente da ronda, na conversa de cada um?`
+        if (!confirm(`Enviar agora ${ids.length} email(s) reais, um a cada cliente ligado da ronda, na conversa de cada um?`
             + `\n\nPara: ${check.replies.map(reply => reply.to).join(', ')}`
+            + (off.length ? `\n\n${off.length} desligado(s): ficam fora e saem da ronda, sem receber nada.` : '')
             + (warned ? `\n\n${warned} com avisos: vê-os em Emails antes, se quiseres.` : ''))) { redraw(saved); return; }
         const result = await call('api/send', {property_ref: ref, preview_token: check.preview_token, confirmed: true});
         const sent = result.results.filter(item => item.status === 'sent').length;
         if (sent) playSound('send');
+        if (off.length) {
+          await call('api/visits/round-cancel', {property_ref: ref, window_id: data.window_id, ids: off});
+          off.forEach(id => roundOff.delete(id));
+        }
         state = await call('api/state'); renderState(); reload();
-        toast(`Ronda: enviados ${sent} de ${ids.length}.` + (sent < ids.length ? ' Os que ficaram continuam aqui, com o aviso.' : ''),
-          sent === ids.length ? 'ok' : 'warn');
-      }, event.currentTarget)}, stepNum2(), buttonIcon('mail'), `Enviar a todos (${items.length})`));
+        toast(`Ronda: enviados ${sent} de ${ids.length}.` + (off.length ? ` ${off.length} ficaram fora e saíram da ronda.` : '')
+          + (sent < ids.length ? ' Os que não saíram continuam aqui, com o aviso.' : ''), sent === ids.length ? 'ok' : 'warn');
+      }, event.currentTarget)});
+  if (hasTexts) actions.replaceChildren(
+      el('button', {onclick: event => run(async () => {
+        redraw(await save()); toast('Alterações guardadas em todos os emails da ronda.');
+      }, event.currentTarget)}, 'Guardar alterações'),
+      sendButton);
+  if (hasTexts) sendLabel();
+  // 06/10: only the customers switched on go; those switched off leave the round afterwards (nothing sent to them)
+  function sendLabel() {
+    const on = items.filter(item => !roundOff.has(item.id)).length;
+    sendButton.replaceChildren(stepNum2(), buttonIcon('mail'), on === items.length ? `Enviar a todos (${on})` : `Enviar a todos (${on} de ${items.length})`);
+    sendButton.disabled = !on;
+  }
+  // 05/10: a round prepared by mistake (or for the wrong day) is cancelled here: its proposals leave, nothing is sent
+  const roundWhen = data.window ? `${dayLabel(data.window.day)}, das ${data.window.start} às ${data.window.end}` : 'esta ronda';
+  actions.append(el('button', {type: 'button', class: 'link danger', onclick: event => run(async () => {
+    if (!confirm(`Cancelar a ronda de ${roundWhen}? As ${items.length} proposta(s) por enviar saem da fila e nada é enviado.`)) return;
+    const result = await call('api/visits/round-cancel', {property_ref: ref, window_id: data.window_id});
+    state = result.state; renderState(); reload();
+    toast(`Ronda cancelada: ${result.cancelled} proposta(s) tirada(s) da fila, nada foi enviado.`);
+  }, event.currentTarget)}, 'Cancelar esta ronda'));
   holdFuelButtons();
   if (roundScroll) { roundScroll = false; box.scrollIntoView({behavior: 'smooth', block: 'start'}); }
 }
@@ -3826,7 +4004,9 @@ function selectionColumn(item) {
         Object.keys(labels).map(key => tick('fiador', key))),
       el('div', {class: 'actions'},
         el('button', {type: 'button', onclick: event => run(async () => {
-          await selectionCall('request', item, {}, 'Pedido de documentos em Emails: gera-o, revê e envia.');
+          const result = await selectionCall('request', item, {});
+        toast(result.attached ? 'O pedido dos documentos que faltam vai na resposta ao email deste cliente que já está em '
+          + 'Emails («Só para esta resposta»): gera-a, revê e envia.' : 'Pedido de documentos em Emails: gera-o, revê e envia.');
         }, event.currentTarget)}, item.docs_requested_at ? 'Pedir de novo' : 'Pedir documentos'),
         item.status !== 'chosen' && ejectChoose(item),
         item.status !== 'suplente' && el('button', {type: 'button', onclick: event => run(() =>
@@ -3855,7 +4035,8 @@ function renderFichas() {
   const inactive = new Set(contactsData.inactive || []);
   const refs = contactsData.properties.filter(ref => !inactive.has(ref));
   const select = $('fichas-property');
-  fillSelect(select, Object.fromEntries(refs.map(ref => [ref, ref])), refs.length > 1 ? 'Todos' : undefined);
+  // 05/10: no «Todos»: one property at a time (it is managed there)
+  fillSelect(select, Object.fromEntries(refs.map(ref => [ref, ref])));
   if (!select.dataset.touched && refs.length > 1 && !select.value) select.value = refs[0];
   renderSelection(select.value, inactive);
   const all = (contactsData.fichas || []).filter(item => select.value ? item.property_ref === select.value
@@ -4047,6 +4228,7 @@ function propertySwitcher(select) {
     if (event.key === 'ArrowRight') go(select.selectedIndex + 1);
   });
   select.addEventListener('change', render);
+  select.addEventListener('change', () => shareProperty(select.value));  // 05/10: the same property in every tab
   new MutationObserver(render).observe(select, {childList: true});
   SWITCHERS.push(render);
   render();
@@ -4558,7 +4740,13 @@ function focusAgenda(key, target, from) {
 function renderAgenda() {
   const properties = Object.fromEntries(activeProperties().map(property =>
     [property.reference, property.reference || property.description || 'Imóvel']));
-  fillSelect($('agenda-property'), properties, 'Todos');
+  fillSelect($('agenda-property'), properties);  // 05/10: no «Todos»: one property at a time
+  // 06/10: on top, as the mailbox in Emails: when «Atualizar visitas» last ran (one run reads every property)
+  const synced = Math.max(0, ...activeProperties().map(property => Date.parse(property.visits?.synced_at || '') || 0));
+  $('agenda-synced').replaceChildren(...(synced
+    ? [el('strong', {class: 'last-read-when'}, `Última atualização: ${daysAgo(synced)}`
+        + `${new Date(synced).toLocaleDateString('pt-PT', {weekday: 'long'})}, ${when(synced)}`)]
+    : ['Ainda por atualizar: a IA lê as conversas e põe aqui as visitas combinadas.']));
   const monday = startOfWeek(new Date());
   monday.setDate(monday.getDate() + agendaWeekOffset * 7);
   const days = [...Array(7)].map((_, i) => { const d = new Date(monday); d.setDate(monday.getDate() + i); return d; });
@@ -4719,6 +4907,29 @@ window.addEventListener('resize', () => { if (activeTab === 'agenda') fitAgenda(
 let propertyRef = null, slideDirection = 0, editorRef = null;
 try { propertyRef = localStorage.getItem('bot-mail-property'); } catch { /* Storage may be unavailable. */ }
 
+// 05/10: one property chosen for every tab (Emails, Clientes, Visitas, Imóveis, and the owners' digest): changing it in
+// one, the others open on it too. It is Imóveis' own choice, kept in this browser.
+function shareProperty(ref) {
+  if (!ref) return;
+  propertyRef = ref;
+  try { localStorage.setItem('bot-mail-property', ref); } catch { /* Storage may be unavailable. */ }
+}
+function applySharedProperty(tab) {
+  if (!propertyRef) return;
+  const put = select => {  // a menu not drawn yet keeps the value by an option of its own, which the redraw keeps
+    if (![...select.options].some(option => option.value === propertyRef)) select.append(el('option', {value: propertyRef}, propertyRef));
+    const changed = select.value !== propertyRef;
+    select.value = propertyRef;
+    return changed;
+  };
+  if (tab === 'replies' && [...$('queue').options].some(option => option.value === propertyRef) && $('queue').value !== propertyRef) {
+    $('queue').value = propertyRef;
+    $('queue').dispatchEvent(new Event('change'));
+  }
+  if (tab === 'contacts') { $('fichas-property').dataset.touched = '1'; if (put($('fichas-property'))) { fichasPage = 0; selectionPage = 0; } }
+  if (tab === 'agenda') put($('agenda-property'));
+  if (tab === 'owners') ownerDigestRef = propertyRef;
+}
 function selectProperty(ref, direction = 0, render = true) {
   propertyRef = ref; slideDirection = direction;
   try { localStorage.setItem('bot-mail-property', ref || ''); } catch { /* Storage may be unavailable. */ }

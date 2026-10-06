@@ -117,3 +117,12 @@ def test_n_days_back_brings_the_visits_gone_by_to_register_and_sends_nothing(ser
     tasks = {task["kind"]: task for task in service.todo()["tasks"]}
     assert tasks["check"]["count"] == 1  # «Visitas por registar: veio ou não veio»
     assert not [email for email in service.pending()["properties"][0]["emails"] if email.get("kind") == "visit_thanks"]
+
+
+def test_the_last_update_is_kept_for_the_top_of_visitas(service):
+    # 06/10: «Última atualização: …» on top of Visitas, as «Última leitura» on top of Emails; with nobody to ask too
+    def synced():
+        return next(p for p in service.settings()["properties"] if p["reference"] == REF)["visits"]["synced_at"]
+    assert synced() is None
+    sync(service, {"clientes": []})
+    assert synced() and synced()[:10] == date.today().isoformat()

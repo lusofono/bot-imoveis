@@ -15,6 +15,177 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.129.0 — 06/10/2026
+
+- **Visitas: o cartão do topo como nos Emails:** à esquerda, «AGENDA DE VISITAS» com a última atualização («Última atualização: HOJE, terça-feira, …») e até quantos dias para trás; à direita, «PASSO 01» com o botão «Atualizar visitas». A hora fica guardada em cada imóvel sempre que a IA lê as conversas.
+
+## α.128.8 — 06/10/2026
+
+- **Os interruptores dizem ON e OFF:** nos temas com interruptores (00's UK Cabrio, Scooter, Racing e Boat), desligado é preto com «OFF» escrito em pequeno, ligado é verde com «ON». No Cabrio, à noite, deixam de ficar da mesma cor ligados e desligados.
+
+## α.128.7 — 06/10/2026
+
+- **Os botões das horas:** os dos minutos (MIN) mais afastados dos das horas (H).
+
+## α.128.6 — 06/10/2026
+
+- **Ronda com texto comum, os interruptores dos clientes:** todos do mesmo tamanho, o de um interruptor (uma regra das
+  antigas caixas da saudação esticava-os, cada um com a largura que sobrava); o nome numa só linha.
+
+## α.128.5 — 06/10/2026
+
+- **Os botões da data e das horas** (◀ ▶, ▲ ▼ das horas e dos minutos): maiores, um pouco afastados, e da altura da caixa
+  ao lado (os ◀ ▶ da data com a altura toda; os ▲ ▼ a partilhá-la com a unidade no meio).
+
+## α.128.4 — 06/10/2026
+
+- **Ronda com texto comum:** um interruptor antes de cada cliente, todos ligados ao abrir; «Enviar a todos (5 de 6)» envia
+  só aos ligados, e os desligados saem da ronda depois (não recebem nada e deixam de contar como convidados na agenda).
+  A confirmação diz quantos ficam fora.
+
+## α.128.3 — 06/10/2026
+
+- **Mais espaço à volta do conteúdo:** entre a barra lateral e o conteúdo, o dobro do que se via (21 → 42 px), e à direita
+  mais 50 % (36 → 54 px); em ecrãs médios na mesma proporção; no telemóvel como estava. Em todos os temas.
+
+## α.128.2 — 06/10/2026
+
+- **Ronda com texto comum, línguas:** o espanhol passa a ter texto próprio (quem escreve em espanhol recebe-o todo em
+  espanhol); quem escreve noutra língua (alemão, francês, urdu…) recebe o texto oficial em inglês e, a seguir, a
+  tradução completa na sua língua (era um resumo curto). No painel, o texto em português vem aberto e os outros textos e
+  traduções fechados, cada um com o seu título.
+
+## α.128.1 — 06/10/2026
+
+- **00's UK Cabrio, os números da barra lateral** (Emails, Painel, Proprietários…): em prata polida com o número a preto
+  (eram verdes com o número a branco).
+
+## α.128.0 — 06/10/2026
+
+- **Leitura automática:** ao abrir Emails, a ARIA lê o Gmail sozinha se ainda não houver leitura ou se a última tiver
+  sido há mais de 10 minutos (como um clique em «Ler emails do Gmail», com o progresso; nada é enviado). Em Settings, um
+  cartão «LEITURA AUTOMÁTICA» liga-a ou desliga-a e muda os minutos (1 a 720). Ligada por defeito.
+
+## α.127.5 — 06/10/2026
+
+- **As setas «‹ ›» do imóvel:** 20 % mais largas ainda, com espaço (115 px); no 00's UK Cabrio, à noite, a seta passa a
+  clara (estava verde-escura no botão escuro e não se lia).
+
+## α.127.4 — 06/10/2026
+
+- **00's UK Cabrio, os interruptores** (R, 5, 6 e a luz): vistos de frente e direitos — uma alavanca cromada só, com a
+  ponta redonda, a sair do furo do aro cromado, com sombra no painel — e com movimento a sério: ao mudar, roda de baixo
+  para cima (encurta a meio, quando aponta para quem olha, e estica para o outro lado), em cerca de 0,2 s; sem animação
+  com «reduzir movimento» ligado.
+
+## α.127.3 — 06/10/2026
+
+- **00's UK Cabrio, a garagem:** o ralenti em ciclo fica só no Settings, com o volume de quando tocava em Imóveis (0,22).
+
+## α.127.2 — 06/10/2026
+
+- **00's UK Cabrio, a garagem é o Settings:** o motor ao ralenti em ciclo passa de Imóveis para o Settings (onde se
+  afina o carro), mais alto; tocava em Imóveis e o Settings, que abre por outro caminho, não o ligava.
+
+## α.127.1 — 06/10/2026
+
+- **00's UK Cabrio, a garagem:** com os sons ligados, em Imóveis (a Garagem) o motor fica ao ralenti, em ciclo e baixo,
+  enquanto lá estiveres; desvanece ao sair, ao desligar os sons ou ao mudar de tema. Um corte próprio do ralenti, com o
+  fim fundido no início para não se notar a volta.
+
+## α.127.0 — 06/10/2026
+
+- **00's UK Cabrio, sons reais:** o motor de um compacto britânico, gravado de verdade (Freesound, CC0, créditos em
+  `frontend/sounds/CREDITS.md`): ao ralenti quando chegam emails, duas aceleradas ao enviar, e uma acelerada curta (a
+  cada separador um pouco mais aguda) com o clique do interruptor ao mudar de separador. A buzina e o pisca sintetizados
+  ficam como reserva.
+
+## α.126.3 — 06/10/2026
+
+- **Visitas, «Ronda de visitas»:** o dia abre em amanhã (abria em hoje, e uma ronda de 05/10 saiu para o dia 6 só pela
+  nota); uma ronda para hoje pede confirmação; o dia, as horas e a nota escolhidos ficam quando a página se redesenha.
+- **Os clientes da ronda** deixam de ter a caixa da saudação («Cara maria,», «Dear Jonas,»): fica a que a IA escreveu.
+- **Dados (só neste Mac):** a ronda enviada a 05/10 para um dos imóveis passou para 06/10, 11:00–18:00, o dia que os
+  emails propuseram.
+
+## α.126.2 — 05/10/2026
+
+- **Visitas, «Ronda de visitas»:** a coluna da direita («Agora: …», «Individualizar» e os botões) 20 % mais larga, a da
+  esquerda mais estreita.
+
+## α.126.1 — 05/10/2026
+
+- **Visitas, «Cancelar esta ronda»:** no painel da ronda com texto comum, um botão para a cancelar (uma preparada por
+  engano ou para o dia errado): as propostas ainda por enviar saem da fila e a janela sai da agenda; nada é enviado.
+
+## α.126.0 — 05/10/2026
+
+- **O mesmo imóvel em todos os separadores:** o imóvel escolhido em Emails, Clientes, Visitas ou Imóveis (setas, pontos
+  ou «Ver →» de um aviso) passa a ser o de todos; ao abrir outro separador, ele abre nesse imóvel (em Proprietários, o
+  ponto de situação também, quando o proprietário o tem). Fica guardado neste browser, como o tema.
+
+## α.125.10 — 05/10/2026
+
+- **Visitas, «Ronda de visitas»:** a linha «Agora: … recebem o convite · …» (que abre com os nomes) passa para a coluna da
+  direita, em cima, por cima de «Individualizar» e dos botões.
+
+## α.125.9 — 05/10/2026
+
+- **Botões que descansam** («✓ Emails lidos», «✓ Respostas geradas»): sem a sombra das letras dos botões do tema (com
+  letra escura em fundo claro parecia tremido) nem o filtro cinzento; e o «Ler emails do Gmail» volta a ficar escondido
+  enquanto o botão descansa (só se vê «✓ Emails lidos»).
+
+## α.125.8 — 05/10/2026
+
+- **Visitas, «Ronda de visitas»:** volta a ocupar a largura toda, em duas colunas: à esquerda o texto, «Agora: …», a data
+  e as horas e o conhecimento da ronda; à direita «Individualizar» e os botões («Preparar o texto da ronda», «Guardar
+  alterações», «Enviar a todos»), uns por baixo dos outros.
+
+## α.125.7 — 05/10/2026
+
+- **Visitas, «Ronda de visitas»:** o texto de explicação passa a «Um email a cada cliente ativo deste imóvel, a propor o
+  dia e o intervalo e a perguntar a hora que lhe dá mais jeito dentro dele. Ficará um email por cliente preparado.»
+
+## α.125.6 — 05/10/2026
+
+- **Visitas, «Ronda de visitas»:** a linha «Agora: 6 recebem o convite · 1 inativo…» abre e fecha e mostra os nomes de
+  cada grupo (quem recebe o convite, os inativos, quem tem email por responder, com visita marcada, ignorados…).
+
+## α.125.5 — 05/10/2026
+
+- **Visitas, «Ronda de visitas»:** com metade da largura, e o campo da data só com a largura de uma data (estava a
+  esticar até ocupar a linha toda).
+
+## α.125.4 — 05/10/2026
+
+- **Clientes e Visitas:** sai a opção «Todos os imóveis» dos seletores de imóvel: um imóvel de cada vez, onde se gere
+  (as setas passam só pelos imóveis). A agenda continua a marcar a tracejado as visitas que se sobrepõem entre imóveis.
+
+## α.125.3 — 05/10/2026
+
+- **00's UK Cabrio, «Tudo em dia.»:** o carro passa a um descapotável britânico compacto dos anos 2000: curto e alto, as
+  rodas nos cantos, arcos e embaladeira pretos, farol redondo, para-brisas direito, a capota dobrada atrás dos bancos,
+  verde com uma risca branca no capô.
+
+## α.125.2 — 05/10/2026
+
+- **Emails, o «acrescento» passa a «email extra»** (a palavra não dizia nada): a etiqueta, o botão «Cancelar email extra»
+  e a frase do cartão, que diz agora que é um email teu a mais a este cliente (com «Escrever mais» ou «Escrever a
+  todos»), quando foi criado, que não é uma mensagem do cliente e, se estiver vazio, que nada foi enviado e como o tirar.
+
+## α.125.1 — 05/10/2026
+
+- **As setas «‹ ›» do imóvel** (Emails, Clientes, Visitas, Imóveis): com espaço (a partir de 900 px), o dobro da
+  largura, em pílula; em ecrãs estreitos continuam redondas. O 80's RacingCar mantém os seus manípulos.
+
+## α.125.0 — 05/10/2026
+
+- **Um só cartão por cliente:** «Pedir documentos» (short list) já não cria um segundo cartão quando o cliente tem um
+  email na fila: o pedido dos documentos que faltam entra nesse cartão como instrução **«Só para esta resposta»**, à
+  vista no cartão (com «tirar»), e a IA segue-a ao escrever. Um cartão já respondido no Gmail volta a ficar ativo com
+  essa instrução. O cartão continua a ter a conversa toda, também os emails que enviaste.
+- **Emails:** sai o «0» que aparecia em alguns cartões (a lista de anexos vazia).
+
 ## α.124.5 — 05/10/2026
 
 - **Clientes, fichas:** «Preencher fichas com a IA (lê as conversas)» passa para o canto superior direito, por baixo da

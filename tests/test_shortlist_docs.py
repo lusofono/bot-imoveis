@@ -34,3 +34,22 @@ def test_the_short_list_reply_asks_for_the_documents_then_reads_what_came(servic
     assert selection["docs"] == {"candidato:irs": True}
     [card] = service.pending()["properties"][0]["emails"]
     assert "IRS do ano anterior (ou dos dois anteriores)" not in card["docs_missing"]
+
+
+def test_asking_for_the_documents_of_a_customer_with_an_email_in_the_queue_goes_into_that_card(service):
+    # 05/10: one card per customer: «Pedir documentos» leaves an instruction for that reply only in the email already in
+    # the queue (the documents still missing), never a second card; it reaches the prompt and can be taken off
+    read(service, [lead("1")])
+    draft_and_send(service, "1", "Olá, Ana.")
+    service.set_selection(REF, CUSTOMER, "shortlist")
+    read(service, [follow_up("c2", 1, "Tenho muito interesse.", service)])
+    result = service.request_documents(REF, CUSTOMER)
+    assert result["attached"] is True
+    queue = service.pending()["properties"][0]
+    [card] = queue["emails"]  # still one
+    assert card["id"] == result["id"] and card["reply_note"].startswith("Pede os documentos da candidatura que ainda faltam: ")
+    assert "Recibos de vencimento" in card["reply_note"]
+    prompt = reply_prompt(queue, [card["id"]])
+    assert "Instrução do proprietário só para esta resposta (segue-a): Pede os documentos" in prompt
+    service.set_reply_note(REF, card["id"], "")
+    assert not service.pending()["properties"][0]["emails"][0]["reply_note"]

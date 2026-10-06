@@ -110,6 +110,9 @@ def test_the_page_is_served_as_its_own_files(page):
     assert html.text.index("Emails em tratamento") < html.text.index('id="prepare-step"') < html.text.index('id="send-step"')
     # 27/09: «Atualizar visitas» only in Visitas (it was in Comunicações too).
     assert 'id="agenda-sync"' not in html.text and 'id="agenda-sync-here"' in html.text
+    # 06/10: on top of Visitas, as the mailbox: the last update at 2/3, «PASSO 01» and the button at 1/3
+    assert 'step-num" aria-hidden="true">1</span>Atualizar visitas' in html.text and 'id="agenda-synced"' in html.text
+    assert html.text.index('id="agenda-synced"') < html.text.index('id="agenda-sync-here"') < html.text.index('id="agenda-week"')
     # 27/09: the ChatGPT way folded under «Gerar respostas»; the conversation always open, in a box that scrolls.
     assert 'id="gpt-box"' in html.text and "$('gpt-paste')" in script.text
     assert "conversation-box" in script.text and "Email completo" not in script.text.replace("no «Email completo» to open", "")
@@ -581,7 +584,8 @@ def test_the_scooter_sounds_are_served_as_audio(page):
     client, _ = page
     client.get(f"/?t={TOKEN}")
     for name in ("scooter-start", "scooter-rev", "scooter-gear", "car-start", "car-send", "car-gear", "car-accel",
-                 "boat-bell", "boat-horn", "boat-engine"):
+                 "boat-bell", "boat-horn", "boat-engine", "cabrio-idle", "cabrio-rev", "cabrio-gear",
+                 "cabrio-loop"):
         response = client.get(f"/sounds/{name}.m4a")
         assert response.status_code == 200 and response.headers["content-type"] == "audio/mp4" and len(response.content) > 5000
     assert client.get("/sounds/CREDITS.md").status_code == 404  # only the clips are served
@@ -639,9 +643,10 @@ def test_the_cabrio_skin_has_its_instruments_selector_sounds_and_lights():
     entry = script[script.index("  cabrio: {\n    words:"):]
     entry = entry[:entry.index("\n  },\n")]
     for slot in ("instruments: cabrioInstruments", "selector: cabrioConsole",
-                 "sounds: {send: cabrioHorn, read: cabrioIndicator, click: cabrioToggle, shift: cabrioFlick}"):
+                 "sounds: {send: cabrioRev, read: cabrioIdle, click: cabrioToggle, shift: cabrioGear}"):  # 06/10: recorded
         assert slot in entry
-    for name in ("cabrioInstruments", "toggleBank", "cabrioGears", "cabrioConsole", "cabrioHorn", "cabrioIndicator", "cabrioToggle", "cabrioFlick", "applyAmbient"):
+    for name in ("cabrioInstruments", "toggleBank", "cabrioGears", "cabrioConsole", "cabrioHorn", "cabrioIndicator", "cabrioToggle",
+                 "cabrioFlick", "cabrioIdle", "cabrioRev", "cabrioGear", "applyAmbient"):
         assert f"function {name}(" in script
     assert "role: 'speedo'" in script[script.index("function cabrioInstruments("):script.index("function heatLimit(")]
     assert "localStorage.setItem('bot-mail-ambient'" in script
@@ -652,3 +657,20 @@ def test_the_cabrio_skin_has_its_instruments_selector_sounds_and_lights():
     assert lights and set(lights) == set(means)
     css = (Path(__file__).resolve().parents[1] / "frontend" / "themes" / "cabrio.css").read_text(encoding="utf-8")
     assert ':root[data-theme="cabrio"][data-ambient="night"]{' in css and ".gauge-speedo svg{" in css and ".bank-toggle.on" in css
+
+
+def test_emails_reads_by_itself_when_the_last_read_is_old_and_settings_turns_it_on_or_off(page, service):
+    # 06/10: on by default, after 10 minutes; changed in Settings (admin only), 1 to 720 minutes
+    client, _ = page
+    client.get(f"/?t={TOKEN}")
+    headers = {"X-Bot-Mail-Token": TOKEN}
+    assert client.get("/api/settings", headers=headers).json()["auto_read"] == {"on": True, "minutes": 10}
+    assert "Settings não está ligado" in client.post("/api/auto-read", json={"on": False, "minutes": 5}, headers=headers).text
+    config = service.folder / "config.json"
+    import json
+    data = json.loads(config.read_text()); data["admin"] = True; config.write_text(json.dumps(data))
+    assert client.post("/api/auto-read", json={"on": False, "minutes": 5}, headers=headers).json() == {"on": False, "minutes": 5}
+    assert client.get("/api/settings", headers=headers).json()["auto_read"] == {"on": False, "minutes": 5}
+    assert "1 a 720" in client.post("/api/auto-read", json={"on": True, "minutes": 0}, headers=headers).text
+    script = (Path(__file__).resolve().parents[1] / "frontend" / "app.js").read_text(encoding="utf-8")
+    assert "if (name === 'replies') maybeAutoRead();" in script

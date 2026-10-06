@@ -125,7 +125,7 @@
 .round-actions{display:contents}
 .round-common-body{margin-top:18px;border-top:1px solid var(--line);padding-top:18px}
 .round-text{display:grid;gap:6px;margin:14px 0}
-.round-common .client-row input{flex:0 1 260px;width:auto;padding:6px 10px}
+/* 06/10: (the greeting boxes, which stretched every input of these rows, are gone) */
 /* 29/09: arrows for the visit's day, hour and minutes; the weekday beside the date */
 .row>.stepper{flex:1 1 220px}
 .row>.stepper-time{flex:0 0 auto;gap:4px}
@@ -138,6 +138,17 @@
 .stepper-unit{font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;line-height:1}
 button.stepper-arrow{min-height:0;height:22px;min-width:30px;padding:0 6px;border-radius:6px;font-size:10px;line-height:1;box-shadow:none}
 .stepper-date button.stepper-arrow{height:42px}
+/* 06/10: the steppers' buttons as tall as the box beside them, bigger and a little apart: the date's ◀ ▶ the box's
+   height, the time's ▲ ▼ sharing it with their unit between them */
+.stepper{align-items:stretch}
+.stepper>input,.stepper-field>input{align-self:center}
+.stepper-field{align-self:stretch}
+.stepper-date button.stepper-arrow{height:auto;min-width:46px;font-size:14px}
+.stepper-time{gap:8px}
+.stepper-time>.stepper-pair+.stepper-pair{margin-left:12px}  /* 06/10: the minutes further from the hours */
+.stepper-pair{justify-content:space-between;gap:4px}
+.stepper-pair button.stepper-arrow{flex:1;height:auto;min-height:28px;min-width:44px;font-size:13px}
+.stepper-unit{font-size:10px}
 .client-row>span:first-child{flex:1;min-width:0;overflow-wrap:anywhere}
 .client-row>.muted{flex:none;max-width:40%;text-align:right}
 
@@ -308,6 +319,24 @@ button.stepper-arrow{min-height:0;height:22px;min-width:30px;padding:0 6px;borde
 .digest-row>div{display:contents}
 #visits-round-panel .row{margin-top:12px}
 #visits-round-panel input[type=date],#visits-round-panel input[type=time]{width:auto;flex:1 1 110px}
+/* 06/10: a switch before each customer of the round (on: sent; off: left out) */
+.round-pick{display:inline-flex;align-items:center;gap:10px;flex:1;min-width:0}
+.round-pick>input[type=checkbox]{flex:none}  /* a switch's own size, the same for all */
+.round-pick>span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}  /* the name on one line */
+/* 05/10: «Agora: …» opens to the names of each group */
+.round-counts summary{cursor:pointer}
+.round-groups{margin:6px 0 0;padding-left:18px;display:grid;gap:3px}
+/* 05/10: «Ronda de visitas» the whole width, in two columns (what the round says | «Individualizar» and the buttons), and
+   its date only as wide as a date */
+.round-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:8px 28px;align-items:start}
+@media(min-width:1000px){.round-layout{grid-template-columns:minmax(0,1fr) minmax(288px,384px)}}  /* 05/10: the right one 20 % wider */
+.round-side{display:flex;flex-direction:column;gap:12px;padding-top:6px}
+.round-side .round-counts{margin:0}
+.round-side .actions{flex-direction:column;align-items:stretch;margin-top:0}
+.round-side .actions :is(button,.button){width:100%}  /* also the ones in .round-actions (display: contents) */
+#visits-round-panel .row>.stepper-date{flex:0 0 auto}
+#visits-round-panel .stepper-date .stepper-field{flex:none}
+#visits-round-panel .stepper-date input[type=date]{flex:none;width:9.5em}
 
 /* Whether a draft's textarea still matches what was last saved: easy to lose track of across many
    emails, so the button and a short status next to it change together, not just the tag at the top. */
@@ -323,6 +352,8 @@ button.stepper-arrow{min-height:0;height:22px;min-width:30px;padding:0 6px;borde
 .property-slider{display:flex;align-items:center;gap:14px;margin:0 0 18px;padding:12px 14px;border:1px solid var(--line);
   border-radius:16px;background:linear-gradient(130deg,var(--surface-start),var(--surface-end))}
 .slider-arrow{flex:none;width:46px;height:46px;min-height:46px;padding:0;border-radius:50%;font-size:26px;line-height:1}
+/* 05/10: with room, the property's arrows twice as wide, as pills (the RacingCar keeps its knobs) */
+@media(min-width:900px){:root:not([data-theme="racing"]) :is(#property-slider,.property-switcher) .slider-arrow.slider-arrow{width:115px;border-radius:999px}}  /* 06/10: 20 % wider still */
 .slider-title{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}
 .slider-title strong{font-size:17px;font-weight:550;overflow-wrap:anywhere}
 .slider-dots{display:flex;align-items:center;gap:2px}
@@ -350,6 +381,8 @@ button.stepper-arrow{min-height:0;height:22px;min-width:30px;padding:0 6px;borde
 .metrics.queue-board{grid-template-columns:repeat(4,minmax(0,1fr));margin:0 0 22px}
 .queue-board .queue-main .value{font-size:52px}
 @media(max-width:1150px){.metrics.queue-board{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* 05/10: the owner's instruction for one reply, in the card, with «tirar» */
+.reply-note .link{padding:0;min-height:0;font-size:12px}
 /* 05/10: «Escrever mais» opens a box in the sent card */
 .write-more{margin-top:12px}
 .write-more .actions{margin-top:8px}
@@ -981,8 +1014,10 @@ nav .tab[data-tab="agenda"]::after{content:"";position:absolute;left:12%;right:1
 .price-table td .tag{margin-left:8px}
 /* 29/09: «1 Ler emails» and «2 Gerar respostas» while they rest after being used: a step done, green, not greyed out */
 /* !important: a state over every theme's own button (their rules are more specific) */
-button.step-done,button.step-done:disabled{opacity:1!important;cursor:default;font-size:0;gap:0;background:var(--ok-bg)!important;
-  color:var(--ok)!important;border-color:var(--success-border)!important;box-shadow:none!important}
+button.step-done,button.step-done:disabled{opacity:1!important;cursor:default;font-size:0!important;gap:0;background:var(--ok-bg)!important;
+  color:var(--ok)!important;border-color:var(--success-border)!important;box-shadow:none!important;
+  text-shadow:none!important;filter:none!important}  /* 05/10: no theme shadow (it blurred the dark letters) nor grey filter;
+  the hidden label stays hidden whatever size a button gives its letters */
 button.step-done>*{display:none}
 button.step-done::after{content:"✓  " attr(data-done);font-size:14px;font-weight:600;white-space:pre}
 /* 29/09: the test platform's two lines (generate; Human contest), each on one line, the fields at their own width */
@@ -1150,7 +1185,11 @@ body:not(.admin) .prompt-view{display:none!important}
 :root .read-row>.card.card{padding-top:14px;padding-bottom:14px}
 /* 05/10: «PASSO 01» at the panel's top left and, under it, the button the whole width of the panel, low (the panel keeps
    its height) */
-#read{flex:none;width:100%;height:auto;min-height:64px;padding:10px 16px;gap:12px;white-space:normal;line-height:1.2;font-size:15px}
+#read,#agenda-sync-here{flex:none;width:100%;height:auto;min-height:64px;padding:10px 16px;gap:12px;white-space:normal;line-height:1.2;font-size:15px}
+/* 06/10: Visitas on top as Emails: «AGENDA DE VISITAS», the last update and how far back, beside «PASSO 01» and its button */
+#agenda-synced{margin:6px 0 0}
+.agenda-sync-days{display:flex;align-items:center;gap:10px;margin-top:10px}
+.agenda-sync-days select{width:auto;padding:6px 10px}
 /* 30/09: the Painel's property tiles, apart from the numbers above and «A fazer» below (they sat glued to both) */
 #dashboard-properties{margin:22px 0}
 /* 30/09: the agency's know-how in three groups that open */
@@ -1449,3 +1488,9 @@ body:not(.admin) .prompt-view{display:none!important}
   background:linear-gradient(135deg,#fbe9a6 0%,#e2b93b 38%,#c99a1e 52%,#f3d77a 70%,#d4a62a 100%)}
 :root .tag.golden.golden{color:#3d2a00;border-color:#b8860b;font-weight:700;text-shadow:0 1px 0 #fff7;
   background:linear-gradient(135deg,#fbe9a6 0%,#e2b93b 38%,#c99a1e 52%,#f3d77a 70%,#d4a62a 100%);box-shadow:inset 0 1px 0 #fff8}
+/* 06/10: more room between the sidebar and the content — twice what showed (the sidebar covers 15 px of the margin:
+   21 → 42 px seen) — and on the right, half as much again (36 → 54 px); the same proportions on a medium screen, the
+   phone's as it was */
+main{padding-left:57px;padding-right:54px}
+@media(max-width:1150px){main{padding-left:33px;padding-right:36px}}
+@media(max-width:760px){main{padding-left:18px;padding-right:18px}}
