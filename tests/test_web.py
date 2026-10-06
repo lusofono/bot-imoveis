@@ -643,7 +643,7 @@ def test_the_cabrio_skin_has_its_instruments_selector_sounds_and_lights():
     entry = script[script.index("  cabrio: {\n    words:"):]
     entry = entry[:entry.index("\n  },\n")]
     for slot in ("instruments: cabrioInstruments", "selector: cabrioConsole",
-                 "sounds: {send: cabrioRev, read: cabrioIdle, click: cabrioToggle, shift: cabrioGear}"):  # 06/10: recorded
+                 "sounds: {send: cabrioRev, read: cabrioIdle, click: cabrioClick, toggle: cabrioToggle, shift: cabrioGear}"):  # 06/10: recorded
         assert slot in entry
     for name in ("cabrioInstruments", "toggleBank", "cabrioGears", "cabrioConsole", "cabrioHorn", "cabrioIndicator", "cabrioToggle",
                  "cabrioFlick", "cabrioIdle", "cabrioRev", "cabrioGear", "applyAmbient"):

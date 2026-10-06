@@ -938,7 +938,8 @@ button.primary .step-num{background:var(--accent-text);color:var(--accent)}
 .notes-grid .alert{margin:0}
 .property-metrics{margin:18px 0}
 .metrics.property-metrics{grid-template-columns:repeat(5,minmax(0,1fr))}  /* 06/10: ten numbers, two rows of five */
-@media(max-width:1150px){.metrics.property-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+#metric-cards.metrics{grid-template-columns:repeat(5,minmax(0,1fr))}  /* 06/10: the Painel's ten numbers too */
+@media(max-width:1150px){.metrics.property-metrics,#metric-cards.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 /* The trip computer first, above the instruments, in one tight line: title, distance, consumption, save, reading (26/09) */
 .cluster .trip-computer{flex-wrap:wrap;align-items:center;gap:6px 14px;margin:4px 0 14px;padding:7px 14px}
 .cluster .trip-computer label{gap:5px}

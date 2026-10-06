@@ -198,3 +198,11 @@ def test_our_reply_time_counts_only_the_last_five_days(service):
     sent_event(service, 0, message_id="hoje", waited_hours=6.0)
     sent_event(service, 6, message_id="antigo", waited_hours=330.0)
     assert service.metrics()["reply_hours"] == 6.0
+
+
+def test_the_painel_has_theirs_and_those_who_never_answered(service):
+    # 06/10: the Painel's numbers too: ours, theirs (only emails they answered) and the share who never answered
+    read(service, [lead("1")])
+    draft_and_send(service, "1", "Olá, Ana.")
+    metrics = service.metrics()
+    assert metrics["no_reply"] == {"written": 1, "never": 1} and metrics["client_reply_hours"] is None

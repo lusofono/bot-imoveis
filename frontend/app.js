@@ -140,7 +140,8 @@ const SKINS = {
     instruments: cabrioInstruments,
     selector: cabrioConsole,
     // 06/10: a real engine (CC0, credits in frontend/sounds/CREDITS.md), the synthesised sounds as a fallback
-    sounds: {send: cabrioRev, read: cabrioIdle, click: cabrioToggle, shift: cabrioGear},
+    // 06/10: the buttons a short soft click of their own; the console's switch only on the panel's levers (toggle)
+    sounds: {send: cabrioRev, read: cabrioIdle, click: cabrioClick, toggle: cabrioToggle, shift: cabrioGear},
     // 06/10: in the garage — Settings, where the car is tuned (the owner's word) — the engine ticking over, in a loop
     ambient: {tab: 'workshop', clip: 'cabrio-loop', level: 0.22},  // the level the owner liked (in Imóveis, at first)
   },
@@ -535,7 +536,9 @@ function cabrioIndicator(context) {
     relayClick(context, t + i * 0.5 + 0.25, 1700, 0.07);
   }
 }
-// Every button: a toggle switch on the console — a firm metal click, a short spring ring and a small thump.
+// 06/10: every button: a short soft click, nothing of the gearbox or the panel's switches (those keep their own)
+function cabrioClick(context) { noiseBurst(context, context.currentTime, 0.012, 'highpass', 2500, 0.1); }
+// The panel's levers: a toggle switch on the console — a firm metal click, a short spring ring and a small thump.
 function cabrioToggle(context) {
   const t = context.currentTime;
   noiseBurst(context, t, 0.02, 'highpass', 3000, 0.16);
@@ -702,7 +705,7 @@ function toggleBank(box) {
     light.flip(ambient() === 'night');
     title.textContent = ambient() === 'night' ? 'Luz ambiente: noite (clica para dia)' : 'Luz ambiente: dia (clica para noite)';
   };
-  light.addEventListener('click', () => { applyAmbient(ambient() === 'night' ? 'day' : 'night'); playSound('click'); paintLight(); });
+  light.addEventListener('click', () => { applyAmbient(ambient() === 'night' ? 'day' : 'night'); playSound('toggle'); paintLight(); });
   const loop = x => [svg('path', {d: `M${x - 5} 76V32Q${x - 5} 21 ${x} 21Q${x + 5} 21 ${x + 5} 32V76`, class: 'bank-loop'}),
     svg('path', {d: `M${x - 3.3} 70V33Q${x - 3.3} 24.5 ${x} 24`, class: 'bank-loop-shine'})];
   box.append(svg('svg', {viewBox: '0 0 198 92', class: 'toggle-bank'},
@@ -3221,7 +3224,14 @@ function renderDashboard(data) {
     metricCard(totals.attention, 'A precisar de atenção', 'bad',
       {title: queueHover(data.properties, QUEUE_SHOWS.attention, split('attention'))}),
     metricCard(totals.answered, 'Respostas enviadas', null, {title: answeredList()}),
-    metricCard(hoursText(data.reply_hours), 'Tempo médio até resposta'),
+    // 06/10: ours and theirs apart, and those who never answered (as in Emails and Imóveis), every property together
+    metricCard(hoursText(data.reply_hours), 'O nosso tempo médio de resposta (5 dias)', null,
+      {title: 'Desde que o email do cliente chega até lhe enviarmos a resposta, nas respostas dos últimos 5 dias. Os '
+        + 'emails ainda por responder não contam.'}),
+    metricCard(hoursText(data.client_reply_hours), 'Tempo médio de resposta dos clientes (5 dias)', null,
+      {title: 'Desde o nosso email até o cliente responder, nas respostas dos últimos 5 dias. Só conta cada email a que '
+        + 'responderam; os que ainda esperam resposta e quem nunca respondeu não contam (estão no número ao lado).'}),
+    noReplyCard(data.no_reply),
     metricCard(totals.visits_booked || 0, 'Visitas marcadas', null, {title: split('visits_booked')}));
   renderByProperty([...data.properties, ...(data.test_properties || [])]);  // 04/10: the test one last, marked
   $('dashboard-read').textContent = `Última leitura ${ago(data.last_read_at)}`

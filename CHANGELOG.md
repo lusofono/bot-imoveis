@@ -15,6 +15,20 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.135.0 — 06/10/2026
+
+- **Painel: o nosso tempo, o dos clientes e quem nunca respondeu:** o antigo «Tempo médio até resposta» dá lugar aos
+  mesmos três cartões dos Emails e dos Imóveis, com todos os imóveis juntos (sem o de teste): «O nosso tempo médio de
+  resposta (5 dias)», «Tempo médio de resposta dos clientes (5 dias)» e «Clientes que nunca responderam», com o gauge. Só
+  contam as respostas que houve: um email ainda por responder, nosso ou deles, não entra na média, e quem nunca
+  respondeu só aparece na percentagem. O Painel fica com 10 números, em duas linhas de cinco.
+
+## α.134.3 — 06/10/2026
+
+- **00's UK Cabrio: um clique só para os botões:** os botões tocavam o mesmo som de interruptor da consola que as
+  alavancas do painel. Passam a ter um clique curto e discreto, só deles. As alavancas do painel continuam com o som de
+  interruptor, e os separadores com a caixa de velocidades.
+
 ## α.134.2 — 06/10/2026
 
 - **Imóveis: os tempos de resposta e quem nunca respondeu:** nos números por cima dos instrumentos do imóvel, «Tempo

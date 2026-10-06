@@ -4651,6 +4651,7 @@ class MailService:
             # two weeks before, answered on 21–24/09 — made ours 163 h)
             recent = datetime.now(timezone.utc) - timedelta(days=REPLY_TIME_DAYS)
             test_waited = {}  # the test property's own, never in the totals
+            everyone = {}  # 06/10: every property's conversations, for the Painel's two numbers of the customers
             today_iso = today.isoformat()
             for ref in refs:
                 data = self.load(ref)
@@ -4658,6 +4659,7 @@ class MailService:
                 status = Counter(item.get("reply_status") or "pending" for item in emails)
                 blocked = sum(1 for item in emails if item.get("blocked"))
                 conversations = data.get("conversations", {})
+                everyone.update({(ref, email): conversation for email, conversation in conversations.items()})
                 answered = sum(conversation.get("stage", 0) for conversation in conversations.values())
                 for message_id in ({item["id"] for item in emails} | set(data.get("replied_message_ids") or [])
                                    | set(data.get("dismissed_message_ids") or [])):
@@ -4807,6 +4809,8 @@ class MailService:
                     "by_day": [{"day": day, "requests": requests.get(day, 0), "sent": sent.get(day, 0)}
                                for day in starts],
                     "reply_hours": round(sum(waited) / len(waited), 1) if waited else None,
+                    # 06/10: theirs apart from ours, and those who never answered (never the test property)
+                    "client_reply_hours": client_reply_hours(everyone, recent), "no_reply": no_reply_share(everyone),
                     "openai_usage": {"period": usage_of(openai_period), "all_time": usage_of(openai_all_time),
                                      "month": usage_of(openai_month),
                                      "unattributed": usage_of(unattributed)},
