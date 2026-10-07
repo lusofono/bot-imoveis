@@ -85,6 +85,8 @@ def test_the_owner_is_set_in_the_owners_tab_and_written_to_first_with_a_subject_
     assert card["owner"] and card["outbound"] and card["new_subject"] == "Renda de novembro"
     _, prompt, _ = service.owner_prompt_for(REF, [made["id"]], extra="Pergunta se aceita baixar 50 €.")
     assert "és tu que lhe escreves" in prompt and "Pergunta se aceita baixar 50 €." in prompt
+    # 06/10: «verifica o draft» written as if to the owner is a request to the owner, not something we will do
+    assert "PEDE AO PROPRIETÁRIO" in prompt and "nunca como algo que nós vamos fazer" in prompt
     draft_and_send(service, made["id"], "Bom dia, Rui. Escrevemos por causa da renda de novembro.")
     [sent] = SMTP.sent
     assert sent["Subject"] == "Renda de novembro" and sent["In-Reply-To"] is None and sent["To"].endswith(f"<{OWNER}>")
@@ -172,3 +174,19 @@ def test_the_owners_waiting_for_us_are_one_red_post_it_listing_them_all(service)
     [card] = service.pending()["owners"]["inbox"]
     service.caixa_dismiss(card["id"])  # none waits: the post-it leaves by itself
     assert service.notices()["notices"] == []
+
+
+def test_one_card_per_owner_as_for_the_customers(service):
+    # 06/10: the user answers an owner everything together: «Escrever ao proprietário» with a card already waiting for
+    # them gives that card; a new email of ours made before their message joins its reply at the next read, draft and all
+    set_owner(service)
+    made = service.write_to_owner(REF, "Contrato")
+    assert service.write_to_owner(REF, "Outra coisa") == {"property_ref": REF, "id": made["id"], "existing": True}
+    service.drafts([{"id": made["id"], "reply_text": "Bom dia, Rui. Quando possível, verifique o draft do contrato."}],
+                   service.pending()["properties"][0]["revision"])
+    read(service, [from_owner("o1", "Por mim dia 15 para início do contrato é perfeito.")])
+    [card] = [email for email in service.pending()["properties"][0]["emails"] if email["kind"] == "owner"]
+    assert card["id"] == "o1" and not card["outbound"] and "verifique o draft do contrato" in card["reply_text"]
+    assert service.write_to_owner(REF)["id"] == "o1"
+    read(service, [from_owner("o2", "E a renda, mantemos?")])  # two messages of theirs: one card, as a customer's
+    assert len([email for email in service.pending()["properties"][0]["emails"] if email["kind"] == "owner"]) == 1

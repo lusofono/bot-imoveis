@@ -297,8 +297,9 @@ def test_dashboard_carries_names_only_never_contacts(service):
     read(service, [lead("1"), lead("2", reply_to=(), body_email="")])
     with patch("backend.service.has_app_password", return_value=False):
         metrics = service.metrics()
-    assert metrics["totals"] == {"pending": 2, "drafts": 0, "blocked": 1, "attention": 0, "answered": 0, "customers": 0,
-                                 "owners_pending": 0, "visits_booked": 0}
+    # 06/10: «Total de clientes» as in Clientes: the new request counts, the one with no address to answer does not
+    assert metrics["totals"] == {"pending": 2, "drafts": 0, "blocked": 1, "attention": 0, "answered": 0, "customers": 1,
+                                 "owners_pending": 0, "visits_booked": 0, "visits_upcoming": 0, "customers_active": 1}
     assert metrics["setup"] == {"account": True, "app_password": False, "voice": True, "properties": 1,
                                 "openai_key": False}
     assert [item["pending"] for item in metrics["properties"]] == [2]
@@ -490,7 +491,7 @@ def test_a_name_is_shown_as_first_name_and_surname_cut_at_about_22_characters():
 
 def test_the_painel_counts_the_owners_emails_to_answer_and_the_visits_booked(service):
     # 04/10: the Painel's fourth column — the owners' emails still to answer (not the ones we wrote first; the owners'
-    # inbox too) and the visits booked from today on
+    # inbox too) and the visits booked from today on (06/10: booked in the period of analysis; the ones ahead apart)
     from datetime import date, timedelta
     from backend.store import load_visits, save_visits
     read(service, [lead("1")])
@@ -502,10 +503,29 @@ def test_the_painel_counts_the_owners_emails_to_answer_and_the_visits_booked(ser
     service.save_caixa({"emails": [{"id": "c1", "kind": "owner", "reply_status": "pending"}], "seen_ids": []})
     agenda = load_visits(service.folder, REF)
     tomorrow, yesterday = (date.today() + timedelta(days=1)).isoformat(), (date.today() - timedelta(days=1)).isoformat()
-    agenda["slots"] += [{"at": f"{tomorrow} 15:00", "customer": "a@example.com"},
-                        {"at": f"{yesterday} 15:00", "customer": "b@example.com"}]
+    long_ago = (date.today() - timedelta(days=10)).isoformat()
+    agenda["slots"] += [{"at": f"{tomorrow} 15:00", "customer": "a@example.com", "booked_at": f"{long_ago}T10:00:00+00:00"},
+                        {"at": f"{yesterday} 15:00", "customer": "b@example.com", "booked_at": f"{yesterday}T10:00:00+00:00"}]
     save_visits(service.folder, REF, agenda)
     metrics = service.metrics()
     assert metrics["totals"]["owners_pending"] == 3 and metrics["owners_inbox_pending"] == 1
     assert metrics["properties"][0]["owners_pending"] == 2
     assert metrics["totals"]["visits_booked"] == 1 and metrics["totals"]["pending"] == 1  # the owners' are not customers
+    assert metrics["totals"]["visits_upcoming"] == 1 and service.metrics(reply_window=30)["totals"]["visits_booked"] == 2
+
+
+def test_the_total_of_customers_and_the_active_ones(service):
+    # 06/10: «Total de clientes» as in Clientes (written to, and the new requests) and «Clientes ativos»: not the
+    # inactive, the ignored or the one who does not want to visit
+    read(service, [lead(n, reply_to=(f"cliente{n}@example.com",), body_email=f"cliente{n}@example.com") for n in "12345"])
+    for number in "1234":
+        draft_and_send(service, number)
+    data = service.load(REF)
+    emails = sorted(data["conversations"])
+    data["conversations"][emails[0]]["inactive"] = {"at": "2026-10-06T10:00:00+00:00", "reason": "teste"}
+    data["conversations"][emails[1]]["ignored"] = {"kind": "grey"}
+    data["conversations"][emails[2]]["visit"] = "nao_quer"
+    service.save(data, REF)
+    metrics = service.metrics()
+    assert metrics["totals"]["customers"] == 5 and metrics["totals"]["customers_active"] == 2  # the 4th and the new one
+    assert metrics["properties"][0]["customers_active"] == 2

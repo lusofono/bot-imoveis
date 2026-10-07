@@ -576,7 +576,10 @@ def web_app(folder, token):
                 "paste": ("POST", paste), "drafts": ("POST", drafts), "preview": ("POST", preview),
                 "send": ("POST", send), "dismiss": ("POST", dismiss),
                 "metrics": ("POST", lambda body: service.metrics(
-                    "all" if body.get("days") == "all" else int(body.get("days") or 14))),
+                    "all" if body.get("days") == "all" else int(body.get("days") or 14),
+                    # 06/10: the reply times' window (3, 5, 7 or 30 days, or "ano"); anything else, the default
+                    "ano" if body.get("reply_window") == "ano" else int(body.get("reply_window") or 5)
+                    if str(body.get("reply_window") or "5").isdigit() else 5)),
                 "settings": ("GET", lambda body: service.settings()), "voice": ("POST", voice),
                 "property/prompt": ("POST", property_prompt),
                 "property/parse": ("POST", lambda body: {"fields": parse_listing(str(body.get("text") or ""))}),

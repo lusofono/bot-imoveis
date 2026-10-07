@@ -3,6 +3,41 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 06/10/2026: um cartão por proprietário (α.141.0)
+
+**Decisão (do utilizador, 06/10).** «Quero que juntes e respondo sempre a tudo junto, como nos clientes.» Em cada imóvel
+(e na caixa dos proprietários sem imóvel) há no máximo um cartão por enviar a cada proprietário: a resposta à mensagem
+dele, ou, sem mensagem, um email novo nosso. «Escrever ao proprietário» com um cartão já à espera usa esse; um email novo
+que já existia junta-se à resposta na leitura seguinte, com o rascunho. **Porquê:** dois cartões para a mesma pessoa
+pareciam duplicados (o email novo copiava a conversa) e partiam em dois o que se lhe queria dizer.
+
+## 06/10/2026: o período de análise na segunda linha de números (α.136.0–α.137.0)
+
+**Decisão (do utilizador, 06/10).** Entre as duas linhas de números do Painel e do painel de cada imóvel (Imóveis) há
+uma lista, «Período de análise»: últimos 3 dias, 5 (por omissão), última semana, último mês ou desde o início do ano. A
+primeira linha é o estado de agora (por responder, rascunhos, bloqueados, proprietários, atenção) e não muda. A segunda
+segue o período toda, e cada cartão diz qual é («(5 dias)», «(semana)»…):
+- **Respostas enviadas:** as que enviámos no período (do registo de envios). Os lembretes e os outros avisos não contam,
+  como já não contavam como interação.
+- **Os dois tempos médios:** só as respostas dadas no período, pela data da resposta; quem ainda não respondeu não entra.
+- **Clientes que nunca responderam:** só os clientes a quem escrevemos pela primeira vez no período. Num período curto
+  sai mais alto, porque alguns ainda não tiveram tempo de responder: o texto do cartão avisa.
+- **Visitas marcadas:** as que marcámos no período, pela data em que as marcámos (não pela data da visita). As visitas de
+  hoje em diante, que era o que o cartão contava, aparecem ao passar o rato.
+
+**Porquê:** a lista ficava por cima dos números, mas só mudava dois deles; com tudo no mesmo período, a linha lê-se
+como um balanço desse tempo. A escolha é uma só e fica guardada no browser.
+
+**Nos Emails, só a primeira linha (α.140.0).** Os Emails mostram o trabalho de agora na fila do imóvel; a linha do período
+saiu (o período escolhia-se noutro separador, e os mesmos números estão no painel do imóvel, em Imóveis), sem link para
+lá (esteve um, «Números do imóvel», e saiu a pedido). Assim os Emails deixam também de pedir o cálculo do Painel de 20
+em 20 segundos.
+
+**Total de clientes e Clientes ativos (α.138.0–α.139.0)** abrem a primeira linha, no Painel e em Imóveis. O total conta
+como Clientes: aqueles a quem já escrevemos e os pedidos novos ainda por responder, nunca os proprietários. Os ativos são
+os que o conta-quilómetros já contava (quem segue a conversa, tem um email por responder ou uma visita marcada) mais os
+pedidos novos. São o estado de agora, não seguem o período.
+
 ## 06/10/2026: o silêncio em dois passos, ausente e inativo, e a bandeira do portal (α.130.0–α.132.0)
 
 **Decisão (do utilizador, 06/10).** Um cliente que escreveu uma vez e deixou quatro emails nossos sem resposta é

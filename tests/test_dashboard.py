@@ -206,3 +206,33 @@ def test_the_painel_has_theirs_and_those_who_never_answered(service):
     draft_and_send(service, "1", "Olá, Ana.")
     metrics = service.metrics()
     assert metrics["no_reply"] == {"written": 1, "never": 1} and metrics["client_reply_hours"] is None
+
+
+def test_the_reply_times_period_is_chosen(service):
+    # 06/10: 3 days, 5, a week, a month or since 1 January, chosen on the Painel; anything else, the 5 days
+    sent_event(service, 0, message_id="hoje", waited_hours=2.0)
+    sent_event(service, 4, message_id="quatro", waited_hours=10.0)
+    sent_event(service, 20, message_id="vinte", waited_hours=30.0)
+    assert service.metrics(reply_window=3)["reply_hours"] == 2.0
+    assert service.metrics(reply_window=5)["reply_hours"] == 6.0
+    assert service.metrics(reply_window=30)["reply_hours"] == 14.0
+    assert service.metrics(reply_window=99)["reply_window"] == 5
+    assert service.metrics(reply_window="ano")["reply_window"] == "ano"
+
+
+def test_the_period_counts_the_replies_sent_and_those_who_never_answered(service):
+    # 06/10: the Painel's whole second row follows the period of analysis: our replies (not a reminder), and those we
+    # first wrote to in it who never answered (the visits booked: in test_properties)
+    from backend.service import no_reply_share
+    sent_event(service, 1, message_id="ontem", waited_hours=3.0, kind="lead")
+    sent_event(service, 1, message_id="lembrete", kind="reminder")
+    sent_event(service, 10, message_id="antigo", waited_hours=5.0, kind="lead")
+    assert service.metrics(reply_window=5)["totals"]["answered"] == 1
+    assert service.metrics(reply_window=30)["totals"]["answered"] == 2
+    now = datetime.now(timezone.utc)
+    old, new = (now - timedelta(days=10)).isoformat(), (now - timedelta(days=1)).isoformat()
+    conversations = {"a": {"history": [{"who": "nos", "text": "Bom dia", "ts": old}]},
+                     "b": {"history": [{"who": "nos", "text": "Bom dia", "ts": new}]},
+                     "c": {"history": [{"who": "nos", "text": "Bom dia", "at": new[:10]}, {"who": "cliente", "text": "Olá"}]}}
+    assert no_reply_share(conversations, now - timedelta(days=5)) == {"written": 2, "never": 1}
+    assert no_reply_share(conversations) == {"written": 3, "never": 2}

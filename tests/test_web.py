@@ -643,8 +643,9 @@ def test_the_cabrio_skin_has_its_instruments_selector_sounds_and_lights():
     entry = script[script.index("  cabrio: {\n    words:"):]
     entry = entry[:entry.index("\n  },\n")]
     for slot in ("instruments: cabrioInstruments", "selector: cabrioConsole",
-                 "sounds: {send: cabrioRev, read: cabrioIdle, click: cabrioClick, toggle: cabrioToggle, shift: cabrioGear}"):  # 06/10: recorded
+                 "sounds: {send: cabrioRev, read: cabrioIdle, toggle: cabrioToggle, shift: cabrioGear}"):  # 06/10: recorded
         assert slot in entry
+    assert "click:" not in entry and "function cabrioClick(" not in script  # 06/10: no click on its buttons, only the engine
     for name in ("cabrioInstruments", "toggleBank", "cabrioGears", "cabrioConsole", "cabrioHorn", "cabrioIndicator", "cabrioToggle",
                  "cabrioFlick", "cabrioIdle", "cabrioRev", "cabrioGear", "applyAmbient"):
         assert f"function {name}(" in script
@@ -674,3 +675,25 @@ def test_emails_reads_by_itself_when_the_last_read_is_old_and_settings_turns_it_
     assert "1 a 720" in client.post("/api/auto-read", json={"on": True, "minutes": 0}, headers=headers).text
     script = (Path(__file__).resolve().parents[1] / "frontend" / "app.js").read_text(encoding="utf-8")
     assert "if (name === 'replies') maybeAutoRead();" in script
+
+
+def test_the_period_of_analysis_sits_between_the_two_rows_in_the_painel_and_imoveis():
+    # 06/10: «Período de análise» between the two rows of numbers, in the Painel and in each property's panel (Imóveis)
+    script = (Path(__file__).resolve().parents[1] / "frontend" / "app.js").read_text(encoding="utf-8")
+    painel = script[script.index("function renderDashboard("):script.index("async function loadMetrics(")]
+    imoveis = script[script.index("function propertyMetrics("):script.index("function satisfactionCard(")]
+    for part, first_row_ends in ((painel, "'A precisar de atenção'"), (imoveis, "'A precisar de atenção'")):
+        assert part.index(first_row_ends) < part.index("periodRow(") < part.index("...periodCards(")
+    assert "'Período de análise'" in script and "Tempos de resposta" not in script
+    # 06/10: «Total de clientes» and «Clientes ativos» open the first row, in both
+    for part in (painel, imoveis):
+        assert part.index("'Total de clientes'") < part.index("'Clientes ativos'") < part.index("'Pedidos por responder'")
+
+
+def test_emails_shows_only_the_work_to_do():
+    # 06/10: the period's numbers left Emails (they are in Imóveis), and so did its call to the metrics
+    script = (Path(__file__).resolve().parents[1] / "frontend" / "app.js").read_text(encoding="utf-8")
+    board = script[script.index("function renderQueueBoard("):]
+    board = board[:board.index("\n}\n")]
+    assert "periodCards(" not in board and "api/metrics" not in board and "Números do imóvel" not in board
+    assert "refreshQueueMetrics" not in script

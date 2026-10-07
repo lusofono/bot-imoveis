@@ -59,6 +59,7 @@ CONTACT_RETENTION_DAYS = 183  # 6 months without consent (decided 21/09); erased
 FIRST_READ_DAYS = 45  # 27/09: how far back a property's first read goes, unless chosen when it was created
 FIRST_READ_RANGE = (1, 365)
 REPLY_TIME_DAYS = 5  # 06/10: the two average reply times count only the last five days (the owner's choice)
+REPLY_WINDOWS = (3, 5, 7, 30, "ano")  # 06/10: or 3 days, a week, a month, since 1 January, chosen on the Painel
 NO_REPLY_DAYS = 3  # 27/09: our last email unanswered this long puts the customer in «Sem resposta», at any step
 # 27/09: the dots in the customers table, in hours, set in Voz e estilo: orange, a message of theirs waiting for us
 # longer than this; blue, their file complete this long and still no visit date from us.
@@ -246,6 +247,18 @@ def waited_hours(item):
     return round((datetime.now(timezone.utc) - arrived).total_seconds() / 3600, 1)
 
 
+def reply_since(window=REPLY_TIME_DAYS):
+    """06/10: from when the reply times count: `window` days back, or 1 January of this year ("ano", local time)."""
+    if window == "ano":
+        return datetime.now().astimezone().replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    return datetime.now(timezone.utc) - timedelta(days=window if window in REPLY_WINDOWS else REPLY_TIME_DAYS)
+
+
+def booked_since(slots, since):
+    """06/10: the visits booked in the period of analysis, by the moment we booked them (an old slot without it, its day)."""
+    return sum(1 for slot in slots if (aware(slot.get("booked_at") or slot.get("at") or "") or since - timedelta(1)) >= since)
+
+
 def client_reply_hours(conversations, since=None):
     """06/10: how long the customers take to answer us, on average: from our email they answered (the last of ours before
     their message) to their message, in hours. Only turns with their exact time (ts), and since: their answers from then
@@ -261,14 +274,18 @@ def client_reply_hours(conversations, since=None):
     return round(sum(hours) / len(hours), 1) if hours else None
 
 
-def no_reply_share(conversations):
+def no_reply_share(conversations, since=None):
     """06/10: of the customers we wrote to, how many never answered any email of ours (they never count in the average
-    above: it only has answers): {"written", "never"}."""
+    above: it only has answers): {"written", "never"}. since (the period of analysis): only those we first wrote to from
+    then on — in a short one, some have not had the time to answer yet."""
     written = never = 0
     for conversation in (conversations or {}).values():
         history = conversation.get("history") or []
         first = next((index for index, turn in enumerate(history) if turn.get("who") == "nos"), None)
         if first is None:
+            continue
+        began = aware(history[first].get("ts") or history[first].get("at") or "")
+        if since is not None and (began is None or began < since):
             continue
         written += 1
         never += not any(turn.get("who") == "cliente" for turn in history[first + 1:])
@@ -290,6 +307,26 @@ def message_key(item):
 
 def recipient_email(item):
     return ((item.get("recipient") or {}).get("email") or "").casefold()
+
+
+def new_requests(data):
+    """06/10: the customers whose request is still unanswered, with no conversation yet (never an owner, nor an email
+    with no address to answer)."""
+    conversations = data.get("conversations") or {}
+    return {email for email in (recipient_email(item) for item in data["emails"] if item.get("kind") not in PROGRAM_KINDS
+                                and item.get("kind") != "owner" and not item.get("blocked") and not item.get("answered_directly"))
+            if email and email not in conversations}
+
+
+def customer_count(data):
+    """06/10: every customer of a property, as in Clientes: those we already wrote to and the new requests still unanswered."""
+    return len(data.get("conversations") or {}) + len(new_requests(data))
+
+
+def active_count(clients, data):
+    """06/10: the active customers (the Painel's and Imóveis' «Clientes ativos», and the odometer): of the visit candidates,
+    the ones still going (ok, an email waiting, a visit booked), and the new requests. clients: their states counted."""
+    return clients["ok"] + clients["pending"] + clients["booked"] + len(new_requests(data))
 
 
 # 04/10, «Escrever a todos»: to every active customer of a property, or only to those who have not answered our last email
@@ -1433,6 +1470,7 @@ class MailService:
                     self.repair_surveys(data)
                     self.drop_empty_additions(data)
                     self.merge_pending(data)
+                    self.fold_owner_cards(data)  # 06/10: one card per owner
             add_contacts(self.folder, contacts)
             for ref, data in queues.items():
                 data["last_read_at"] = start_at
@@ -1448,6 +1486,8 @@ class MailService:
             # received: message ID → the day the customer's email arrived, so the dashboard still counts it
             # after it is answered or dismissed and leaves the queue. IDs and dates only, never an address.
             if profiles:
+                self.merge_pending(caixa)  # 06/10: the owners with no property, one card each too
+                self.fold_owner_cards(caixa)
                 self.save_caixa(caixa)
                 self.update_owners_notice()  # 04/10: one red post-it with every owner waiting for our answer
                 self.auto_backup()  # 02/10: once a day, at the first read (the queue is saved and still locked: a clean copy)
@@ -1461,6 +1501,41 @@ class MailService:
                     "properties": [self.property_view(ref, profiles[ref], queues[ref], voice, added[ref]) for ref in refs]}
 
     @staticmethod
+    def owner_card(data, email):
+        """06/10: the card waiting for this owner in a queue (or the owners' inbox): their message's reply first, else
+        the oldest new email of ours to them; None without one."""
+        cards = [item for item in data["emails"] if item.get("kind") == "owner" and recipient_email(item) == email
+                 and not item.get("blocked") and item.get("reply_status") in ("pending", "draft")]
+        cards.sort(key=lambda item: (bool(item.get("outbound")), str(item.get("date") or "")))
+        return cards[0] if cards else None
+
+    @classmethod
+    def fold_owner_cards(cls, data):
+        """06/10: one card per owner, as for the customers (the user answers everything together): a new email of ours
+        to an owner («Escrever ao proprietário») joins the card already waiting for them — the reply to their message,
+        else the oldest new email —, its draft with it. Returns how many were folded."""
+        folded = 0
+        for email in {recipient_email(item) for item in data["emails"] if item.get("kind") == "owner" and item.get("outbound")}:
+            base = cls.owner_card(data, email) if email else None
+            extra = [item for item in data["emails"] if base is not None and item is not base and item.get("outbound")
+                     and item.get("kind") == "owner" and recipient_email(item) == email and not item.get("blocked")
+                     and item.get("reply_status") in ("pending", "draft")]
+            for item in extra:
+                text = (item.get("reply_text") or "").strip()
+                if text and (base.get("reply_text") or "").strip():
+                    base["reply_text"] = base["reply_text"].rstrip() + "\n\n" + text
+                    base["reply_status"] = "pending"
+                    base.setdefault("warnings", []).append("Juntámos aqui o rascunho do email novo a este proprietário: "
+                                                           "revê o texto todo antes de enviar.")
+                elif text:
+                    base.update(reply_text=item["reply_text"], reply_status=item.get("reply_status") or "pending")
+            if extra:
+                gone = {id(item) for item in extra}
+                data["emails"] = [item for item in data["emails"] if id(item) not in gone]
+                folded += len(extra)
+        return folded
+
+    @staticmethod
     def merge_pending(data):
         """Several emails from one customer in the queue become one card: one reply answers them all (25/09).
 
@@ -1469,11 +1544,12 @@ class MailService:
         thread, subject). Emails already answered in Gmail join too, as context: with anything still
         unanswered, the card is a new step. A draft written before the other messages goes back to review.
         Reminders, proposals, additions and blocked emails are never merged. Returns how many were merged.
+        06/10: a new email of ours to an owner (no message of theirs) neither: fold_owner_cards joins it.
         """
         groups = {}
         for item in data["emails"]:
             email = recipient_email(item)
-            if (email and item.get("kind") not in PROGRAM_KINDS and not item.get("blocked")
+            if (email and item.get("kind") not in PROGRAM_KINDS and not item.get("blocked") and not item.get("outbound")
                     and item.get("reply_status") in ("pending", "draft")):
                 groups.setdefault(email, []).append(item)
         merged = 0
@@ -2083,7 +2159,8 @@ class MailService:
     def write_to_owner(self, property_ref, subject="", owner=None):
         """02/10, «Escrever ao proprietário»: a new email to them, without them writing first — a card of its own, to
         write by hand or with the AI, then reviewed and sent like a reply. 03/10: property_ref CAIXA + owner: to an owner
-        with no property (the owners' inbox)."""
+        with no property (the owners' inbox). 06/10: one card per owner — with one already waiting for them (their
+        message's reply, or another new email), that one, "existing": True."""
         if property_ref == CAIXA:
             email = str(owner or "").strip().casefold()
             owners = self.owners_list()
@@ -2091,6 +2168,9 @@ class MailService:
                 raise ValueError("Escolhe um proprietário da lista.")
             with locked(self.folder, "owners", wait=SHORT_WAIT):
                 caixa = self.load_caixa()
+                waiting = self.owner_card(caixa, email)
+                if waiting is not None:
+                    return {"property_ref": CAIXA, "id": waiting["id"], "existing": True}
                 name = owners[email].get("name") or ""
                 talk = (caixa.get("owner_conversations") or {}).get(email) or {}
                 subject = " ".join(str(subject or "").split())[:150] or "Contacto da agência"
@@ -2110,6 +2190,9 @@ class MailService:
             if not email:
                 raise ValueError("Este imóvel ainda não tem o email do proprietário: põe-no primeiro.")
             data = self.load(ref)
+            waiting = self.owner_card(data, email.casefold())
+            if waiting is not None:
+                return {"property_ref": ref, "id": waiting["id"], "existing": True}
             talk = (data.get("owner_conversations") or {}).get(email.casefold()) or {}
             subject = " ".join(str(subject or "").split())[:150] or f"{prop.get('reference')} — {prop.get('description') or ''}".strip(" —")
             name = prop.get("owner_name") or talk.get("name") or ""
@@ -4473,9 +4556,12 @@ class MailService:
                              **{part: survey.get(part) for part in ("imovel", "consultor", "marcacao")}}
                             for name, survey in answers]}
 
-    def queue_numbers(self, ref, profile):
-        """04/10: a property's queue in numbers (the Painel's «Por imóvel»), for one kept out of the totals (the test one)."""
+    def queue_numbers(self, ref, profile, since=None):
+        """04/10: a property's queue in numbers (the Painel's «Por imóvel»), for one kept out of the totals (the test one).
+        06/10: its replies in the period of analysis come from the log, in metrics."""
+        since = since or reply_since()
         data = self.load(ref)
+        slots = load_visits(self.folder, ref)["slots"]
         emails = [item for item in data["emails"] if item.get("kind") != "owner"]
         status = Counter(item.get("reply_status") or "pending" for item in emails)
         waits = [waited_hours(item) for item in emails if item.get("kind") in ("lead", "follow_up") and not item.get("blocked")
@@ -4485,14 +4571,15 @@ class MailService:
                 "advertised_rent_eur": listing.get("advertised_rent_eur"),  # 04/10: «Por imóvel» shows the rent
                 "pending": len(emails), "drafts": status["draft"], "blocked": sum(1 for item in emails if item.get("blocked")),
                 "attention": status["uncertain"] + status["error"] + status["sending"],
-                "answered": sum(conversation.get("stage", 0) for conversation in (data.get("conversations") or {}).values()),
+                "answered": 0,
                 "reply_hours": None, "oldest_wait_hours": max([hours for hours in waits if hours is not None], default=None),
-                "client_reply_hours": client_reply_hours(data.get("conversations"),  # 06/10
-                                                         datetime.now(timezone.utc) - timedelta(days=REPLY_TIME_DAYS)),
-                "no_reply": no_reply_share(data.get("conversations")),
+                "client_reply_hours": client_reply_hours(data.get("conversations"), since),  # 06/10
+                "no_reply": no_reply_share(data.get("conversations"), since),
                 # 04/10: enough for its panel in Imóveis (the instruments), the rest reads zero there
-                "customers": len(data.get("conversations") or {}), "last_read_at": data.get("last_read_at"),
-                "visits_booked": sum(1 for slot in load_visits(self.folder, ref)["slots"] if slot["at"][:10] >= date.today().isoformat()),
+                "customers": customer_count(data), "last_read_at": data.get("last_read_at"),
+                "customers_active": active_count(Counter(customer["state"] for customer in self.candidates(ref, data)), data),
+                "visits_booked": booked_since(slots, since),  # 06/10: in the period; the ones ahead, below
+                "visits_upcoming": sum(1 for slot in slots if slot["at"][:10] >= date.today().isoformat()),
                 "reply_hours_max": self.panel(ref)["reply_hours_max"],
                 "ignored": dict(Counter(ignore_kind(c) for c in (data.get("conversations") or {}).values() if c.get("ignored")))}
 
@@ -4590,7 +4677,7 @@ class MailService:
             tasks.sort(key=lambda task: self.TODO_ORDER.index(task["kind"]))
             return {"tasks": tasks}
 
-    def metrics(self, days=14):
+    def metrics(self, days=14, reply_window=REPLY_TIME_DAYS):
         """Numbers for the dashboard. Of the customers, only names leave this call (first name and surname, shown_name): no address or phone.
 
         days: the chart's period, one of CHART_PERIODS; 3 months are drawn one bar per week, not per day. "all"
@@ -4648,8 +4735,10 @@ class MailService:
             # queue keeps for good. Old log events carry no property; this is how they are attributed.
             owner = {}
             # 06/10: the two reply times from the last REPLY_TIME_DAYS only (all time, the start-up's backlog — emails of
-            # two weeks before, answered on 21–24/09 — made ours 163 h)
-            recent = datetime.now(timezone.utc) - timedelta(days=REPLY_TIME_DAYS)
+            # two weeks before, answered on 21–24/09 — made ours 163 h). Then the period of analysis, chosen on the Painel:
+            # the replies sent, the visits booked and those who never answered too.
+            reply_window = reply_window if reply_window in REPLY_WINDOWS else REPLY_TIME_DAYS
+            recent = reply_since(reply_window)
             test_waited = {}  # the test property's own, never in the totals
             everyone = {}  # 06/10: every property's conversations, for the Painel's two numbers of the customers
             today_iso = today.isoformat()
@@ -4660,7 +4749,6 @@ class MailService:
                 blocked = sum(1 for item in emails if item.get("blocked"))
                 conversations = data.get("conversations", {})
                 everyone.update({(ref, email): conversation for email, conversation in conversations.items()})
-                answered = sum(conversation.get("stage", 0) for conversation in conversations.values())
                 for message_id in ({item["id"] for item in emails} | set(data.get("replied_message_ids") or [])
                                    | set(data.get("dismissed_message_ids") or [])):
                     owner.setdefault(str(message_id), ref)
@@ -4676,7 +4764,8 @@ class MailService:
                                      "first_contact": (contacts.get((email, ref)) or {}).get("primeiro_contacto") or None,
                                      "last_reply": str(conversation.get("last_sent_at") or "")[:10] or None,
                                      "interactions": conversation.get("stage", 0)}
-                                    for email, conversation in conversations.items() if conversation.get("stage")),
+                                    for email, conversation in conversations.items() if conversation.get("stage")
+                                    and (aware(conversation.get("last_sent_at")) or recent) >= recent),  # 06/10: in the period
                                    key=lambda customer: customer["last_reply"] or "", reverse=True)
                 # 27/09: what is behind the Painel's four queue numbers, for their hover (the last ten of each): the
                 # name (shown_name), day, what it is and how it stands. The same exception as above: never an address or a phone.
@@ -4686,12 +4775,16 @@ class MailService:
                           "status": item.get("reply_status") or "pending", "blocked": bool(item.get("blocked"))}
                          for item in emails]
                 # 04/10: the owners' emails still to answer (theirs, not the ones we wrote first) and the visits booked
-                # from today on — the Painel's fourth column
+                # from today on — the Painel's fourth column (06/10: booked in the period; the ones ahead, for its hover)
                 owners_pending = sum(1 for item in data["emails"] if item.get("kind") == "owner" and not item.get("outbound")
                                      and item.get("reply_status") in (None, "pending", "draft"))
-                visits_booked = sum(1 for slot in slots if slot["at"][:10] >= today_iso)
-                totals.update(pending=len(emails), drafts=status["draft"], blocked=blocked, answered=answered,
-                              customers=len(conversations), owners_pending=owners_pending, visits_booked=visits_booked,
+                visits_booked, visits_upcoming = booked_since(slots, recent), sum(1 for slot in slots if slot["at"][:10] >= today_iso)
+                # 06/10: the Painel's «Total de clientes», as in Clientes, and the active ones
+                customers_total = customer_count(data)
+                customers_active = active_count(clients, data) if ref else customers_total
+                totals.update(pending=len(emails), drafts=status["draft"], blocked=blocked, visits_upcoming=visits_upcoming,
+                              customers_active=customers_active,
+                              customers=customers_total, owners_pending=owners_pending, visits_booked=visits_booked,
                               attention=status["uncertain"] + status["error"] + status["sending"])
                 last_read = max([stamp for stamp in (last_read, data.get("last_read_at")) if stamp], default=None)
                 listing = profiles[ref]["property"] if ref else {}
@@ -4701,11 +4794,12 @@ class MailService:
                          and item.get("reply_status") in (None, "pending", "draft")]
                 properties.append({"property_ref": ref, "pending": len(emails), "drafts": status["draft"],
                                    "oldest_wait_hours": max([hours for hours in waits if hours is not None], default=None),
-                                   "blocked": blocked, "answered": answered, "customers": len(conversations),
+                                   "blocked": blocked, "answered": 0, "customers": customers_total,  # answered: below
+                                   "customers_active": customers_active,
                                    "attention": status["uncertain"] + status["error"] + status["sending"],
-                                   "visits_booked": visits_booked, "owners_pending": owners_pending,
+                                   "visits_booked": visits_booked, "visits_upcoming": visits_upcoming, "owners_pending": owners_pending,
                                    "client_reply_hours": client_reply_hours(conversations, recent),  # 06/10
-                                   "no_reply": no_reply_share(conversations),
+                                   "no_reply": no_reply_share(conversations, recent),
                                    "reply_hours_max": self.panel(ref)["reply_hours_max"],
                                    "api_fuel": self.api_fuel(ref, events),
                                    "petrol": self.visit_petrol(self.panel(ref), slots),
@@ -4722,7 +4816,10 @@ class MailService:
             # 27/09: the wallet's own period, the last 30 days, whatever the chart shows
             openai_month, month_start = Counter(), (today - timedelta(days=29)).isoformat()
             per = {ref: {"requests": Counter(), "sent": Counter(), "waited": [], "period": Counter(),
-                         "all_time": Counter()} for ref in refs}
+                         "all_time": Counter(), "answered": 0} for ref in refs}
+            # 06/10: «Respostas enviadas» in the period of analysis: our replies sent, not a reminder or another notice
+            reply = lambda event, at: event.get("kind") not in AUX_KINDS and at is not None and at >= recent
+            test_answered = Counter()
             # 02/10: the test property's API cost, for its own tank in Depósitos (it was counted as unattributed)
             tests = {ref: {"period": Counter(), "all_time": Counter()} for ref in sorted(test_refs & set(profiles))}
             for event in events:
@@ -4732,6 +4829,8 @@ class MailService:
                                                        or str(event.get("message_id")) in test_ids):
                     # 06/10: never in the Painel's numbers, but the test property shows its own reply time
                     hours, sent_at = event.get("waited_hours"), aware(event.get("at") or "")
+                    if event.get("status") == "sent" and event.get("kind") != "owner" and reply(event, sent_at):
+                        test_answered[event.get("reference")] += 1
                     if (event.get("status") == "sent" and event.get("reference") in test_refs and sent_at and sent_at >= recent
                             and isinstance(hours, (int, float)) and event.get("kind") not in PROGRAM_KINDS):
                         test_waited.setdefault(event["reference"], []).append(hours)
@@ -4741,9 +4840,13 @@ class MailService:
                     ref = event.get("reference") or owner.get(str(event.get("message_id")))
                     if ref in per:
                         per[ref]["sent"][bucket(event.get("at"))] += 1
+                    sent_at = aware(event.get("at") or "")
+                    if reply(event, sent_at):
+                        totals["answered"] += 1
+                        if ref in per:
+                            per[ref]["answered"] += 1
                     hours = event.get("waited_hours")
                     if isinstance(hours, (int, float)) and event.get("kind") not in PROGRAM_KINDS:
-                        sent_at = aware(event.get("at") or "")
                         if sent_at and sent_at >= recent:  # 06/10: the last REPLY_TIME_DAYS
                             waited.append(hours)
                             if ref in per:
@@ -4792,6 +4895,7 @@ class MailService:
                 mine = per[item["property_ref"]]
                 item.update(by_day=[{"day": day, "requests": mine["requests"].get(day, 0),
                                      "sent": mine["sent"].get(day, 0)} for day in starts],
+                            answered=mine["answered"],
                             reply_hours=round(sum(mine["waited"]) / len(mine["waited"]), 1) if mine["waited"] else None,
                             openai_usage={"period": usage_of(mine["period"]), "all_time": usage_of(mine["all_time"])})
             # The Painel's quality dials: every property's survey answers together (names never leave here).
@@ -4803,20 +4907,21 @@ class MailService:
             totals["owners_pending"] += caixa_pending
             return {"account": account, "last_read_at": last_read, "properties": properties, "quality": quality_all,
                     "totals": {key: totals[key] for key in ("pending", "drafts", "blocked", "attention", "answered", "customers",
-                                                            "owners_pending", "visits_booked")},
+                                                            "owners_pending", "visits_booked", "visits_upcoming", "customers_active")},
                     "owners_inbox_pending": caixa_pending,
                     "period_days": days, "bucket_days": step,
                     "by_day": [{"day": day, "requests": requests.get(day, 0), "sent": sent.get(day, 0)}
                                for day in starts],
                     "reply_hours": round(sum(waited) / len(waited), 1) if waited else None,
                     # 06/10: theirs apart from ours, and those who never answered (never the test property)
-                    "client_reply_hours": client_reply_hours(everyone, recent), "no_reply": no_reply_share(everyone),
+                    "client_reply_hours": client_reply_hours(everyone, recent), "no_reply": no_reply_share(everyone, recent),
                     "openai_usage": {"period": usage_of(openai_period), "all_time": usage_of(openai_all_time),
                                      "month": usage_of(openai_month),
                                      "unattributed": usage_of(unattributed)},
                     "api_fuel": self.api_fuel(None, events),
                     # 04/10: the test property's row for «Por imóvel» (never in the totals nor the ponto de situação)
-                    "test_properties": [{**self.queue_numbers(ref, profiles[ref]), "reply_hours": round(
+                    "reply_window": reply_window, "reply_since": recent.isoformat(),
+                    "test_properties": [{**self.queue_numbers(ref, profiles[ref], recent), "answered": test_answered[ref], "reply_hours": round(
                         sum(test_waited[ref]) / len(test_waited[ref]), 1) if test_waited.get(ref) else None}
                         for ref in sorted(test_refs & set(profiles))],
                     # 02/10: the test property's tank, apart from the properties (it never counts in the Painel)

@@ -15,6 +15,100 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.141.0 — 06/10/2026
+
+- **Proprietários: um só cartão por proprietário, como nos clientes.** «Escrever ao proprietário», quando já há um
+  cartão por enviar a essa pessoa (a resposta a uma mensagem dela ou outro email novo), não cria outro: avisa e fica-se
+  com esse. Um email novo nosso que já existia junta-se à resposta à mensagem dele na leitura seguinte, com o rascunho
+  (se os dois tinham texto, ficam os dois, com um aviso para rever). As mensagens dele, várias, juntam-se num cartão
+  também na caixa dos proprietários sem imóvel. A resposta segue sempre na conversa dele.
+
+## α.140.4 — 06/10/2026
+
+- **Proprietários: a instrução de «Gerar resposta» lê-se como a escreves.** Um pedido escrito como se falasses com o
+  proprietário («Quando possível verifica o draft de contrato enviado») passa para o email como um pedido a ele («Quando
+  possível, verifique o draft do contrato que lhe enviámos»); a IA tinha escrito «Vamos também verificar o draft». O
+  que fala dele ou da escrita («agradece-lhe», «sê breve») continua a ser instrução para a IA.
+
+## α.140.3 — 06/10/2026
+
+- **O mostrador do tempo de resposta, no painel do imóvel, passa a dizer «Que demoramos a responder»**, com o período, em
+  todos os temas (dizia «Tempo médio de resposta»).
+
+## α.140.2 — 06/10/2026
+
+- **Os dois tempos médios com nomes que dizem quem responde a quem:** «O nosso tempo médio de resposta» passa a «Que
+  demoramos a responder» e «Tempo médio de resposta dos clientes» a «Que clientes demoram a responder», sempre com o período
+  («(mês)»…). Também no resumo da atividade e na coluna da tabela «Por imóvel».
+
+## α.140.1 — 06/10/2026
+
+- **Emails: sai o link «Números do imóvel →»** por baixo dos números.
+
+## α.140.0 — 06/10/2026
+
+- **Emails: só os números do trabalho de agora.** Saiu a segunda linha (respostas enviadas, os dois tempos médios, quem
+  nunca respondeu e as visitas marcadas no período): o período escolhia-se noutro separador e os mesmos números estão no
+  painel do imóvel, em Imóveis. No lugar dela há um link, «Números do imóvel →», que abre esse painel. Com os Emails
+  abertos, a página deixa de pedir o cálculo do Painel de 20 em 20 segundos.
+
+## α.139.0 — 06/10/2026
+
+- **«Total de clientes» passa para primeiro, e ao lado «Clientes ativos»**, no Painel e em Imóveis. Ativos: os pedidos
+  novos, quem tem um email por responder ou uma visita marcada, e quem segue a conversa; não contam os inativos, a
+  blacklist e a greylist, quem não quer visitar ou só pode noutra data, nem os contactos encerrados. O conta-quilómetros
+  «Clientes ativos» do painel do imóvel conta da mesma maneira (agora também com os pedidos novos).
+- **A primeira linha fica mais apertada:** sete números, mais estreitos e com menos margem dos lados; a de baixo continua
+  com cinco, à mesma largura.
+
+## α.138.0 — 06/10/2026
+
+- **«Total de clientes» na primeira linha de números, no Painel e em Imóveis:** todos os clientes, como em Clientes:
+  aqueles a quem já escrevemos e os pedidos novos ainda por responder (nunca os proprietários). Fica no fim da linha,
+  que passa a ter seis números; a de baixo continua com cinco, à mesma largura. No Painel, ao passar o rato, aparece a
+  divisão por imóvel. O conta-quilómetros «Clientes» do painel do imóvel passa a contar da mesma maneira.
+
+## α.137.1 — 06/10/2026
+
+- **Cabrio: o texto dos cartões de números afasta-se do mostrador:** o nome de cada número fica mais abaixo, longe do aro
+  cromado da janela do número; no cartão dos que nunca responderam, a barra também.
+
+## α.137.0 — 06/10/2026
+
+- **«Período de análise»:** a lista «Tempos de resposta» muda de nome e passa a contar para a segunda linha de números
+  toda, no Painel, nos Emails e em Imóveis. «Respostas enviadas» conta as respostas enviadas no período (sem os
+  lembretes e os outros avisos). «Clientes que nunca responderam» conta só os clientes a quem escrevemos pela primeira
+  vez no período, com um aviso nos períodos curtos. «Visitas marcadas» conta as que marcámos no período; as de hoje em
+  diante aparecem ao passar o rato. Cada cartão diz o período, e na tabela «Por imóvel» também.
+- **Imóveis:** o painel de cada imóvel tem a mesma lista, entre as duas linhas de números. A escolha é a mesma do Painel.
+
+## α.136.4 — 06/10/2026
+
+- **Cabrio: os botões deixam de fazer clique:** fica só o motor (a acelerar ao enviar, ao ralenti ao ler e na garagem), as
+  mudanças nos separadores e o interruptor nas alavancas do tablier.
+
+## α.136.3 — 06/10/2026
+
+- **Cabrio: um motor nos botões de envio:** no lugar do ícone de ligar/desligar, o motor da luz de avaria do tablier, a
+  branco no vermelho.
+
+## α.136.2 — 06/10/2026
+
+- **Cabrio: os botões de envio deixam de ter o ícone de ligar/desligar:** lia-se como desligar ou terminar sessão. Ficam
+  só vermelhos, com o texto.
+
+## α.136.1 — 06/10/2026
+
+- **A lista «Tempos de resposta» passa para o meio dos cartões do Painel:** fica entre as duas linhas de números, por cima
+  da segunda, que é a única que usa o período escolhido.
+
+## α.136.0 — 06/10/2026
+
+- **O período dos tempos de resposta escolhe-se:** no Painel, por cima dos números, há uma lista «Tempos de resposta»
+  com as opções últimos 3 dias, últimos 5 dias, última semana, último mês e desde o início do ano. Os dois tempos médios
+  mudam conforme a escolha, e o nome dos cartões também («(3 dias)», «(semana)», «(mês)», «(este ano)»). Os Emails e os
+  Imóveis seguem a mesma escolha, que fica guardada neste browser. Por omissão são 5 dias.
+
 ## α.135.0 — 06/10/2026
 
 - **Painel: o nosso tempo, o dos clientes e quem nunca respondeu:** o antigo «Tempo médio até resposta» dá lugar aos

@@ -140,8 +140,8 @@ const SKINS = {
     instruments: cabrioInstruments,
     selector: cabrioConsole,
     // 06/10: a real engine (CC0, credits in frontend/sounds/CREDITS.md), the synthesised sounds as a fallback
-    // 06/10: the buttons a short soft click of their own; the console's switch only on the panel's levers (toggle)
-    sounds: {send: cabrioRev, read: cabrioIdle, click: cabrioClick, toggle: cabrioToggle, shift: cabrioGear},
+    // 06/10: no click on the buttons (the owner's wish): only the engine, and the console's switch on the panel's levers
+    sounds: {send: cabrioRev, read: cabrioIdle, toggle: cabrioToggle, shift: cabrioGear},
     // 06/10: in the garage — Settings, where the car is tuned (the owner's word) — the engine ticking over, in a loop
     ambient: {tab: 'workshop', clip: 'cabrio-loop', level: 0.22},  // the level the owner liked (in Imóveis, at first)
   },
@@ -536,8 +536,6 @@ function cabrioIndicator(context) {
     relayClick(context, t + i * 0.5 + 0.25, 1700, 0.07);
   }
 }
-// 06/10: every button: a short soft click, nothing of the gearbox or the panel's switches (those keep their own)
-function cabrioClick(context) { noiseBurst(context, context.currentTime, 0.012, 'highpass', 2500, 0.1); }
 // The panel's levers: a toggle switch on the console — a firm metal click, a short spring ring and a small thump.
 function cabrioToggle(context) {
   const t = context.currentTime;
@@ -1217,7 +1215,6 @@ function showTab(name) {
   if (name === 'dashboard') { run(loadMetrics); run(loadDigest); }
   if (name === 'voice') run(loadMetrics);  // «O teu espaço» (27/09) lives at the top of the settings now
   if (name === 'contacts') run(loadContacts);
-  if (name === 'replies') refreshQueueMetrics(true);  // 05/10: the numbers above «Emails em tratamento»
   if (name === 'replies') maybeAutoRead();  // 06/10: reads by itself when the last read is old (Settings)
   if (name === 'owners') { renderOwners(); run(loadOwnersDigest); }
   if (name === 'agenda') renderAgenda();
@@ -1956,24 +1953,15 @@ function renderPipeline(queue) {
     ...below.filter(Boolean));
 }
 
-// 05/10: above «Emails em tratamento», the property's numbers, eight as in Imóveis: how many wait for an answer (big;
-// those answered straight in Gmail apart), without a draft yet, with a draft to review and send, blocked, the owners'
-// emails waiting (they have their own tab), and — from the Painel's metrics, asked in the background at most every 20
-// seconds while Emails is open — the replies sent, the average time to answer and the visits booked.
-let queueMetrics = null, queueMetricsAt = 0;
-function refreshQueueMetrics(force = false) {
-  if (!force && Date.now() - queueMetricsAt < 20000) return;
-  queueMetricsAt = Date.now();
-  call('api/metrics', {days: chartDays()}).then(data => {
-    queueMetrics = data;
-    if (activeTab === 'replies' && state) renderQueueBoard(currentQueue());
-  }).catch(() => {});
-}
+// 05/10: above «Emails em tratamento», the property's queue in numbers: how many wait for an answer (big; those answered
+// straight in Gmail apart), without a draft yet, with a draft to review and send, blocked, and the owners' emails waiting
+// (they have their own tab). 06/10: only the work to do now; the period's numbers (replies sent, reply times, visits)
+// left, as they are in the property's panel in Imóveis — and with them the Painel's metrics, asked every 20 seconds
+// while Emails was open.
 function renderQueueBoard(queue) {
   const box = $('queue-board');
   if (!queue || state.error) { box.hidden = true; return; }
   box.hidden = false;
-  if (activeTab === 'replies') refreshQueueMetrics();
   const emails = (queue.emails || []).filter(email => !email.round && !email.owner);
   const open = emails.filter(email => !email.answered_direct), direct = emails.length - open.length;
   // 06/10: «por responder» is what customers wrote; an email of ours prepared to send (a proposal taken out of the round,
@@ -1983,8 +1971,6 @@ function renderQueueBoard(queue) {
   const blocked = open.filter(email => email.blocked).length;
   const owners = (queue.emails || []).filter(email => email.owner && !email.outbound
     && ['pending', 'draft', undefined, null].includes(email.reply_status)).length;
-  const numbers = [...(queueMetrics?.properties || []), ...(queueMetrics?.test_properties || [])]
-    .find(item => item.property_ref === queue.property_ref);
   box.replaceChildren(
     el('article', {class: 'metric queue-main' + (theirs ? ' bad' : ' ok')},
       el('div', {class: 'value'}, String(theirs)),
@@ -1995,16 +1981,7 @@ function renderQueueBoard(queue) {
     metricCard(open.length - drafted - blocked, 'Sem rascunho: «Gerar respostas»', 'warn'),
     metricCard(drafted, 'Rascunhos prontos: rever e enviar', 'ok'),
     metricCard(blocked, 'Bloqueados: tratar à mão', 'bad'),
-    metricCard(owners, 'Proprietários por responder', 'warn'),
-    metricCard(numbers ? numbers.answered : '—', 'Respostas enviadas'),
-    // 06/10: the two times apart: ours (the customer's email to our reply) and theirs (our email to their answer)
-    metricCard(numbers ? hoursText(numbers.reply_hours) : '—', 'O nosso tempo médio de resposta (5 dias)', null,
-      {title: 'Desde que o email do cliente chega até lhe enviarmos a resposta, nas respostas dos últimos 5 dias.'}),
-    metricCard(numbers ? hoursText(numbers.client_reply_hours) : '—', 'Tempo médio de resposta dos clientes (5 dias)', null,
-      {title: 'Desde que lhes enviamos um email até eles responderem, nas respostas dos últimos 5 dias. Só conta quem '
-        + 'respondeu: quem nunca respondeu está no número ao lado.'}),
-    noReplyCard(numbers?.no_reply),
-    metricCard(numbers ? numbers.visits_booked || 0 : '—', 'Visitas marcadas'));
+    metricCard(owners, 'Proprietários por responder', 'warn'));
 }
 
 // 04/10, «Escrever a todos»: the owner's words to every active customer of the property, or only to those who have not
@@ -2194,7 +2171,9 @@ function renderOwnerBox(owner) {
       el('button', {class: 'primary', onclick: event => run(async () => {
         const result = await call('api/owners/write', {property_ref: about.value, subject: subject.value.trim(), owner: owner.email});
         state = result.state; renderState();
-        toast('Email novo ao proprietário: escreve-o no cartão abaixo, ou com «Gerar resposta», e envia.');
+        // 06/10: one card per owner, as for the customers: with one already waiting, that one
+        toast(result.existing ? 'Já há um email por enviar a este proprietário: escreve tudo nesse cartão, abaixo (vai tudo junto).'
+          : 'Email novo ao proprietário: escreve-o no cartão abaixo, ou com «Gerar resposta», e envia.');
       }, event.currentTarget)}, 'Escrever ao proprietário')),
     adding);
   join.addEventListener('change', () => { if (join.value) setOwner(join.value, owner.email, `${join.value} passou a ser deste proprietário.`); });
@@ -2924,11 +2903,14 @@ function noReplyCard(share) {
   const pct = share?.written ? Math.round(100 * share.never / share.written) : null;
   const fill = el('span', {class: 'gauge-fill'});
   if (pct != null) fill.style.setProperty('--fill', pct + '%');
+  // 06/10: those we first wrote to in the period of analysis; in a short one, some have not had the time to answer
+  const short = ['3', '5', '7'].includes(replyWindow());
   return el('article', {class: 'metric gauge-card' + (pct >= 50 ? ' warn' : ''), title: share?.written
-      ? `${share.never} de ${share.written} clientes a quem escrevemos nunca responderam a nenhum email nosso.` : ''},
+      ? `${share.never} de ${share.written} clientes a quem escrevemos pela primeira vez ${replyIn()} nunca responderam a `
+        + 'nenhum email nosso.' + (short ? ' Num período curto, alguns ainda não tiveram tempo de responder.' : '') : ''},
     el('div', {class: 'value'}, pct == null ? '—' : pct + '%'),
     el('div', {class: 'gauge', 'aria-hidden': 'true'}, fill),
-    el('div', {class: 'label'}, 'Clientes que nunca responderam'));
+    el('div', {class: 'label'}, `Clientes que nunca responderam (${replyShort()})`));
 }
 function metricCard(value, label, kind, {title} = {}) {
   return el('article', {class: 'metric' + (kind && value ? ' ' + kind : ''), title},
@@ -3039,7 +3021,7 @@ function activitySummary(data) {
   return [
     stat('requests', 'Pedidos recebidos', requests.toLocaleString('pt-PT'),
       `≈ ${(requests / span).toLocaleString('pt-PT', {maximumFractionDigits: 1})} por dia`),
-    stat('sent', 'Respostas enviadas', sent.toLocaleString('pt-PT'), `o nosso tempo médio de resposta (5 dias): ${hoursText(data.reply_hours)}`),
+    stat('sent', 'Respostas enviadas', sent.toLocaleString('pt-PT'), `que demoramos a responder (${replyShort()}): ${hoursText(data.reply_hours)}`),
     stat(null, (data.bucket_days || 1) > 1 ? 'Período com mais pedidos' : 'Dia com mais pedidos',
       peak && peak.requests ? peak.requests.toLocaleString('pt-PT') : '—',
       peak && peak.requests ? bucketLabel(peak, data.bucket_days || 1) : 'ainda sem pedidos')];
@@ -3148,10 +3130,10 @@ function renderByProperty(properties) {
   const rent = value => value == null ? '—'
     : new Intl.NumberFormat('pt-PT', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0}).format(value);
   const openReplies = item => openTask({tab: 'replies', property_ref: item.property_ref});
-  const openPanel = item => { selectProperty(item.property_ref, 0, false); showPropertiesView('list'); showTab('properties'); };
+  const openPanel = item => openPropertyPanel(item.property_ref);
   // 04/10: the titles in two lines and the description cut short (the whole of it on hover), so it all fits across
   const columns = [['pending', ['Por', 'responder'], ''], ['drafts', ['Rascunhos'], 'ok'], ['blocked', ['Bloqueados'], 'warn'],
-    ['attention', ['A precisar', 'de atenção'], 'bad'], ['answered', ['Respostas', 'enviadas'], '']];
+    ['attention', ['A precisar', 'de atenção'], 'bad'], ['answered', ['Respostas', `enviadas (${replyShort()})`], '']];  // 06/10: in the period
   const title = lines => lines.flatMap((line, index) => index ? [el('br'), line] : [line]);
   const short = text => text.length > 36 ? text.slice(0, 35).trimEnd() + '…' : text;
   const cell = (value, tone) => el('td', {class: 'num' + (value ? ' ' + tone : ' zero')}, String(value || 0));
@@ -3171,7 +3153,7 @@ function renderByProperty(properties) {
     el('div', {class: 'by-property-scroll'}, el('table', {class: 'by-property'},
       el('thead', {}, el('tr', {}, el('th', {scope: 'col'}, 'Imóvel'), el('th', {scope: 'col', class: 'num'}, 'Renda'),
         columns.map(([, label]) => el('th', {scope: 'col', class: 'num'}, title(label))),
-        el('th', {scope: 'col', class: 'num'}, title(['Tempo', 'médio'])),
+        el('th', {scope: 'col', class: 'num'}, title(['Que demoramos', `a responder (${replyShort()})`])),  // 06/10: as the card
         el('th', {scope: 'col', class: 'by-property-links'}, el('span', {class: 'sr-only'}, 'Abrir')))),
       el('tbody', {}, properties.map(item => el('tr', {class: item.test ? 'test-row' : ''},
         el('th', {scope: 'row'}, dot(item), el('button', {type: 'button', class: 'link', title: 'Abrir em Emails',
@@ -3198,8 +3180,10 @@ function renderDashboard(data) {
     ? data.properties.map(item => `${item.property_ref || 'Fila única'}: ${item[field]}`).join('\n') : undefined;
   const dm = day => day ? day.slice(8, 10) + '/' + day.slice(5, 7) : '?';
   // Who was answered: first name, the day they first wrote (when known), our last reply and how many.
+  // 06/10: those answered in the period of analysis
   const answeredList = () => {
-    const lines = [`${totals.customers} cliente(s) · ${totals.answered} resposta(s)`];
+    const answered = data.properties.reduce((sum, item) => sum + (item.answered_customers || []).length, 0);
+    const lines = [`${totals.answered} resposta(s) ${replyIn()} · ${answered} cliente(s)`];
     for (const item of data.properties) {
       const people = item.answered_customers || [];
       if (!people.length) continue;
@@ -3215,6 +3199,11 @@ function renderDashboard(data) {
     .map(item => `${item.property_ref || 'Fila única'}: ${item.owners_pending}`),
     ...(data.owners_inbox_pending ? [`Sem imóvel (caixa dos proprietários): ${data.owners_inbox_pending}`] : [])].join('\n') || undefined;
   $('metric-cards').replaceChildren(
+    // 06/10: every customer, as in Clientes, and the active ones, first
+    metricCard(totals.customers || 0, 'Total de clientes', null,
+      {title: [CUSTOMERS_HOVER, split('customers')].filter(Boolean).join('\n\n')}),
+    metricCard(totals.customers_active || 0, 'Clientes ativos', null,
+      {title: [ACTIVE_HOVER, split('customers_active')].filter(Boolean).join('\n\n')}),
     metricCard(totals.pending, 'Pedidos por responder', null,
       {title: queueHover(data.properties, QUEUE_SHOWS.pending, split('pending'))}),
     metricCard(totals.drafts, 'Rascunhos prontos', 'ok', {title: queueHover(data.properties, QUEUE_SHOWS.drafts, split('drafts'))}),
@@ -3223,16 +3212,9 @@ function renderDashboard(data) {
     metricCard(totals.owners_pending || 0, 'Proprietários por responder', 'warn', {title: ownersSplit()}),
     metricCard(totals.attention, 'A precisar de atenção', 'bad',
       {title: queueHover(data.properties, QUEUE_SHOWS.attention, split('attention'))}),
-    metricCard(totals.answered, 'Respostas enviadas', null, {title: answeredList()}),
-    // 06/10: ours and theirs apart, and those who never answered (as in Emails and Imóveis), every property together
-    metricCard(hoursText(data.reply_hours), 'O nosso tempo médio de resposta (5 dias)', null,
-      {title: 'Desde que o email do cliente chega até lhe enviarmos a resposta, nas respostas dos últimos 5 dias. Os '
-        + 'emails ainda por responder não contam.'}),
-    metricCard(hoursText(data.client_reply_hours), 'Tempo médio de resposta dos clientes (5 dias)', null,
-      {title: 'Desde o nosso email até o cliente responder, nas respostas dos últimos 5 dias. Só conta cada email a que '
-        + 'responderam; os que ainda esperam resposta e quem nunca respondeu não contam (estão no número ao lado).'}),
-    noReplyCard(data.no_reply),
-    metricCard(totals.visits_booked || 0, 'Visitas marcadas', null, {title: split('visits_booked')}));
+    // 06/10: the period of analysis, between the rows: the second follows it (as in Emails and Imóveis), every property together
+    periodRow(() => run(loadMetrics)),
+    ...periodCards({...data, ...totals}, {answered: answeredList(), visits: split('visits_booked')}));
   renderByProperty([...data.properties, ...(data.test_properties || [])]);  // 04/10: the test one last, marked
   $('dashboard-read').textContent = `Última leitura ${ago(data.last_read_at)}`
     + (data.last_read_at ? ` (${when(data.last_read_at)})` : '') + ` · conta ${data.account}`;
@@ -3257,7 +3239,7 @@ function renderDashboard(data) {
 }
 
 async function loadMetrics() {
-  renderDashboard(await call('api/metrics', {days: chartDays()}));
+  renderDashboard(await call('api/metrics', {days: chartDays(), reply_window: replyWindow()}));
   renderNotices(await call('api/notices'));
   renderTodo(await call('api/todo'));
 }
@@ -3415,6 +3397,53 @@ function renderTodo(data) {
 try { $('chart-period').value = localStorage.getItem('bot-mail-period-2') || 'all'; } catch { /* Storage may be unavailable. */ }
 if (!$('chart-period').value) $('chart-period').value = 'all';
 const chartDays = () => $('chart-period').value === 'all' ? 'all' : Number($('chart-period').value) || 14;
+// 06/10: the period of analysis («Período de análise»), chosen between the two rows of numbers in the Painel and in
+// Imóveis: days back, or since 1 January. One choice, kept in this browser.
+const REPLY_WINDOW_WORDS = {3: ['3 dias', 'dos últimos 3 dias', 'nos últimos 3 dias', 'últimos 3 dias'],
+  5: ['5 dias', 'dos últimos 5 dias', 'nos últimos 5 dias', 'últimos 5 dias'],
+  7: ['semana', 'da última semana', 'na última semana', 'última semana'],
+  30: ['mês', 'do último mês', 'no último mês', 'último mês'],
+  ano: ['este ano', 'desde o início do ano', 'desde o início do ano', 'desde o início do ano']};
+function replyWindow() {
+  try { const kept = localStorage.getItem('bot-mail-reply-window'); if (kept in REPLY_WINDOW_WORDS) return kept; } catch { /* none */ }
+  return '5';
+}
+const replyShort = () => REPLY_WINDOW_WORDS[replyWindow()][0], replyLong = () => REPLY_WINDOW_WORDS[replyWindow()][1];
+const replyIn = () => REPLY_WINDOW_WORDS[replyWindow()][2];
+// The row between the two rows of cards: redraw, what to draw again once it changes
+function periodRow(redraw) {
+  const select = el('select', {'aria-label': 'Período de análise'},
+    Object.entries(REPLY_WINDOW_WORDS).map(([value, words]) => el('option', {value}, words[3])));
+  select.value = replyWindow();
+  select.addEventListener('change', () => {
+    try { localStorage.setItem('bot-mail-reply-window', select.value); } catch { /* Storage may be unavailable. */ }
+    redraw();
+  });
+  return el('label', {class: 'period-row'}, el('span', {class: 'muted small'}, 'Período de análise'), select);
+}
+// 06/10: «Total de clientes» and «Clientes ativos», first in the first row of the Painel and of Imóveis
+const CUSTOMERS_HOVER = 'Todos os clientes, como em Clientes: aqueles a quem já escrevemos e os pedidos novos ainda por responder.';
+const ACTIVE_HOVER = 'Os clientes em curso: os pedidos novos, quem tem um email por responder ou uma visita marcada, e quem '
+  + 'segue a conversa. Não contam os inativos, a blacklist e a greylist, quem não quer visitar ou só pode noutra data, '
+  + 'nem os contactos encerrados.';
+// The second row of numbers, the same in the Painel and Imóveis, all in the period of analysis.
+// titles: the Painel's own hovers (who was answered; the visits by property)
+function periodCards(numbers, titles = {}) {
+  const value = key => numbers ? numbers[key] || 0 : '—';
+  const visits = numbers ? [`As visitas que marcámos ${replyIn()}.`, titles.visits,
+    `De hoje em diante: ${numbers.visits_upcoming || 0} visita(s) marcada(s).`].filter(Boolean).join('\n') : undefined;
+  return [
+    metricCard(value('answered'), `Respostas enviadas (${replyShort()})`, null,
+      {title: titles.answered || `As respostas que enviámos ${replyIn()}. Os lembretes e os outros avisos não contam.`}),
+    metricCard(numbers ? hoursText(numbers.reply_hours) : '—', `Que demoramos a responder (${replyShort()})`, null,
+      {title: `Desde que o email do cliente chega até lhe enviarmos a resposta, nas respostas ${replyLong()}. Os emails `
+        + 'ainda por responder não contam.'}),
+    metricCard(numbers ? hoursText(numbers.client_reply_hours) : '—', `Que clientes demoram a responder (${replyShort()})`, null,
+      {title: `Desde o nosso email até o cliente responder, nas respostas ${replyLong()}. Só conta cada email a que `
+        + 'responderam; os que ainda esperam resposta e quem nunca respondeu não contam (estão no número ao lado).'}),
+    noReplyCard(numbers?.no_reply),
+    metricCard(value('visits_booked'), `Visitas marcadas (${replyShort()})`, null, {title: visits})];
+}
 $('chart-period').addEventListener('change', event => {
   try { localStorage.setItem('bot-mail-period-2', event.target.value); } catch { /* Storage may be unavailable. */ }
   run(loadMetrics);
@@ -5052,6 +5081,8 @@ function applySharedProperty(tab) {
   if (tab === 'agenda') put($('agenda-property'));
   if (tab === 'owners') ownerDigestRef = propertyRef;
 }
+// 06/10: a property's panel in Imóveis, from elsewhere (the Painel's «Por imóvel»)
+function openPropertyPanel(ref) { selectProperty(ref, 0, false); showPropertiesView('list'); showTab('properties'); }
 function selectProperty(ref, direction = 0, render = true) {
   propertyRef = ref; slideDirection = direction;
   try { localStorage.setItem('bot-mail-property', ref || ''); } catch { /* Storage may be unavailable. */ }
@@ -5461,7 +5492,7 @@ function petrolGauge(ref, petrol, caption) {
 function plainInstruments(ref, s) {
   return [
     gauge({key: ref + ':hours', role: 'heat', value: s.hours || 0, max: s.hoursMax, red: [s.hoursMax * 0.75, s.hoursMax],
-      unit: 'horas', divisions: 4, minor: 3, readout: hoursText(s.hours), caption: 'Tempo médio de resposta', alert: s.hot}),
+      unit: 'horas', divisions: 4, minor: 3, readout: hoursText(s.hours), caption: `Que demoramos a responder (${replyShort()})`, alert: s.hot}),
     gauge({key: ref + ':pending', role: 'tach', value: s.pending, max: s.pendingMax, red: [s.pendingMax / 2, s.pendingMax],
       unit: 'emails', size: 'big', face: 'yellow', divisions: 10, minor: 2, readout: String(s.pending), caption: 'Por responder'}),
     tankGauge(s.fuel, s.usage, 'cluster:fuel', null, 'small', s.onFill),
@@ -5476,7 +5507,7 @@ function carInstruments(ref, s) {
   return [
     gauge({key: ref + ':hours', role: 'heat', value: s.hours || 0, max: s.hoursMax, red: [s.hoursMax * 0.75, s.hoursMax],
       unit: '', icon: 'heat', labels: ['C', '', 'H'], divisions: 2, minor: 4, readout: hoursText(s.hours),
-      caption: 'Tempo médio de resposta', alert: s.hot}),
+      caption: `Que demoramos a responder (${replyShort()})`, alert: s.hot}),
     gauge({key: ref + ':pending', role: 'tach', value: s.pending, max: s.pendingMax, red: [s.pendingMax / 2, s.pendingMax],
       unit: 'emails', size: 'big', face: 'yellow', divisions: 10, minor: 2, readout: String(s.pending),
       caption: 'Por responder'}),
@@ -5495,7 +5526,7 @@ function boatInstruments(ref, s) {
   return [
     gauge({key: ref + ':hours', role: 'heat', value: s.hours || 0, max: s.hoursMax, red: [s.hoursMax * 0.75, s.hoursMax],
       unit: 'horas', face: 'white', labels: ['BOM TEMPO', 'VARIÁVEL', 'TEMPESTADE'], divisions: 2, minor: 4,
-      readout: hoursText(s.hours), caption: 'Tempo médio de resposta', alert: s.hot}),
+      readout: hoursText(s.hours), caption: `Que demoramos a responder (${replyShort()})`, alert: s.hot}),
     gauge({key: ref + ':pending', role: 'tach', value: s.pending, max: s.pendingMax, red: [s.pendingMax / 2, s.pendingMax],
       unit: 'emails', size: 'big', face: 'white', divisions: 10, minor: 2, readout: String(s.pending),
       caption: 'Por responder'}),
@@ -5514,7 +5545,7 @@ function scooterInstruments(ref, s) {
   return [
     gauge({key: ref + ':hours', role: 'heat', value: s.hours || 0, max: s.hoursMax, red: [s.hoursMax * 0.75, s.hoursMax],
       unit: 'motor', face: 'cream', icon: 'heat', labels: ['C', '', 'H'], divisions: 2, minor: 4, readout: hoursText(s.hours),
-      caption: 'Tempo médio de resposta', alert: s.hot}),
+      caption: `Que demoramos a responder (${replyShort()})`, alert: s.hot}),
     gauge({key: ref + ':speed', role: 'speedo', value: s.perDay, max: speedMax, unit: 'pedidos / dia', size: 'big',
       face: 'cream', divisions: 5, minor: 4, readout: s.perDay.toLocaleString('pt-PT', {maximumFractionDigits: 1}) + ' /dia',
       caption: 'Pedidos por dia'}),
@@ -5539,7 +5570,7 @@ function cabrioInstruments(ref, s) {
       caption: 'Pedidos por dia'}),
     gauge({key: ref + ':hours', role: 'heat', value: s.hours || 0, max: s.hoursMax, red: [s.hoursMax * 0.75, s.hoursMax],
       unit: 'motor', face: 'cabrio', icon: 'heat', labels: ['C', '', 'H'], divisions: 2, minor: 4, readout: hoursText(s.hours),
-      caption: 'Tempo médio de resposta', alert: s.hot}),
+      caption: `Que demoramos a responder (${replyShort()})`, alert: s.hot}),
     fuelGauge(s.fuel, 'cluster:fuel'),
     petrolGauge(ref, s.petrol, 'Gasolina · visitas')];
 }
@@ -5609,7 +5640,7 @@ function propertyCluster(property, data, metrics) {
     el('div', {class: 'cluster-gauges'}, dials),
     el('div', {class: 'cluster-odometers'},
       odometer(data.answered, 'Respostas enviadas'),
-      odometer(data.clients.ok + data.clients.pending + data.clients.booked, 'Clientes ativos'),
+      odometer(data.customers_active || 0, 'Clientes ativos'),  // 06/10: as the card, the new requests too
       odometer(data.customers, 'Clientes'),
       odometer(data.visits_booked, 'Visitas marcadas', 3)),
     el('div', {class: 'cluster-lamps'},
@@ -5643,23 +5674,19 @@ function propertyChartCard(property, data, metrics) {
 }
 
 // The Painel's numbers, for this property only (26/09), above its instruments since 04/10 (ten since 06/10); like
-// the Painel's, they only inform (27/09).
-function propertyMetrics(data) {
+// the Painel's, they only inform (27/09). 06/10: the period of analysis between the two rows, as in the Painel; redraw,
+// this property's panel once it changes.
+function propertyMetrics(data, redraw) {
   return el('div', {class: 'metrics property-metrics'},
+    metricCard(data.customers || 0, 'Total de clientes', null, {title: CUSTOMERS_HOVER}),  // 06/10: the two totals first
+    metricCard(data.customers_active || 0, 'Clientes ativos', null, {title: ACTIVE_HOVER}),
     metricCard(data.pending, 'Pedidos por responder', null, {title: queueHover([data], QUEUE_SHOWS.pending)}),
     metricCard(data.drafts, 'Rascunhos prontos', 'ok', {title: queueHover([data], QUEUE_SHOWS.drafts)}),
     metricCard(data.blocked, 'Bloqueados', 'warn', {title: queueHover([data], QUEUE_SHOWS.blocked)}),
     metricCard(data.owners_pending || 0, 'Proprietários por responder', 'warn'),  // 04/10: the Painel's fourth column too
     metricCard(data.attention, 'A precisar de atenção', 'bad', {title: queueHover([data], QUEUE_SHOWS.attention)}),
-    metricCard(data.answered, 'Respostas enviadas'),
-    // 06/10: the two reply times apart and the share who never answered, as in Emails
-    metricCard(hoursText(data.reply_hours), 'O nosso tempo médio de resposta (5 dias)', null,
-      {title: 'Desde que o email do cliente chega até lhe enviarmos a resposta, nas respostas dos últimos 5 dias.'}),
-    metricCard(hoursText(data.client_reply_hours), 'Tempo médio de resposta dos clientes (5 dias)', null,
-      {title: 'Desde que lhes enviamos um email até eles responderem, nas respostas dos últimos 5 dias. Só conta quem '
-        + 'respondeu: quem nunca respondeu está no número ao lado.'}),
-    noReplyCard(data.no_reply),
-    metricCard(data.visits_booked || 0, 'Visitas marcadas'));
+    periodRow(redraw),
+    ...periodCards(data));
 }
 
 // The customers' satisfaction with this property, always in view under its instruments (26/09): one dial per part of
@@ -5790,13 +5817,13 @@ async function renderPropertyDashboard(property, slide = '') {
   const token = renderPropertyDashboard.token = (renderPropertyDashboard.token || 0) + 1;
   await run(async () => {
     const ref = property.reference;
-    const metrics = await call('api/metrics', {days: chartDays()});
+    const metrics = await call('api/metrics', {days: chartDays(), reply_window: replyWindow()});
     const selection = ((await call('api/contacts')).selection || []).filter(item => item.property_ref === ref);
     const ignored = await call('api/contacts/ignored', {property_ref: ref});
     const data = metrics.properties.find(item => item.property_ref === ref) || testPropertyData(ref, metrics);
     if (token !== renderPropertyDashboard.token || !data) return;
     // 04/10: the numbers first, above the instruments
-    const wrap = el('div', {class: slide}, propertyMetrics(data),
+    const wrap = el('div', {class: slide}, propertyMetrics(data, () => renderPropertyDashboard(property)),
       propertyCluster(property, data, metrics),
       satisfactionCard(property),
       // 04/10: «Quem já visitou» and, beside it, a little narrower, the selected; under them, side by side, the blacklist

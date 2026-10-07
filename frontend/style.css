@@ -381,7 +381,7 @@ button.stepper-arrow{min-height:0;height:22px;min-width:30px;padding:0 6px;borde
 @media(max-width:1150px){.property-slide,.dashboard-lists{grid-template-columns:1fr}}
 /* 05/10: Emails, the property's eight numbers under the property, two rows of four, the first one bigger */
 .metrics.queue-board{grid-template-columns:repeat(4,minmax(0,1fr));margin:0 0 22px}
-/* 06/10: ten numbers, two rows of five */
+/* 06/10: five numbers, the work to do now in one row (the period's are in Imóveis) */
 .metrics.queue-board{grid-template-columns:repeat(5,minmax(0,1fr))}
 /* 06/10: «Clientes que nunca responderam»: the share as a gauge under the number */
 .gauge-card .gauge{height:6px;margin:8px 0 4px;border-radius:999px;background:var(--line);overflow:hidden}
@@ -937,9 +937,14 @@ button.primary .step-num{background:var(--accent-text);color:var(--accent)}
 .notes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:10px}
 .notes-grid .alert{margin:0}
 .property-metrics{margin:18px 0}
-.metrics.property-metrics{grid-template-columns:repeat(5,minmax(0,1fr))}  /* 06/10: ten numbers, two rows of five */
-#metric-cards.metrics{grid-template-columns:repeat(5,minmax(0,1fr))}  /* 06/10: the Painel's ten numbers too */
-@media(max-width:1150px){.metrics.property-metrics,#metric-cards.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* 06/10: twelve numbers, the Painel's and each property's: seven above (the state now, the two totals first) and five
+   below (the period of analysis), on a grid of 35 — a card above spans 5, one below 7. The seven above a little
+   tighter: less room at the sides. */
+.metrics.property-metrics,#metric-cards.metrics{grid-template-columns:repeat(35,minmax(0,1fr))}
+.metrics.property-metrics>.metric,#metric-cards.metrics>.metric{grid-column:span 7}
+.metrics.property-metrics>.metric:nth-child(-n+7),#metric-cards.metrics>.metric:nth-child(-n+7){grid-column:span 5;padding-inline:16px}
+@media(max-width:1150px){.metrics.property-metrics,#metric-cards.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .metrics.property-metrics>.metric:nth-child(n),#metric-cards.metrics>.metric:nth-child(n){grid-column:auto}}
 /* The trip computer first, above the instruments, in one tight line: title, distance, consumption, save, reading (26/09) */
 .cluster .trip-computer{flex-wrap:wrap;align-items:center;gap:6px 14px;margin:4px 0 14px;padding:7px 14px}
 .cluster .trip-computer label{gap:5px}
@@ -1507,3 +1512,6 @@ main{padding-left:57px;padding-right:54px}
 @media(max-width:1150px){main{padding-left:33px;padding-right:36px}}
 @media(max-width:760px){main{padding-left:18px;padding-right:18px}}
 .history-none{margin:0 0 10px}  /* 06/10: a conversation with only our emails says so */
+/* 06/10: «Período de análise», a whole row of the grid between the two rows of cards (the Painel's and each property's) */
+.period-row{grid-column:1/-1;display:flex;justify-content:flex-end;align-items:center;gap:10px;margin:-4px 0}
+.period-row select{width:auto;padding:6px 10px;font-size:12px}
