@@ -1,0 +1,103 @@
+/* AgentVal (theme id "agentval", 30/09) — asked for by a client, in the spirit of her agency's site: a warm cream page, cards
+   a shade lighter, anthracite ink for the text and a serif for the titles (Cormorant Garamond when the computer has it,
+   else Garamond, Hoefler Text or Georgia — the page loads no fonts from outside), Lato-like capitals with wide spacing
+   for the labels, nearly square corners (2 px) and the three Portuguese accents of the site's palette: terracotta,
+   azulejo blue and olive. The sidebar is anthracite, like the site's dark sections; the mark is a V drawn in parallel
+   lines (our own drawing, in the manner of the logo). Its headings speak with a warmer, more human voice (SKINS words in
+   app.js); no instruments, selector or sounds of its own. Everything is under :root[data-theme="agentval"]. */
+
+:root[data-theme="agentval"]{color-scheme:light;--bg:#f8f2ee;--card:#fbf8f5;--text:#4d4d4d;--muted:#6f6a66;--line:#dad7d4;
+  --accent:#a8532f;--accent-text:#f8f2ee;--accent-soft:#f3e4dc;--ok:#5a6134;--ok-bg:#eceee0;--warn:#8a5a1a;--warn-bg:#f6ead8;
+  --bad:#a8322d;--bad-bg:#f7e2df;--shadow:none;--halo:#0000;--sidebar:#3a3a3a;--topbar:#f8f2eef2;
+  --surface-start:#fbf8f5;--surface-end:#fbf8f5;--input:#fdfbf9;--input1:#f4efeb;--quote:#f1ebe6;--control:#fbf8f5;
+  --control1:#ece7e3;--control-border:#c9c5c2;--control-border1:#dad7d4;--control-border2:#dad7d4;--hover:#ece7e3;
+  --hover-border:#4d4d4d;--placeholder:#9a948f;--nav-muted:#f8f2ee8c;--breadcrumb:#9a948f;--selected-start:#ece7e3;
+  --selected-end:#f4efeb;--selected-border:#c9c5c2;--highlight-start:#f3e4dc;--highlight-end:#fbf8f5;--highlight-border:#d9b9a8;
+  --brand-start:#3a3a3a;--brand-end:#3a3a3a;--brand-border:#0000;--avatar:#cb6443;--avatar-text:#f8f2ee;--tag-text:#5c5753;
+  --quote-text:#4d4d4d;--quote-border:#cb6443;--cover-start:#ece7e3;--cover-mid:#eee9e1;--cover-end:#cdcac7;--cover-text:#4d4d4d;
+  --chart-secondary:#9a948f;--metric-line:#cb6443;--empty-border:#c9c5c2;--success-border:#b9bf95;--success-border1:#b9bf95;
+  --error-border:#dfa9a3;--warning-border:#dcbf8d;--accent-hover:#383838;--glow-soft:#0000;--glow-soft1:#0000;
+  --accent-tint:#cb64431f;--glow:#cb644333;
+  --av-ink:#4d4d4d;--av-heading:#383838;--av-cream:#f8f2ee;--av-sand:#ece7e3;--av-line:#c9c5c2;--av-terracotta:#cb6443;
+  --av-terracotta-text:#a8532f;--av-azulejo:#0c54a0;--av-olive:#707746;
+  --av-serif:"Cormorant Garamond","Cormorant","EB Garamond",Garamond,"Hoefler Text",Baskerville,Georgia,serif;
+  --av-sans:"Lato","Helvetica Neue","Avenir Next",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  scrollbar-color:#c9c5c2 #f8f2ee}
+/* The chart's pair: terracotta and azulejo, apart for colour-blind eyes and clear on the cream card */
+:root[data-theme="agentval"]{--chart-requests:#b35a38;--chart-sent:#0c54a0}
+:root[data-theme="agentval"] ::selection{background:#ece7e3;color:#383838}
+:root[data-theme="agentval"] body{font-family:var(--av-sans);background:var(--av-cream);color:var(--av-ink)}
+:root[data-theme="agentval"] a{color:var(--av-azulejo)}
+
+/* Type: the serif for the titles, light and large; the labels are small capitals with wide spacing after a short line */
+:root[data-theme="agentval"] :is(h1,h2,h3){font-family:var(--av-serif);color:var(--av-heading);font-weight:400}
+:root[data-theme="agentval"] h1{font-size:clamp(32px,3.1vw,46px);font-weight:300;letter-spacing:-.015em;line-height:1.1}
+:root[data-theme="agentval"] h2{font-size:22px;letter-spacing:-.005em}
+:root[data-theme="agentval"] h3{font-size:19px}
+:root[data-theme="agentval"] .eyebrow{display:flex;align-items:center;gap:10px;width:fit-content;color:var(--av-terracotta-text);
+  font:400 10px/1.6 var(--av-sans);letter-spacing:.22em;text-transform:uppercase}
+:root[data-theme="agentval"] .eyebrow::before{content:"";width:22px;height:1px;background:var(--av-terracotta);flex:none}
+:root[data-theme="agentval"] .step,:root[data-theme="agentval"] .muted{color:var(--muted)}
+
+/* The sidebar: anthracite, cream capitals, a terracotta line on the chosen tab, the V of parallel lines on top */
+:root[data-theme="agentval"] .sidebar{background:#3a3a3a;border-right:0;color:var(--av-cream)}
+:root[data-theme="agentval"] .brand .brand-mark{width:44px;height:40px;padding:0;border:0;border-radius:0;box-shadow:none;font-size:0;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 46 40'%3E%3Cg fill='none' stroke='%23f8f2ee' stroke-linecap='square'%3E%3Cpath d='M4 4 L20 36 M9 4 L22.5 31 M14 4 L25 26' stroke-width='.9'/%3E%3Cpath d='M20 36 L36 4 M23.6 36 L39.6 4 M27.2 36 L43.2 4' stroke-width='2'/%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat}
+:root[data-theme="agentval"] .brand-mark img{display:none}
+/* The wordmark: AGENTVAL in thin, wide capitals; under it, a small line in spaced lower case */
+:root[data-theme="agentval"] .brand .brand-name{font-size:0;color:var(--av-cream)}
+:root[data-theme="agentval"] .brand .brand-name::before{content:"AGENTVAL";display:block;font:300 19px/1.1 var(--av-sans);letter-spacing:.26em}
+:root[data-theme="agentval"] .brand .brand-name::after{content:"real estate · assistant";display:block;margin-top:6px;
+  font:400 9.5px/1.4 var(--av-sans);letter-spacing:.3em;color:#f8f2eea6}
+:root[data-theme="agentval"] .brand .brand-name :is(span,sup){display:none}
+:root[data-theme="agentval"] :is(.brand-by,.app-build){color:#f8f2ee99}
+:root[data-theme="agentval"] .app-version{border-color:#f8f2ee40;background:#f8f2ee12;color:var(--av-cream)}
+:root[data-theme="agentval"] .nav-label{color:#f8f2ee80;font-family:var(--av-sans);letter-spacing:.24em}
+:root[data-theme="agentval"] .sidebar .tab{color:#f8f2eed0;border-radius:2px;border-left:2px solid #0000;
+  font:400 11px/1.5 var(--av-sans);letter-spacing:.16em;text-transform:uppercase}
+:root[data-theme="agentval"] .sidebar .tab:hover{background:#f8f2ee0f;color:var(--av-cream)}
+:root[data-theme="agentval"] .sidebar .tab.active{background:#f8f2ee14;border-color:#0000;border-left-color:var(--av-terracotta);
+  color:var(--av-cream);font-weight:700}
+:root[data-theme="agentval"] .sidebar .nav-count{background:var(--av-terracotta);color:var(--av-cream);border-radius:2px;font-weight:700}
+:root[data-theme="agentval"] .sidebar :focus-visible{outline-color:#e08a6a}
+:root[data-theme="agentval"] :is(.sidebar-note,.sidebar-note p){color:#f8f2eeb3}
+:root[data-theme="agentval"] .sidebar .status-dot{background:var(--av-olive);box-shadow:none}
+:root[data-theme="agentval"] .account-card{border-top-color:#f8f2ee26}
+:root[data-theme="agentval"] .account-card .muted{color:#f8f2ee99}
+:root[data-theme="agentval"] .account-card .avatar{border-radius:50%;font-weight:700}
+:root[data-theme="agentval"] .workshop-link{color:#f8f2ee99;border-color:#f8f2ee40;border-radius:2px}
+@media(max-width:760px){
+  :root[data-theme="agentval"] .sidebar .tab{font-size:10px;letter-spacing:.06em}
+}
+
+/* The header bar: cream, a hairline below, the page name in spaced capitals */
+:root[data-theme="agentval"] .topbar{background:#f8f2eef2;border-bottom-color:var(--av-line)}
+:root[data-theme="agentval"] .topbar strong{color:var(--av-heading);font:400 11px/1.5 var(--av-sans);letter-spacing:.22em;text-transform:uppercase}
+
+/* Cards: a shade lighter than the page, a thin warm rule, square corners, no shadow; the numbers in the serif */
+:root[data-theme="agentval"] :is(.card,.metric){background:var(--card);border-color:var(--line);border-radius:2px;box-shadow:none}
+:root[data-theme="agentval"] .metric:first-child{background:linear-gradient(120deg,var(--highlight-start),var(--highlight-end));
+  border-color:var(--highlight-border)}
+:root[data-theme="agentval"] .metric:first-child::after{box-shadow:none}
+:root[data-theme="agentval"] .metric .value{font-family:var(--av-serif);font-weight:400;color:var(--av-heading)}
+:root[data-theme="agentval"] .metric.ok .value{color:var(--ok)}
+:root[data-theme="agentval"] .metric.warn .value{color:var(--warn)}
+:root[data-theme="agentval"] .metric.bad .value{color:var(--bad)}
+:root[data-theme="agentval"] :is(.workflow,.retro-widget,.ficha-card){border-radius:2px;background:var(--card)}
+:root[data-theme="agentval"] .retro-clock #clock-time{text-shadow:none;font-family:var(--av-serif);font-weight:400}
+:root[data-theme="agentval"] .tag{border-radius:2px;letter-spacing:.08em}
+:root[data-theme="agentval"] blockquote{border-left-color:var(--av-terracotta);background:var(--quote)}
+
+/* Buttons: the main ones anthracite with cream capitals (the site's filled button); the others outlined in ink.
+   The pieces with a look of their own (pills, quick replies, copy icons, names, arrows) keep it. */
+:root[data-theme="agentval"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link,.deal-button){
+  border-radius:2px;font-family:var(--av-sans);letter-spacing:.14em;text-transform:uppercase;font-size:11.5px;font-weight:700}
+:root[data-theme="agentval"] :is(button.primary,.button.primary){background:var(--av-ink);border-color:var(--av-ink);color:var(--av-cream);
+  box-shadow:none}
+:root[data-theme="agentval"] :is(button.primary,.button.primary):hover:not(:disabled){background:var(--av-heading);border-color:var(--av-heading)}
+:root[data-theme="agentval"] :is(button,.button):not(.primary,.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link,.deal-button):hover:not(:disabled){
+  background:var(--av-sand);border-color:var(--av-ink)}
+:root[data-theme="agentval"] button.link{color:var(--av-azulejo)}
+:root[data-theme="agentval"] :is(input,select,textarea){border-radius:2px;background:var(--input);border-color:var(--line);color:var(--av-ink)}
+:root[data-theme="agentval"] :is(input,select,textarea):focus{border-color:var(--av-ink)}
+:root[data-theme="agentval"] :focus-visible{outline-color:var(--av-terracotta)}

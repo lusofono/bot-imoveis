@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "integration_status": "pending",
+  "scope": "owner_all_properties",
+  "style": {
+    "greeting": {
+      "selected": "normal",
+      "status": "configured",
+      "options": {
+        "normal": {
+          "description": "Saudação habitual: «Caro» ou «Cara» conforme o nome do cliente; se o nome não o indicar, «Caro(a)». Sem nome: «Bom dia,».",
+          "examples": {
+            "pt": "Caro {customer_name}, / Cara {customer_name},",
+            "en": "Dear {customer_name},",
+            "fr": "Cher {customer_name}, / Chère {customer_name},"
+          }
+        },
+        "formal": {
+          "description": "Saudação formal, sem presumir género ou título.",
+          "examples": {
+            "pt": "Exmo./Exma. — usar apenas quando o tratamento for conhecido; caso contrário, «Bom dia, {customer_name}.»",
+            "en": "Dear {customer_name},",
+            "fr": "Bonjour {customer_name},"
+          }
+        },
+        "cordial": {
+          "description": "Saudação cordial e simples.",
+          "examples": {
+            "pt": "Olá, {customer_name}.",
+            "en": "Hello {customer_name},",
+            "fr": "Bonjour {customer_name},"
+          }
+        }
+      },
+      "missing_name": "Omitir o nome sem inventar tratamento ou identidade."
+    },
+    "languages": {
+      "selected": "multilingual_en_backup",
+      "status": "configured",
+      "options": {
+        "multilingual": {
+          "description": "Responder no idioma da mensagem do cliente, quando identificável."
+        },
+        "pt_en_fr": {
+          "description": "Responder em português, inglês ou francês, conforme o idioma da mensagem.",
+          "allowed": [
+            "pt",
+            "en",
+            "fr"
+          ]
+        },
+        "multilingual_en_backup": {
+          "description": "Responde sempre na língua da mensagem do cliente, seja ela qual for. Se essa língua não for português, inglês nem espanhol, acrescenta no fim da mesma resposta — depois da saudação, do texto e do fecho, separada por uma linha em branco e o título \"English translation:\" — uma tradução completa em inglês de tudo o que escreveste na língua do cliente. Português, inglês e espanhol não levam tradução a seguir.",
+          "examples": {
+            "pt": "Responde em português, sem tradução a seguir.",
+            "de": "Responde em alemão e acrescenta a tradução completa em inglês, separada por uma linha em branco."
+          }
+        }
+      },
+      "portuguese_locale": "pt-PT",
+      "one_language_per_reply": true,
+      "on_unclear_or_unsupported_language": "Avisar o proprietário e pedir indicação do idioma, sem enviar automaticamente."
+    },
+    "closing": {
+      "selected": "formal",
+      "status": "configured",
+      "options": {
+        "formal": {
+          "pt": "Com os melhores cumprimentos,",
+          "en": "Kind regards,",
+          "fr": "Cordialement,"
+        },
+        "cordial": {
+          "pt": "Obrigado pelo seu contacto.",
+          "en": "Thank you for getting in touch.",
+          "fr": "Merci pour votre message."
+        }
+      }
+    },
+    "signature": {
+      "text": "Equipa APalace Imobiliária",
+      "status": "proposed_by_owner",
+      "translate": false,
+      "append_once": true
+    },
+    "sender_name": {
+      "text": "",
+      "status": "not_configured",
+      "description": "Nome ao lado do endereço no email enviado. Vazio: só o endereço."
+    },
+    "reply_subject": {
+      "text": "{imovel}",
+      "status": "configured",
+      "description": "Assunto das respostas a pedidos do portal: {imovel} é a descrição do imóvel e {referencia} a referência. Nas respostas diretas do cliente mantém-se «Re: » e o assunto dele."
+    },
+    "visits": {
+      "slot_minutes": 30,
+      "rental": "15 a 20 minutos",
+      "sale": "30 a 40 minutos",
+      "status": "configured"
+    },
+    "reminders": {
+      "day2": {
+        "text": "",
+        "status": "not_configured",
+        "description": "Frase para o lembrete aos 2 dias sem resposta, por cima do último texto enviado."
+      },
+      "day4": {
+        "text": "",
+        "status": "not_configured",
+        "description": "Frase para o lembrete aos 4 dias sem resposta (o segundo e último)."
+      }
+    },
+    "visits_closed": {
+      "text": "",
+      "status": "not_configured",
+      "description": "Texto do email de visitas fechadas, para todos os clientes do imóvel."
+    },
+    "consent_request": {
+      "text": "",
+      "status": "not_configured",
+      "description": "Texto do pedido de consentimento RGPD, para quem já respondeu."
+    },
+    "digest_recipient": {
+      "text": "",
+      "status": "not_configured",
+      "description": "Endereço que recebe o ponto de situação diário (rascunho, precisa de confirmação para sair)."
+    }
+  },
+  "application_instructions": "Aplicar as opções de estilo selecionadas a todas as interações. A saudação e o fecho da configuração de estilo substituem os do texto base. Traduzir o conteúdo para o idioma escolhido, mantendo a assinatura exatamente como configurada. Não produzir várias versões linguísticas na mesma resposta, salvo pedido do proprietário.",
+  "frontend_section": "Voz e estilo",
+  "frontend_scope": "Uma configuração comum a todos os imóveis desta pessoa ou equipa."
+}

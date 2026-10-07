@@ -1,0 +1,425 @@
+/* 00's UK Cabrio (theme id "cabrio", 04/10) — a British convertible hatch of the 2000s: British racing green with white
+   bonnet stripes, tan leather with cream stitching, chrome rings, the canvas hood folded at the top, the bank of toggle
+   switches on the console (the tab selector, drawn by app.js) and the giant round speedometer in the middle of the dash.
+   Inspired by the cars of the time, with no brand, badge or name: like the other skins, a generic label. A switch on the
+   toggle bank turns the ambient light from day (orange) to night (a dark cabin, blue light). Everything is under
+   :root[data-theme="cabrio"]; the drawings (the Union flag, the car, the hills, the steering wheel) are SVG inside the CSS, and the
+   fonts are the ones macOS already has (Gill Sans, Avenir Next), with fallbacks elsewhere. */
+
+/* Colours and materials */
+:root[data-theme="cabrio"]{color-scheme:light;--bg:#f3eee3;--card:#fffdf8;--text:#1d2a22;--muted:#5f6b62;--line:#e2dacb;
+  --accent:#14532d;--accent-text:#fff;--accent-soft:#dcebe1;--ok:#1d6b43;--ok-bg:#e1f1e6;--warn:#8a5200;--warn-bg:#fff1d6;
+  --bad:#b5122e;--bad-bg:#fde6e8;--shadow:0 12px 28px #1d2a2220;--halo:#e7dcc4;--sidebar:#2a1f17;--topbar:#1e2a23;
+  --surface-start:#fffdf8;--surface-end:#f7f2e7;--input:#fffdf9;--input1:#faf6ec;--quote:#f6f0e3;--control:#fffaf0;
+  --control1:#f3ecdc;--control-border:#cdbf9f;--control-border1:#d6c9ab;--control-border2:#d6c9ab;--hover:#e9f2ec;
+  --hover-border:#14532d;--placeholder:#8a8576;--nav-muted:#fbeedd;--breadcrumb:#b8ad94;--selected-start:#14532d;
+  --selected-end:#0a2e19;--selected-border:#062012;--highlight-start:#f1f7f2;--highlight-end:#dfeee3;--highlight-border:#9cc2a8;
+  --brand-start:#fff;--brand-end:#e8dcc4;--brand-border:#0000;--avatar:#fffaf0;--avatar-text:#14532d;--tag-text:#3d4a41;
+  --quote-text:#2a352e;--quote-border:#a8703f;--cover-start:#14532d;--cover-mid:#f3eee3;--cover-end:#a8703f;--cover-text:#fff;
+  --chart-secondary:#a8703f;--metric-line:#a8703f;--empty-border:#c99665;--success-border:#9cc9ad;--success-border1:#9cc9ad;
+  --error-border:#e3a3ad;--warning-border:#e2c07a;--accent-hover:#0a2e19;--glow-soft:#14532d10;--glow-soft1:#14532d18;
+  --accent-tint:#14532d14;--glow:#14532d40;
+  --brg:#14532d;--brg-deep:#0a2e19;--brg-light:#2f7a50;--tan:#a8703f;--tan-deep:#7a4a24;--tan-light:#c99665;--cream:#fbf4e6;
+  --union-red:#c8102e;--ambient:#ff9a3c;
+  --paper:linear-gradient(180deg,#fffdf8,#f7f2e7);
+  --face-cream:linear-gradient(180deg,#fffdf8,#f1e9d6);
+  --lacquer-brg:linear-gradient(180deg,#3d8c60,#1c6a3e 38%,#14532d 62%,#0a2e19);
+  --lacquer-red:linear-gradient(180deg,#ff5a6e,#d8233d 40%,#b5122e 70%,#8a0c22);
+  --chrome:linear-gradient(180deg,#fff,#e3e8eb 20%,#9aa3aa 48%,#f4f6f7 60%,#c3cacf 80%,#8d969d);
+  --leather:radial-gradient(circle at 20% 30%,#ffffff12 0 1px,#0000 1.6px) 0 0/7px 7px,
+    radial-gradient(circle at 70% 60%,#00000014 0 1px,#0000 1.6px) 0 0/9px 9px,
+    linear-gradient(100deg,#ffffff12,#0000 40%,#00000024 70%,#ffffff08),linear-gradient(180deg,#36281d,#281d15 45%,#1b130d);
+  --display:"Gill Sans","Gill Sans MT","Optima","Avenir Next",ui-sans-serif,sans-serif;
+  --ui:"Avenir Next","Helvetica Neue",system-ui,sans-serif;
+  scrollbar-color:#a8703f #ece4d3}
+:root[data-theme="cabrio"] ::selection{background:#cfe3d6;color:#0a2e19}
+:root[data-theme="cabrio"] body{background:radial-gradient(ellipse at 92% -6%,#ffffffd0,#0000 46%) fixed,
+  linear-gradient(180deg,#f6f2e8,#efe8d9) fixed,var(--bg)}
+:root[data-theme="cabrio"] :focus-visible{outline-color:var(--brg)}
+
+/* Type: Gill Sans, very British, for the titles; the small labels are green pennants with white letters */
+:root[data-theme="cabrio"] h1{font-family:var(--display);font-weight:600;letter-spacing:-.4px;color:var(--brg-deep)}
+:root[data-theme="cabrio"] h1::after{content:"";display:block;width:96px;height:9px;margin-top:10px;border-radius:2px;
+  background:linear-gradient(180deg,var(--brg) 0 2px,#fff 2px 4px,var(--brg) 4px 5px,#fff 5px 7px,var(--brg) 7px 9px);box-shadow:0 0 0 1px #0a2e1933}
+:root[data-theme="cabrio"] h2{font-family:var(--display);font-weight:600;color:var(--text)}
+:root[data-theme="cabrio"] .eyebrow{display:block;width:fit-content;max-width:100%;height:fit-content;justify-self:start;align-self:start;margin-bottom:12px;
+  padding:3px 24px 3px 12px;border:0;border-radius:3px 0 0 3px;color:#fff;background:var(--lacquer-brg);font:700 10px/1.6 var(--display);
+  letter-spacing:2.2px;white-space:nowrap;text-shadow:0 1px 1px #0007;clip-path:polygon(0 0,100% 0,calc(100% - 9px) 50%,100% 100%,0 100%)}
+:root[data-theme="cabrio"] .ignore-list.black .eyebrow{color:#fff;background:#1d1d1d;text-shadow:none}
+:root[data-theme="cabrio"] .ignore-list.grey .eyebrow{color:#fff;background:#6b7570;text-shadow:none}
+
+/* 05/10: the Union flag, once (the decal at the sidebar's foot) */
+:root[data-theme="cabrio"]{--union-flag:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 30'%3E %3CclipPath id='t'%3E%3Cpath d='M30,15 h30 v15 z v15 h-30 z h-30 v-15 z v-15 h30 z'/%3E%3C/clipPath%3E %3Cpath d='M0,0 v30 h60 v-30 z' fill='%23012169'/%3E %3Cpath d='M0,0 L60,30 M60,0 L0,30' stroke='%23fff' stroke-width='6'/%3E %3Cpath d='M0,0 L60,30 M60,0 L0,30' clip-path='url(%23t)' stroke='%23C8102E' stroke-width='4'/%3E %3Cpath d='M30,0 v30 M0,15 h60' stroke='%23fff' stroke-width='10'/%3E %3Cpath d='M30,0 v30 M0,15 h60' stroke='%23C8102E' stroke-width='6'/%3E%3C/svg%3E")}
+/* The sidebar is the seat: black leather with a touch of brown, two lines of tan stitching down its edge, the Union
+   flag decal at its foot */
+:root[data-theme="cabrio"] .sidebar{background:var(--leather);border-right:0;box-shadow:inset -10px 0 18px #0000002e,inset 1px 0 0 #ffffff22}
+:root[data-theme="cabrio"] .sidebar::before{content:"";position:absolute;top:0;bottom:0;right:9px;width:7px;pointer-events:none;
+  background:repeating-linear-gradient(180deg,#b88a58 0 6px,#0000 6px 11px) 0 0/1.5px 100% no-repeat,
+    repeating-linear-gradient(180deg,#b88a58 0 6px,#0000 6px 11px) 5.5px 3px/1.5px 100% no-repeat}
+:root[data-theme="cabrio"] .sidebar::after{content:"";position:absolute;left:calc(50% - 28px);bottom:14px;width:56px;height:28px;pointer-events:none;border-radius:3px;
+  background:var(--union-flag) center/cover no-repeat;box-shadow:0 0 0 2px #fff,0 0 0 3.5px #8d969d,0 3px 8px #0006}
+:root[data-theme="cabrio"] .sidebar{padding-bottom:56px;overflow-y:auto;scrollbar-width:thin}
+:root[data-theme="cabrio"] .brand-mark{border:0;box-shadow:0 0 0 2px #fbf4e6,0 0 0 3.5px #8d969d,0 4px 10px #0005}
+:root[data-theme="cabrio"] .brand .brand-name{font-family:var(--display);font-weight:600;color:#fffaf0;text-shadow:0 1px 2px #0008}
+:root[data-theme="cabrio"] .brand .brand-name span{color:#f3e3c4;text-shadow:0 1px 2px #0008}
+:root[data-theme="cabrio"] :is(.brand-by,.app-build){color:#f7ead2;text-shadow:0 1px 1px #0007}
+:root[data-theme="cabrio"] .app-version{padding:2px 12px;border:0;border-radius:999px;color:var(--brg-deep);font:700 10px/1.7 var(--display);
+  letter-spacing:1px;background:#fbf4e6;box-shadow:0 0 0 2px #e3e8eb,0 0 0 3px #8d969d,0 2px 4px #0004}
+:root[data-theme="cabrio"] .nav-label{color:#f7ead2;font:700 9px/1.6 var(--display);letter-spacing:2.6px;text-shadow:0 1px 1px #0007}
+:root[data-theme="cabrio"] :is(.sidebar-note,.sidebar-note p){color:#f7ead2;text-shadow:0 1px 1px #0007}
+:root[data-theme="cabrio"] .status-dot{background:var(--ambient);box-shadow:0 0 0 1.5px #fff,0 0 9px var(--ambient)}
+:root[data-theme="cabrio"] .account-card{border-top-color:#ffffff40}
+:root[data-theme="cabrio"] .account-card .muted,:root[data-theme="cabrio"] #account{color:#f7ead2}
+:root[data-theme="cabrio"] .avatar{border-radius:50%;background:#fbf4e6;color:var(--brg-deep);box-shadow:0 0 0 2px #e3e8eb,0 0 0 3px #8d969d}
+
+/* Tabs: cream words on the leather; the open one is the racing green bonnet, its two white stripes and a chrome rim */
+:root[data-theme="cabrio"] .tab{border-radius:10px;color:#fffaf0;font:600 14px/1.3 var(--display);letter-spacing:.3px;text-shadow:0 1px 2px #0009}
+:root[data-theme="cabrio"] .tab:hover{background:#ffffff26;border-color:#ffffff40;color:#fff}
+:root[data-theme="cabrio"] .tab.active{color:#fff;border-color:var(--brg-deep);
+  background:linear-gradient(90deg,#0000 0 9px,#fff 9px 12px,#0000 12px 15px,#fff 15px 18px,#0000 18px),var(--lacquer-brg);
+  padding-left:26px;box-shadow:0 0 0 2px #fbf4e6,0 0 0 3.5px #8d969d,0 4px 10px #0a2e1966,0 0 14px -2px var(--ambient)}
+/* 06/10: the counts in polished silver with black figures (they were green with white ones) */
+:root[data-theme="cabrio"] .nav-count{border:0;color:#111;font:700 11px/1.5 var(--display);text-shadow:0 1px 0 #ffffffa6;
+  background:linear-gradient(135deg,#f6f8f9 0%,#cfd4d9 38%,#aab1b8 52%,#e6e9ec 70%,#bcc3c9 100%);
+  box-shadow:0 0 0 1.5px #e3e8eb,0 0 0 2.5px #8d969d}
+:root[data-theme="cabrio"] nav .tab:is([data-tab="voice"],[data-tab="agenda"])::after{height:3px;border-radius:2px;
+  background:linear-gradient(90deg,#0000,#8d969d 18%,#fff 50%,#8d969d 82%,#0000);box-shadow:0 1px 1px #0004}
+
+/* The console (04/10): one piano black panel in a chrome rim — the warning lights as keys with an LED on top, and the
+   toggle bank under them (drawn by app.js): short tilted chrome levers in dark sockets with chrome collars, between
+   glossy black half loops; the open tab's lever up, its number lit */
+:root[data-theme="cabrio"] .skin-selector{display:block;margin:16px 0 0}
+:root[data-theme="cabrio"] .cabrio-panel{max-width:190px;margin:14px auto 0;padding:8px 4px 2px;border-radius:14px;
+  background:radial-gradient(ellipse at 50% 0%,#ffffff14,#0000 60%),linear-gradient(180deg,#2a2f2c,#121513 50%,#050605);
+  box-shadow:0 0 0 1.5px #8d969d,0 0 0 3px #e3e8eb55,0 4px 8px #0006}
+:root[data-theme="cabrio"] .toggle-bank{display:block;width:100%;height:auto;margin:0 auto;overflow:visible}
+:root[data-theme="cabrio"] .cabrio-panel .bank-panel{display:none}
+:root[data-theme="cabrio"] .bank-toggle{cursor:pointer}
+:root[data-theme="cabrio"] .bank-hit{fill:transparent}
+:root[data-theme="cabrio"] .bank-socket{fill:url(#bank-socket);stroke:#3a3f3c;stroke-width:.8}
+:root[data-theme="cabrio"] .bank-ring{fill:url(#bank-chrome);stroke:#5f676d;stroke-width:.6}
+/* 06/10: the levers seen from the front, upright, one each, moved by app.js (toggleBank): a chrome shaft, its round end,
+   the hole in the chrome collar it comes out of, and its shadow on the panel */
+:root[data-theme="cabrio"] .bank-shaft{fill:url(#bank-barrel);stroke:#4f565c;stroke-width:.5}
+:root[data-theme="cabrio"] .bank-tip{fill:url(#bank-tip);stroke:#5f676d;stroke-width:.5}
+:root[data-theme="cabrio"] .bank-tip-shine{fill:#fff;opacity:.85}
+:root[data-theme="cabrio"] .bank-shine{stroke:#fff;stroke-width:1.2;stroke-linecap:round;opacity:.7}
+:root[data-theme="cabrio"] .bank-hole{fill:#050505;stroke:#2e2e2e;stroke-width:.6}
+:root[data-theme="cabrio"] .bank-shadow{fill:#000}
+:root[data-theme="cabrio"] .bank-loop{fill:none;stroke:#050505;stroke-width:6.5;stroke-linecap:round}
+:root[data-theme="cabrio"] .bank-loop-shine{fill:none;stroke:#ffffff6b;stroke-width:1.2;stroke-linecap:round}
+:root[data-theme="cabrio"] .bank-label{fill:#c9cfcb;font:700 8.5px/1 var(--display);letter-spacing:.5px;text-anchor:middle}
+:root[data-theme="cabrio"] .bank-toggle.on .bank-label{fill:var(--ambient);filter:drop-shadow(0 0 3px var(--ambient))}
+:root[data-theme="cabrio"] .bank-toggle:hover .bank-label{fill:#fff}
+:root[data-theme="cabrio"] .bank-toggle.light .bank-label{font-size:7px}
+
+/* The gear stick (drawn by app.js), seen from above: a round base with a chrome ring and stitched black leather in the
+   middle, the gear numbers in the leather, and the knob in its boot with the engaged gear on top */
+:root[data-theme="cabrio"] .cabrio-gears{display:block;width:100%;max-width:150px;height:auto;margin:0 auto;overflow:visible;filter:drop-shadow(0 3px 5px #0005)}
+:root[data-theme="cabrio"] .mg-ring{fill:url(#mg-chrome);stroke:#6d767d;stroke-width:.8}
+:root[data-theme="cabrio"] .mg-leather{fill:url(#mg-leather);stroke:#000;stroke-width:1}
+:root[data-theme="cabrio"] .mg-stitch{fill:none;stroke:#d9c4a0;stroke-width:1;stroke-dasharray:3 2.6;opacity:.8}
+:root[data-theme="cabrio"] .mg-seam{fill:none;stroke:#d9c4a0;stroke-width:.9;stroke-dasharray:2.4 2.4;opacity:.35}
+:root[data-theme="cabrio"] .mg-fold{fill:none;stroke:#000;stroke-width:1.2;opacity:.6}
+:root[data-theme="cabrio"] .mg-spot{fill:#e9dcc4;font:700 11px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;text-anchor:middle;cursor:pointer;opacity:.85}
+:root[data-theme="cabrio"] .mg-spot:hover{fill:#fff;opacity:1}
+:root[data-theme="cabrio"] .mg-knob-number{fill:#fff;font:700 13px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;text-anchor:middle;pointer-events:none}
+:root[data-theme="cabrio"] .mg-hit{cursor:pointer}
+
+/* Top bar: the canvas hood, folded — dark green canvas with a cream stitched seam along its edge */
+:root[data-theme="cabrio"] .topbar{position:relative;border-bottom:0;color:#e9e3d2;
+  background:repeating-linear-gradient(45deg,#ffffff08 0 1px,#0000 1px 4px),repeating-linear-gradient(-45deg,#00000026 0 1px,#0000 1px 4px),
+    linear-gradient(180deg,#26342b,#1a241e 70%,#141c17)}
+:root[data-theme="cabrio"] .topbar::after{content:"";position:absolute;left:0;right:0;bottom:3px;height:1.5px;pointer-events:none;
+  background:repeating-linear-gradient(90deg,#e9dcc0 0 7px,#0000 7px 12px)}
+:root[data-theme="cabrio"] .topbar strong{color:#fffaf0;font-family:var(--display);font-weight:600}
+:root[data-theme="cabrio"] .breadcrumb{color:#9aa79e}
+:root[data-theme="cabrio"] :is(.local-label,.theme-control){color:#e9e3d2}
+:root[data-theme="cabrio"] #busy{display:inline-flex;align-items:center;gap:8px;color:var(--ambient);font:700 10px/1 var(--display);letter-spacing:1.4px;text-transform:uppercase}
+:root[data-theme="cabrio"] #busy::before{content:"";width:18px;height:18px;border-radius:50%;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ff9a3c' stroke-width='2.2' stroke-linecap='round'%3E %3Ccircle cx='12' cy='12' r='9.5'/%3E%3Ccircle cx='12' cy='12' r='2.6' fill='%23ff9a3c'/%3E%3Cpath d='M12 14.6V21.4M9.6 11L2.8 9.6M14.4 11L21.2 9.6'/%3E%3C/svg%3E") center/contain no-repeat;
+  animation:cabrio-steer 1.2s ease-in-out infinite alternate}
+@keyframes cabrio-steer{from{transform:rotate(-70deg)}to{transform:rotate(70deg)}}
+
+/* Surfaces: white panels with a fine edge and a chrome trim across their top */
+:root[data-theme="cabrio"] .card{border:1px solid #d9d1bf;border-radius:16px;
+  background:var(--chrome) top/100% 7px no-repeat,var(--paper);
+  box-shadow:0 0 0 1px #ffffffb3 inset,0 10px 24px #1d2a221c}
+:root[data-theme="cabrio"] .metric{border:1px solid #d9d1bf;border-radius:16px;background:var(--paper);box-shadow:0 8px 20px #1d2a2217}
+:root[data-theme="cabrio"] .metric:first-child{border-color:#9cc2a8;background:linear-gradient(180deg,#f6fbf7,#e3efe6)}
+:root[data-theme="cabrio"] .metric:after,:root[data-theme="cabrio"] .metric:first-child:after{top:0;right:22px;width:44px;height:7px;border-radius:0 0 4px 4px;box-shadow:0 1px 2px #0003;
+  background:var(--chrome)}
+/* Each count in a dial's window: white figures on black, in a chrome ring */
+:root[data-theme="cabrio"] .metric .value{display:inline-block;min-width:3ch;padding:0 12px;border-radius:10px;color:#fff;
+  background:radial-gradient(ellipse at 50% 0%,#ffffff26,#0000 60%),linear-gradient(180deg,#232826,#0b0d0c);
+  font:600 32px/1.12 var(--display);box-shadow:0 0 0 3px #e3e8eb,0 0 0 4.5px #8d969d,inset 0 2px 5px #000}
+:root[data-theme="cabrio"] .metric.ok .value{color:#9ff0c0}
+:root[data-theme="cabrio"] .metric.warn .value{color:#ffc978}
+:root[data-theme="cabrio"] .metric.bad .value{color:#ff9aa8}
+:root[data-theme="cabrio"] .metric .label{margin-top:13px;color:var(--muted);font:600 11.5px/1.4 var(--display);letter-spacing:.4px}
+/* 06/10: the words clear of the window's chrome ring (it stands 4.5px out of the box); the gauge too, the words then under it */
+:root[data-theme="cabrio"] .metric.gauge-card .gauge{margin:15px 0 0}
+:root[data-theme="cabrio"] .metric.gauge-card .label{margin-top:9px}
+
+/* Switchgear: cream switches in a chrome ring; primary is the racing green; sending is red, with the engine light's
+   engine (06/10: it had a power icon, which reads as switching off or logging out) */
+:root[data-theme="cabrio"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link,.deal-button){border:1px solid #b9c1c6;border-radius:9px;color:var(--text);
+  font:600 13px/1.2 var(--display);letter-spacing:.2px;background:var(--face-cream);box-shadow:0 0 0 2px #fff,0 0 0 3px #b9c1c6,0 3px 6px #1d2a2224}
+:root[data-theme="cabrio"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link,.deal-button):hover{background:linear-gradient(180deg,#f3faf5,#d9ece0);border-color:var(--brg)}
+:root[data-theme="cabrio"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link,.deal-button):active{transform:translateY(1px);box-shadow:0 0 0 2px #fff,0 0 0 3px #b9c1c6}
+:root[data-theme="cabrio"] :is(button,.button).primary{color:#fff;border-color:var(--brg-deep);background:var(--lacquer-brg);text-shadow:0 1px 1px #0007}
+:root[data-theme="cabrio"] :is(button,.button).primary:hover{border-color:var(--brg-deep);background:linear-gradient(180deg,#4aa070,#21784a 40%,#0f4024)}
+:root[data-theme="cabrio"] :is(button,.button).send-action{color:#fff;border-color:#7a0a1d;background:var(--lacquer-red);text-shadow:0 1px 1px #0007}
+:root[data-theme="cabrio"] :is(button,.button).send-action::before{content:"";flex:none;width:17px;height:17px;background:currentColor;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 3.5h6M12 3.5v3'/%3E%3Cpath d='M7 6.5h8l2 2.5h1.5V7.5H21v10h-2.5V16H17l-2.5 3H9l-2-2H5.5v-3H3v-4h2.5V8Z'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 3.5h6M12 3.5v3'/%3E%3Cpath d='M7 6.5h8l2 2.5h1.5V7.5H21v10h-2.5V16H17l-2.5 3H9l-2-2H5.5v-3H3v-4h2.5V8Z'/%3E%3C/svg%3E") center/contain no-repeat}
+:root[data-theme="cabrio"] :is(button,.button).send-action:has(.button-icon)::before{display:none}
+:root[data-theme="cabrio"] :is(button,.button):disabled{filter:grayscale(.8);opacity:.55;transform:none}
+:root[data-theme="cabrio"] button.link{color:var(--brg);font:600 13px/1.3 var(--display)}
+:root[data-theme="cabrio"] button.link:hover{color:var(--brg-deep);text-decoration:underline;text-underline-offset:4px}
+:root[data-theme="cabrio"] .link.danger{color:var(--bad)}
+:root[data-theme="cabrio"] .segmented{border-radius:10px;background:#ece4d3;box-shadow:inset 0 1px 3px #1d2a2226}
+:root[data-theme="cabrio"] .segmented button{border-radius:8px;color:var(--muted);font:600 12px/1.2 var(--display)}
+:root[data-theme="cabrio"] .segmented button.active{color:#fff;background:var(--lacquer-brg)}
+:root[data-theme="cabrio"] :is(button,.button).shortlist-toggle.on{color:#fff;border-color:var(--brg-deep);background:var(--lacquer-brg)}
+
+/* Controls: checkboxes are small toggle switches (06/10: black and «OFF» when off, green and «ON» when on, day and night);
+   cream fields with a fine edge */
+:root[data-theme="cabrio"] input[type=checkbox]{-webkit-appearance:none;appearance:none;position:relative;width:44px;height:20px;padding:0;border:1px solid #000;
+  border-radius:999px;background:linear-gradient(180deg,#0b0d0c,#252a27);box-shadow:inset 0 1px 3px #000c;cursor:pointer;transition:background .2s}
+:root[data-theme="cabrio"] input[type=checkbox]::before{content:"";position:absolute;top:1px;left:1px;width:16px;height:16px;border-radius:50%;background:var(--chrome);
+  box-shadow:0 1px 2px #0007;transition:transform .2s;z-index:1}
+:root[data-theme="cabrio"] input[type=checkbox]::after{content:"OFF";position:absolute;inset:0 6px 0 auto;display:flex;align-items:center;
+  font:700 7.5px/1 var(--display);letter-spacing:.4px;color:#c9d0cc;pointer-events:none}
+:root[data-theme="cabrio"] input[type=checkbox]:checked{background:linear-gradient(180deg,#62d48f,#2ba65f 45%,#178241);border-color:#0e5a2b}
+:root[data-theme="cabrio"] input[type=checkbox]:checked::before{transform:translateX(24px)}
+:root[data-theme="cabrio"] input[type=checkbox]:checked::after{content:"ON";inset:0 auto 0 7px;color:#fff;text-shadow:0 1px 1px #0007}
+:root[data-theme="cabrio"] input[type=checkbox]:disabled{opacity:.4;cursor:not-allowed}
+:root[data-theme="cabrio"] input[type=radio]{width:17px;height:17px;margin:0;padding:0;flex:none;accent-color:var(--brg);vertical-align:middle}
+:root[data-theme="cabrio"] :is(input:not([type=checkbox],[type=radio]),textarea,select){border:1.5px solid #ddd3bd;border-radius:10px;background-color:var(--input);color:var(--text)}
+:root[data-theme="cabrio"] :is(input,textarea,select):focus{border-color:var(--brg);outline:3px solid #14532d33;outline-offset:1px}
+:root[data-theme="cabrio"] .tag{border-radius:999px;border-color:#ddd3bd;background:#faf5ea;color:var(--tag-text);font:600 10px/1.4 var(--display);letter-spacing:.3px}
+:root[data-theme="cabrio"] .tag.draft{color:var(--ok);border-color:var(--success-border);background:var(--ok-bg)}
+:root[data-theme="cabrio"] .tag.warn{color:var(--warn)}
+:root[data-theme="cabrio"] .alert{border-radius:12px;border-left:4px solid currentColor}
+:root[data-theme="cabrio"] pre{border-radius:12px;background:var(--input);border-color:#e2dacb}
+:root[data-theme="cabrio"] .table-wrap{border:1px solid #d9d1bf;border-radius:16px;background:var(--input)}
+:root[data-theme="cabrio"] .contacts-table th{color:var(--brg);font:700 11px/1.4 var(--display);letter-spacing:1.4px;text-transform:uppercase}
+:root[data-theme="cabrio"] .contacts-table :is(input,select){border-color:#0000;background-color:#0000;color:var(--text);font-size:13px}
+:root[data-theme="cabrio"] .contacts-table :is(input,select):is(:hover,:focus){border-color:#ddd3bd;background-color:var(--input)}
+
+/* Painel: the dash clock — a chrome ring, a white face, black numbers and an orange seconds hand */
+:root[data-theme="cabrio"] .retro-widget{border:1px solid #d9d1bf;border-radius:16px;background:var(--paper)}
+:root[data-theme="cabrio"] .clock-analog{display:block;width:92px;height:92px;padding:4px;border-radius:50%;background:var(--chrome);box-shadow:0 4px 10px #0004}
+:root[data-theme="cabrio"] .clock-analog svg{display:block;width:100%;height:100%}
+:root[data-theme="cabrio"] .retro-clock #clock-time{display:none}
+:root[data-theme="cabrio"] .clock-bezel{fill:#c3cacf;stroke:#8d969d;stroke-width:1.2}
+:root[data-theme="cabrio"] .clock-face{fill:#f7f7f4;stroke:#c9ccd0;stroke-width:.8}
+:root[data-theme="cabrio"] .clock-tick{stroke:#1a1a1a}
+:root[data-theme="cabrio"] .clock-numeral{fill:#1a1a1a;font:italic 700 12px/1 var(--display)}
+:root[data-theme="cabrio"] .clock-hand line{stroke:#1a1a1a}
+:root[data-theme="cabrio"] .clock-hand .second{stroke:var(--ambient)}
+:root[data-theme="cabrio"] .clock-cap{fill:var(--ambient);stroke:#fff;stroke-width:.8}
+:root[data-theme="cabrio"] :is(.retro-date,.retro-cal-month){color:var(--brg);font:700 11px/1.4 var(--display);letter-spacing:1.6px;text-transform:uppercase}
+:root[data-theme="cabrio"] .cal-cell.today{background:var(--brg);color:#fff}
+:root[data-theme="cabrio"] .cal-cell.has-visit:after{background:var(--tan);box-shadow:none}
+
+/* Comunicações: the steps in chrome roundels */
+:root[data-theme="cabrio"] .workflow{counter-reset:passo;border:1px solid #d9d1bf;border-radius:14px;overflow:hidden;background:var(--paper)}
+:root[data-theme="cabrio"] .workflow li{counter-increment:passo}
+:root[data-theme="cabrio"] .workflow li+li{border-left-color:#e2dacb}
+:root[data-theme="cabrio"] .workflow a{align-items:center;color:var(--text);font:600 13px/1.4 var(--display)}
+:root[data-theme="cabrio"] .workflow .num{font-size:0}
+:root[data-theme="cabrio"] .workflow .num::before{content:counter(passo);display:inline-grid;place-items:center;min-width:28px;height:28px;border-radius:50%;
+  color:#fff;background:var(--lacquer-brg);font:700 13px/1 var(--display);text-shadow:0 1px 1px #0007;box-shadow:0 0 0 2px #e3e8eb,0 0 0 3px #8d969d}
+:root[data-theme="cabrio"] .workflow li.done{background:linear-gradient(180deg,#eef6f0,#dcebe1)}
+
+/* Imóveis: the slider on white, chrome arrows */
+:root[data-theme="cabrio"] .property-slider{border:1px solid #d9d1bf;border-radius:16px;background:var(--paper)}
+:root[data-theme="cabrio"] .slider-arrow{border:0;border-radius:50%;color:var(--brg-deep);background:var(--face-cream);box-shadow:0 0 0 2px #e3e8eb,0 0 0 3px #8d969d}
+/* 06/10: at night the arrow light on the dark face (it was dark green on it, unreadable) */
+:root[data-theme="cabrio"][data-ambient="night"] .slider-arrow{color:#eef3ef;font-weight:700}
+:root[data-theme="cabrio"] .slider-dot.active:before{background:var(--brg);box-shadow:0 0 0 2px #fff,0 0 0 3px #b9c1c6}
+
+/* Each property's dash: piano black with a chrome rim; the dials are white faces with black figures in chrome rings and
+   black pods, the giant speedometer in the middle, ringed by the ambient light */
+:root[data-theme="cabrio"] .cluster-gauges{flex-wrap:wrap;align-items:center;gap:clamp(8px,1.6vw,24px);margin:10px 0 22px;padding:24px 22px 16px;border-radius:44px;
+  background:radial-gradient(ellipse at 50% 0%,#ffffff1f,#0000 55%),linear-gradient(180deg,#232826,#0e1110 60%,#070908);
+  box-shadow:0 0 0 3px #e3e8eb,0 0 0 5px #8d969d,inset 0 -8px 16px #0008,0 12px 26px #0a2e1940}
+:root[data-theme="cabrio"] .cluster-gauges .gauge figcaption{color:#e9edf0;font:700 10px/1.5 var(--display);letter-spacing:1.2px;text-transform:uppercase}
+:root[data-theme="cabrio"] .cluster-gauges .gauge-setting{color:#e9edf0;font-family:var(--display)}
+:root[data-theme="cabrio"] .cluster-gauges .gauge-setting button.link{color:var(--ambient)}
+:root[data-theme="cabrio"] .cluster-gauges .gauge-setting input{background:#0b0d0c;border-color:#3a3f3c;color:#fff}
+:root[data-theme="cabrio"] .gauge svg{overflow:visible;filter:drop-shadow(0 6px 10px #000b)}
+:root[data-theme="cabrio"] .gauge-big svg{width:clamp(166px,15vw,230px)}
+:root[data-theme="cabrio"] .gauge-small svg{width:clamp(104px,9vw,140px)}
+:root[data-theme="cabrio"] .gauge-mini svg{width:clamp(80px,6.5vw,104px)}
+:root[data-theme="cabrio"] .gauge-speedo svg{width:clamp(200px,18vw,280px);border-radius:50%;filter:drop-shadow(0 0 3px var(--ambient)) drop-shadow(0 0 16px var(--ambient)) drop-shadow(0 6px 10px #000a)}
+:root[data-theme="cabrio"] .gauge-bezel{display:inline;stroke:#141414;stroke-width:10;paint-order:stroke}
+:root[data-theme="cabrio"] .gauge-face{fill:#f7f7f4;stroke:#c9ccd0;stroke-width:2.5}
+:root[data-theme="cabrio"] .gauge-tick{stroke:#1a1a1a;stroke-width:1.2}
+:root[data-theme="cabrio"] .gauge-tick:not(.major),:root[data-theme="cabrio"] .gauge-number:not(.end){display:inline}
+:root[data-theme="cabrio"] .gauge-tick.major{stroke-width:3}
+:root[data-theme="cabrio"] .gauge-number{fill:#1a1a1a;font:italic 700 16px/1 var(--display)}
+:root[data-theme="cabrio"] .gauge-unit{fill:#4a4f4c;font:700 9px/1 var(--display);letter-spacing:1.4px}
+:root[data-theme="cabrio"] .gauge-icon{display:inline;color:#2a2f2c}
+:root[data-theme="cabrio"] .gauge-red{stroke:#d8233d;stroke-width:7;opacity:1}
+:root[data-theme="cabrio"] .gauge-green{stroke:#3ec27a;stroke-width:7;opacity:1}
+:root[data-theme="cabrio"] .gauge-readout-box{fill:#141414;stroke:#3a3f3c;stroke-width:1.5}
+:root[data-theme="cabrio"] .gauge-readout{fill:var(--ambient);font:700 12px/1 var(--display)}
+:root[data-theme="cabrio"] .gauge-alert .gauge-readout{fill:#ff8a9a;animation:cabrio-blink 1s steps(2,start) infinite}
+@keyframes cabrio-blink{to{visibility:hidden}}
+:root[data-theme="cabrio"] .gauge-needle{transition-duration:1.3s;transition-timing-function:cubic-bezier(.2,1.3,.4,1)}
+:root[data-theme="cabrio"] .gauge-needle path{fill:#ff7a1a;filter:drop-shadow(0 1.5px 1px #0006)}
+/* the needle's cap is a chrome ball (the gear knob's chrome, where the console is drawn; plain chrome otherwise) */
+:root[data-theme="cabrio"] .gauge-cap{fill:url(#mg-chrome-ball) #c3cacf;stroke:#9aa3aa;stroke-width:6;paint-order:stroke;filter:drop-shadow(0 2px 2px #0007)}
+:root[data-theme="cabrio"] .real-bezel{stroke:#141414;stroke-width:10;paint-order:stroke}
+/* The fuel half-dials keep their white face: the dash's one cream instrument */
+:root[data-theme="cabrio"] .real-face{stroke:#8d969d}
+/* Trip computer and counters: the orange display of the dash, in chrome */
+:root[data-theme="cabrio"] .trip-computer{border-radius:14px;background:#0b0d0c;color:#ffd2a8;font:600 12px/1.4 var(--display);box-shadow:0 0 0 3px #e3e8eb,0 0 0 4.5px #8d969d}
+:root[data-theme="cabrio"] .trip-title{color:var(--ambient);font:700 10px/1 var(--display);letter-spacing:2px}
+:root[data-theme="cabrio"] .trip-computer input{border:1px solid #3a3f3c;background:#000;color:#fff;font:600 12px/1 var(--display)}
+:root[data-theme="cabrio"] .trip-computer button.link{color:var(--ambient)}
+:root[data-theme="cabrio"] .trip-reading{color:#ffd2a8}
+:root[data-theme="cabrio"] .odometer-digits{gap:2px;padding:3px;border-radius:6px;background:var(--chrome);box-shadow:0 0 0 1px #8d969d}
+:root[data-theme="cabrio"] .odometer-digits .lead{display:grid}
+:root[data-theme="cabrio"] .odometer-digits span{display:grid;place-items:center;width:19px;height:27px;border-radius:2px;color:#fff;
+  font:600 16px/1 var(--display);background:linear-gradient(#000,#262a28 45%,#262a28 55%,#000)}
+:root[data-theme="cabrio"] .odometer-label{color:var(--muted);font:700 9px/1.4 var(--display);letter-spacing:1.4px;text-transform:uppercase}
+/* Warning lights: lenses on a black strip in a chrome rim */
+:root[data-theme="cabrio"] .cluster-lamps{padding:12px;border-radius:16px;background:#0e1110;box-shadow:0 0 0 3px #e3e8eb,0 0 0 4.5px #8d969d}
+:root[data-theme="cabrio"] .lamp{border-color:#2a2f2c;background:#161a18;color:#c9cfcb;font:700 10px/1.2 var(--display);letter-spacing:.8px;text-transform:uppercase}
+:root[data-theme="cabrio"] .lamp-bulb{width:10px;height:10px;background:#2a2f2c;box-shadow:0 0 0 1.5px #8d969d}
+:root[data-theme="cabrio"] .lamp.on,:root[data-theme="cabrio"] .lamp.on strong{color:#fff}
+:root[data-theme="cabrio"] .lamp.on.lamp-red .lamp-bulb{background:#ff4d63;box-shadow:0 0 0 1.5px #e3e8eb,0 0 10px #ff4d63}
+:root[data-theme="cabrio"] .lamp.on.lamp-amber .lamp-bulb{background:#ffb02e;box-shadow:0 0 0 1.5px #e3e8eb,0 0 10px #ffb02e}
+:root[data-theme="cabrio"] .lamp.on.lamp-green .lamp-bulb{background:#5fe39a;box-shadow:0 0 0 1.5px #e3e8eb,0 0 10px #5fe39a}
+:root[data-theme="cabrio"] .lamp.on.lamp-grey .lamp-bulb{background:#f1ece0;box-shadow:0 0 0 1.5px #e3e8eb,0 0 8px #f1ece0}
+/* Charts: cream paper with a fine green grid, requests in red and replies in green */
+:root[data-theme="cabrio"] .chart{padding:8px 10px 4px;border-radius:14px;background:repeating-linear-gradient(0deg,#0000 0 29px,#14532d1f 29px 30px),#fffdf8;
+  box-shadow:0 0 0 1px #e2dacb}
+:root[data-theme="cabrio"]{--chart-requests:#b5122e;--chart-sent:#1d6b43}
+:root[data-theme="cabrio"] .chart .bar-label{fill:var(--muted)}
+
+/* Agenda: a black leather road book with cream pages */
+:root[data-theme="cabrio"] .filofax{border:6px solid #1b130d;border-radius:16px;background:var(--leather);box-shadow:0 0 0 2px #fff,0 0 0 3px #b9c1c6,0 16px 40px #1d2a2233}
+:root[data-theme="cabrio"] .filofax-page{border-color:#e2dacb;background-color:#fffdf8;color:var(--text);--agenda-rule:#e2dacb;--agenda-paper:#fffdf8;--page-bg:#fffdf8}
+:root[data-theme="cabrio"] .filofax-page.today{background-color:#eef6f0;--page-bg:#eef6f0}
+:root[data-theme="cabrio"] :is(.filofax-page .muted,.filofax-weekday){color:#6f6656}
+:root[data-theme="cabrio"] .filofax-head{border-bottom-color:var(--brg)}
+:root[data-theme="cabrio"] .filofax-page.today .filofax-weekday{color:var(--brg)}
+
+/* Messages: the toast is a cream switch in a chrome ring with a green light; an empty inbox waits with the car */
+:root[data-theme="cabrio"] #toast{padding-left:46px;border:1px solid #b9c1c6;border-radius:14px;background:var(--face-cream);color:var(--text);
+  font:600 13px/1.5 var(--display);box-shadow:0 0 0 3px #fff,0 0 0 4.5px #b9c1c6,0 16px 40px #1d2a2240}
+:root[data-theme="cabrio"] #toast::before{content:"";position:absolute;left:18px;top:50%;width:12px;height:12px;margin-top:-6px;border-radius:50%;
+  background:#3ec27a;box-shadow:0 0 10px #3ec27a}
+:root[data-theme="cabrio"] #toast.warn{color:var(--warn)}
+:root[data-theme="cabrio"] #toast.warn::before{background:#ffb02e;box-shadow:0 0 10px #ffb02e}
+:root[data-theme="cabrio"] #toast.bad{color:var(--bad)}
+:root[data-theme="cabrio"] #toast.bad::before{background:#e8344e;box-shadow:0 0 10px #e8344e}
+:root[data-theme="cabrio"] .empty-state{border:2px dashed var(--tan-light);border-radius:16px;background:#fffdf899}
+/* 05/10: the car of «Tudo em dia.»: a compact British convertible of the 2000s — short and tall, the wheels at its corners,
+   black arches and sill, a round lamp, an upright screen, the folded hood behind the seats, green with a white bonnet stripe */
+:root[data-theme="cabrio"] .empty-state strong::before{content:"";display:block;width:96px;height:44px;margin:0 auto 10px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 46'%3E%3Cdefs%3E%3ClinearGradient id='b' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%232f7350'/%3E%3Cstop offset='.55' stop-color='%231d4a33'/%3E%3Cstop offset='1' stop-color='%23123323'/%3E%3C/linearGradient%3E%3CradialGradient id='r' cx='.4' cy='.35' r='.7'%3E%3Cstop offset='0' stop-color='%23f4f6f8'/%3E%3Cstop offset='.6' stop-color='%23b9c1c8'/%3E%3Cstop offset='1' stop-color='%237d868e'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cellipse cx='50' cy='42.2' rx='43' ry='2.4' fill='%230000002e'/%3E%3Crect x='14' y='14.6' width='17' height='6.4' rx='3.2' fill='%231b1b1b'/%3E%3Crect x='35' y='11' width='5.4' height='9' rx='2.2' fill='%239a6b3e'/%3E%3Crect x='42.5' y='11.6' width='5' height='8.4' rx='2.1' fill='%23b07c48'/%3E%3Cpath d='M9.5 32.5V25c0-3 1.6-5.2 4.6-5.6L57 18.6l24.4 1.6c4 .3 6.6 1.6 8 4.4l1.4 3.4V32.5H86a10 10 0 0 0-20 0H34a10 10 0 0 0-20 0z' fill='url(%23b)'/%3E%3Cpath d='M57.4 18.8 51.6 9.6' stroke='%232a2f33' stroke-width='1.6' stroke-linecap='round'/%3E%3Cpath d='M57 18.7 51.7 10.2h2.4l5.2 8.6z' fill='%23bfe1f0' opacity='.55'/%3E%3Cpath d='M59 19.2 84.6 20.9' stroke='%23f4f1e8' stroke-width='1.5' stroke-linecap='round'/%3E%3Cpath d='M14.2 33a9.8 9.8 0 0 1 19.6 0zM66.2 33a9.8 9.8 0 0 1 19.6 0z' fill='%230b0b0b'/%3E%3Cpath d='M13 33a11 11 0 0 1 22 0M65 33a11 11 0 0 1 22 0' fill='none' stroke='%23151515' stroke-width='3.2'/%3E%3Crect x='34' y='30.6' width='32' height='3' rx='1' fill='%23151515'/%3E%3Cpath d='M9.5 30.5h1.8v3H9.5zM89.6 30h1.6v3.4h-1.6z' fill='%23151515'/%3E%3Cpath d='M48 20.4v10.6' stroke='%230e2a1c' stroke-width='.6'/%3E%3Crect x='50.2' y='22.6' width='3.4' height='.9' rx='.45' fill='%23d9dee2'/%3E%3Cpath d='M56.4 17.6h3.2l-.6 2h-2.6z' fill='%231d4a33'/%3E%3Ccircle cx='84.3' cy='23.4' r='3.1' fill='%23d9dee2'/%3E%3Ccircle cx='84.3' cy='23.4' r='2.2' fill='%23fff8dc'/%3E%3Crect x='9.8' y='22.6' width='1.6' height='3.4' rx='.6' fill='%23c8102e'/%3E%3Crect x='67.5' y='23.4' width='2' height='.9' rx='.4' fill='%23f39a1e'/%3E%3Ccircle cx='24' cy='33.6' r='8' fill='%23151515'/%3E%3Ccircle cx='24' cy='33.6' r='5' fill='url(%23r)'/%3E%3Ccircle cx='24' cy='33.6' r='1.4' fill='%235d666e'/%3E%3Ccircle cx='76' cy='33.6' r='8' fill='%23151515'/%3E%3Ccircle cx='76' cy='33.6' r='5' fill='url(%23r)'/%3E%3Ccircle cx='76' cy='33.6' r='1.4' fill='%235d666e'/%3E%3Cpath d='M24 28.9v2.6M19.5 32.1l2.5.8M28.5 32.1l-2.5.8M21.2 37.7l1.5-2.1M26.8 37.7l-1.5-2.1M76 28.9v2.6M71.5 32.1l2.5.8M80.5 32.1l-2.5.8M73.2 37.7l1.5-2.1M78.8 37.7l-1.5-2.1' stroke='%237d868e' stroke-width='.9' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat}
+
+/* The notice board: cork (04/10: it was the seat's black leather with tan stitching), the notes on cream paper */
+:root[data-theme="cabrio"] .card.notices-card{border:1px solid #4a3520;border-radius:16px;padding:26px 28px 30px;
+  background:var(--cork);
+  box-shadow:inset 0 2px 12px #0000004d,0 6px 18px #3b24102e}
+:root[data-theme="cabrio"] .card.notices-card h2{color:#fffaf0;text-shadow:0 1px 2px #0008}
+:root[data-theme="cabrio"] .card.notices-card .notices-actions .link{color:#fffaf0;font-weight:700;text-shadow:0 1px 2px #0008}
+:root[data-theme="cabrio"] .card.notices-card .notice{background:#fffdf6;color:#2d2416;border:0;border-radius:2px 2px 46px 2px/2px 2px 13px 2px;
+  box-shadow:0 1px 1px #00000021,0 4px 7px -4px #00000029,10px 12px 12px -9px #00000066}
+:root[data-theme="cabrio"] .card.notices-card .notice.unread{background:#fff2a6}
+:root[data-theme="cabrio"] .card.notices-card .notice .notice-when{color:#6b5a43}
+:root[data-theme="cabrio"] .card.notices-card .notice .link{color:var(--brg)}
+:root[data-theme="cabrio"] .card.notices-card .notice-legend{color:#fffaf0;text-shadow:0 1px 2px #0008}
+
+/* The Sons switch: at the right of the top bar, a cream switch with the speaker crossed out or sounding */
+:root[data-theme="cabrio"] .sound-toggle{margin-left:auto;min-height:32px;padding:4px 12px 4px 9px;gap:7px;font-size:11px;letter-spacing:.6px;text-transform:uppercase}
+:root[data-theme="cabrio"] .sound-toggle::before{content:"";width:16px;height:16px;flex:none;background:currentColor;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E %3Cpath d='M4 9.5h3.5L12 5.5v13l-4.5-4H4Z'/%3E%3Cpath d='M16 9.5l5 5M21 9.5l-5 5'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E %3Cpath d='M4 9.5h3.5L12 5.5v13l-4.5-4H4Z'/%3E%3Cpath d='M16 9.5l5 5M21 9.5l-5 5'/%3E%3C/svg%3E") center/contain no-repeat}
+:root[data-theme="cabrio"] .sound-toggle[aria-pressed="true"]{color:#fff;border-color:var(--brg-deep);background:var(--lacquer-brg)}
+:root[data-theme="cabrio"] .sound-toggle[aria-pressed="true"]::before{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E %3Cpath d='M4 9.5h3.5L12 5.5v13l-4.5-4H4Z'/%3E%3Cpath d='M15.5 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E %3Cpath d='M4 9.5h3.5L12 5.5v13l-4.5-4H4Z'/%3E%3Cpath d='M15.5 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11'/%3E%3C/svg%3E")}
+:root[data-theme="cabrio"] .sound-toggle:not([hidden])+.theme-control{margin-left:0}
+
+/* The warning lights, as the console's keys: piano black, an icon, and a small LED on top — dark until it has a
+   reason, lit in its colour (the indicator blinks) */
+:root[data-theme="cabrio"] .telltales{display:flex;flex-wrap:nowrap;justify-content:center;gap:3px;margin:0 4px 4px;padding:0}
+:root[data-theme="cabrio"] .telltales button.telltale.telltale{position:relative;display:grid;place-items:center;flex:1 1 0;max-width:30px;height:26px;min-height:0;
+  padding:5px 0 0;border:1px solid #000;border-radius:4px;cursor:pointer;animation:none;transform:none;
+  background:linear-gradient(180deg,#2c302e,#151816 55%,#0c0e0d);box-shadow:inset 0 1px 0 #ffffff1f,0 1px 1px #0008}
+:root[data-theme="cabrio"] .telltales button.telltale.telltale::before{content:"";position:absolute;top:3px;left:50%;width:9px;height:2.5px;margin-left:-4.5px;
+  border-radius:2px;background:#3a3f3c}
+:root[data-theme="cabrio"] .telltale-icon{width:14px;height:14px;fill:none;stroke:#9aa0a6;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+:root[data-theme="cabrio"] .telltale-icon .fill{fill:#9aa0a6;stroke:none}
+:root[data-theme="cabrio"] .telltale-text{font:700 9px/1 var(--display);text-anchor:middle}
+:root[data-theme="cabrio"] .telltales button.telltale.lit::before{background:var(--lens);box-shadow:0 0 6px 1px var(--lens)}
+:root[data-theme="cabrio"] .telltale.lit .telltale-icon{stroke:#e9edf0}
+:root[data-theme="cabrio"] .telltale.lit .telltale-icon .fill{fill:#e9edf0}
+:root[data-theme="cabrio"] .telltale.green{--lens:#5fe39a}
+:root[data-theme="cabrio"] .telltale.blue{--lens:#4fb6ff}
+:root[data-theme="cabrio"] .telltale.amber{--lens:#ffb02e}
+:root[data-theme="cabrio"] .telltale.red{--lens:#ff4d63}
+:root[data-theme="cabrio"] .telltales button.telltale.blink::before{animation:cabrio-indicator 1s steps(2,start) infinite}
+@keyframes cabrio-indicator{to{opacity:.25}}
+
+/* The country road at the foot of the window: green hills, a hedge, the lane — and the cabrio driving by, every 45 s */
+:root[data-theme="cabrio"] body::before{content:"";position:fixed;left:0;right:0;bottom:0;height:120px;z-index:-1;pointer-events:none;background:
+  repeating-linear-gradient(90deg,#fff 0 26px,#0000 26px 52px) 0 calc(100% - 15px)/100% 2px no-repeat,
+  linear-gradient(#6d6a64,#57544f) 0 100%/100% 30px no-repeat,
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 480 90' preserveAspectRatio='none'%3E %3Cpath d='M0 60 C60 30 120 38 180 52 C240 66 300 26 360 34 C410 40 450 52 480 46 L480 90 L0 90 Z' fill='%237fae6e'/%3E %3Cpath d='M0 72 C70 56 130 62 200 70 C270 78 330 54 400 60 C440 64 465 70 480 68 L480 90 L0 90 Z' fill='%234f8a4a'/%3E %3Cpath d='M0 80 C40 74 80 78 120 80 C170 82 220 74 270 78 C330 82 400 74 480 79 L480 90 L0 90 Z' fill='%232f6a36'/%3E %3Cg fill='%23244f2a'%3E%3Ccircle cx='60' cy='70' r='7'/%3E%3Ccircle cx='70' cy='68' r='8'/%3E%3Ccircle cx='300' cy='64' r='6'/%3E%3Ccircle cx='310' cy='62' r='8'/%3E%3Ccircle cx='420' cy='70' r='7'/%3E%3C/g%3E %3C/svg%3E") 0 calc(100% - 30px)/100% 90px no-repeat}
+:root[data-theme="cabrio"] body::after{content:"";position:fixed;left:0;bottom:12px;width:96px;height:44px;z-index:-1;pointer-events:none;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 140 64'%3E %3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%232f7a50'/%3E%3Cstop offset='0.45' stop-color='%2314532d'/%3E%3Cstop offset='1' stop-color='%230a2e19'/%3E%3C/linearGradient%3E %3ClinearGradient id='c' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23fff'/%3E%3Cstop offset='0.5' stop-color='%239aa3aa'/%3E%3Cstop offset='1' stop-color='%23e3e8eb'/%3E%3C/linearGradient%3E%3C/defs%3E %3Cellipse cx='72' cy='59' rx='62' ry='3.5' fill='%23000' opacity='.22'/%3E %3Cpath d='M88 30 L82 15 L85 14.5 L92 30 Z' fill='%231b1b1b'/%3E%3Cpath d='M84 16 L90 29 L95 29 L87 16 Z' fill='%23bfe3f2' opacity='.7'/%3E %3Cpath d='M30 30 C30 23 36 21 44 21 L50 21 C53 21 54 24 54 30 Z' fill='%23151515'/%3E %3Crect x='58' y='19' width='9' height='12' rx='3' fill='%238a5a2b'/%3E%3Crect x='72' y='19' width='9' height='12' rx='3' fill='%238a5a2b'/%3E %3Cpath d='M12 48 L12 39 C12 34 16 31 23 30.5 L112 30 C120 30.5 127 32 131 36 C133.5 38.5 134 41 134 44 L134 48 Z' fill='url(%23g)'/%3E %3Cpath d='M104 30.6 L131 35.6 L130 37.2 L103 32.4 Z M104 33.6 L129 38.6 L128.4 39.8 L103.6 35 Z' fill='%23fff' opacity='.92'/%3E %3Cpath d='M14 34 L70 33.4' stroke='%23fff' stroke-width='1.2' opacity='.5'/%3E %3Ccircle cx='129' cy='38' r='3.4' fill='%23fff7c8' stroke='%239aa3aa' stroke-width='1'/%3E %3Crect x='12' y='35' width='3.4' height='5' rx='1.2' fill='%23c8102e'/%3E %3Crect x='93' y='31' width='7' height='4' rx='2' fill='%23fff'/%3E %3Cpath d='M60 38 L68 38' stroke='url(%23c)' stroke-width='1.6' stroke-linecap='round'/%3E %3Crect x='112' y='36.5' width='3' height='1.6' rx='.8' fill='%23ff9a3c'/%3E %3Cpath d='M22 48 A15 15 0 0 1 52 48 Z M90 48 A15 15 0 0 1 120 48 Z' fill='%230a2316'/%3E %3Ccircle cx='37' cy='48' r='10.5' fill='%23141414'/%3E%3Ccircle cx='37' cy='48' r='6.4' fill='url(%23c)'/%3E%3Ccircle cx='37' cy='48' r='2' fill='%23555'/%3E %3Ccircle cx='105' cy='48' r='10.5' fill='%23141414'/%3E%3Ccircle cx='105' cy='48' r='6.4' fill='url(%23c)'/%3E%3Ccircle cx='105' cy='48' r='2' fill='%23555'/%3E %3C/svg%3E") center/contain no-repeat;animation:cabrio-drive 45s linear infinite}
+@keyframes cabrio-drive{0%,50%{transform:translateX(-120px)}100%{transform:translateX(calc(100vw + 20px))}}
+:root[data-theme="cabrio"] main{padding-bottom:160px}
+
+/* Night: the ambient light switch on the toggle bank turns the cabin dark, the light blue */
+:root[data-theme="cabrio"][data-ambient="night"]{color-scheme:dark;--bg:#0c1310;--card:#151d18;--text:#eef3ee;--muted:#a9b8ad;--line:#2b3a31;
+  --accent:#7fd3a0;--accent-text:#0a2e19;--accent-soft:#1d3a2a;--ok:#7fd3a0;--ok-bg:#163526;--warn:#ffc978;--warn-bg:#33281a;
+  --bad:#ff9aa8;--bad-bg:#3a1d24;--shadow:0 12px 28px #0008;--halo:#1d3a2a;--topbar:#0f1612;
+  --surface-start:#18221c;--surface-end:#121a15;--input:#0f1612;--input1:#0f1612;--quote:#131b16;--control:#1b261f;
+  --control1:#1b261f;--control-border:#3a4d40;--control-border1:#3a4d40;--control-border2:#3a4d40;--hover:#1f3328;
+  --hover-border:#7fd3a0;--placeholder:#86978b;--highlight-start:#1a2a20;--highlight-end:#132019;--highlight-border:#2f5a40;
+  --avatar:#1b261f;--tag-text:#cfdcd2;--quote-text:#dfe9e1;--empty-border:#7a4a24;--accent-hover:#a6e6bf;
+  --accent-tint:#7fd3a018;--ambient:#4fb6ff;
+  --paper:linear-gradient(180deg,#18221c,#121a15);--face-cream:linear-gradient(180deg,#222d26,#18211b);
+  scrollbar-color:#7a4a24 #121a15}
+:root[data-theme="cabrio"][data-ambient="night"] body{background:radial-gradient(ellipse at 92% -6%,#4fb6ff1f,#0000 46%) fixed,linear-gradient(180deg,#0f1713,#0a0f0c) fixed,var(--bg)}
+:root[data-theme="cabrio"][data-ambient="night"] :is(.card,.metric,.retro-widget,.workflow,.property-slider,.table-wrap){border-color:#2b3a31}
+:root[data-theme="cabrio"][data-ambient="night"] .metric:first-child{border-color:#2f5a40;background:linear-gradient(180deg,#1a2a20,#132019)}
+:root[data-theme="cabrio"][data-ambient="night"] h1{color:#eef3ee}
+:root[data-theme="cabrio"][data-ambient="night"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link,.deal-button){color:var(--text);border-color:#3a4d40;box-shadow:0 0 0 2px #0c1310,0 0 0 3px #5f676d,0 3px 6px #0006}
+:root[data-theme="cabrio"][data-ambient="night"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link,.deal-button):hover{background:linear-gradient(180deg,#25362c,#1b2a21);border-color:#7fd3a0}
+:root[data-theme="cabrio"][data-ambient="night"] button.link{color:#7fd3a0}
+:root[data-theme="cabrio"][data-ambient="night"] .tag{background:#18221c;border-color:#3a4d40}
+:root[data-theme="cabrio"][data-ambient="night"] .chart{background:repeating-linear-gradient(0deg,#0000 0 29px,#7fd3a01f 29px 30px),#121a15;box-shadow:0 0 0 1px #2b3a31}
+:root[data-theme="cabrio"][data-ambient="night"] :is(.retro-date,.retro-cal-month,.contacts-table th){color:#7fd3a0}
+:root[data-theme="cabrio"][data-ambient="night"] .filofax-page{background-color:#151d18;--agenda-rule:#2b3a31;--agenda-paper:#151d18;--page-bg:#151d18;border-color:#2b3a31}
+:root[data-theme="cabrio"][data-ambient="night"] .filofax-page.today{background-color:#1a2a20;--page-bg:#1a2a20}
+:root[data-theme="cabrio"][data-ambient="night"] #toast{color:var(--text)}
+:root[data-theme="cabrio"][data-ambient="night"] .empty-state{background:#121a1599}
+:root[data-theme="cabrio"][data-ambient="night"] input[type=checkbox]:not(:checked){border-color:#4d5c53}  /* black on the dark cabin: an edge to see it */
+:root[data-theme="cabrio"][data-ambient="night"] :is(.gauge-face,.clock-face){fill:#e4e7e3}
+
+
+/* Phone: the seat becomes the top strip, the toggle bank hides, the dials go two by two */
+@media(max-width:760px){
+  :root[data-theme="cabrio"] .sidebar{padding-bottom:16px}
+  :root[data-theme="cabrio"] .sidebar::before,:root[data-theme="cabrio"] .sidebar::after{display:none}
+  :root[data-theme="cabrio"] .skin-selector{display:none}
+  :root[data-theme="cabrio"] .tab{justify-content:center;padding:9px 6px;font-size:12px}
+  :root[data-theme="cabrio"] .tab.active{padding-left:6px;background:var(--lacquer-brg)}
+  :root[data-theme="cabrio"] .sound-toggle{padding:4px 8px;font-size:0;gap:0}
+  :root[data-theme="cabrio"] .cluster-gauges{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));justify-items:center;padding:20px 10px 12px;border-radius:26px}
+  :root[data-theme="cabrio"] .gauge-speedo{order:-2;grid-column:1/-1}
+  :root[data-theme="cabrio"] :is(.gauge svg,.gauge-big svg,.gauge-small svg){width:100%;max-width:170px}
+  :root[data-theme="cabrio"] .gauge-speedo svg{max-width:240px}
+  :root[data-theme="cabrio"] .gauge-mini svg{width:100%;max-width:120px}
+  :root[data-theme="cabrio"] main{padding-bottom:150px}
+}
+@media(prefers-reduced-motion:reduce){
+  :root[data-theme="cabrio"] body::after,:root[data-theme="cabrio"] #busy::before,:root[data-theme="cabrio"] .gauge-alert .gauge-readout,:root[data-theme="cabrio"] .telltales button.telltale.blink::before{animation:none}
+  :root[data-theme="cabrio"] body::after{display:none}
+  :root[data-theme="cabrio"] .bank-arm{transition:none}
+}

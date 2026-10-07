@@ -1,0 +1,420 @@
+/* 70's Scooter (theme id "scooter") — a 70s Italian scooter on the coast road: cream and chrome, mint lacquer on the
+   legshield (the sidebar), a rosso seat for what matters most, the four stripes of the seventies (mustard, orange,
+   rosso, brown) along every edge, and the headset's cream dials with italic numbers. Inspired by the Italian scooters
+   of the time, with no brand, badge or name: like the other skins, a generic label. Everything is under
+   :root[data-theme="scooter"]; the drawings (the red scooter, headlight, wheel, road, the town) are SVG inside the CSS, and the fonts are the ones
+   macOS already has (Futura, Arial Rounded, Brush Script), with fallbacks elsewhere. */
+
+/* Colours and materials */
+:root[data-theme="scooter"]{color-scheme:light;--bg:#f6ecd6;--card:#fffaf0;--text:#2a1d14;--muted:#6e5a48;--line:#e6d7ba;
+  --accent:#d7261e;--accent-text:#fff;--accent-soft:#fde3d6;--ok:#1d7a5e;--ok-bg:#dff3ea;--warn:#8f5200;--warn-bg:#fff0cf;
+  --bad:#b3261e;--bad-bg:#fde6e3;--shadow:0 12px 28px #5a3a2224;--halo:#ffd9a8;--sidebar:#8fd5c3;--topbar:#ffe9c9;
+  --surface-start:#fffdf7;--surface-end:#fbf1dd;--input:#fffdf8;--input1:#fdf8ec;--quote:#fdf4e2;--control:#fffaf0;
+  --control1:#f7ecd4;--control-border:#d9c39c;--control-border1:#dccaa6;--control-border2:#dccaa6;--hover:#e8f6f1;
+  --hover-border:#3f8f7d;--placeholder:#9a8672;--nav-muted:#1f4f45;--breadcrumb:#a08c74;--selected-start:#d7261e;
+  --selected-end:#a51a13;--selected-border:#7a120c;--highlight-start:#fff7e6;--highlight-end:#fde6c3;--highlight-border:#e8a15a;
+  --brand-start:#fff;--brand-end:#e8d9b8;--brand-border:#0000;--avatar:#fffaf0;--avatar-text:#1f4f45;--tag-text:#4a3526;
+  --quote-text:#3a2a1e;--quote-border:#e8743b;--cover-start:#8fd5c3;--cover-mid:#f6ecd6;--cover-end:#e8743b;--cover-text:#d7261e;
+  --chart-secondary:#e8743b;--metric-line:#e8743b;--empty-border:#e8a15a;--success-border:#9fd4bd;--success-border1:#9fd4bd;
+  --error-border:#e6a39c;--warning-border:#e6c27a;--accent-hover:#b81d16;--glow-soft:#d7261e10;--glow-soft1:#d7261e18;
+  --accent-tint:#d7261e1a;--glow:#d7261e40;
+  --mint:#8fd5c3;--mint-deep:#3f8f7d;--mint-ink:#13352e;--rosso:#d7261e;--orange:#e8743b;--mustard:#f2b632;--brown:#6b3f22;
+  --stripes:linear-gradient(180deg,#009246 0 33.3%,#fff 33.3% 66.6%,#ce2b37 66.6%);
+  --lacquer-mint:linear-gradient(180deg,#d4f1e7,#a3dccd 35%,#8fd5c3 60%,#72bfae);
+  --lacquer-rosso:linear-gradient(180deg,#ff6a5c,#e0342a 40%,#c41f17 70%,#a51a13);
+  --chrome:linear-gradient(180deg,#fff,#e3e8eb 20%,#9aa3aa 48%,#f4f6f7 60%,#c3cacf 80%,#8d969d);
+  --display:"Futura","Futura PT","Century Gothic","Avenir Next",ui-sans-serif,sans-serif;
+  --round:"Arial Rounded MT Bold","Helvetica Rounded","Nunito","Avenir Next",ui-rounded,system-ui,sans-serif;
+  --script:"Brush Script MT","Snell Roundhand","Segoe Script",cursive;
+  scrollbar-color:#8fd5c3 #f1e4c8}
+:root[data-theme="scooter"] ::selection{background:#8fd5c3;color:#13352e}
+:root[data-theme="scooter"] body{background:radial-gradient(circle at 94% -4%,#ffd27d 0 110px,#ffb86b 111px 128px,#0000 129px) fixed,
+  radial-gradient(ellipse at 90% 0%,#ffd9a855,#0000 45%) fixed,var(--bg)}
+:root[data-theme="scooter"] :focus-visible{outline-color:var(--mint-deep)}
+
+/* Type: Futura italic for the titles, with the four stripes as a shadow; rounded bold for the rest of the dash */
+:root[data-theme="scooter"] h1{font-family:var(--display);font-style:italic;font-weight:800;letter-spacing:-.5px;color:var(--text);
+  text-shadow:2px 2px 0 #f2b632,4px 4px 0 #e8743b,6px 6px 0 #d7261e33}
+:root[data-theme="scooter"] h2{font-family:var(--display);font-style:italic;font-weight:700;color:var(--text)}
+:root[data-theme="scooter"] .eyebrow{display:inline-block;width:fit-content;padding:3px 12px;border-radius:999px;color:#fff;background:var(--orange);
+  font:italic 800 10px/1.6 var(--display);letter-spacing:2px;box-shadow:inset 0 -2px 0 #0000002e}
+:root[data-theme="scooter"] .ignore-list.black .eyebrow{background:var(--bad)}
+:root[data-theme="scooter"] .ignore-list.grey .eyebrow{background:#8a7a68}
+
+/* The sidebar is the legshield: mint lacquer, a chrome trim down its edge and the tricolore at its foot */
+:root[data-theme="scooter"] .sidebar{background:var(--lacquer-mint);border-right:0;box-shadow:inset -10px 0 18px #ffffff40}
+:root[data-theme="scooter"] .sidebar::before{content:"";position:absolute;top:0;bottom:0;right:0;width:7px;pointer-events:none;
+  background:linear-gradient(90deg,#8d969d,#fff 45%,#c3cacf 70%,#6d767d)}
+:root[data-theme="scooter"] .sidebar::after{content:"";position:absolute;left:18px;right:25px;bottom:10px;height:6px;border-radius:3px;pointer-events:none;
+  background:linear-gradient(90deg,#009246 0 33.3%,#fff 33.3% 66.6%,#ce2b37 66.6%);box-shadow:0 1px 2px #0003}
+:root[data-theme="scooter"] .brand-mark{width:46px;height:46px;border:0;border-radius:50%;font-size:0;
+  background:radial-gradient(circle at 38% 34%,#fff 0 12%,#fff6c8 13% 44%,#f2d27a 45% 58%,#0000 59%),var(--chrome);
+  box-shadow:0 0 0 2px #fff,0 3px 8px #13352e59,0 0 22px #fff6c8aa}
+:root[data-theme="scooter"] .brand .brand-name{font-family:var(--script);font-weight:400;font-size:25px;line-height:1.05;letter-spacing:0;color:var(--rosso);
+  text-shadow:1px 1px 0 #fff}
+:root[data-theme="scooter"] .brand .brand-name span{display:block;margin-top:4px;color:#009246;font:900 10px/1.4 var(--round);letter-spacing:2.6px;
+  text-transform:uppercase;text-shadow:1px 1px 0 #fff,-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff}
+:root[data-theme="scooter"] .brand-by,:root[data-theme="scooter"] .app-build{color:#1f4f45}
+:root[data-theme="scooter"] .app-version{padding:2px 12px;border:0;border-radius:7px;color:#4a3526;font:italic 800 10px/1.7 var(--display);letter-spacing:1px;
+  background:linear-gradient(180deg,#fbf3e0,#efe0bf);box-shadow:0 0 0 2px #fff,0 0 0 3.5px #9aa3aa,inset 0 1px 0 #fff,0 2px 4px #13352e40}
+:root[data-theme="scooter"] .nav-label{color:#1f4f45;font:800 9px/1.6 var(--round);letter-spacing:2.4px}
+:root[data-theme="scooter"] .sidebar-note{color:var(--mint-ink)}
+:root[data-theme="scooter"] .sidebar-note p{color:#1f4f45}
+:root[data-theme="scooter"] .status-dot{background:#fff6c8;box-shadow:0 0 0 1.5px #8d969d,0 0 9px #fff6c8}
+:root[data-theme="scooter"] .account-card{border-top-color:#ffffff80}
+:root[data-theme="scooter"] .avatar{border-radius:50%;background:var(--chrome);color:var(--mint-ink)}
+
+/* Tabs: cream pills on the legshield; the open one is the rosso seat */
+:root[data-theme="scooter"] .tab{border-radius:999px;color:var(--mint-ink);font:800 14px/1.3 var(--round);letter-spacing:.2px}
+:root[data-theme="scooter"] .tab:hover{background:#ffffffa6;border-color:#ffffffcc;color:var(--mint-ink)}
+:root[data-theme="scooter"] .tab.active{color:#fff;background:var(--lacquer-rosso);border-color:#7a120c;text-shadow:0 1px 1px #0006;
+  box-shadow:0 0 0 2px #fff,0 4px 10px #7a120c55}
+:root[data-theme="scooter"] .nav-count{background:#fff;color:var(--rosso);font:800 11px/1.6 var(--round)}
+:root[data-theme="scooter"] .tab.active .nav-count{color:var(--rosso)}
+
+/* The twist grip (drawn by app.js): a chrome handlebar, a black rubber grip, the gear drum in a mint housing */
+:root[data-theme="scooter"] .skin-selector{display:block;margin:18px 2px 0}
+:root[data-theme="scooter"] .twist-grip{display:block;width:100%;max-width:176px;height:auto;margin:0 auto;overflow:visible;filter:drop-shadow(0 4px 6px #13352e40)}
+:root[data-theme="scooter"] .grip-window{fill:#fffaf0;stroke:#3f8f7d;stroke-width:1}
+:root[data-theme="scooter"] .grip-number{fill:var(--text);font:italic 800 18px/1 var(--display);text-anchor:middle}
+:root[data-theme="scooter"] .grip-pointer{fill:var(--rosso)}
+/* 02/10: ▲ and ▼ on the black grip (the notches under the handlebar are gone): one gear up, one down */
+:root[data-theme="scooter"] .grip-button{cursor:pointer}
+:root[data-theme="scooter"] .grip-hit{fill:transparent}
+:root[data-theme="scooter"] .grip-arrow{fill:none;stroke:#efe8dc;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;opacity:.8}
+:root[data-theme="scooter"] .grip-button:hover .grip-arrow{stroke:var(--rosso);opacity:1}
+:root[data-theme="scooter"] .grip-rubber{transform-box:fill-box;transform-origin:50% 50%}
+:root[data-theme="scooter"] .grip-rubber.twist{animation:scooter-twist .45s ease-out}
+@keyframes scooter-twist{0%{transform:none}35%{transform:skewY(-8deg)}70%{transform:skewY(4deg)}100%{transform:none}}
+
+/* Top bar: an evening sky over the sea, with the four stripes as its trim */
+:root[data-theme="scooter"] .topbar{position:relative;z-index:0;overflow:hidden;border-bottom:0;color:#6b3f22;
+  background:radial-gradient(circle at 78% 130%,#ffd27d 0 26px,#0000 27px),linear-gradient(180deg,#bfe7f2,#ffe9c9 70%,#ffd6a3)}
+:root[data-theme="scooter"] .topbar::after{content:"";position:absolute;left:0;right:0;bottom:0;height:8px;pointer-events:none;background:var(--stripes)}
+:root[data-theme="scooter"] .topbar strong{color:var(--text);font-weight:800}
+:root[data-theme="scooter"] .breadcrumb{color:#b08c6a}
+:root[data-theme="scooter"] .local-label{color:#6b3f22}
+:root[data-theme="scooter"] #busy{display:inline-flex;align-items:center;gap:8px;color:var(--rosso);font:italic 800 10px/1 var(--display);letter-spacing:1.4px;
+  text-transform:uppercase}
+:root[data-theme="scooter"] #busy::before{content:"";width:18px;height:18px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10.5' fill='%231b1b1b'/%3E %3Ccircle cx='12' cy='12' r='6' fill='%23dfe4e7' stroke='%238d969d'/%3E%3Cpath d='M12 6.5V17.5M6.5 12H17.5M8.2 8.2L15.8 15.8M15.8 8.2L8.2 15.8' stroke='%238d969d' stroke-width='1.1'/%3E %3Ccircle cx='12' cy='12' r='1.8' fill='%23d7261e'/%3E%3C/svg%3E") center/contain no-repeat;
+  animation:scooter-spin .5s linear infinite}
+@keyframes scooter-spin{to{transform:rotate(-360deg)}}
+
+/* Surfaces: cream panels with rounded corners, the four stripes across their top */
+:root[data-theme="scooter"] .card{border:2px solid #eadbbd;border-radius:22px;
+  background:linear-gradient(180deg,#009246 0 33.3%,#fff 33.3% 66.6%,#ce2b37 66.6%) top/100% 9px no-repeat,linear-gradient(180deg,#fffdf7,#fbf1dd);box-shadow:0 10px 24px #5a3a221a}
+:root[data-theme="scooter"] .metric{border:2px solid #eadbbd;border-radius:22px;background:linear-gradient(180deg,#fffdf7,#fbf1dd);box-shadow:0 8px 20px #5a3a2217}
+:root[data-theme="scooter"] .metric:first-child{border-color:#e8a15a;background:linear-gradient(180deg,#fff7e6,#fde6c3)}
+:root[data-theme="scooter"] .metric:after,:root[data-theme="scooter"] .metric:first-child:after{top:0;right:24px;width:44px;height:9px;border-radius:0 0 6px 6px;background:var(--stripes);box-shadow:none}
+/* Each count sits on the odometer drum: white italic digits on black, in a chrome frame */
+:root[data-theme="scooter"] .metric .value{display:inline-block;min-width:3ch;padding:0 12px;border-radius:9px;color:#fff;background:linear-gradient(180deg,#3a3634,#141212 50%,#2a2624);
+  font:italic 800 32px/1.12 var(--display);box-shadow:0 0 0 3px #dfe4e7,0 0 0 4.5px #8d969d,inset 0 2px 5px #000}
+:root[data-theme="scooter"] .metric.ok .value{color:#b8f5dd}
+:root[data-theme="scooter"] .metric.warn .value{color:#ffd57a}
+:root[data-theme="scooter"] .metric.bad .value{color:#ffb3aa}
+:root[data-theme="scooter"] .metric .label{color:var(--muted);font:800 11px/1.4 var(--round)}
+
+/* Switchgear: cream push-buttons in a chrome ring; primary is the rosso seat; sending is the mint horn button */
+:root[data-theme="scooter"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link,.deal-button){border:1px solid #c9cfd3;border-radius:999px;color:var(--text);
+  font:800 13px/1.2 var(--round);background:linear-gradient(180deg,#fffdf8,#f3e6cb);box-shadow:0 0 0 2px #fff,0 0 0 3px #b9c1c6,0 3px 6px #5a3a2224}
+:root[data-theme="scooter"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link,.deal-button):hover{background:linear-gradient(180deg,#f2fbf8,#cdeee3);border-color:#3f8f7d}
+:root[data-theme="scooter"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link,.deal-button):active{transform:translateY(1px);box-shadow:0 0 0 2px #fff,0 0 0 3px #b9c1c6}
+:root[data-theme="scooter"] :is(button,.button).primary{color:#fff;border-color:#7a120c;background:var(--lacquer-rosso);text-shadow:0 1px 1px #0006}
+:root[data-theme="scooter"] :is(button,.button).primary:hover{border-color:#7a120c;background:linear-gradient(180deg,#ff7b6e,#d42a20 45%,#a51a13)}
+:root[data-theme="scooter"] :is(button,.button).send-action{color:var(--mint-ink);border-color:#3f8f7d;background:var(--lacquer-mint)}
+:root[data-theme="scooter"] :is(button,.button).send-action::before{content:"";flex:none;width:15px;height:15px;background:currentColor;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 9.5h3.5L12 5.5v13l-4.5-4H4Z'/%3E%3Cpath d='M15.5 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 9.5h3.5L12 5.5v13l-4.5-4H4Z'/%3E%3Cpath d='M15.5 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11'/%3E%3C/svg%3E") center/contain no-repeat}
+/* 28/09: a send button with its own icon («Enviar já este por email») keeps only that one */
+:root[data-theme="scooter"] :is(button,.button).send-action:has(.button-icon)::before{display:none}
+:root[data-theme="scooter"] :is(button,.button):disabled{filter:grayscale(.8);opacity:.55;transform:none}
+:root[data-theme="scooter"] button.link{color:var(--rosso);font:800 13px/1.3 var(--round)}
+:root[data-theme="scooter"] button.link:hover{color:var(--accent-hover);text-decoration:underline;text-underline-offset:4px}
+:root[data-theme="scooter"] .link.danger{color:var(--bad)}
+:root[data-theme="scooter"] .segmented{border-radius:999px;background:#f1e4c8;box-shadow:inset 0 1px 3px #5a3a2226}
+:root[data-theme="scooter"] .segmented button{border-radius:999px;color:var(--muted);font:800 12px/1.2 var(--round)}
+:root[data-theme="scooter"] .segmented button.active{color:#fff;background:var(--lacquer-rosso)}
+
+/* Controls: round toggles for checkboxes (06/10: dark and «OFF» when off, green and «ON» when on); cream fields with rounded corners */
+:root[data-theme="scooter"] input[type=checkbox]{-webkit-appearance:none;appearance:none;position:relative;width:44px;height:20px;padding:0;border:1px solid #1d1a17;
+  border-radius:999px;background:linear-gradient(180deg,#1d1a17,#38322c);box-shadow:inset 0 1px 3px #000b;cursor:pointer;transition:background .2s}
+:root[data-theme="scooter"] input[type=checkbox]::before{content:"";position:absolute;top:1px;left:1px;width:16px;height:16px;border-radius:50%;background:var(--chrome);
+  box-shadow:0 1px 2px #0006;transition:transform .2s;z-index:1}
+:root[data-theme="scooter"] input[type=checkbox]::after{content:"OFF";position:absolute;inset:0 6px 0 auto;display:flex;align-items:center;
+  font:700 7.5px/1 var(--display);letter-spacing:.4px;color:#d9d0c2;pointer-events:none}
+:root[data-theme="scooter"] input[type=checkbox]:checked{background:linear-gradient(180deg,#7fe0b6,#3dba86 45%,#24946a);border-color:#1d7a55}
+:root[data-theme="scooter"] input[type=checkbox]:checked::before{transform:translateX(24px)}
+:root[data-theme="scooter"] input[type=checkbox]:checked::after{content:"ON";inset:0 auto 0 7px;color:#fff;text-shadow:0 1px 1px #0006}
+:root[data-theme="scooter"] input[type=checkbox]:disabled{opacity:.4;cursor:not-allowed}
+:root[data-theme="scooter"] :is(input:not([type=checkbox],[type=radio]),textarea,select){border:1.5px solid #e0cfab;border-radius:12px;background-color:#fffdf8;color:var(--text)}
+:root[data-theme="scooter"] :is(input,textarea,select):focus{border-color:#3f8f7d;outline:3px solid #8fd5c366;outline-offset:1px}
+:root[data-theme="scooter"] .tag{border-radius:999px;border-color:#e0cfab;background:#fff7e6;color:var(--tag-text);font:800 10px/1.4 var(--round)}
+:root[data-theme="scooter"] .tag.draft{color:var(--ok);border-color:var(--success-border);background:var(--ok-bg)}
+:root[data-theme="scooter"] .tag.visit{color:#9a4a12;border-color:#f0b98f;background:#fff0e3}
+:root[data-theme="scooter"] .tag.warn{color:var(--warn)}
+:root[data-theme="scooter"] .alert{border-radius:14px;border-left:4px solid currentColor}
+:root[data-theme="scooter"] pre{border-radius:14px;background:#fffdf8;border-color:#eadbbd}
+:root[data-theme="scooter"] .table-wrap{border:2px solid #eadbbd;border-radius:20px;background:#fffdf8}
+:root[data-theme="scooter"] .contacts-table th{color:#9a4a12;font:italic 800 11px/1.4 var(--display);letter-spacing:1.4px;text-transform:uppercase}
+:root[data-theme="scooter"] .contacts-table td.email{color:var(--text);font-size:13px}
+:root[data-theme="scooter"] .contacts-table :is(input,select){border-color:#0000;background-color:#0000;color:var(--text);font-size:13px}
+:root[data-theme="scooter"] .contacts-table :is(input,select):is(:hover,:focus){border-color:#e0cfab;background-color:#fff}
+
+/* Painel: the dash clock, cream with a chrome bezel and a rosso seconds hand, beside the calendar */
+:root[data-theme="scooter"] .retro-widget{border:2px solid #eadbbd;border-radius:22px;background:linear-gradient(180deg,#fffdf7,#fbf1dd)}
+:root[data-theme="scooter"] .clock-analog{display:block;width:92px;height:92px;padding:4px;border-radius:50%;background:var(--lacquer-mint);box-shadow:0 4px 10px #13352e40}
+:root[data-theme="scooter"] .clock-analog svg{display:block;width:100%;height:100%}
+:root[data-theme="scooter"] .retro-clock #clock-time{display:none}
+:root[data-theme="scooter"] .clock-bezel{fill:#c3cacf;stroke:#8d969d;stroke-width:1.2}
+:root[data-theme="scooter"] .clock-face{fill:#f7eed8;stroke:#b9a988;stroke-width:.8}
+:root[data-theme="scooter"] .clock-tick{stroke:var(--brown)}
+:root[data-theme="scooter"] .clock-numeral{fill:var(--text);font:italic 800 12px/1 var(--display)}
+:root[data-theme="scooter"] .clock-hand line{stroke:var(--text)}
+:root[data-theme="scooter"] .clock-hand .second{stroke:var(--rosso)}
+:root[data-theme="scooter"] .clock-cap{fill:var(--rosso);stroke:#fff;stroke-width:.8}
+:root[data-theme="scooter"] .retro-date,:root[data-theme="scooter"] .retro-cal-month{color:#9a4a12;font:italic 800 11px/1.4 var(--display);letter-spacing:1.6px;text-transform:uppercase}
+:root[data-theme="scooter"] .cal-cell.today{background:var(--rosso);color:#fff}
+:root[data-theme="scooter"] .cal-cell.has-visit:after{background:var(--mint-deep);box-shadow:none}
+
+/* Comunicações: the steps are gears, 1ª to 4ª, in rosso roundels */
+:root[data-theme="scooter"] .workflow{counter-reset:marcia;border:2px solid #eadbbd;border-radius:999px;overflow:hidden;background:linear-gradient(180deg,#fffdf7,#fbf1dd)}
+:root[data-theme="scooter"] .workflow li{counter-increment:marcia}
+:root[data-theme="scooter"] .workflow li+li{border-left-color:#eadbbd}
+:root[data-theme="scooter"] .workflow a{align-items:center;color:var(--text);font:800 13px/1.4 var(--round)}
+:root[data-theme="scooter"] .workflow .num{font-size:0}
+:root[data-theme="scooter"] .workflow .num::before{content:counter(marcia) "ª";display:inline-grid;place-items:center;min-width:30px;height:30px;border-radius:50%;
+  color:#fff;background:var(--lacquer-rosso);font:italic 800 13px/1 var(--display);box-shadow:0 0 0 2px #fff,0 0 0 3px #b9c1c6}
+:root[data-theme="scooter"] .workflow li.done{background:linear-gradient(180deg,#e8f6f1,#cdeee3)}
+
+/* Imóveis: the slider on cream, chrome arrows */
+:root[data-theme="scooter"] .property-slider{border:2px solid #eadbbd;border-radius:22px;background:linear-gradient(180deg,#fffdf7,#fbf1dd)}
+:root[data-theme="scooter"] .slider-arrow{border:1px solid #8d969d;border-radius:50%;color:var(--text);background:var(--chrome)}
+:root[data-theme="scooter"] .slider-dot.active:before{background:var(--rosso);box-shadow:0 0 0 2px #fff,0 0 0 3px #b9c1c6}
+
+/* Each property's headset: mint lacquer with a chrome rim; cream dials, italic numbers, a rosso needle */
+:root[data-theme="scooter"] .cluster-gauges{align-items:flex-start;gap:clamp(8px,1.6vw,24px);margin:10px 0 22px;padding:26px 22px 16px;border-radius:60px 60px 26px 26px;
+  background:radial-gradient(ellipse at 50% 0%,#ffffff8c,#0000 55%),var(--lacquer-mint);
+  box-shadow:0 0 0 3px #fff,0 0 0 6px #b9c1c6,inset 0 -8px 16px #13352e33,0 12px 26px #13352e40}
+:root[data-theme="scooter"] .cluster-gauges .gauge figcaption{color:var(--mint-ink);font:800 10px/1.5 var(--round);letter-spacing:1px;text-transform:uppercase}
+:root[data-theme="scooter"] .cluster-gauges .gauge-setting{color:var(--mint-ink);font-family:var(--round)}
+:root[data-theme="scooter"] .cluster-gauges .gauge-setting button.link{color:#7a120c}
+:root[data-theme="scooter"] .gauge svg{filter:drop-shadow(0 5px 8px #13352e4d)}
+:root[data-theme="scooter"] .gauge-big svg{width:clamp(166px,15vw,230px)}
+:root[data-theme="scooter"] .gauge-small svg{width:clamp(118px,10.5vw,160px)}
+:root[data-theme="scooter"] .gauge-mini svg{width:clamp(92px,7.6vw,120px)}
+:root[data-theme="scooter"] .gauge-bezel{display:inline}
+:root[data-theme="scooter"] .gauge-face{fill:#f7eed8;stroke:#b9a988;stroke-width:1.5}
+:root[data-theme="scooter"] .gauge-tick{stroke:var(--brown);stroke-width:1.2}
+:root[data-theme="scooter"] .gauge-tick:not(.major),:root[data-theme="scooter"] .gauge-number:not(.end){display:inline}
+:root[data-theme="scooter"] .gauge-tick.major{stroke-width:3}
+:root[data-theme="scooter"] .gauge-number{fill:var(--text);font:italic 800 15px/1 var(--display)}
+:root[data-theme="scooter"] .gauge-unit{fill:#9a4a12;font:italic 800 9px/1 var(--display);letter-spacing:1.4px}
+:root[data-theme="scooter"] .gauge-icon{display:inline;color:var(--brown)}
+:root[data-theme="scooter"] .gauge-red{stroke:var(--rosso);stroke-width:7;opacity:1}
+:root[data-theme="scooter"] .gauge-green{stroke:var(--mint-deep);stroke-width:7;opacity:1}
+:root[data-theme="scooter"] .gauge-readout-box{fill:#1b1918;stroke:#8d969d;stroke-width:1.5}
+:root[data-theme="scooter"] .gauge-readout{fill:#fff;font:italic 800 12px/1 var(--display)}
+:root[data-theme="scooter"] .gauge-alert .gauge-readout{fill:#ffb3aa;animation:scooter-blink 1s steps(2,start) infinite}
+@keyframes scooter-blink{to{visibility:hidden}}
+:root[data-theme="scooter"] .gauge-needle{transition-duration:1.3s;transition-timing-function:cubic-bezier(.2,1.4,.4,1)}
+:root[data-theme="scooter"] .gauge-needle path{fill:var(--rosso)}
+:root[data-theme="scooter"] .gauge-cap{fill:#dfe4e7;stroke:#8d969d;stroke-width:2}
+/* Trip computer and counters: the odometer drum, white on black in chrome */
+:root[data-theme="scooter"] .trip-computer{border-radius:18px;background:#1b1918;color:#f7eed8;font:800 12px/1.4 var(--round);box-shadow:0 0 0 3px #dfe4e7,0 0 0 4.5px #8d969d}
+:root[data-theme="scooter"] .trip-title{color:var(--mustard);font:italic 800 10px/1 var(--display);letter-spacing:2px}
+:root[data-theme="scooter"] .trip-computer input{border:1px solid #4a4644;background:#0d0c0c;color:#fff;font:italic 800 12px/1 var(--display)}
+:root[data-theme="scooter"] .trip-computer button.link{color:var(--mustard)}
+:root[data-theme="scooter"] .trip-reading{color:#f7eed8}
+:root[data-theme="scooter"] .odometer-digits{gap:2px;padding:3px;border-radius:6px;background:var(--chrome);box-shadow:0 0 0 1px #8d969d}
+:root[data-theme="scooter"] .odometer-digits .lead{display:grid}
+:root[data-theme="scooter"] .odometer-digits span{display:grid;place-items:center;width:19px;height:27px;border-radius:2px;color:#fff;
+  font:italic 800 16px/1 var(--display);background:linear-gradient(#000,#2e2a28 45%,#2e2a28 55%,#000)}
+:root[data-theme="scooter"] .odometer-label{color:var(--muted);font:800 9px/1.4 var(--round);letter-spacing:1.4px;text-transform:uppercase}
+/* Warning lights: jewels in chrome bezels on a black switch panel */
+:root[data-theme="scooter"] .cluster-lamps{padding:12px;border-radius:999px;background:#1b1918;box-shadow:0 0 0 3px #dfe4e7,0 0 0 4.5px #8d969d}
+:root[data-theme="scooter"] .lamp{border-color:#3a3634;background:#262220;color:#cfc4b3;font:800 10px/1.2 var(--round);letter-spacing:.8px;text-transform:uppercase}
+:root[data-theme="scooter"] .lamp-bulb{width:10px;height:10px;background:#3a3634;box-shadow:0 0 0 1.5px #8d969d}
+:root[data-theme="scooter"] .lamp.on,:root[data-theme="scooter"] .lamp.on strong{color:#fff}
+:root[data-theme="scooter"] .lamp.on.lamp-red .lamp-bulb{background:#ff5a4d;box-shadow:0 0 0 1.5px #dfe4e7,0 0 10px #ff5a4d}
+:root[data-theme="scooter"] .lamp.on.lamp-amber .lamp-bulb{background:#f2b632;box-shadow:0 0 0 1.5px #dfe4e7,0 0 10px #f2b632}
+:root[data-theme="scooter"] .lamp.on.lamp-green .lamp-bulb{background:#6ee7b7;box-shadow:0 0 0 1.5px #dfe4e7,0 0 10px #6ee7b7}
+:root[data-theme="scooter"] .lamp.on.lamp-grey .lamp-bulb{background:#f7eed8;box-shadow:0 0 0 1.5px #dfe4e7,0 0 8px #f7eed8}
+/* Charts: a road map, requests in rosso and replies in orange */
+:root[data-theme="scooter"] .chart{padding:8px 10px 4px;border-radius:18px;background:repeating-linear-gradient(0deg,#0000 0 29px,#e0cfab80 29px 30px),#fffaf0;
+  box-shadow:0 0 0 2px #eadbbd}
+/* 28/09: the chart's pair, red and green (the orange was too close to the red to tell apart), validated against the card */
+:root[data-theme="scooter"]{--chart-requests:#d7261e;--chart-sent:#1f8a70}
+:root[data-theme="scooter"] .chart .bar-label{fill:var(--muted)}
+
+/* Agenda: a mint leather road book with cream pages */
+:root[data-theme="scooter"] .filofax{border:6px solid #3f8f7d;border-radius:18px;background:#3f8f7d;box-shadow:0 0 0 2px #fff,0 0 0 3px #b9c1c6,0 16px 40px #13352e33}
+:root[data-theme="scooter"] .filofax-page{border-color:#eadbbd;background-color:#fffaf0;color:var(--text);--agenda-rule:#e6d7ba;--agenda-paper:#fffaf0;--page-bg:#fffaf0}
+:root[data-theme="scooter"] .filofax-page.today{background-color:#fff0e3;--page-bg:#fff0e3}
+:root[data-theme="scooter"] .filofax-page .muted,:root[data-theme="scooter"] .filofax-weekday{color:#8a6a4e}
+:root[data-theme="scooter"] .filofax-head{border-bottom-color:var(--rosso)}
+:root[data-theme="scooter"] .filofax-page.today .filofax-weekday{color:var(--rosso)}
+
+/* Messages: the toast is a cream pill in a chrome ring with a mint light; an empty inbox waits with the scooter */
+:root[data-theme="scooter"] #toast{padding-left:46px;border:1px solid #c9cfd3;border-radius:999px;background:linear-gradient(180deg,#fffdf8,#f3e6cb);color:var(--text);
+  font:800 13px/1.5 var(--round);box-shadow:0 0 0 3px #fff,0 0 0 4.5px #b9c1c6,0 16px 40px #5a3a2240}
+:root[data-theme="scooter"] #toast::before{content:"";position:absolute;left:18px;top:50%;width:12px;height:12px;margin-top:-6px;border-radius:50%;
+  background:#3fbf8f;box-shadow:0 0 10px #3fbf8f}
+:root[data-theme="scooter"] #toast.warn{color:var(--warn)}
+:root[data-theme="scooter"] #toast.warn::before{background:#f2b632;box-shadow:0 0 10px #f2b632}
+:root[data-theme="scooter"] #toast.bad{color:var(--bad)}
+:root[data-theme="scooter"] #toast.bad::before{background:#e0342a;box-shadow:0 0 10px #e0342a}
+:root[data-theme="scooter"] .empty-state{border:2px dashed #e8a15a;border-radius:22px;background:#fffaf099}
+:root[data-theme="scooter"] .empty-state strong::before{content:"";display:block;width:84px;height:56px;margin:0 auto 10px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 132 88'%3E %3Cdefs%3E%3ClinearGradient id='b' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23ff6a5a'/%3E%3Cstop offset='0.35' stop-color='%23e0301f'/%3E%3Cstop offset='1' stop-color='%23a8170c'/%3E%3C/linearGradient%3E %3ClinearGradient id='c' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23fff'/%3E%3Cstop offset='0.5' stop-color='%239aa3aa'/%3E%3Cstop offset='1' stop-color='%23e3e8eb'/%3E%3C/linearGradient%3E%3C/defs%3E %3Cg transform='translate(132 0) scale(-1 1)'%3E%3Cg transform='translate(8 0)'%3E %3Ccircle cx='26' cy='76' r='11' fill='%231b1b1b'/%3E%3Ccircle cx='26' cy='76' r='6' fill='url(%23c)' stroke='%236d767d' stroke-width='0.6'/%3E%3Ccircle cx='26' cy='76' r='2' fill='%236d767d'/%3E %3Ccircle cx='103' cy='75' r='11' fill='%231b1b1b'/%3E%3Ccircle cx='103' cy='75' r='6' fill='url(%23c)' stroke='%236d767d' stroke-width='0.6'/%3E%3Ccircle cx='103' cy='75' r='2' fill='%236d767d'/%3E %3Cpath d='M36 73 L60 73 C62 73 63 75 61 76.5 L38 77 Z' fill='url(%23c)' stroke='%236d767d' stroke-width='0.5'/%3E %3Cpath d='M6 67 C2 57 6 48.5 17 45.5 C29 42.8 46 43.3 52.5 46.5 C57 49 57.5 56 56.5 62 L57 70 L10 70 C7.5 70 6.5 69 6 67 Z' fill='url(%23b)' stroke='%238e140b' stroke-width='0.7'/%3E %3Cpath d='M12 50 C20 46.5 40 46 49 48.5' fill='none' stroke='%23fff' stroke-opacity='0.6' stroke-width='1.4' stroke-linecap='round'/%3E %3Cpath d='M8 66 C20 62.5 44 62.5 56 65' fill='none' stroke='%238e140b' stroke-opacity='0.35' stroke-width='0.8'/%3E %3Cpath d='M9 69.5 L56.5 69.5' stroke='url(%23c)' stroke-width='1.4'/%3E %3Crect x='4' y='54' width='4' height='6' rx='1' fill='%23ff7a2e' stroke='%238e140b' stroke-width='0.5'/%3E %3Cpath d='M55 47 C60 52 60 62 62 68.5 L84 68.5 L84 72 L58 72 L55 70 Z' fill='url(%23b)' stroke='%238e140b' stroke-width='0.6'/%3E %3Crect x='58' y='68' width='26' height='3.6' rx='0.8' fill='%232a2624'/%3E%3Cpath d='M60 69.3 H82 M60 70.7 H82' stroke='%235a5654' stroke-width='0.5'/%3E %3Cpath d='M14 45.5 C14 40 21 37 32 36.8 L56 37.5 C61.5 38 63 42.5 60.5 45.5 Z' fill='%231d1b1a'/%3E %3Cpath d='M18 39.5 C26 38 44 38 56 39' fill='none' stroke='%23fff' stroke-opacity='0.18' stroke-width='1.2'/%3E %3Crect x='36' y='45.5' width='3' height='3' rx='0.6' fill='url(%23c)'/%3E %3Cpath d='M81 72 L83 27 C83.5 21 91 19 93 23.5 L97.5 57 C98.5 64 96 69.5 90 72 Z' fill='url(%23b)' stroke='%238e140b' stroke-width='0.7'/%3E %3Cpath d='M93 24 L97.5 57 C98.5 64 96 69.5 90.5 72' fill='none' stroke='url(%23c)' stroke-width='1.4'/%3E %3Cpath d='M86 30 C87.5 42 88.5 55 88 66' fill='none' stroke='%23fff' stroke-opacity='0.45' stroke-width='1.2' stroke-linecap='round'/%3E %3Cpath d='M87 22 L87 17' stroke='url(%23c)' stroke-width='3'/%3E %3Cpath d='M71 17 C70 11 85 8 94 11.5 C98 13.5 97 20 92.5 21 L75 21.5 C72.5 21.5 71 19.5 71 17 Z' fill='url(%23b)' stroke='%238e140b' stroke-width='0.6'/%3E %3Ccircle cx='96.5' cy='15.5' r='4.3' fill='%23fff6c8' stroke='url(%23c)' stroke-width='1.8'/%3E %3Cpath d='M73 15.5 L64 16.5' stroke='%231b1b1b' stroke-width='3.2' stroke-linecap='round'/%3E %3Cpath d='M80 10.5 L77 1.8' stroke='url(%23c)' stroke-width='0.9'/%3E%3Cellipse cx='76.5' cy='2' rx='2.8' ry='1.7' fill='url(%23c)' stroke='%236d767d' stroke-width='0.4'/%3E %3Cpath d='M95 62 C98 61 101 64 102.5 73' stroke='%232a2624' stroke-width='2.4' fill='none' stroke-linecap='round'/%3E %3Cpath d='M97 63 L100.5 70.5' stroke='url(%23c)' stroke-width='1.4' stroke-dasharray='1.2 0.8'/%3E %3Cpath d='M86.5 68.5 C88 54.5 111 52.5 120 66.5 L116.5 68.5 C110 59.5 96.5 59.5 91.5 69.5 Z' fill='url(%23b)' stroke='%238e140b' stroke-width='0.7'/%3E %3Cpath d='M91 64 C97 57.5 108 57.5 115 63' fill='none' stroke='%23fff' stroke-opacity='0.55' stroke-width='1.1' stroke-linecap='round'/%3E %3C/g%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat}
+
+/* The coast road at the foot of the window: the sea, a strip of sand, the asphalt with its white dashes */
+:root[data-theme="scooter"] body::before{content:"";position:fixed;left:0;right:0;bottom:0;height:42px;z-index:-1;pointer-events:none;
+  background:repeating-linear-gradient(90deg,#fff 0 26px,#0000 26px 52px) 0 29px/100% 2px no-repeat,
+    linear-gradient(180deg,#6cc3d5 0 9px,#f2dfb0 9px 13px,#5a5654 13px)}
+/* The scooter, with its little tricolore: it crosses the top bar to the left in the first half of a 90 s ride... */
+/* 29/09: em pausa, a pedido — o veículo já não passa no cabeçalho, só no rodapé. Para voltar, tira este comentário.
+:root[data-theme="scooter"] .topbar::before{content:"";position:absolute;left:0;bottom:7px;width:66px;height:40px;z-index:-1;pointer-events:none;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 132 88'%3E %3Cdefs%3E%3ClinearGradient id='b' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23ff6a5a'/%3E%3Cstop offset='0.35' stop-color='%23e0301f'/%3E%3Cstop offset='1' stop-color='%23a8170c'/%3E%3C/linearGradient%3E %3ClinearGradient id='c' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23fff'/%3E%3Cstop offset='0.5' stop-color='%239aa3aa'/%3E%3Cstop offset='1' stop-color='%23e3e8eb'/%3E%3C/linearGradient%3E%3C/defs%3E %3Cg transform='translate(132 0) scale(-1 1)'%3E%3Cg transform='translate(8 0)'%3E %3Ccircle cx='26' cy='76' r='11' fill='%231b1b1b'/%3E%3Ccircle cx='26' cy='76' r='6' fill='url(%23c)' stroke='%236d767d' stroke-width='0.6'/%3E%3Ccircle cx='26' cy='76' r='2' fill='%236d767d'/%3E %3Ccircle cx='103' cy='75' r='11' fill='%231b1b1b'/%3E%3Ccircle cx='103' cy='75' r='6' fill='url(%23c)' stroke='%236d767d' stroke-width='0.6'/%3E%3Ccircle cx='103' cy='75' r='2' fill='%236d767d'/%3E %3Cpath d='M36 73 L60 73 C62 73 63 75 61 76.5 L38 77 Z' fill='url(%23c)' stroke='%236d767d' stroke-width='0.5'/%3E %3Cpath d='M6 67 C2 57 6 48.5 17 45.5 C29 42.8 46 43.3 52.5 46.5 C57 49 57.5 56 56.5 62 L57 70 L10 70 C7.5 70 6.5 69 6 67 Z' fill='url(%23b)' stroke='%238e140b' stroke-width='0.7'/%3E %3Cpath d='M12 50 C20 46.5 40 46 49 48.5' fill='none' stroke='%23fff' stroke-opacity='0.6' stroke-width='1.4' stroke-linecap='round'/%3E %3Cpath d='M8 66 C20 62.5 44 62.5 56 65' fill='none' stroke='%238e140b' stroke-opacity='0.35' stroke-width='0.8'/%3E %3Cpath d='M9 69.5 L56.5 69.5' stroke='url(%23c)' stroke-width='1.4'/%3E %3Crect x='4' y='54' width='4' height='6' rx='1' fill='%23ff7a2e' stroke='%238e140b' stroke-width='0.5'/%3E %3Cpath d='M55 47 C60 52 60 62 62 68.5 L84 68.5 L84 72 L58 72 L55 70 Z' fill='url(%23b)' stroke='%238e140b' stroke-width='0.6'/%3E %3Crect x='58' y='68' width='26' height='3.6' rx='0.8' fill='%232a2624'/%3E%3Cpath d='M60 69.3 H82 M60 70.7 H82' stroke='%235a5654' stroke-width='0.5'/%3E %3Cpath d='M14 45.5 C14 40 21 37 32 36.8 L56 37.5 C61.5 38 63 42.5 60.5 45.5 Z' fill='%231d1b1a'/%3E %3Cpath d='M18 39.5 C26 38 44 38 56 39' fill='none' stroke='%23fff' stroke-opacity='0.18' stroke-width='1.2'/%3E %3Crect x='36' y='45.5' width='3' height='3' rx='0.6' fill='url(%23c)'/%3E %3Cpath d='M81 72 L83 27 C83.5 21 91 19 93 23.5 L97.5 57 C98.5 64 96 69.5 90 72 Z' fill='url(%23b)' stroke='%238e140b' stroke-width='0.7'/%3E %3Cpath d='M93 24 L97.5 57 C98.5 64 96 69.5 90.5 72' fill='none' stroke='url(%23c)' stroke-width='1.4'/%3E %3Cpath d='M86 30 C87.5 42 88.5 55 88 66' fill='none' stroke='%23fff' stroke-opacity='0.45' stroke-width='1.2' stroke-linecap='round'/%3E %3Cpath d='M87 22 L87 17' stroke='url(%23c)' stroke-width='3'/%3E %3Cpath d='M71 17 C70 11 85 8 94 11.5 C98 13.5 97 20 92.5 21 L75 21.5 C72.5 21.5 71 19.5 71 17 Z' fill='url(%23b)' stroke='%238e140b' stroke-width='0.6'/%3E %3Ccircle cx='96.5' cy='15.5' r='4.3' fill='%23fff6c8' stroke='url(%23c)' stroke-width='1.8'/%3E %3Cpath d='M73 15.5 L64 16.5' stroke='%231b1b1b' stroke-width='3.2' stroke-linecap='round'/%3E %3Cpath d='M80 10.5 L77 1.8' stroke='url(%23c)' stroke-width='0.9'/%3E%3Cellipse cx='76.5' cy='2' rx='2.8' ry='1.7' fill='url(%23c)' stroke='%236d767d' stroke-width='0.4'/%3E %3Cpath d='M95 62 C98 61 101 64 102.5 73' stroke='%232a2624' stroke-width='2.4' fill='none' stroke-linecap='round'/%3E %3Cpath d='M97 63 L100.5 70.5' stroke='url(%23c)' stroke-width='1.4' stroke-dasharray='1.2 0.8'/%3E %3Cpath d='M86.5 68.5 C88 54.5 111 52.5 120 66.5 L116.5 68.5 C110 59.5 96.5 59.5 91.5 69.5 Z' fill='url(%23b)' stroke='%238e140b' stroke-width='0.7'/%3E %3Cpath d='M91 64 C97 57.5 108 57.5 115 63' fill='none' stroke='%23fff' stroke-opacity='0.55' stroke-width='1.1' stroke-linecap='round'/%3E %3C/g%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat;animation:scooter-ride 90s linear infinite} */
+@keyframes scooter-ride{0%{transform:translateX(100vw)}40%,100%{transform:translateX(-90px)}}
+/* ...and comes back along the coast road, mirrored, heading right, in the second half */
+:root[data-theme="scooter"] body::after{content:"";position:fixed;left:0;bottom:12px;width:54px;height:33px;z-index:-1;pointer-events:none;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 132 88'%3E %3Cdefs%3E%3ClinearGradient id='b' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23ff6a5a'/%3E%3Cstop offset='0.35' stop-color='%23e0301f'/%3E%3Cstop offset='1' stop-color='%23a8170c'/%3E%3C/linearGradient%3E %3ClinearGradient id='c' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23fff'/%3E%3Cstop offset='0.5' stop-color='%239aa3aa'/%3E%3Cstop offset='1' stop-color='%23e3e8eb'/%3E%3C/linearGradient%3E%3C/defs%3E %3Cg transform='translate(132 0) scale(-1 1)'%3E%3Cg transform='translate(8 0)'%3E %3Ccircle cx='26' cy='76' r='11' fill='%231b1b1b'/%3E%3Ccircle cx='26' cy='76' r='6' fill='url(%23c)' stroke='%236d767d' stroke-width='0.6'/%3E%3Ccircle cx='26' cy='76' r='2' fill='%236d767d'/%3E %3Ccircle cx='103' cy='75' r='11' fill='%231b1b1b'/%3E%3Ccircle cx='103' cy='75' r='6' fill='url(%23c)' stroke='%236d767d' stroke-width='0.6'/%3E%3Ccircle cx='103' cy='75' r='2' fill='%236d767d'/%3E %3Cpath d='M36 73 L60 73 C62 73 63 75 61 76.5 L38 77 Z' fill='url(%23c)' stroke='%236d767d' stroke-width='0.5'/%3E %3Cpath d='M6 67 C2 57 6 48.5 17 45.5 C29 42.8 46 43.3 52.5 46.5 C57 49 57.5 56 56.5 62 L57 70 L10 70 C7.5 70 6.5 69 6 67 Z' fill='url(%23b)' stroke='%238e140b' stroke-width='0.7'/%3E %3Cpath d='M12 50 C20 46.5 40 46 49 48.5' fill='none' stroke='%23fff' stroke-opacity='0.6' stroke-width='1.4' stroke-linecap='round'/%3E %3Cpath d='M8 66 C20 62.5 44 62.5 56 65' fill='none' stroke='%238e140b' stroke-opacity='0.35' stroke-width='0.8'/%3E %3Cpath d='M9 69.5 L56.5 69.5' stroke='url(%23c)' stroke-width='1.4'/%3E %3Crect x='4' y='54' width='4' height='6' rx='1' fill='%23ff7a2e' stroke='%238e140b' stroke-width='0.5'/%3E %3Cpath d='M55 47 C60 52 60 62 62 68.5 L84 68.5 L84 72 L58 72 L55 70 Z' fill='url(%23b)' stroke='%238e140b' stroke-width='0.6'/%3E %3Crect x='58' y='68' width='26' height='3.6' rx='0.8' fill='%232a2624'/%3E%3Cpath d='M60 69.3 H82 M60 70.7 H82' stroke='%235a5654' stroke-width='0.5'/%3E %3Cpath d='M14 45.5 C14 40 21 37 32 36.8 L56 37.5 C61.5 38 63 42.5 60.5 45.5 Z' fill='%231d1b1a'/%3E %3Cpath d='M18 39.5 C26 38 44 38 56 39' fill='none' stroke='%23fff' stroke-opacity='0.18' stroke-width='1.2'/%3E %3Crect x='36' y='45.5' width='3' height='3' rx='0.6' fill='url(%23c)'/%3E %3Cpath d='M81 72 L83 27 C83.5 21 91 19 93 23.5 L97.5 57 C98.5 64 96 69.5 90 72 Z' fill='url(%23b)' stroke='%238e140b' stroke-width='0.7'/%3E %3Cpath d='M93 24 L97.5 57 C98.5 64 96 69.5 90.5 72' fill='none' stroke='url(%23c)' stroke-width='1.4'/%3E %3Cpath d='M86 30 C87.5 42 88.5 55 88 66' fill='none' stroke='%23fff' stroke-opacity='0.45' stroke-width='1.2' stroke-linecap='round'/%3E %3Cpath d='M87 22 L87 17' stroke='url(%23c)' stroke-width='3'/%3E %3Cpath d='M71 17 C70 11 85 8 94 11.5 C98 13.5 97 20 92.5 21 L75 21.5 C72.5 21.5 71 19.5 71 17 Z' fill='url(%23b)' stroke='%238e140b' stroke-width='0.6'/%3E %3Ccircle cx='96.5' cy='15.5' r='4.3' fill='%23fff6c8' stroke='url(%23c)' stroke-width='1.8'/%3E %3Cpath d='M73 15.5 L64 16.5' stroke='%231b1b1b' stroke-width='3.2' stroke-linecap='round'/%3E %3Cpath d='M80 10.5 L77 1.8' stroke='url(%23c)' stroke-width='0.9'/%3E%3Cellipse cx='76.5' cy='2' rx='2.8' ry='1.7' fill='url(%23c)' stroke='%236d767d' stroke-width='0.4'/%3E %3Cpath d='M95 62 C98 61 101 64 102.5 73' stroke='%232a2624' stroke-width='2.4' fill='none' stroke-linecap='round'/%3E %3Cpath d='M97 63 L100.5 70.5' stroke='url(%23c)' stroke-width='1.4' stroke-dasharray='1.2 0.8'/%3E %3Cpath d='M86.5 68.5 C88 54.5 111 52.5 120 66.5 L116.5 68.5 C110 59.5 96.5 59.5 91.5 69.5 Z' fill='url(%23b)' stroke='%238e140b' stroke-width='0.7'/%3E %3Cpath d='M91 64 C97 57.5 108 57.5 115 63' fill='none' stroke='%23fff' stroke-opacity='0.55' stroke-width='1.1' stroke-linecap='round'/%3E %3C/g%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat;animation:scooter-return 90s linear infinite}
+@keyframes scooter-return{0%,50%{transform:translateX(-90px) scaleX(-1)}100%{transform:translateX(calc(100vw + 20px)) scaleX(-1)}}
+/* The open tab's seat bounces a little on the cobbles; a button, when pointed at, too */
+:root[data-theme="scooter"] .tab.active{animation:scooter-bump 3.2s ease-in-out infinite}
+@keyframes scooter-bump{0%,88%,100%{transform:none}92%{transform:translateY(-2px)}96%{transform:translateY(1px)}}
+
+/* The Sons switch: at the right of the top bar, as in the other skins, with the horn crossed out or sounding */
+:root[data-theme="scooter"] .sound-toggle{margin-left:auto;min-height:32px;padding:4px 12px 4px 9px;gap:7px;font-size:11px;letter-spacing:.6px;text-transform:uppercase}
+:root[data-theme="scooter"] .sound-toggle::before{content:"";width:16px;height:16px;flex:none;background:currentColor;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 9.5h3.5L12 5.5v13l-4.5-4H4Z'/%3E%3Cpath d='M16 9.5l5 5M21 9.5l-5 5'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 9.5h3.5L12 5.5v13l-4.5-4H4Z'/%3E%3Cpath d='M16 9.5l5 5M21 9.5l-5 5'/%3E%3C/svg%3E") center/contain no-repeat}
+:root[data-theme="scooter"] .sound-toggle[aria-pressed="true"]{color:var(--mint-ink);border-color:#3f8f7d;background:var(--lacquer-mint)}
+:root[data-theme="scooter"] .sound-toggle[aria-pressed="true"]::before{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 9.5h3.5L12 5.5v13l-4.5-4H4Z'/%3E%3Cpath d='M15.5 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 9.5h3.5L12 5.5v13l-4.5-4H4Z'/%3E%3Cpath d='M15.5 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11'/%3E%3C/svg%3E")}
+:root[data-theme="scooter"] .sound-toggle:not([hidden])+.theme-control{margin-left:0}
+
+/* Phone: the legshield becomes the top strip, the grip hides, the dials go two by two */
+@media(max-width:760px){
+  :root[data-theme="scooter"] .sidebar::before{top:auto;left:0;right:0;bottom:0;width:auto;height:5px;background:var(--chrome)}
+  :root[data-theme="scooter"] .sidebar::after{display:none}
+  :root[data-theme="scooter"] .sidebar{padding-bottom:16px}
+  :root[data-theme="scooter"] .skin-selector{display:none}
+  :root[data-theme="scooter"] .tab{justify-content:center;padding:9px 6px;font-size:12px}
+  :root[data-theme="scooter"] .sound-toggle{padding:4px 8px;font-size:0;gap:0}
+  :root[data-theme="scooter"] .cluster-gauges{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));justify-items:center;padding:22px 10px 12px;border-radius:36px 36px 18px 18px}
+  :root[data-theme="scooter"] .gauge-speedo{order:-2}
+  :root[data-theme="scooter"] .gauge-tach{order:-1}
+  :root[data-theme="scooter"] .gauge svg,:root[data-theme="scooter"] .gauge-big svg,:root[data-theme="scooter"] .gauge-small svg{width:100%;max-width:170px}
+  :root[data-theme="scooter"] .gauge-mini svg{width:100%;max-width:130px}
+  :root[data-theme="scooter"] .workflow{border-radius:18px}
+}
+@media(prefers-reduced-motion:reduce){
+  :root[data-theme="scooter"] .topbar::before,:root[data-theme="scooter"] body::after,:root[data-theme="scooter"] #busy::before,:root[data-theme="scooter"] .tab.active,:root[data-theme="scooter"] .gauge-alert .gauge-readout,:root[data-theme="scooter"] .grip-rubber.twist{animation:none}
+  :root[data-theme="scooter"] .topbar::before,:root[data-theme="scooter"] body::after{display:none}
+}
+
+/* ===== WILD (26/09, «está pouco wild»): the seventies, loud. Later rules, so they win over the calmer ones above. ===== */
+/* The wall: a sunburst from the top right and the four stripes sweeping in giant arcs from the bottom left, see-through
+   enough for the cream panels on top to stay easy to read */
+:root[data-theme="scooter"] body{background:
+  radial-gradient(circle at 0% 100%,#0000 0 30vmax,#00924633 30vmax 33vmax,#ffffffa6 33vmax 36vmax,#ce2b3733 36vmax 39vmax,#0000 39vmax) fixed,
+  radial-gradient(circle at 100% 0%,#ffd27d 0 90px,#ffb86b 91px 104px,#0000 105px) fixed,
+  repeating-conic-gradient(from 0deg at 100% 0%,#ffcf7a2e 0 5deg,#0000 5deg 10deg) fixed,
+  var(--bg)}
+/* Titles: bigger, chunkier, the stripes stepping out behind them */
+:root[data-theme="scooter"] h1{font-size:clamp(30px,3vw,46px);font-weight:800;letter-spacing:-.6px;margin-bottom:18px;
+  color:#2a1d14;text-shadow:2px 2px 0 #f2b632a6}
+/* The seventies stay, off the letters: the four stripes as a short bar under the title */
+:root[data-theme="scooter"] h1::after{content:"";display:block;width:112px;height:9px;margin-top:12px;border-radius:2px;
+  background:linear-gradient(90deg,#009246 0 33.3%,#fff 33.3% 66.6%,#ce2b37 66.6%)}
+/* The small labels are stickers: slapped on a little crooked, white edge, a shadow under them */
+:root[data-theme="scooter"] .eyebrow{transform:rotate(-2.5deg);padding:4px 14px;font-size:10.5px;background:var(--rosso);
+  box-shadow:0 0 0 2.5px #fff,2px 4px 0 2.5px #6b3f2240}
+:root[data-theme="scooter"] .card:nth-of-type(2n) .eyebrow{transform:rotate(1.8deg);background:var(--orange)}
+:root[data-theme="scooter"] .card:nth-of-type(3n) .eyebrow{background:var(--mint-deep)}
+/* The legshield: flower-power stickers all over the mint, and an Italy decal at its foot */
+:root[data-theme="scooter"] .sidebar{background:linear-gradient(90deg,#d7261e 0 10px,#fff 10px 13px,#0000 13px 17px,#1b1918 17px 19px,#0000 19px),var(--lacquer-mint)}
+:root[data-theme="scooter"] .sidebar{padding-bottom:108px}
+:root[data-theme="scooter"] .sidebar::after{left:calc(50% - 60px);right:auto;bottom:14px;width:120px;height:80px;border-radius:0;box-shadow:none;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 80'%3E %3Cdefs%3E %3ClinearGradient id='ring' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23ffffff'/%3E%3Cstop offset='0.25' stop-color='%23d9dee2'/%3E%3Cstop offset='0.5' stop-color='%237c858c'/%3E%3Cstop offset='0.62' stop-color='%23f4f6f7'/%3E%3Cstop offset='0.85' stop-color='%23aab2b8'/%3E%3Cstop offset='1' stop-color='%236d767d'/%3E%3C/linearGradient%3E %3ClinearGradient id='flag' x1='0' x2='1'%3E%3Cstop offset='0.335' stop-color='%230a8f45'/%3E%3Cstop offset='0.335' stop-color='%23f7f7f2'/%3E%3Cstop offset='0.665' stop-color='%23f7f7f2'/%3E%3Cstop offset='0.665' stop-color='%23d0222e'/%3E%3C/linearGradient%3E %3CradialGradient id='dome' cx='0.5' cy='0.35' r='0.7'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='0'/%3E%3Cstop offset='0.75' stop-color='%23000' stop-opacity='0.08'/%3E%3Cstop offset='1' stop-color='%23000' stop-opacity='0.4'/%3E%3C/radialGradient%3E %3ClinearGradient id='gloss' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23fff' stop-opacity='0.85'/%3E%3Cstop offset='1' stop-color='%23fff' stop-opacity='0'/%3E%3C/linearGradient%3E %3ClinearGradient id='ink' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%235a5f63'/%3E%3Cstop offset='0.45' stop-color='%230f1113'/%3E%3Cstop offset='1' stop-color='%233a3e42'/%3E%3C/linearGradient%3E %3CclipPath id='inner'%3E%3Cellipse cx='60' cy='40' rx='49' ry='30'/%3E%3C/clipPath%3E %3C/defs%3E %3Cellipse cx='60' cy='42' rx='58' ry='37' fill='%23000' opacity='0.35'/%3E %3Cellipse cx='60' cy='40' rx='58' ry='37' fill='url(%23ring)'/%3E %3Cellipse cx='60' cy='40' rx='52.5' ry='32.5' fill='%235d666d'/%3E %3Cellipse cx='60' cy='40' rx='51' ry='31.5' fill='url(%23ring)' transform='rotate(180 60 40)'/%3E %3Cg clip-path='url(%23inner)'%3E%3Crect x='8' y='8' width='104' height='64' fill='url(%23flag)'/%3E%3Crect x='8' y='8' width='104' height='64' fill='url(%23dome)'/%3E%3C/g%3E %3Ctext x='60' y='49' text-anchor='middle' transform='rotate(-8 60 44)' font-family='Brush Script MT, Snell Roundhand, cursive' font-style='italic' font-size='30' fill='url(%23ink)' stroke='%23fff' stroke-opacity='0.6' stroke-width='0.6'%3EItalia%3C/text%3E %3Cellipse cx='60' cy='24' rx='40' ry='11' fill='url(%23gloss)' clip-path='url(%23inner)'/%3E %3C/svg%3E") center/contain no-repeat;transform:none;filter:drop-shadow(0 3px 5px #13352e66)}
+:root[data-theme="scooter"] .tab.active{padding-left:26px;border-radius:0 999px 999px 0;
+  background:linear-gradient(180deg,#009246 0 33.3%,#fff 33.3% 66.6%,#ce2b37 66.6%) 0 0/12px 100% no-repeat,var(--lacquer-rosso)}
+/* Panels: a thick band of the four stripes on top, a hand-cut feel on the corners, and a small lift when pointed at */
+:root[data-theme="scooter"] .card{border-width:3px;border-color:#f0dcb4;border-radius:26px 26px 26px 8px;
+  background:linear-gradient(180deg,#009246 0 33.3%,#fff 33.3% 66.6%,#ce2b37 66.6%) top/100% 14px no-repeat,linear-gradient(180deg,#fffdf7,#fbf1dd);
+  box-shadow:6px 6px 0 #00924622,0 12px 26px #5a3a2226;transition:transform .25s,box-shadow .25s}
+:root[data-theme="scooter"] .card:hover{transform:translateY(-2px) rotate(-.15deg);box-shadow:8px 9px 0 #ce2b3730,0 16px 30px #5a3a2230}
+:root[data-theme="scooter"] .metric{border-width:3px;border-radius:26px 26px 26px 8px;box-shadow:5px 5px 0 #8fd5c366,0 10px 22px #5a3a221f}
+/* Buttons give a little «vroom» when pointed at */
+:root[data-theme="scooter"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link,.deal-button):not(:disabled):hover{animation:scooter-vroom .35s ease-out}
+@keyframes scooter-vroom{0%{transform:none}30%{transform:translateX(-2px) rotate(-1.5deg)}60%{transform:translateX(2px) rotate(1deg)}100%{transform:none}}
+/* The top bar: a louder sunset, rays and all, and a bigger scooter puffing smoke, passing every 45 s */
+:root[data-theme="scooter"] .topbar{background:radial-gradient(circle at 80% 135%,#ffd27d 0 30px,#ffb86b 31px 38px,#0000 39px),
+  repeating-conic-gradient(from 0deg at 80% 135%,#ffcf7a55 0 6deg,#0000 6deg 12deg),
+  linear-gradient(180deg,#9fdcee,#ffe0b8 62%,#ffb98a)}
+:root[data-theme="scooter"] .topbar::before{width:84px;height:56px;bottom:8px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 132 88'%3E %3Cdefs%3E%3ClinearGradient id='b' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23ff6a5a'/%3E%3Cstop offset='0.35' stop-color='%23e0301f'/%3E%3Cstop offset='1' stop-color='%23a8170c'/%3E%3C/linearGradient%3E %3ClinearGradient id='c' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23fff'/%3E%3Cstop offset='0.5' stop-color='%239aa3aa'/%3E%3Cstop offset='1' stop-color='%23e3e8eb'/%3E%3C/linearGradient%3E%3C/defs%3E %3Cg transform='translate(132 0) scale(-1 1)'%3E%3Cg transform='translate(8 0)'%3E%3Ccircle cx='-3' cy='70' r='4.6' fill='%23fff' opacity='0.75'/%3E%3Ccircle cx='3' cy='74' r='3.4' fill='%23fff' opacity='0.85'/%3E%3Ccircle cx='-6' cy='63' r='2.8' fill='%23fff' opacity='0.55'/%3E %3Ccircle cx='26' cy='76' r='11' fill='%231b1b1b'/%3E%3Ccircle cx='26' cy='76' r='6' fill='url(%23c)' stroke='%236d767d' stroke-width='0.6'/%3E%3Ccircle cx='26' cy='76' r='2' fill='%236d767d'/%3E %3Ccircle cx='103' cy='75' r='11' fill='%231b1b1b'/%3E%3Ccircle cx='103' cy='75' r='6' fill='url(%23c)' stroke='%236d767d' stroke-width='0.6'/%3E%3Ccircle cx='103' cy='75' r='2' fill='%236d767d'/%3E %3Cpath d='M36 73 L60 73 C62 73 63 75 61 76.5 L38 77 Z' fill='url(%23c)' stroke='%236d767d' stroke-width='0.5'/%3E %3Cpath d='M6 67 C2 57 6 48.5 17 45.5 C29 42.8 46 43.3 52.5 46.5 C57 49 57.5 56 56.5 62 L57 70 L10 70 C7.5 70 6.5 69 6 67 Z' fill='url(%23b)' stroke='%238e140b' stroke-width='0.7'/%3E %3Cpath d='M12 50 C20 46.5 40 46 49 48.5' fill='none' stroke='%23fff' stroke-opacity='0.6' stroke-width='1.4' stroke-linecap='round'/%3E %3Cpath d='M8 66 C20 62.5 44 62.5 56 65' fill='none' stroke='%238e140b' stroke-opacity='0.35' stroke-width='0.8'/%3E %3Cpath d='M9 69.5 L56.5 69.5' stroke='url(%23c)' stroke-width='1.4'/%3E %3Crect x='4' y='54' width='4' height='6' rx='1' fill='%23ff7a2e' stroke='%238e140b' stroke-width='0.5'/%3E %3Cpath d='M55 47 C60 52 60 62 62 68.5 L84 68.5 L84 72 L58 72 L55 70 Z' fill='url(%23b)' stroke='%238e140b' stroke-width='0.6'/%3E %3Crect x='58' y='68' width='26' height='3.6' rx='0.8' fill='%232a2624'/%3E%3Cpath d='M60 69.3 H82 M60 70.7 H82' stroke='%235a5654' stroke-width='0.5'/%3E %3Cpath d='M14 45.5 C14 40 21 37 32 36.8 L56 37.5 C61.5 38 63 42.5 60.5 45.5 Z' fill='%231d1b1a'/%3E %3Cpath d='M18 39.5 C26 38 44 38 56 39' fill='none' stroke='%23fff' stroke-opacity='0.18' stroke-width='1.2'/%3E %3Crect x='36' y='45.5' width='3' height='3' rx='0.6' fill='url(%23c)'/%3E %3Cpath d='M81 72 L83 27 C83.5 21 91 19 93 23.5 L97.5 57 C98.5 64 96 69.5 90 72 Z' fill='url(%23b)' stroke='%238e140b' stroke-width='0.7'/%3E %3Cpath d='M93 24 L97.5 57 C98.5 64 96 69.5 90.5 72' fill='none' stroke='url(%23c)' stroke-width='1.4'/%3E %3Cpath d='M86 30 C87.5 42 88.5 55 88 66' fill='none' stroke='%23fff' stroke-opacity='0.45' stroke-width='1.2' stroke-linecap='round'/%3E %3Cpath d='M87 22 L87 17' stroke='url(%23c)' stroke-width='3'/%3E %3Cpath d='M71 17 C70 11 85 8 94 11.5 C98 13.5 97 20 92.5 21 L75 21.5 C72.5 21.5 71 19.5 71 17 Z' fill='url(%23b)' stroke='%238e140b' stroke-width='0.6'/%3E %3Ccircle cx='96.5' cy='15.5' r='4.3' fill='%23fff6c8' stroke='url(%23c)' stroke-width='1.8'/%3E %3Cpath d='M73 15.5 L64 16.5' stroke='%231b1b1b' stroke-width='3.2' stroke-linecap='round'/%3E %3Cpath d='M80 10.5 L77 1.8' stroke='url(%23c)' stroke-width='0.9'/%3E%3Cellipse cx='76.5' cy='2' rx='2.8' ry='1.7' fill='url(%23c)' stroke='%236d767d' stroke-width='0.4'/%3E %3Cpath d='M95 62 C98 61 101 64 102.5 73' stroke='%232a2624' stroke-width='2.4' fill='none' stroke-linecap='round'/%3E %3Cpath d='M97 63 L100.5 70.5' stroke='url(%23c)' stroke-width='1.4' stroke-dasharray='1.2 0.8'/%3E %3Cpath d='M86.5 68.5 C88 54.5 111 52.5 120 66.5 L116.5 68.5 C110 59.5 96.5 59.5 91.5 69.5 Z' fill='url(%23b)' stroke='%238e140b' stroke-width='0.7'/%3E %3Cpath d='M91 64 C97 57.5 108 57.5 115 63' fill='none' stroke='%23fff' stroke-opacity='0.55' stroke-width='1.1' stroke-linecap='round'/%3E %3C/g%3E%3C/g%3E%3C/svg%3E");animation-duration:45s}
+:root[data-theme="scooter"] body::after{width:78px;height:36px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 132 88'%3E %3Cdefs%3E%3ClinearGradient id='b' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23ff6a5a'/%3E%3Cstop offset='0.35' stop-color='%23e0301f'/%3E%3Cstop offset='1' stop-color='%23a8170c'/%3E%3C/linearGradient%3E %3ClinearGradient id='c' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23fff'/%3E%3Cstop offset='0.5' stop-color='%239aa3aa'/%3E%3Cstop offset='1' stop-color='%23e3e8eb'/%3E%3C/linearGradient%3E%3C/defs%3E %3Cg transform='translate(132 0) scale(-1 1)'%3E%3Cg transform='translate(8 0)'%3E%3Ccircle cx='-3' cy='70' r='4.6' fill='%23fff' opacity='0.75'/%3E%3Ccircle cx='3' cy='74' r='3.4' fill='%23fff' opacity='0.85'/%3E%3Ccircle cx='-6' cy='63' r='2.8' fill='%23fff' opacity='0.55'/%3E %3Ccircle cx='26' cy='76' r='11' fill='%231b1b1b'/%3E%3Ccircle cx='26' cy='76' r='6' fill='url(%23c)' stroke='%236d767d' stroke-width='0.6'/%3E%3Ccircle cx='26' cy='76' r='2' fill='%236d767d'/%3E %3Ccircle cx='103' cy='75' r='11' fill='%231b1b1b'/%3E%3Ccircle cx='103' cy='75' r='6' fill='url(%23c)' stroke='%236d767d' stroke-width='0.6'/%3E%3Ccircle cx='103' cy='75' r='2' fill='%236d767d'/%3E %3Cpath d='M36 73 L60 73 C62 73 63 75 61 76.5 L38 77 Z' fill='url(%23c)' stroke='%236d767d' stroke-width='0.5'/%3E %3Cpath d='M6 67 C2 57 6 48.5 17 45.5 C29 42.8 46 43.3 52.5 46.5 C57 49 57.5 56 56.5 62 L57 70 L10 70 C7.5 70 6.5 69 6 67 Z' fill='url(%23b)' stroke='%238e140b' stroke-width='0.7'/%3E %3Cpath d='M12 50 C20 46.5 40 46 49 48.5' fill='none' stroke='%23fff' stroke-opacity='0.6' stroke-width='1.4' stroke-linecap='round'/%3E %3Cpath d='M8 66 C20 62.5 44 62.5 56 65' fill='none' stroke='%238e140b' stroke-opacity='0.35' stroke-width='0.8'/%3E %3Cpath d='M9 69.5 L56.5 69.5' stroke='url(%23c)' stroke-width='1.4'/%3E %3Crect x='4' y='54' width='4' height='6' rx='1' fill='%23ff7a2e' stroke='%238e140b' stroke-width='0.5'/%3E %3Cpath d='M55 47 C60 52 60 62 62 68.5 L84 68.5 L84 72 L58 72 L55 70 Z' fill='url(%23b)' stroke='%238e140b' stroke-width='0.6'/%3E %3Crect x='58' y='68' width='26' height='3.6' rx='0.8' fill='%232a2624'/%3E%3Cpath d='M60 69.3 H82 M60 70.7 H82' stroke='%235a5654' stroke-width='0.5'/%3E %3Cpath d='M14 45.5 C14 40 21 37 32 36.8 L56 37.5 C61.5 38 63 42.5 60.5 45.5 Z' fill='%231d1b1a'/%3E %3Cpath d='M18 39.5 C26 38 44 38 56 39' fill='none' stroke='%23fff' stroke-opacity='0.18' stroke-width='1.2'/%3E %3Crect x='36' y='45.5' width='3' height='3' rx='0.6' fill='url(%23c)'/%3E %3Cpath d='M81 72 L83 27 C83.5 21 91 19 93 23.5 L97.5 57 C98.5 64 96 69.5 90 72 Z' fill='url(%23b)' stroke='%238e140b' stroke-width='0.7'/%3E %3Cpath d='M93 24 L97.5 57 C98.5 64 96 69.5 90.5 72' fill='none' stroke='url(%23c)' stroke-width='1.4'/%3E %3Cpath d='M86 30 C87.5 42 88.5 55 88 66' fill='none' stroke='%23fff' stroke-opacity='0.45' stroke-width='1.2' stroke-linecap='round'/%3E %3Cpath d='M87 22 L87 17' stroke='url(%23c)' stroke-width='3'/%3E %3Cpath d='M71 17 C70 11 85 8 94 11.5 C98 13.5 97 20 92.5 21 L75 21.5 C72.5 21.5 71 19.5 71 17 Z' fill='url(%23b)' stroke='%238e140b' stroke-width='0.6'/%3E %3Ccircle cx='96.5' cy='15.5' r='4.3' fill='%23fff6c8' stroke='url(%23c)' stroke-width='1.8'/%3E %3Cpath d='M73 15.5 L64 16.5' stroke='%231b1b1b' stroke-width='3.2' stroke-linecap='round'/%3E %3Cpath d='M80 10.5 L77 1.8' stroke='url(%23c)' stroke-width='0.9'/%3E%3Cellipse cx='76.5' cy='2' rx='2.8' ry='1.7' fill='url(%23c)' stroke='%236d767d' stroke-width='0.4'/%3E %3Cpath d='M95 62 C98 61 101 64 102.5 73' stroke='%232a2624' stroke-width='2.4' fill='none' stroke-linecap='round'/%3E %3Cpath d='M97 63 L100.5 70.5' stroke='url(%23c)' stroke-width='1.4' stroke-dasharray='1.2 0.8'/%3E %3Cpath d='M86.5 68.5 C88 54.5 111 52.5 120 66.5 L116.5 68.5 C110 59.5 96.5 59.5 91.5 69.5 Z' fill='url(%23b)' stroke='%238e140b' stroke-width='0.7'/%3E %3Cpath d='M91 64 C97 57.5 108 57.5 115 63' fill='none' stroke='%23fff' stroke-opacity='0.55' stroke-width='1.1' stroke-linecap='round'/%3E %3C/g%3E%3C/g%3E%3C/svg%3E");animation-duration:45s}
+/* The headset's dials sit in chrome rings on the mint, with a sticker of the four stripes across the top */
+:root[data-theme="scooter"] .cluster-gauges{position:relative}
+/* The tricolore as a painted pinstripe on the headset itself (26/09): centred, inside the rounded shape, rounded ends,
+   with a thin chrome line either side (a flat border-image ignored the round corners and stuck out) */
+:root[data-theme="scooter"] .cluster-gauges::before{content:"";position:absolute;top:12px;left:50%;width:min(46%,420px);height:7px;
+  transform:translateX(-50%);border-radius:999px;pointer-events:none;
+  background:linear-gradient(90deg,#009246 0 33.3%,#fff 33.3% 66.6%,#ce2b37 66.6%);
+  box-shadow:0 0 0 1.5px #ffffffcc,0 0 0 2.5px #8d969d66,0 2px 4px #13352e33}
+@media(prefers-reduced-motion:reduce){
+  :root[data-theme="scooter"] .card,:root[data-theme="scooter"] .card:hover{transition:none;transform:none}
+  :root[data-theme="scooter"] :is(button,.button):hover{animation:none}
+}
+:root[data-theme="scooter"] .sidebar::after{content:""}
+@media(max-width:760px){
+  :root[data-theme="scooter"] .sidebar{padding-bottom:16px}
+  :root[data-theme="scooter"] .sidebar::after{display:none}
+}
+
+/* ===== The coast (26/09): in the footer, a town by the sea — pastel houses with green shutters and a bell tower —
+   above a straight coast road, where the scooter rides to the left; in the header, the same
+   town far away, and the scooter riding along. Both go to the left. ===== */
+:root[data-theme="scooter"] body::before{height:158px;background:
+  repeating-linear-gradient(90deg,#fff 0 30px,#0000 30px 60px) 0 calc(100% - 19px)/100% 3px no-repeat,
+  linear-gradient(#fffaf0,#fffaf0) 0 calc(100% - 40px)/100% 5px no-repeat,
+  linear-gradient(#c9b18a,#c9b18a) 0 100%/100% 4px no-repeat,
+  linear-gradient(#55514f,#55514f) 0 calc(100% - 4px)/100% 36px no-repeat,
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 480 110'%3E%3Crect x='0' y='53' width='90' height='57' fill='%23f4c27a'/%3E%3Cpath d='M-2 53 L45.0 46 L92 53 Z' fill='%23c8553a'/%3E%3Crect x='9' y='58' width='7' height='10' fill='%234a3526'/%3E%3Crect x='6' y='58' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='16.4' y='58' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='25' y='58' width='7' height='10' fill='%234a3526'/%3E%3Crect x='22' y='58' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='32.4' y='58' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='41' y='58' width='7' height='10' fill='%234a3526'/%3E%3Crect x='38' y='58' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='48.4' y='58' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='57' y='58' width='7' height='10' fill='%234a3526'/%3E%3Crect x='54' y='58' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='64.4' y='58' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='73' y='58' width='7' height='10' fill='%234a3526'/%3E%3Crect x='70' y='58' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='80.4' y='58' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='9' y='75' width='7' height='10' fill='%234a3526'/%3E%3Crect x='6' y='75' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='16.4' y='75' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='25' y='75' width='7' height='10' fill='%234a3526'/%3E%3Crect x='22' y='75' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='32.4' y='75' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='41' y='75' width='7' height='10' fill='%234a3526'/%3E%3Crect x='38' y='75' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='48.4' y='75' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='57' y='75' width='7' height='10' fill='%234a3526'/%3E%3Crect x='54' y='75' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='64.4' y='75' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='73' y='75' width='7' height='10' fill='%234a3526'/%3E%3Crect x='70' y='75' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='80.4' y='75' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='4' y='97' width='82' height='13' fill='%234a3526' opacity='0.85'/%3E%3Cpath d='M2 91 H8 L9 97 H3 Z' fill='%23d7261e'/%3E%3Cpath d='M8 91 H14 L15 97 H9 Z' fill='%23fff'/%3E%3Cpath d='M14 91 H20 L21 97 H15 Z' fill='%23d7261e'/%3E%3Cpath d='M20 91 H26 L27 97 H21 Z' fill='%23fff'/%3E%3Cpath d='M26 91 H32 L33 97 H27 Z' fill='%23d7261e'/%3E%3Cpath d='M32 91 H38 L39 97 H33 Z' fill='%23fff'/%3E%3Cpath d='M38 91 H44 L45 97 H39 Z' fill='%23d7261e'/%3E%3Cpath d='M44 91 H50 L51 97 H45 Z' fill='%23fff'/%3E%3Cpath d='M50 91 H56 L57 97 H51 Z' fill='%23d7261e'/%3E%3Cpath d='M56 91 H62 L63 97 H57 Z' fill='%23fff'/%3E%3Cpath d='M62 91 H68 L69 97 H63 Z' fill='%23d7261e'/%3E%3Cpath d='M68 91 H74 L75 97 H69 Z' fill='%23fff'/%3E%3Cpath d='M74 91 H80 L81 97 H75 Z' fill='%23d7261e'/%3E%3Cpath d='M80 91 H86 L87 97 H81 Z' fill='%23fff'/%3E%3Cpath d='M86 91 H88 L89 97 H87 Z' fill='%23d7261e'/%3E%3Cpath d='M98 95 V108' stroke='%236b3f22' stroke-width='1'/%3E%3Cpath d='M89 95 Q98 86 107 95 Z' fill='%23d7261e'/%3E%3Crect x='93' y='104' width='10' height='1.6' fill='%238d969d'/%3E%3Cpath d='M95 105.6 V110 M101 105.6 V110' stroke='%238d969d' stroke-width='0.8'/%3E%3Crect x='108' y='101' width='44' height='9' rx='4' fill='%234f8f5a'/%3E%3Crect x='114.5' y='98' width='3' height='12' fill='%236b3f22'/%3E%3Ccircle cx='116' cy='90' r='11' fill='%233f7f4f'/%3E%3Ccircle cx='112' cy='87' r='5.5' fill='%235aa26a' opacity='0.8'/%3E%3Cellipse cx='134' cy='88' rx='5' ry='22' fill='%232f5f3d'/%3E%3Crect x='148.5' y='98' width='3' height='12' fill='%236b3f22'/%3E%3Ccircle cx='150' cy='92' r='9' fill='%233f7f4f'/%3E%3Ccircle cx='146' cy='89' r='4.5' fill='%235aa26a' opacity='0.8'/%3E%3Crect x='160' y='70' width='100' height='40' fill='%23f7d9c4'/%3E%3Cpath d='M158 70 L210.0 63 L262 70 Z' fill='%23b8462e'/%3E%3Crect x='169' y='75' width='7' height='10' fill='%234a3526'/%3E%3Crect x='166' y='75' width='2.6' height='10' fill='%232f6fa0'/%3E%3Crect x='176.4' y='75' width='2.6' height='10' fill='%232f6fa0'/%3E%3Crect x='185' y='75' width='7' height='10' fill='%234a3526'/%3E%3Crect x='182' y='75' width='2.6' height='10' fill='%232f6fa0'/%3E%3Crect x='192.4' y='75' width='2.6' height='10' fill='%232f6fa0'/%3E%3Crect x='201' y='75' width='7' height='10' fill='%234a3526'/%3E%3Crect x='198' y='75' width='2.6' height='10' fill='%232f6fa0'/%3E%3Crect x='208.4' y='75' width='2.6' height='10' fill='%232f6fa0'/%3E%3Crect x='217' y='75' width='7' height='10' fill='%234a3526'/%3E%3Crect x='214' y='75' width='2.6' height='10' fill='%232f6fa0'/%3E%3Crect x='224.4' y='75' width='2.6' height='10' fill='%232f6fa0'/%3E%3Crect x='233' y='75' width='7' height='10' fill='%234a3526'/%3E%3Crect x='230' y='75' width='2.6' height='10' fill='%232f6fa0'/%3E%3Crect x='240.4' y='75' width='2.6' height='10' fill='%232f6fa0'/%3E%3Crect x='169' y='92' width='7' height='10' fill='%234a3526'/%3E%3Crect x='166' y='92' width='2.6' height='10' fill='%232f6fa0'/%3E%3Crect x='176.4' y='92' width='2.6' height='10' fill='%232f6fa0'/%3E%3Crect x='185' y='92' width='7' height='10' fill='%234a3526'/%3E%3Crect x='182' y='92' width='2.6' height='10' fill='%232f6fa0'/%3E%3Crect x='192.4' y='92' width='2.6' height='10' fill='%232f6fa0'/%3E%3Crect x='201' y='92' width='7' height='10' fill='%234a3526'/%3E%3Crect x='198' y='92' width='2.6' height='10' fill='%232f6fa0'/%3E%3Crect x='208.4' y='92' width='2.6' height='10' fill='%232f6fa0'/%3E%3Crect x='217' y='92' width='7' height='10' fill='%234a3526'/%3E%3Crect x='214' y='92' width='2.6' height='10' fill='%232f6fa0'/%3E%3Crect x='224.4' y='92' width='2.6' height='10' fill='%232f6fa0'/%3E%3Crect x='233' y='92' width='7' height='10' fill='%234a3526'/%3E%3Crect x='230' y='92' width='2.6' height='10' fill='%232f6fa0'/%3E%3Crect x='240.4' y='92' width='2.6' height='10' fill='%232f6fa0'/%3E%3Crect x='264' y='53' width='88' height='57' fill='%23fbe3b8'/%3E%3Cpath d='M262 53 L308.0 46 L354 53 Z' fill='%23c8553a'/%3E%3Crect x='273' y='58' width='7' height='10' fill='%234a3526'/%3E%3Crect x='270' y='58' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='280.4' y='58' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='289' y='58' width='7' height='10' fill='%234a3526'/%3E%3Crect x='286' y='58' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='296.4' y='58' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='305' y='58' width='7' height='10' fill='%234a3526'/%3E%3Crect x='302' y='58' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='312.4' y='58' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='321' y='58' width='7' height='10' fill='%234a3526'/%3E%3Crect x='318' y='58' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='328.4' y='58' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='337' y='58' width='7' height='10' fill='%234a3526'/%3E%3Crect x='334' y='58' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='344.4' y='58' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='273' y='75' width='7' height='10' fill='%234a3526'/%3E%3Crect x='270' y='75' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='280.4' y='75' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='289' y='75' width='7' height='10' fill='%234a3526'/%3E%3Crect x='286' y='75' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='296.4' y='75' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='305' y='75' width='7' height='10' fill='%234a3526'/%3E%3Crect x='302' y='75' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='312.4' y='75' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='321' y='75' width='7' height='10' fill='%234a3526'/%3E%3Crect x='318' y='75' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='328.4' y='75' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='337' y='75' width='7' height='10' fill='%234a3526'/%3E%3Crect x='334' y='75' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='344.4' y='75' width='2.6' height='10' fill='%233f8f7d'/%3E%3Crect x='268' y='97' width='80' height='13' fill='%234a3526' opacity='0.85'/%3E%3Cpath d='M266 91 H272 L273 97 H267 Z' fill='%233f8f7d'/%3E%3Cpath d='M272 91 H278 L279 97 H273 Z' fill='%23fff'/%3E%3Cpath d='M278 91 H284 L285 97 H279 Z' fill='%233f8f7d'/%3E%3Cpath d='M284 91 H290 L291 97 H285 Z' fill='%23fff'/%3E%3Cpath d='M290 91 H296 L297 97 H291 Z' fill='%233f8f7d'/%3E%3Cpath d='M296 91 H302 L303 97 H297 Z' fill='%23fff'/%3E%3Cpath d='M302 91 H308 L309 97 H303 Z' fill='%233f8f7d'/%3E%3Cpath d='M308 91 H314 L315 97 H309 Z' fill='%23fff'/%3E%3Cpath d='M314 91 H320 L321 97 H315 Z' fill='%233f8f7d'/%3E%3Cpath d='M320 91 H326 L327 97 H321 Z' fill='%23fff'/%3E%3Cpath d='M326 91 H332 L333 97 H327 Z' fill='%233f8f7d'/%3E%3Cpath d='M332 91 H338 L339 97 H333 Z' fill='%23fff'/%3E%3Cpath d='M338 91 H344 L345 97 H339 Z' fill='%233f8f7d'/%3E%3Cpath d='M344 91 H350 L351 97 H345 Z' fill='%23fff'/%3E%3Cpath d='M360 95 V108' stroke='%236b3f22' stroke-width='1'/%3E%3Cpath d='M351 95 Q360 86 369 95 Z' fill='%233f8f7d'/%3E%3Crect x='355' y='104' width='10' height='1.6' fill='%238d969d'/%3E%3Cpath d='M357 105.6 V110 M363 105.6 V110' stroke='%238d969d' stroke-width='0.8'/%3E%3Cpath d='M378 95 V108' stroke='%236b3f22' stroke-width='1'/%3E%3Cpath d='M369 95 Q378 86 387 95 Z' fill='%23f2b632'/%3E%3Crect x='373' y='104' width='10' height='1.6' fill='%238d969d'/%3E%3Cpath d='M375 105.6 V110 M381 105.6 V110' stroke='%238d969d' stroke-width='0.8'/%3E%3Crect x='388' y='101' width='30' height='9' rx='4' fill='%234f8f5a'/%3E%3Cellipse cx='396' cy='88' rx='5' ry='22' fill='%232f5f3d'/%3E%3Crect x='408.5' y='98' width='3' height='12' fill='%236b3f22'/%3E%3Ccircle cx='410' cy='91' r='10' fill='%233f7f4f'/%3E%3Ccircle cx='406' cy='88' r='5.0' fill='%235aa26a' opacity='0.8'/%3E%3Crect x='420' y='70' width='60' height='40' fill='%23b5d6c7'/%3E%3Cpath d='M418 70 L450.0 63 L482 70 Z' fill='%23b8462e'/%3E%3Crect x='429' y='75' width='7' height='10' fill='%234a3526'/%3E%3Crect x='426' y='75' width='2.6' height='10' fill='%23c8553a'/%3E%3Crect x='436.4' y='75' width='2.6' height='10' fill='%23c8553a'/%3E%3Crect x='445' y='75' width='7' height='10' fill='%234a3526'/%3E%3Crect x='442' y='75' width='2.6' height='10' fill='%23c8553a'/%3E%3Crect x='452.4' y='75' width='2.6' height='10' fill='%23c8553a'/%3E%3Crect x='461' y='75' width='7' height='10' fill='%234a3526'/%3E%3Crect x='458' y='75' width='2.6' height='10' fill='%23c8553a'/%3E%3Crect x='468.4' y='75' width='2.6' height='10' fill='%23c8553a'/%3E%3Crect x='429' y='92' width='7' height='10' fill='%234a3526'/%3E%3Crect x='426' y='92' width='2.6' height='10' fill='%23c8553a'/%3E%3Crect x='436.4' y='92' width='2.6' height='10' fill='%23c8553a'/%3E%3Crect x='445' y='92' width='7' height='10' fill='%234a3526'/%3E%3Crect x='442' y='92' width='2.6' height='10' fill='%23c8553a'/%3E%3Crect x='452.4' y='92' width='2.6' height='10' fill='%23c8553a'/%3E%3Crect x='461' y='92' width='7' height='10' fill='%234a3526'/%3E%3Crect x='458' y='92' width='2.6' height='10' fill='%23c8553a'/%3E%3Crect x='468.4' y='92' width='2.6' height='10' fill='%23c8553a'/%3E%3C/svg%3E") 0 calc(100% - 45px)/480px 110px repeat-x,
+  linear-gradient(180deg,#0000 0 52px,#7fcfe0 52px 72px,#5bb8d0 72px 107px,#0000 107px)}
+:root[data-theme="scooter"] body::after{left:0;bottom:17px;width:78px;height:52px;animation:scooter-road 45s linear infinite}
+@keyframes scooter-road{0%,50%{transform:translateX(calc(100vw + 20px))}100%{transform:translateX(-110px)}}
+:root[data-theme="scooter"] .topbar{background:radial-gradient(circle at 80% 135%,#ffd27d 0 30px,#ffb86b 31px 38px,#0000 39px),
+  repeating-conic-gradient(from 0deg at 80% 135%,#ffcf7a55 0 6deg,#0000 6deg 12deg),
+  linear-gradient(180deg,#9fdcee,#ffe0b8 62%,#ffb98a)}
+:root[data-theme="scooter"] .topbar::before{z-index:0}
+:root[data-theme="scooter"] .topbar>*{position:relative;z-index:1}
+@media(prefers-reduced-motion:reduce){:root[data-theme="scooter"] body::after{display:none}}
+/* The panels end above the town (26/09): scrolled to the bottom, the whole footer scene is in view */
+:root[data-theme="scooter"] main{padding-bottom:190px}
+@media(max-width:760px){:root[data-theme="scooter"] main{padding-bottom:180px}}
+/* Radio buttons (Apareceu / Não apareceu): a small round button, rosso when chosen, lined up with its label (26/09) */
+:root[data-theme="scooter"] input[type=radio]{width:17px;height:17px;margin:0;padding:0;flex:none;accent-color:var(--rosso);vertical-align:middle}
+:root[data-theme="scooter"] :is(button,.button).shortlist-toggle.on{color:#fff;border-color:#7a120c;background:var(--lacquer-rosso)}
+/* The tricolore logo (26/09): «Real Estate» red, «AI ASSISTANT» green, «by BigLearn PT» white and bold */
+:root[data-theme="scooter"] .brand-by{color:#fff;font-weight:800;letter-spacing:.3px;text-shadow:0 1px 2px #13352e99}
+/* The chrome strip between «R» (Voz e estilo) and the gears (27/09) */
+:root[data-theme="scooter"] nav .tab:is([data-tab="voice"],[data-tab="agenda"])::after{height:3px;border-radius:2px;background:linear-gradient(90deg,#0000,#8d969d 18%,#fff 50%,#8d969d 82%,#0000);box-shadow:0 1px 1px #0004}
+/* The page ends 40 px above the town and the road (158 px) (27/09) */
+:root[data-theme="scooter"] main{padding-bottom:198px}
+@media(max-width:760px){:root[data-theme="scooter"] main{padding-bottom:198px}}
+
+/* The headset's jewels under the twist grip (27/09): a brushed-metal arc in a chrome rim, and round glass lights — nearly
+   black when off, lit in their colour with a glow: green (headlamp), oil, the black one (neutral), fuel */
+:root[data-theme="scooter"] .telltales{display:flex;justify-content:center;gap:9px;margin:14px 8px 0;padding:10px 12px 12px;border-radius:40px 40px 14px 14px;
+  background:linear-gradient(180deg,#eef1f3,#b9c1c6 55%,#e3e8eb);box-shadow:0 0 0 2px #fff,0 0 0 3.5px #8d969d,inset 0 2px 4px #0003}
+:root[data-theme="scooter"] .telltales button.telltale.telltale{display:grid;place-items:center;width:34px;height:34px;min-height:0;padding:0;border-radius:50%;
+  border:2px solid #8d969d;cursor:pointer;animation:none;transform:none;
+  background:radial-gradient(circle at 36% 28%,#ffffff80 0 10%,#0000 12%),radial-gradient(circle at 50% 55%,#3a3a3a,#0b0b0b 85%);
+  box-shadow:inset 0 -2px 3px #0008,0 1px 2px #0005,0 0 0 1.5px #fff}
+:root[data-theme="scooter"] .telltale-icon{width:19px;height:19px;fill:none;stroke:#1d1d1d;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;opacity:.55}
+:root[data-theme="scooter"] .telltale-icon .fill{fill:#1d1d1d;stroke:none}
+:root[data-theme="scooter"] .telltale-text{font:900 11px/1 var(--display);text-anchor:middle}
+:root[data-theme="scooter"] .telltales button.telltale.lit{box-shadow:inset 0 -2px 3px #0005,0 0 0 1.5px #fff,0 0 12px 2px var(--jewel)}
+:root[data-theme="scooter"] .telltale.lit .telltale-icon{opacity:.85}
+:root[data-theme="scooter"] .telltales button.telltale.lit.green{--jewel:#5dffa0;background:radial-gradient(circle at 36% 28%,#fff 0 10%,#0000 12%),radial-gradient(circle at 50% 55%,#b9ffd6,#29c46a 70%,#127a3e)}
+:root[data-theme="scooter"] .telltales button.telltale.lit.red{--jewel:#ff8a55;background:radial-gradient(circle at 36% 28%,#fff 0 10%,#0000 12%),radial-gradient(circle at 50% 55%,#ffd2b8,#ff6a2a 65%,#b8320f)}
+:root[data-theme="scooter"] .telltales button.telltale.lit.white{--jewel:#fff4c2;background:radial-gradient(circle at 36% 28%,#fff 0 10%,#0000 12%),radial-gradient(circle at 50% 55%,#ffffff,#f1e7c2 65%,#b9ab80)}
+:root[data-theme="scooter"] .telltales button.telltale.lit.yellow{--jewel:#ffd23a;background:radial-gradient(circle at 36% 28%,#fff 0 10%,#0000 12%),radial-gradient(circle at 50% 55%,#fff1a6,#f6c21a 65%,#b88600)}
