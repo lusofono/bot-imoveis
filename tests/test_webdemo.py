@@ -16,6 +16,10 @@ UNAVAILABLE = {"api/consent/confirm", "api/consent/request", "api/paste", "api/p
                "api/property/parse", "api/property/prompt", "api/property/save", "api/recipient", "api/visits/close",
                "api/visits/round-generate", "api/visits/round-individual", "api/visits/round-paste",
                "api/visits/round-prompt", "api/visits/round-save",
+               # 07/10: «Negócio fechado» and the archive
+               "api/property/archive", "api/property/unarchive", "api/property/deal-candidates", "api/property/deal-round",
+               "api/property/deal-prepare", "api/property/deal-generate", "api/property/deal-prompt", "api/property/deal-paste",
+               "api/property/deal-save", "api/property/deal-cancel", "api/property/closing-price",
                # 29/09: the Oficina (admin only): never in the sales demo
                "api/ai/price", "api/read/progress", "api/ai/hidden", "api/ai/effort", "api/ai/reviewer", "api/review", "api/prompts/common", "api/ai/context", "api/ai/limits", "api/testlab/state", "api/testlab/contest", "api/testlab/clients",
                "api/testlab/consultant", "api/testlab/wipe", "api/testlab/advance",

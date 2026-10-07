@@ -15,6 +15,83 @@ ficheiro passa a usar «α.X.Y» a partir daqui, para corresponder ao que aparec
 
 O porquê de cada decisão está em `docs/DECISOES.md`; aqui fica só o quê.
 
+## α.146.0 — 07/10/2026
+
+- **«Todos / Arrendamento / Venda» também nos Emails, nas Visitas e nos Clientes**, por cima do seletor do imóvel (o mesmo
+  componente nos três). A escolha é uma só para a página toda: muda-se num sítio e os outros seguem-na. As setas e os
+  pontos passam só pelos imóveis do tipo escolhido («Todos», nas Visitas, fica sempre); se o imóvel aberto for do outro
+  tipo, passa para o primeiro do tipo escolhido.
+
+## α.145.0 — 07/10/2026
+
+- **Imóveis: «Todos / Arrendamento / Venda» por cima do seletor do imóvel.** As setas e os pontos passam só pelos imóveis
+  escolhidos, com quantos há de cada; a escolha fica guardada neste browser. Só aparece quando há imóveis dos dois
+  tipos. Um imóvel aberto de outro sítio (por exemplo, do Painel) que a escolha esconderia volta a mostrar «Todos».
+
+## α.144.0 — 07/10/2026
+
+- **O valor de fecho:** ao arquivar com «Negócio fechado», e no painel do negócio fechado, pergunta-se o valor por que
+  fechou: a renda por mês, num arrendamento, ou o preço, numa venda (opcional). Fica no arquivo, ao lado do valor anunciado
+  e da diferença em percentagem, e pode ser indicado ou corrigido depois, no cartão do arquivo. Fica só nos teus dados:
+  não vai para os clientes nem para a IA.
+
+## α.143.1 — 07/10/2026
+
+- **O tipo de negócio no seletor do imóvel:** uma etiqueta ARRENDAMENTO ou VENDA no canto direito da linha «IMÓVEL», em
+  Imóveis, nos outros separadores e no arquivo.
+
+## α.143.0 — 07/10/2026
+
+- **«Negócio fechado», no painel de cada imóvel (Imóveis):** um botão dourado abre uma ronda como a das visitas. Escolhes
+  a quem (Ativos, Todos ou Não ativos) e ligas ou desligas cada cliente; o selecionado, o que ficou com o imóvel, vem
+  desligado. Ficam de fora, com os nomes, quem tem um email por responder (responde-lhes em Emails), quem já o recebeu e as
+  listas negra e cinzenta. A IA escreve um só texto para todos, na língua de cada um (português, inglês, espanhol e as
+  traduções), a dizer que o imóvel já foi arrendado (ou vendido) e com um inquérito curto de 1 a 5: rapidez das
+  respostas, clareza da informação, a visita (se a fez), se nos recomendaria e um comentário. Revês, envias, e cada
+  cliente recebe-o na sua conversa.
+- **As respostas ao inquérito são lidas:** ficam no cliente, com um aviso no cartão (e outro se houver uma nota baixa ou
+  «não» a recomendar-nos), e o imóvel mostra as médias, quem nos recomendaria e os comentários.
+- **Depois de saírem todos, o imóvel fecha e vai para o arquivo:** os pedidos novos ouvem que já não está disponível, e a
+  IA responde assim a quem voltar a escrever.
+- **O arquivo, no fim de Imóveis:** «Arquivar», com o motivo (negócio fechado, o proprietário desistiu, desistimos nós ou em
+  pausa), tira o imóvel da lista, dos menus e da tabela «Por imóvel»; os números continuam nas médias do Painel. Os
+  arquivados passam-se com as suas setas, com o motivo, a data, o inquérito e «Reativar», que o devolve à lista e reabre
+  as visitas fechadas pelo negócio. Um imóvel arquivado não prepara lembretes. Nos Emails, só aparece enquanto tiver emails.
+  Fica à parte de ATIVO/INATIVO, que continua igual.
+- **Settings → Prompts:** o texto do negócio fechado e o inquérito, nos comuns aos arrendamentos e nos comuns às vendas.
+
+## α.142.1 — 07/10/2026
+
+- **O link do anúncio do Idealista fica sempre igual,** `https://www.idealista.pt/imovel/<código>/`, venha como vier: da
+  página da agência (`/pro/<agência>/…`), curto (`idealista.pt/<código>/`), sem `https://` ou com `http://`, sem
+  `www`, do site móvel, noutra língua (`/en/…`), de uma foto do anúncio (`…/foto/3`) ou com `?…` e `#…` no fim. O
+  código do anúncio preenche-se sozinho. Os outros links ficam como estão.
+
+## α.142.0 — 07/10/2026
+
+- **Imóveis de venda com prompts próprios.** Um imóvel novo de venda copia os prompts de outro de venda; o primeiro
+  recebe os de venda de partida. A 1.ª resposta não pergunta pelos rendimentos, por quem vai viver na casa nem por
+  contratos: responde às perguntas do cliente, pergunta quando gostaria de visitar e a disponibilidade habitual, e
+  oferece mais informações, perguntando o que procura exatamente e com que objetivo. A 2.ª pede só o que faltar
+  disso. Um imóvel que muda de tipo de negócio recebe os prompts das interações do novo tipo.
+- **A ficha do comprador:** «O que procura», «Objetivo» e «Disponibilidade para visitas» (a do arrendamento não
+  muda). Os pontos por saber, os avisos de ficha incompleta, as fichas em Clientes e a short list seguem o tipo de
+  negócio; no ponto de situação, quem visitou um imóvel de venda aparece com o que procura e o objetivo.
+- **Os prompts comuns têm uma cópia para as vendas** (5.ª a 8.ª interação, fecho, pós-visita e inquérito, lembretes,
+  visita marcada, já visitou, visita falhada, documentos e short list), já adaptada (comprador, compra, sem
+  candidatura nem fiador), para afinar em Settings → Prompts → «Comuns às vendas». O comportamento geral e as
+  respostas ao proprietário continuam a ser os mesmos para todos.
+- **Documentos de um comprador:** identificação e comprovativo da capacidade financeira (pré-aprovação do banco ou
+  fundos próprios), sem fiador.
+- **Novo imóvel:** ao lado do link, escolhe-se Arrendamento ou Venda antes de extrair; num anúncio de venda, a IA
+  procura o preço e os factos de uma venda. O campo da renda passa a «Preço (€)» numa venda, e no Painel a coluna
+  chama-se «Renda / preço».
+- **Correção: um imóvel novo deixava de lado só o que vinha no formulário e herdava do imóvel que lhe serve de modelo
+  o nome do proprietário** (e, criado sem o formulário, também o email dele), ou a marca de imóvel de teste. Agora só
+  copia as regras e os prompts.
+- **O link do anúncio na página da agência** (`idealista.pt/pro/<agência>/imovel/<código>/`) é reconhecido: o código
+  preenche-se sozinho e guarda-se o link normal do anúncio.
+
 ## α.141.0 — 06/10/2026
 
 - **Proprietários: um só cartão por proprietário, como nos clientes.** «Escrever ao proprietário», quando já há um

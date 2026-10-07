@@ -342,7 +342,13 @@ def test_the_agency_knowhow_reaches_every_property(service):
 
 
 @pytest.mark.parametrize("url", ["https://www.idealista.pt/12345678", "https://www.idealista.pt/imovel/12345678/",
-                                 "https://idealista.pt/imovel/12345678?xtmc=1"])
+                                 "https://idealista.pt/imovel/12345678?xtmc=1",
+                                 # 07/10: the agency's page, no scheme, http, mobile, another language, a photo, an anchor
+                                 "https://www.idealista.pt/pro/agencia-exemplo/imovel/12345678/",
+                                 "www.idealista.pt/imovel/12345678/", "idealista.pt/12345678/",
+                                 "http://www.idealista.pt/imovel/12345678/", "https://m.idealista.pt/imovel/12345678/",
+                                 "https://www.idealista.pt/en/imovel/12345678/", "https://www.idealista.pt/imovel/12345678/foto/3",
+                                 "https://www.idealista.pt/pro/agencia-exemplo/en/imovel/12345678/#fotos"])
 def test_idealista_links_have_one_form_and_bring_the_listing_code(url):
     fields = clean_property({"reference": REF, "description": "T2", "listing_url": url})
     assert (fields["listing_url"], fields["listing_id"]) == ("https://www.idealista.pt/imovel/12345678/", "12345678")

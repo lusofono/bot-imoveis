@@ -162,10 +162,10 @@
 
 /* Switchgear: cream switches in a chrome ring; primary is the racing green; sending is red, with the engine light's
    engine (06/10: it had a power icon, which reads as switching off or logging out) */
-:root[data-theme="cabrio"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link){border:1px solid #b9c1c6;border-radius:9px;color:var(--text);
+:root[data-theme="cabrio"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link,.deal-button){border:1px solid #b9c1c6;border-radius:9px;color:var(--text);
   font:600 13px/1.2 var(--display);letter-spacing:.2px;background:var(--face-cream);box-shadow:0 0 0 2px #fff,0 0 0 3px #b9c1c6,0 3px 6px #1d2a2224}
-:root[data-theme="cabrio"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link):hover{background:linear-gradient(180deg,#f3faf5,#d9ece0);border-color:var(--brg)}
-:root[data-theme="cabrio"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link):active{transform:translateY(1px);box-shadow:0 0 0 2px #fff,0 0 0 3px #b9c1c6}
+:root[data-theme="cabrio"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link,.deal-button):hover{background:linear-gradient(180deg,#f3faf5,#d9ece0);border-color:var(--brg)}
+:root[data-theme="cabrio"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link,.deal-button):active{transform:translateY(1px);box-shadow:0 0 0 2px #fff,0 0 0 3px #b9c1c6}
 :root[data-theme="cabrio"] :is(button,.button).primary{color:#fff;border-color:var(--brg-deep);background:var(--lacquer-brg);text-shadow:0 1px 1px #0007}
 :root[data-theme="cabrio"] :is(button,.button).primary:hover{border-color:var(--brg-deep);background:linear-gradient(180deg,#4aa070,#21784a 40%,#0f4024)}
 :root[data-theme="cabrio"] :is(button,.button).send-action{color:#fff;border-color:#7a0a1d;background:var(--lacquer-red);text-shadow:0 1px 1px #0007}
@@ -389,8 +389,8 @@
 :root[data-theme="cabrio"][data-ambient="night"] :is(.card,.metric,.retro-widget,.workflow,.property-slider,.table-wrap){border-color:#2b3a31}
 :root[data-theme="cabrio"][data-ambient="night"] .metric:first-child{border-color:#2f5a40;background:linear-gradient(180deg,#1a2a20,#132019)}
 :root[data-theme="cabrio"][data-ambient="night"] h1{color:#eef3ee}
-:root[data-theme="cabrio"][data-ambient="night"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link){color:var(--text);border-color:#3a4d40;box-shadow:0 0 0 2px #0c1310,0 0 0 3px #5f676d,0 3px 6px #0006}
-:root[data-theme="cabrio"][data-ambient="night"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link):hover{background:linear-gradient(180deg,#25362c,#1b2a21);border-color:#7fd3a0}
+:root[data-theme="cabrio"][data-ambient="night"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link,.deal-button){color:var(--text);border-color:#3a4d40;box-shadow:0 0 0 2px #0c1310,0 0 0 3px #5f676d,0 3px 6px #0006}
+:root[data-theme="cabrio"][data-ambient="night"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link,.deal-button):hover{background:linear-gradient(180deg,#25362c,#1b2a21);border-color:#7fd3a0}
 :root[data-theme="cabrio"][data-ambient="night"] button.link{color:#7fd3a0}
 :root[data-theme="cabrio"][data-ambient="night"] .tag{background:#18221c;border-color:#3a4d40}
 :root[data-theme="cabrio"][data-ambient="night"] .chart{background:repeating-linear-gradient(0deg,#0000 0 29px,#7fd3a01f 29px 30px),#121a15;box-shadow:0 0 0 1px #2b3a31}

@@ -199,10 +199,14 @@
         <button id="view-new-property" aria-pressed="false">+ Novo imóvel</button>
       </div></div>
     <div id="properties-view">
+      <!-- 07/10: which properties the slider goes through: all, the rentals or the sales -->
+      <div id="deal-filter" class="segmented deal-filter" role="group" aria-label="Que imóveis" hidden></div>
       <div id="property-slider" class="property-slider"></div>
       <div id="property-dashboard" class="property-dashboard"></div>
       <p class="kind-legend"><span class="kind kind-rag">RAG</span> factos que o assistente consulta · <span class="kind kind-prompt">Prompt</span> instruções de como responder · <span class="kind kind-voice">Voz</span> estilo comum · <span class="kind kind-copy">Copiar/colar</span> texto que levas e trazes do ChatGPT</p>
       <div id="property-list"></div>
+      <!-- 07/10: the archived properties, with their own arrows -->
+      <section id="property-archive" class="property-archive" hidden></section>
     </div>
     <div id="new-property-view" hidden>
     <article class="card editor-card" id="property-editor">
@@ -211,6 +215,8 @@
       <p class="step api-only-show">À mão, ou com a API: abre o anúncio no browser, seleciona o texto todo (⌘A), copia e cola aqui com o link. A API extrai os campos e tu revês antes de guardar.</p>
       <div class="row">
         <input id="listing-url" aria-label="Link do anúncio" placeholder="https://www.idealista.pt/imovel/…">
+        <!-- 07/10: a listing for sale is read with a price and a sale's facts, and the property gets a sale's prompts -->
+        <select id="listing-deal" aria-label="Tipo de negócio do anúncio"><option value="arrendamento">Arrendamento</option><option value="venda">Venda</option></select>
         <button id="listing-prompt" class="copy-only">Copiar prompt do anúncio</button>
       </div>
       <details id="listing-prompt-box" class="copy-only prompt-view"><summary class="muted small">Ver o prompt</summary><pre id="listing-prompt-text"></pre></details>
@@ -226,7 +232,7 @@
         <label class="field">Código do anúncio<input id="f-listing_id"></label>
         <label class="field">Link do anúncio<input id="f-listing_url"></label>
         <label class="field">Anunciante<input id="f-advertiser"></label>
-        <label class="field">Renda anunciada (€)<input id="f-advertised_rent_eur"></label>
+        <label class="field"><span id="f-price-label">Renda anunciada (€)</span><input id="f-advertised_rent_eur"></label>
         <label class="field">Email do proprietário (recebe o ponto de situação)<input id="f-owner_email" type="email" placeholder="opcional"></label>
         <!-- 27/09: asked only when the property is created; after that each read goes on from the last one -->
         <label class="field" id="first-read-field">Primeira leitura do Gmail: emails dos últimos … dias (entrada e saída)<input id="f-first-read" type="number" min="1" max="365"></label>

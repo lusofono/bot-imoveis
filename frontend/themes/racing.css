@@ -123,14 +123,14 @@
 
 /* Switchgear. Buttons: black rubberised switches that press in. Primary: the red engine-start button in a
    chrome ring. Anything that sends an email: a guarded switch, with the yellow-and-black hazard frame. */
-:root[data-theme="racing"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link){
+:root[data-theme="racing"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link,.deal-button){
   border:1px solid #040405;border-radius:8px;color:#ecebe8;font-family:var(--din);letter-spacing:.4px;
   background:linear-gradient(180deg,#2e2e33,#17171a 55%,#101012);
   box-shadow:inset 0 1px 0 #ffffff21,inset 0 -2px 0 #00000080,0 2px 0 #000,0 4px 10px #0009;
   transition:background .15s,box-shadow .15s,transform .08s,filter .15s}
-:root[data-theme="racing"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link):hover{
+:root[data-theme="racing"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link,.deal-button):hover{
   background:linear-gradient(180deg,#3a3a40,#1e1e22 55%,#141417);border-color:#040405}
-:root[data-theme="racing"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link):active{
+:root[data-theme="racing"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link,.deal-button):active{
   transform:translateY(2px);box-shadow:inset 0 2px 6px #000c,0 0 0 #000}
 :root[data-theme="racing"] :is(button,.button).primary{padding-inline:22px;border:1px solid #3d0402;border-radius:999px;color:#fff;
   font-weight:700;letter-spacing:.6px;text-shadow:0 1px 1px #0008;

@@ -3,6 +3,45 @@
 As decisões de produto e de arquitetura, da mais recente para a mais antiga. Cada uma diz o que se decidiu
 e porquê. O código em pausa fica no histórico do Git, na tag `referencia-python`.
 
+## 07/10/2026: «Negócio fechado» e o arquivo de imóveis (α.143.0)
+
+**Decisão (do utilizador, 07/10, depois de arrendar um imóvel).** Um botão no painel do imóvel prepara um email para os
+clientes, como a ronda de visitas: o mesmo texto para todos, só traduzido, com interruptores ON/OFF e a escolha entre
+ativos, todos e não ativos; e com uma avaliação. Depois, o imóvel vai para um arquivo: mantêm-se as médias, mas não
+aparece na lista habitual; no fim de Imóveis, um seletor passa pelos arquivados. Arquiva-se também quando o proprietário
+ou nós desistimos, ou se põe o negócio em pausa, e pode-se sempre reativar.
+- **A avaliação é um inquérito novo, lido pela ARIA** (escolha do utilizador): cinco perguntas, numeradas como as do
+  pós-visita, para o mesmo leitor as ler (rapidez, clareza, a visita, se nos recomendaria, comentário). Guarda-se no
+  cliente (`deal_survey`) e resume-se por imóvel.
+- **O selecionado aparece, mas desligado** (escolha do utilizador): quem ficou com o imóvel não recebe o email por
+  engano, mas pode ser ligado.
+- **Depois de saírem todos os emails, o imóvel fecha (visitas fechadas) e vai para o arquivo** com o motivo «Negócio
+  fechado» (escolha do utilizador). «Reativar» reabre só as visitas que o negócio ou o arquivo fecharam
+  (`closed_by` em `visitas.json`), nunca as fechadas à mão.
+- **O arquivo fica à parte de ATIVO/INATIVO** (escolha do utilizador): `archived` em `profile.json`, com o motivo e a
+  data. Um imóvel arquivado continua a ser lido (os clientes podem responder ao inquérito) e aparece nos Emails só
+  enquanto tiver emails; sai da lista de Imóveis, dos menus e de «Por imóvel», mas conta nas médias do Painel.
+- **Ficam de fora da ronda** quem tem um email por responder (responde-se em Emails; depois do envio, a IA já sabe que o imóvel fechou),
+  as listas negra e cinzenta (nunca escrevemos primeiro) e quem já o recebeu.
+
+## 07/10/2026: prompts por tipo de negócio, duplicados para a venda (α.142.0)
+
+**Decisão (do utilizador, 07/10).** «São prompts diferentes por tipo de negócio, e até a lógica de marcar visitas:
+duplica tudo com alteração e depois afinamos.» Numa venda não se pergunta quanto as pessoas ganham, quem vai morar nem
+o contrato: a 1.ª resposta vai logo à visita («Quando gostaria de fazer uma visita, e qual é a sua disponibilidade
+habitual?») e ao que o cliente procura («Posso enviar-lhe mais informações sobre o imóvel. O que procura exatamente, e
+com que objetivo…?»), e responde às perguntas dele.
+- **Os prompts das interações (1.ª a 4.ª) são de cada imóvel:** um imóvel de venda novo copia-os do primeiro imóvel de
+  venda; sem nenhum, recebe os de partida do código (`SALE_PROMPTS`).
+- **Os prompts comuns têm duas cópias:** a das vendas fica em `voice.json`, em `sale_style`, ao lado de `style` (a
+  dos arrendamentos, que já existia). O comportamento geral e as respostas ao proprietário são uma só.
+- **A ficha do cliente depende do tipo de negócio:** numa venda, o que procura, o objetivo e a disponibilidade. Os
+  documentos da short list também: identificação e capacidade financeira, sem fiador.
+- **O know-how da agência para vendas** (`data/venda/knowledge/`) recebeu a cópia adaptada do de arrendamento (o tom
+  das respostas e o pedido de outra data) e a regra de não perguntar rendimentos.
+- **A lógica de marcar visitas ainda é a mesma** (rondas, janelas, marcação de 30 em 30 minutos): só os textos se
+  duplicaram. Fica para afinar com o uso.
+
 ## 06/10/2026: um cartão por proprietário (α.141.0)
 
 **Decisão (do utilizador, 06/10).** «Quero que juntes e respondo sempre a tudo junto, como nos clientes.» Em cada imóvel

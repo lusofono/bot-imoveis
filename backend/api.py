@@ -24,7 +24,7 @@ from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse, R
 from starlette.routing import Route
 from . import APP_NAME
 from .ai import (listing_prompt, parse_fichas, parse_listing, parse_alerts, parse_documents, parse_replies, parse_round, parse_visits, reply_prompt,
-                 round_prompt, short_id, sign)
+                 round_prompt, short_id, sign, deal_round_prompt)
 from .openai_client import complete, context_of, estimate_cost_usd, estimate_tokens
 from .rules import phone_in
 from .secrets import openai_api_key
@@ -278,7 +278,7 @@ def web_app(folder, token):
         url = str(body.get("listing_url") or "").strip()
         if urlsplit(url).scheme != "https" or not urlsplit(url).hostname:
             raise ValueError("Indica o link do anúncio, começado por https://.")
-        return {"prompt": listing_prompt(url)}
+        return {"prompt": listing_prompt(url, body.get("deal"))}
 
     def property_save(body):
         return {**service.save_property(body.get("fields") or {}, body.get("first_read_days")),
@@ -425,6 +425,59 @@ def web_app(folder, token):
     def property_active(body):
         service.set_property_active(str(body.get("reference") or ""), body.get("active"))
         return {"settings": service.settings(), "state": state()}
+
+    # 07/10: the archive, and «Negócio fechado» — a round like the visits', from the property's panel in Imóveis
+    def property_archive(body):
+        service.archive_property(str(body.get("reference") or ""), str(body.get("reason") or ""), body.get("price"))
+        return {"settings": service.settings(), "state": state()}
+
+    def property_unarchive(body):
+        service.unarchive_property(str(body.get("reference") or ""))
+        return {"settings": service.settings(), "state": state()}
+
+    def deal_ids(ref):
+        current = service.deal_round(ref)
+        ids = [item["id"] for item in current["items"]]
+        if not ids:
+            raise ValueError("Este negócio já não tem emails por enviar.")
+        return current["property_ref"], ids
+
+    def deal_prompt_text(ref, ids):
+        rule, template, note = service.deal_texts(ref)
+        return deal_round_prompt(queue(ref), ids, rule, template, note, now=datetime.now().astimezone())
+
+    def deal_prepare(body):
+        emails = body.get("emails") if isinstance(body.get("emails"), list) else []
+        result = service.prepare_deal_round(body.get("property_ref") or None, emails, str(body.get("note") or ""),
+                                            body.get("price"))
+        return {**result, "state": state()}
+
+    def deal_generate(body):
+        ref, ids = deal_ids(body.get("property_ref") or None)
+        service.require_fuel(ref)
+        cfg = service.config()
+        model = service.model(cfg)
+        answer, usage = complete(openai_api_key(service.folder, cfg["account"]), model, deal_prompt_text(ref, ids))
+        cost = estimate_cost_usd(model, **{k: usage[k] for k in ("prompt_tokens", "completion_tokens")})
+        service.log("openai_usage", model=model, **usage, reference=ref, cost_usd=round(cost, 6))
+        result = service.save_deal_round(ref, parse_round(answer, queue(ref), ids))
+        return {**result, "state": state(), "cost_usd": round(cost, 6), "fuel": service.api_fuel(ref)}
+
+    def deal_prompt(body):
+        ref, ids = deal_ids(body.get("property_ref") or None)
+        return {"prompt": deal_prompt_text(ref, ids)}
+
+    def deal_paste(body):
+        ref, ids = deal_ids(body.get("property_ref") or None)
+        return {**service.save_deal_round(ref, parse_round(str(body.get("text") or ""), queue(ref), ids)), "state": state()}
+
+    def deal_save(body):
+        return {**service.save_deal_round(body.get("property_ref") or None, body.get("common") or {}), "state": state()}
+
+    def deal_cancel(body):
+        ids = body.get("ids") if isinstance(body.get("ids"), list) else None
+        result = service.cancel_deal_round(body.get("property_ref") or None, ids)
+        return {**result, "state": state(), "settings": service.settings()}
 
     def contact_save(body):
         return {**service.save_contact(body.get("contact") or {}), **service.contacts()}
@@ -585,7 +638,8 @@ def web_app(folder, token):
                 "property/parse": ("POST", lambda body: {"fields": parse_listing(str(body.get("text") or ""))}),
                 "property/save": ("POST", property_save), "property/prompts": ("POST", property_prompts),
                 "property/photo": ("POST", property_photo), "property/panel": ("POST", property_panel),
-                "property/extract": ("POST", lambda body: service.extract_listing(body.get("text"), body.get("listing_url"))),
+                "property/extract": ("POST", lambda body: service.extract_listing(body.get("text"), body.get("listing_url"),
+                                                                                     body.get("deal"))),
                 "ai/model": ("POST", lambda body: service.set_model(str(body.get("model") or ""))),
                 "ai/price": ("POST", ai_price),
                 "ai/hidden": ("POST", lambda body: (admin(), service.set_hidden(str(body.get("model") or ""), body.get("hidden") is True))[1]),
@@ -596,7 +650,8 @@ def web_app(folder, token):
                                                                                   body.get("auto") is True))[1]),
                 "review": ("POST", lambda body: {**service.review_drafts(body.get("property_ref") or None, ids_of(body)),
                                                  "state": state(), "fuel": service.api_fuel(body.get("property_ref") or None)}),
-                "prompts/common": ("POST", lambda body: (admin(), service.save_common_prompts(body.get("prompts") or {}),
+                "prompts/common": ("POST", lambda body: (admin(), service.save_common_prompts(body.get("prompts") or {},
+                                                                                              body.get("deal")),
                                                          service.settings())[2]),
                 "ai/context": ("POST", lambda body: (admin(), service.set_context(
                     body.get("model"), int(body["tokens"]) if str(body.get("tokens", "")).isdigit() else body.get("tokens")))[1]),
@@ -611,6 +666,14 @@ def web_app(folder, token):
                 "testlab/advance": ("POST", lambda body: (admin(), testlab.advance(
                     service, datetime.now().astimezone().isoformat(timespec="seconds")))[1]),
                 "property/active": ("POST", property_active),
+                "property/archive": ("POST", property_archive), "property/unarchive": ("POST", property_unarchive),
+                "property/closing-price": ("POST", lambda body: (service.set_closing_price(
+                    str(body.get("reference") or ""), body.get("price")), {"settings": service.settings()})[1]),
+                "property/deal-candidates": ("POST", lambda body: service.deal_candidates(body.get("property_ref") or None)),
+                "property/deal-round": ("POST", lambda body: service.deal_round(body.get("property_ref") or None)),
+                "property/deal-prepare": ("POST", deal_prepare), "property/deal-generate": ("POST", deal_generate),
+                "property/deal-prompt": ("POST", deal_prompt), "property/deal-paste": ("POST", deal_paste),
+                "property/deal-save": ("POST", deal_save), "property/deal-cancel": ("POST", deal_cancel),
                 "visits/candidates": ("POST", visit_candidates), "visits/propose": ("POST", visit_propose),
                 "visits/round": ("POST", visit_round), "visits/round-prompt": ("POST", visit_round_prompt),
                 "visits/round-generate": ("POST", visit_round_generate), "visits/round-paste": ("POST", visit_round_paste),

@@ -10,7 +10,10 @@ DEFAULT = {
     "remetente_chamadas": "naoresponder@idealista.pt",
     "assunto_nome": r"\bde (?:teste de )?(.+?) sobre o teu imóvel",
     "codigo_anuncio": r"Código do anúncio:\s*(\d+)",
-    "link_anuncio": r"https://(?:www\.)?idealista\.pt/(?:imovel/)?(\d+)/?(?:[?#].*)?",
+    # 07/10: every form a link to the listing comes in — the agency's page (pro/<agência>/), another language (en/…),
+    # the mobile site, a photo of it (…/foto/2), with or without www —, all saved in the one form below
+    "link_anuncio": r"https://(?:www\.|m\.)?idealista\.pt/(?:pro/[^/?#]+/)?(?:(?:en|es|fr|it|de|ca|pt)/)?(?:imovel/)?(\d+)"
+                    r"(?:/[^?#]*)?(?:[?#].*)?",
     "link_anuncio_forma": "https://www.idealista.pt/imovel/{codigo}/",
     "assunto_chamada": r"Chamada (?:atendida|n[aã]o respondida) de um interessado",
     "chamada_telefone": r"n[úu]mero de telefone [ée]:\s*\+?(\d[\d ]{7,15}\d)",

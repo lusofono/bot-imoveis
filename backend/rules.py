@@ -150,14 +150,51 @@ def property_active(profile):
     return profile.get("active") is not False
 
 
+# 07/10: the archive — a property that is no longer worked on leaves the usual views (the Imóveis slider, the menus,
+# «Por imóvel»), keeps its numbers in the averages and comes back with «Reativar». Apart from ATIVO/INATIVO (the user's
+# choice): a property is archived for a reason, kept in profile.json as {"reason", "at"}.
+ARCHIVE_REASONS = {"fechado": "Negócio fechado", "proprietario_desistiu": "O proprietário desistiu",
+                   "desistimos": "Desistimos nós", "pausa": "Em pausa"}
+
+
+def closing_price(value, deal=None):
+    """07/10: the value the deal closed for (monthly rent, or the sale's price), for the archive: a positive number, or None
+    when left empty. Kept only in the data folder: never sent to customers nor to the AI."""
+    if value in (None, ""):
+        return None
+    price = parse_rent(value)
+    if price is None or not 0 < price <= (100_000_000 if deal == "venda" else 1_000_000):
+        raise ValueError("Valor de fecho inválido: escreve, por exemplo, 1500 ou 1.500.")
+    return int(price) if price.is_integer() else price
+
+
+def property_archived(profile):
+    """The property's archive record ({"reason", "label", "at"} and, closed, the "price"), or None when not archived."""
+    archived = (profile or {}).get("archived")
+    if not isinstance(archived, dict) or archived.get("reason") not in ARCHIVE_REASONS:
+        return None
+    return {**archived, "label": ARCHIVE_REASONS[archived["reason"]]}
+
+
 # The customer's file (26/09): what the qualification (the 2nd interaction, repeated until a visit is proposed)
 # gathers. The first four always count; the company and the pets only when the customer brought them up.
+# 07/10: a sale asks something else — what the buyer is looking for, what for, and when they can visit; never the
+# income, who will live there or a contract. FICHA_FIELDS names every point of both; FICHA_DEALS says which count.
 FICHA_FIELDS = {"trabalho": "Situação profissional e rendimentos", "agregado": "Agregado familiar",
-                "datas": "Datas ou duração do contrato", "disponibilidade": "Disponibilidade para visitas",
+                "datas": "Datas ou duração do contrato", "procura": "O que procura",
+                "objetivo": "Objetivo (habitação própria, investimento…)", "disponibilidade": "Disponibilidade para visitas",
                 "empresa": "Empresa (se arrenda por uma)", "animais": "Animais (qual, tamanho, quantos)"}
-FICHA_REQUIRED = ("trabalho", "agregado", "datas", "disponibilidade")
+FICHA_DEALS = {"arrendamento": (("trabalho", "agregado", "datas", "disponibilidade"), ("empresa", "animais")),
+               "venda": (("procura", "objetivo", "disponibilidade"), ())}
+FICHA_REQUIRED = FICHA_DEALS["arrendamento"][0]
 FICHA_OPTIONAL = ("empresa", "animais")
 FICHA_VALUE_MAX = 300
+
+
+def ficha_keys(deal=None):
+    """The points of a customer's file for this kind of business, in order: the required ones, then the optional."""
+    required, optional = FICHA_DEALS.get(deal) or FICHA_DEALS["arrendamento"]
+    return (*required, *optional)
 
 
 def clean_ficha(raw):
@@ -181,13 +218,15 @@ def merge_ficha(old, new):
     return merged
 
 
-def ficha_summary(ficha):
-    """What is still missing, and whether the file is complete (the four required points and any optional
-    one the customer raised)."""
+def ficha_summary(ficha, deal=None):
+    """What is still missing, and whether the file is complete (the required points of the property's kind of
+    business, and any optional one the customer raised)."""
     ficha = ficha or {}
-    missing = [key for key in FICHA_REQUIRED if not ficha.get(key)] + list(ficha.get("falta_extra") or [])
+    required, optional = FICHA_DEALS.get(deal) or FICHA_DEALS["arrendamento"]
+    missing = ([key for key in required if not ficha.get(key)]
+               + [key for key in ficha.get("falta_extra") or [] if key in optional])
     return {"falta": missing, "complete": not missing,
-            "known": sum(1 for key in FICHA_REQUIRED if ficha.get(key)), "total": len(FICHA_REQUIRED)}
+            "known": sum(1 for key in required if ficha.get(key)), "total": len(required)}
 
 
 # The after-visit survey (26/09): the three parts asked, each read on its own dial. A 1 weighs three times and a 2
@@ -234,6 +273,44 @@ def survey_report(surveys):
             "alerts": sum(1 for survey in surveys if survey_alerts(survey)), "green": QUALITY_GREEN, "red": QUALITY_RED}
 
 
+# 07/10, «Negócio fechado»: the survey that goes with the email to every customer when the deal closes, answered in the
+# email itself like the after-visit one (read by ai.parse_survey, question by question) — what each answer means here
+DEAL_SURVEY_PARTS = {"respostas": "Rapidez das respostas", "informacao": "Clareza da informação", "visita": "A visita"}
+
+
+def deal_survey(survey):
+    """The after-deal survey from what parse_survey read: 1 the replies, 2 the information, 3 the visit (none when they
+    did not visit), 4 whether they would recommend us, 5 the comment. None when it answers none of it."""
+    if not survey:
+        return None
+    found = {"respostas": survey.get("imovel"), "informacao": survey.get("consultor"), "visita": survey.get("marcacao"),
+             "recomenda": survey.get("interesse"), "comentario": survey.get("comentario")}
+    return found if any(value for value in found.values()) else None
+
+
+def deal_survey_alerts(survey):
+    """What in an after-deal answer the owner must see: a 1 or a 2, or «não» to recommending us."""
+    survey = survey or {}
+    alerts = [f"{label}: {survey[part]}/5" for part, label in DEAL_SURVEY_PARTS.items() if survey.get(part) in (1, 2)]
+    if survey.get("recomenda") == "não":
+        alerts.append("não nos recomendaria")
+    return alerts
+
+
+def deal_survey_report(surveys):
+    """The after-deal answers of one property: the average of each part, who would recommend us, and the comments."""
+    surveys = [survey for survey in surveys if survey]
+    parts = {}
+    for part, label in DEAL_SURVEY_PARTS.items():
+        scores = [survey.get(part) for survey in surveys if survey.get(part) in SCORE_WEIGHTS]
+        parts[part] = {"label": label, "score": quality(scores), "count": len(scores),
+                       "average": round(sum(scores) / len(scores), 1) if scores else None}
+    recommend = {key: sum(1 for survey in surveys if survey.get("recomenda") == key) for key in ("sim", "talvez", "não")}
+    return {"responses": len(surveys), "parts": parts, "recommend": recommend,
+            "comments": [survey["comentario"] for survey in surveys if survey.get("comentario")],
+            "alerts": sum(1 for survey in surveys if deal_survey_alerts(survey))}
+
+
 # The selection (26/09): 2 or 3 candidates on a short list; one chosen and one reserve (suplente). The documents are
 # asked only of the short list, and the program keeps a checklist of what arrived, never the files themselves.
 SELECTION_STATES = {"shortlist": "Short list", "chosen": "Selecionado", "suplente": "Suplente"}  # 04/10: «Escolhido» → «Selecionado»
@@ -241,16 +318,26 @@ SELECTION_STATES = {"shortlist": "Short list", "chosen": "Selecionado", "suplent
 DOCUMENTS = {"identificacao": ("Documento de identificação (CC, passaporte ou título de residência)", True),
              "recibos": ("Recibos de vencimento", True), "email_emprego": ("Email oficial do emprego (se tiver)", False),
              "contrato": ("Declaração ou contrato de trabalho (opcional)", False),
-             "irs": ("IRS do ano anterior (ou dos dois anteriores)", True)}
+             "irs": ("IRS do ano anterior (ou dos dois anteriores)", True),
+             # 07/10: a buyer is never asked for income: who they are and how they will pay
+             "financiamento": ("Comprovativo da capacidade financeira (pré-aprovação do banco ou fundos próprios)", True)}
+DOCUMENT_DEALS = {"arrendamento": ("identificacao", "recibos", "email_emprego", "contrato", "irs"),
+                  "venda": ("identificacao", "financiamento")}
 
 
-def documents_summary(selection):
+def documents_of(deal=None):
+    """The short list's documents for this kind of business, in order: {key: (label, required)}. A guarantor (fiador)
+    only in a rental."""
+    return {key: DOCUMENTS[key] for key in DOCUMENT_DEALS.get(deal) or DOCUMENT_DEALS["arrendamento"]}
+
+
+def documents_summary(selection, deal=None):
     """Which documents arrived, for the candidate and, when there is one, the guarantor (fiador)."""
     selection = selection or {}
     received = selection.get("docs") or {}
-    people = ["candidato"] + (["fiador"] if selection.get("fiador") else [])
+    people = ["candidato"] + (["fiador"] if selection.get("fiador") and deal != "venda" else [])
     missing = [f"{DOCUMENTS[key][0]}{' do fiador' if who == 'fiador' else ''}" for who in people
-               for key, (_, required) in DOCUMENTS.items() if required and not received.get(f"{who}:{key}")]
+               for key, (_, required) in documents_of(deal).items() if required and not received.get(f"{who}:{key}")]
     return {"received": received, "fiador": bool(selection.get("fiador")), "missing": missing, "complete": not missing}
 
 
@@ -334,6 +421,11 @@ def clean_property(fields):
         clean["deal"] = deal
     if clean["listing_id"] and not clean["listing_id"].isdigit():
         raise ValueError("O código do anúncio tem de ter só algarismos.")
+    # 07/10: a link pasted without https:// (www.idealista.pt/…), or with http://, is the same link
+    url = clean["listing_url"] or ""
+    if url and not re.match(r"[a-z]+://", url, re.I) and re.match(r"[\w-]+(\.[\w-]+)+/", url):
+        url = "https://" + url
+    clean["listing_url"] = re.sub(r"^http://", "https://", url, flags=re.I) or None
     if clean["listing_url"] and urlsplit(clean["listing_url"]).scheme != "https":
         raise ValueError("O link do anúncio tem de começar por https://.")
     idealista = IDEALISTA_LINK.fullmatch(clean["listing_url"] or "")
@@ -344,8 +436,9 @@ def clean_property(fields):
         clean["listing_id"] = idealista[1]
         clean["listing_url"] = PORTAL["link_anuncio_forma"].replace("{codigo}", idealista[1])
     rent = parse_rent(fields.get("advertised_rent_eur"))
-    if rent is not None and not 0 <= rent <= 1_000_000:
-        raise ValueError("Renda inválida.")
+    # 07/10: for a sale, the same field holds the asking price
+    if rent is not None and not 0 <= rent <= (100_000_000 if clean.get("deal") == "venda" else 1_000_000):
+        raise ValueError("Preço inválido." if clean.get("deal") == "venda" else "Renda inválida.")
     clean["advertised_rent_eur"] = int(rent) if rent is not None and rent.is_integer() else rent
     facts = fields.get("facts") or []
     facts = facts.splitlines() if isinstance(facts, str) else facts
@@ -363,6 +456,11 @@ def build_profile(fields, account, template, existing, today):
     profile.pop("_knowledge", None)  # runtime only, never written to profile.json
     if not existing:
         profile.pop("active", None)  # a new property starts ATIVO, even when its template is INATIVO
+        # 07/10: nothing of the template's own property comes along — its owner (email and name), its listing, or
+        # being the test property; only the rules and the prompts
+        profile.pop("test", None)
+        profile["property"] = {key: value for key, value in (profile.get("property") or {}).items()
+                               if key in ("reference", "description")}  # replaced in the general prompt just below
     ref = fields["reference"]
     prop, match = profile.setdefault("property", {}), profile.setdefault("match", {})
     reply = profile.setdefault("reply", {})

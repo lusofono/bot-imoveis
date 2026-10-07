@@ -90,12 +90,12 @@
 
 /* Buttons: the main ones anthracite with cream capitals (the site's filled button); the others outlined in ink.
    The pieces with a look of their own (pills, quick replies, copy icons, names, arrows) keep it. */
-:root[data-theme="agentval"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link){
+:root[data-theme="agentval"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link,.deal-button){
   border-radius:2px;font-family:var(--av-sans);letter-spacing:.14em;text-transform:uppercase;font-size:11.5px;font-weight:700}
 :root[data-theme="agentval"] :is(button.primary,.button.primary){background:var(--av-ink);border-color:var(--av-ink);color:var(--av-cream);
   box-shadow:none}
 :root[data-theme="agentval"] :is(button.primary,.button.primary):hover:not(:disabled){background:var(--av-heading);border-color:var(--av-heading)}
-:root[data-theme="agentval"] :is(button,.button):not(.primary,.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link):hover:not(:disabled){
+:root[data-theme="agentval"] :is(button,.button):not(.primary,.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link,.deal-button):hover:not(:disabled){
   background:var(--av-sand);border-color:var(--av-ink)}
 :root[data-theme="agentval"] button.link{color:var(--av-azulejo)}
 :root[data-theme="agentval"] :is(input,select,textarea){border-radius:2px;background:var(--input);border-color:var(--line);color:var(--av-ink)}

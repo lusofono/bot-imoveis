@@ -3,7 +3,8 @@
 const STATUS ={pending: 'por responder', draft: 'rascunho', error: 'erro no envio', sending: 'a enviar', uncertain: 'envio incerto'};
 const AUX_KINDS = ['reminder', 'consent_request', 'visits_closed', 'addition'];
 // 06/10: every email the program prepares (backend PROGRAM_KINDS): ours to send, never a customer's message to answer
-const OUR_KINDS = new Set([...AUX_KINDS, 'visit_thanks', 'visit_reminder', 'docs_request', 'visit_missed', 'visit_proposal']);
+const OUR_KINDS = new Set([...AUX_KINDS, 'visit_thanks', 'visit_reminder', 'docs_request', 'visit_missed', 'visit_proposal',
+  'deal_closed']);
 const FIELDS = ['reference', 'sender', 'deal', 'listing_id', 'listing_url', 'advertiser', 'advertised_rent_eur', 'description',
   'owner_email'];
 const $ = id => document.getElementById(id);
@@ -1465,21 +1466,35 @@ const COMMON_PROMPT_FIELDS = [
   ['docs_request', 'Pedido de documentos (sem nunca dizer «short list»)', 5],
   // 03/10: a short-list customer's next reply asks for the documents; then each reply says what came and what is missing
   ['shortlist_request', 'Short list: a resposta seguinte pede os documentos', 5],
-  ['shortlist_docs', 'Short list: o que chegou (pelo que disse e pelos nomes dos anexos) e o que falta', 5]];
+  ['shortlist_docs', 'Short list: o que chegou (pelo que disse e pelos nomes dos anexos) e o que falta', 5],
+  // 07/10: «Negócio fechado», in the property's panel
+  ['deal_closed', 'Negócio fechado: o email a todos os clientes quando o imóvel fica arrendado ou vendido', 5],
+  ['deal_closed_template', 'Negócio fechado: o inquérito (de 1 a 5; a numeração mantém-se para a ARIA ler as respostas)', 7]];
 const PROPERTY_PROMPT_FIELDS = [
   ['general', 'Prompt base: contexto do imóvel', 4], ['first', '1.ª interação: primeira resposta', 4],
   ['first_template', 'Texto base da 1.ª resposta (opcional)', 5], ['second', '2.ª interação: qualificação (pedir o que falta)', 5],
   ['third', '3.ª interação: proposta de visita', 4], ['fourth', '4.ª interação: marcar a visita', 6],
   ['knowledge', 'Como usar a base de conhecimento (RAG)', 3]];
 let promptsProperty = null;
+// 07/10: these two are the same for every property; the others have a copy for the properties for sale
+const SHARED_PROMPTS = ['application_instructions', 'owner_reply'];
+function commonPromptsGroup(title, fields, value, deal) {
+  const boxes = Object.fromEntries(fields.map(([key, , rows]) => [key, el('textarea', {rows}, value(key) || '')]));
+  const field = (label, box) => el('label', {class: 'field'}, el('span', {}, label, kind('prompt')), box);
+  return el('details', {class: 'prompts-group'}, el('summary', {}, title),
+    fields.map(([key, label]) => field(label, boxes[key])),
+    el('div', {class: 'actions'}, el('button', {class: 'primary', onclick: event => run(async () => {
+      settings = await call('api/prompts/common', {deal,
+        prompts: Object.fromEntries(Object.entries(boxes).map(([key, box]) => [key, box.value]))});
+      renderSettings(); await refreshState(); toast(deal === 'venda' ? 'Prompts das vendas guardados.' : 'Prompts comuns guardados.');
+    }, event.currentTarget)}, deal === 'venda' ? 'Guardar prompts das vendas' : 'Guardar prompts comuns')));
+}
 function promptsCard() {
-  const boxes = Object.fromEntries(COMMON_PROMPT_FIELDS.map(([key, , rows]) =>
-    [key, el('textarea', {rows}, settings.voice[key] || '')]));
   const properties = settings.properties || [];
   if (!properties.some(property => property.reference === promptsProperty)) promptsProperty = properties[0]?.reference || null;
   const property = properties.find(item => item.reference === promptsProperty);
   const select = el('select', {'aria-label': 'Imóvel'}, properties.map(item =>
-    el('option', {value: item.reference}, item.reference + (item.test ? ' (teste)' : ''))));
+    el('option', {value: item.reference}, item.reference + (item.test ? ' (teste)' : item.deal === 'venda' ? ' (venda)' : ''))));
   select.value = promptsProperty || '';
   select.addEventListener('change', () => { promptsProperty = select.value; renderWorkshop(); });
   const own = Object.fromEntries(PROPERTY_PROMPT_FIELDS.map(([key, , rows]) =>
@@ -1489,12 +1504,12 @@ function promptsCard() {
     el('p', {class: 'eyebrow'}, 'PROMPTS'),
     el('p', {class: 'step'}, 'Tudo o que a IA segue, para mudares quando precisares. Um texto apagado volta ao de partida. '
       + 'Quem usa a página não os vê nem os muda: só copia o prompt, sem o ver.'),
-    el('details', {class: 'prompts-group'}, el('summary', {}, 'Comuns a todos os imóveis'),
-      COMMON_PROMPT_FIELDS.map(([key, label]) => field(label, boxes[key])),
-      el('div', {class: 'actions'}, el('button', {class: 'primary', onclick: event => run(async () => {
-        settings = await call('api/prompts/common', {prompts: Object.fromEntries(Object.entries(boxes).map(([key, box]) => [key, box.value]))});
-        renderSettings(); await refreshState(); toast('Prompts comuns guardados.');
-      }, event.currentTarget)}, 'Guardar prompts comuns'))),
+    commonPromptsGroup('Comuns a todos os imóveis', COMMON_PROMPT_FIELDS.filter(([key]) => SHARED_PROMPTS.includes(key)),
+      key => settings.voice[key]),
+    commonPromptsGroup('Comuns aos arrendamentos', COMMON_PROMPT_FIELDS.filter(([key]) => !SHARED_PROMPTS.includes(key)),
+      key => settings.voice[key]),
+    commonPromptsGroup('Comuns às vendas', COMMON_PROMPT_FIELDS.filter(([key]) => !SHARED_PROMPTS.includes(key)),
+      key => settings.voice.sale?.[key], 'venda'),
     property && el('details', {class: 'prompts-group'}, el('summary', {}, 'De cada imóvel'),
       el('div', {class: 'row'}, el('label', {}, 'Imóvel', select)),
       PROPERTY_PROMPT_FIELDS.map(([key, label]) => field(label, own[key])),
@@ -1767,9 +1782,10 @@ function renderState() {
   $('error').hidden = !state.error; $('error').textContent = state.error || '';
   const select = $('queue'), chosen = select.value;
   // Only ATIVO properties; an INATIVO one still shows while it has emails waiting, so none gets lost.
-  const listed = state.properties.filter(queue => !queue.inactive || queue.emails.length);
+  // 07/10: an archived one too, only while it has emails (an answer to the «Negócio fechado» survey)
+  const listed = state.properties.filter(queue => (!queue.inactive && !queue.archived) || queue.emails.length);
   select.replaceChildren(...(listed.length ? listed : state.properties).map(queue => el('option', {value: queue.property_ref ?? ''},
-    (queue.property_ref ?? 'Todos') + (queue.inactive ? ' (inativo)' : ''))));
+    (queue.property_ref ?? 'Todos') + (queue.inactive ? ' (inativo)' : queue.archived ? ' (arquivo)' : ''))));
   if ([...select.options].some(option => option.value === chosen)) select.value = chosen;
   const queue = currentQueue();
   // 27/09: no «Dias para trás» — each read goes on from the last one; a new property's first one from the day it chose.
@@ -1780,10 +1796,13 @@ function renderState() {
     : queue?.read_from ? [`Ainda por ler: a primeira leitura traz os emails desde ${dayLabel(queue.read_from)}.`] : []));
   // 29/09: a round with one text for all is reviewed and sent in its own panel (Agenda), not card by card here.
   const emails = sortCards((queue?.emails || []).filter(email => !email.round && !email.owner), queue);
-  const inRound = (queue?.emails || []).length - emails.length;
-  $('round-notice').hidden = !inRound;
-  $('round-notice').textContent = inRound ? `${inRound} proposta(s) de visita da ronda com texto comum: revê-as e envia-as `
-    + 'no painel «Ronda de visitas», na Agenda.' : '';
+  const inRound = (queue?.emails || []).filter(email => email.round && !email.owner);
+  const dealing = inRound.filter(email => email.kind === 'deal_closed').length, proposing = inRound.length - dealing;
+  $('round-notice').hidden = !inRound.length;
+  $('round-notice').textContent = [proposing && `${proposing} proposta(s) de visita da ronda com texto comum: revê-as e envia-as `
+    + 'no painel «Ronda de visitas», na Agenda.',
+    // 07/10
+    dealing && `${dealing} email(s) de negócio fechado: revê-os e envia-os no painel do imóvel, em Imóveis.`].filter(Boolean).join(' ');
   renderQueueBoard(queue);
   $('emails').replaceChildren(...(emails.length ? emails.map(card)
     : [el('div', {class: 'empty-state'}, el('strong', {}, state.error ? 'Configuração pendente' : 'Tudo em dia.'), state.error ? 'Verifica o aviso acima para continuar.' : 'Não há emails em tratamento. Faz uma nova leitura quando quiseres.')]));
@@ -3123,7 +3142,8 @@ function renderQuality(report) {
 // With a single property the cards already say it all.
 function renderByProperty(properties) {
   // 04/10: the Painel's only list of the properties (the cards below it are gone): from one property on, with the rent
-  // and the ways in — the property's Comunicações and its Painel
+  // and the ways in — the property's Comunicações and its Painel. 07/10: not the archived ones (still in the cards)
+  properties = properties.filter(item => !item.archived);
   const box = $('metric-by-property');
   box.hidden = !properties.length;
   if (box.hidden) { box.replaceChildren(); return; }
@@ -3151,7 +3171,7 @@ function renderByProperty(properties) {
     return el('span', {class: 'state-dot ' + tone, title: meaning[tone], 'aria-label': meaning[tone]}); };
   box.replaceChildren(el('p', {class: 'eyebrow'}, 'POR IMÓVEL'),
     el('div', {class: 'by-property-scroll'}, el('table', {class: 'by-property'},
-      el('thead', {}, el('tr', {}, el('th', {scope: 'col'}, 'Imóvel'), el('th', {scope: 'col', class: 'num'}, 'Renda'),
+      el('thead', {}, el('tr', {}, el('th', {scope: 'col'}, 'Imóvel'), el('th', {scope: 'col', class: 'num'}, 'Renda / preço'),
         columns.map(([, label]) => el('th', {scope: 'col', class: 'num'}, title(label))),
         el('th', {scope: 'col', class: 'num'}, title(['Que demoramos', `a responder (${replyShort()})`])),  // 06/10: as the card
         el('th', {scope: 'col', class: 'by-property-links'}, el('span', {class: 'sr-only'}, 'Abrir')))),
@@ -3160,7 +3180,7 @@ function renderByProperty(properties) {
           onclick: () => openReplies(item)}, item.property_ref || 'Fila única'),
           item.test ? el('span', {class: 'tag test-tag', title: 'Fora dos totais e do ponto de situação'}, 'TESTE') : null,
           item.description ? el('span', {class: 'muted small by-property-desc', title: item.description}, ' · ' + short(item.description)) : null),
-        el('td', {class: 'num'}, rent(item.advertised_rent_eur)),
+        el('td', {class: 'num', title: item.deal === 'venda' ? 'Preço de venda' : 'Renda mensal'}, rent(item.advertised_rent_eur)),
         columns.map(([key, , tone]) => cell(item[key], tone)),
         el('td', {class: 'num'}, item.reply_hours == null ? '—' : hoursText(item.reply_hours)),
         el('td', {class: 'by-property-links'},
@@ -3901,7 +3921,8 @@ let contactsData = {contacts: [], properties: [], rgpd_states: {}};
 const fullDay = day => day ? day.split('-').reverse().join('/') : '—';
 
 // The property menus list only ATIVO properties; Imóveis shows them all, with the switch.
-function activeProperties() { return (settings?.properties || []).filter(property => property.active !== false); }
+// 07/10: nor the archived ones (they are at the end of Imóveis, in «Arquivo»)
+function activeProperties() { return (settings?.properties || []).filter(property => property.active !== false && !property.archived); }
 
 function fillSelect(select, options, first) {
   const chosen = select.value;
@@ -3954,8 +3975,12 @@ function contactRow(contact) {
 
 // Customer files (26/09): what the qualification gathered, per property, a few at a time above the full list.
 const FICHA_LABELS = {trabalho: 'Situação profissional e rendimentos', agregado: 'Agregado familiar',
-  datas: 'Datas ou duração do contrato', disponibilidade: 'Disponibilidade para visitas', empresa: 'Empresa',
-  animais: 'Animais'};
+  datas: 'Datas ou duração do contrato', procura: 'O que procura', objetivo: 'Objetivo',
+  disponibilidade: 'Disponibilidade para visitas', empresa: 'Empresa', animais: 'Animais'};
+// 07/10: a file's points follow the property's kind of business (the backend says which); the optional ones show only
+// when known or asked for
+const FICHA_RENTAL = ['trabalho', 'agregado', 'datas', 'disponibilidade', 'empresa', 'animais'];
+const FICHA_OPTIONAL = ['empresa', 'animais'];
 // No (valid) Reply-To on a portal notice (26/09): the recipient comes from the notice's body, or none; the owner
 // confirms it or types another here.
 function recipientEditor(email) {
@@ -4014,8 +4039,9 @@ document.addEventListener('click', event => {
   if (box && !event.target.closest('a, button, input, select, textarea')) box.classList.toggle('open');
 });
 function fichaCard(item) {
-  const optional = ['empresa', 'animais'].filter(key => item.ficha[key] || item.falta.includes(key));
-  const rows = ['trabalho', 'agregado', 'datas', 'disponibilidade', ...optional].flatMap(key => [
+  const keys = (item.keys || FICHA_RENTAL).filter(key => !FICHA_OPTIONAL.includes(key) || item.ficha[key]
+    || item.falta.includes(key));
+  const rows = keys.flatMap(key => [
     el('dt', {}, FICHA_LABELS[key]),
     // 05/10: known, dark green; at most 3 lines (5 for the work and income), «…» opening the rest on a click
     el('dd', {class: item.ficha[key] ? 'ficha-known ' + clampClass(key === 'trabalho' ? 5 : 3) : 'ficha-missing',
@@ -4091,6 +4117,7 @@ function ejectChoose(item) {
 const docsOpen = new Set();  // 05/10: whose «DOCUMENTOS» is open, kept while the page redraws
 function selectionColumn(item) {
   const docs = item.documents, labels = contactsData.documents || {};
+  const docKeys = item.document_keys || Object.keys(labels), sale = docKeys.includes('financiamento');
   const tick = (who, key) => el('label', {class: 'doc-tick'},
     el('input', {type: 'checkbox', checked: !!docs.received[`${who}:${key}`], onchange: event => run(() =>
       selectionCall('doc', item, {document: `${who}:${key}`, received: event.target.checked}))}), labels[key]);
@@ -4103,8 +4130,8 @@ function selectionColumn(item) {
         selectionCall('set', item, {status: null}, 'Saiu da short list.'), event.currentTarget)}, 'Tirar da short list')),
     el('div', {class: 'muted small ficha-email'}, item.email),
     el('p', {class: 'eyebrow'}, 'FICHA'),
-    el('dl', {}, ['trabalho', 'agregado', 'datas', 'disponibilidade', 'empresa', 'animais']
-      .filter(key => item.ficha[key] || ['trabalho', 'agregado', 'datas'].includes(key))
+    el('dl', {}, (item.ficha_keys || FICHA_RENTAL)
+      .filter(key => item.ficha[key] || (!FICHA_OPTIONAL.includes(key) && key !== 'disponibilidade'))
       .flatMap(key => [el('dt', {}, FICHA_LABELS[key]), el('dd', {class: item.ficha[key] ? clampClass(key === 'trabalho' ? 5 : 3)
         : 'ficha-missing', title: item.ficha[key] ? CLAMP_HINT : null}, item.ficha[key] || 'falta')])),
     el('p', {class: 'eyebrow'}, 'VISITA'),
@@ -4126,11 +4153,11 @@ function selectionColumn(item) {
         el('span', {class: 'tag docs-state ' + (docs.complete ? 'data-full' : Object.values(docs.received || {}).some(Boolean)
           ? 'data-some' : 'data-none')}, docs.complete ? 'Documentos completos'
           : 'Falta: ' + docs.missing.join(', ').toLowerCase())),
-      el('div', {class: 'doc-list'}, Object.keys(labels).map(key => tick('candidato', key))),
-      el('label', {class: 'doc-tick'}, el('input', {type: 'checkbox', checked: docs.fiador, onchange: event => run(() =>
+      el('div', {class: 'doc-list'}, docKeys.map(key => tick('candidato', key))),
+      !sale && el('label', {class: 'doc-tick'}, el('input', {type: 'checkbox', checked: docs.fiador, onchange: event => run(() =>
         selectionCall('doc', item, {fiador: event.target.checked}))}), 'Tem fiador'),
-      docs.fiador && el('div', {class: 'doc-list fiador'}, el('span', {class: 'muted small'}, 'Do fiador:'),
-        Object.keys(labels).map(key => tick('fiador', key))),
+      !sale && docs.fiador && el('div', {class: 'doc-list fiador'}, el('span', {class: 'muted small'}, 'Do fiador:'),
+        docKeys.map(key => tick('fiador', key))),
       el('div', {class: 'actions'},
         el('button', {type: 'button', onclick: event => run(async () => {
           const result = await selectionCall('request', item, {});
@@ -4338,6 +4365,18 @@ function applyAiMode() {
   $('generate-api').classList.toggle('primary', apiOnly());
 }
 
+// 07/10: «Todos / Arrendamento / Venda», one choice for the whole page (Imóveis and every switcher), kept in this browser.
+// Up here: the switchers below are built at start-up and read it.
+const DEAL_KINDS = {arrendamento: 'ARRENDAMENTO', venda: 'VENDA'};
+const DEAL_FILTERS = [['todos', 'Todos'], ['arrendamento', 'Arrendamento'], ['venda', 'Venda']];
+let dealFilter = 'todos';
+try { dealFilter = localStorage.getItem('bot-mail-deal-filter') || 'todos'; } catch { /* Storage may be unavailable. */ }
+const dealOf = property => property.deal === 'venda' ? 'venda' : 'arrendamento';
+function setDealFilter(key) {
+  dealFilter = key;
+  try { localStorage.setItem('bot-mail-deal-filter', key); } catch { /* Storage may be unavailable. */ }
+}
+
 // The property switcher of Imóveis (27/09), the same in Comunicações, Agenda and Contactos: big arrows, the reference,
 // the description, the dots and «1 / 3». It drives the page's own <select> (kept, hidden), so every tab's logic stays
 // as it was: a change here sets the select and fires its «change»; a select refilled or changed elsewhere redraws it.
@@ -4346,37 +4385,68 @@ function propertySwitcher(select) {
   const label = select.closest('label');
   const row = label?.parentElement;
   const box = el('div', {class: 'property-slider property-switcher', tabindex: '0', 'aria-label': 'Escolher o imóvel'});
-  row.before(box);
+  // 07/10: «Todos / Arrendamento / Venda» above it (only with both kinds): the arrows and the dots go through the chosen
+  // kind; «Todos», on the agenda, always stays. The property on screen stays even when it is of the other kind.
+  const filterBox = el('div', {class: 'segmented deal-filter', role: 'group', 'aria-label': 'Que imóveis', hidden: true});
+  row.before(filterBox, box);
   label.hidden = true;
-  const go = index => {
-    const options = [...select.options];
-    if (!options.length) return;
-    select.selectedIndex = (index + options.length) % options.length;
+  const propertyOf = option => (settings?.properties || []).find(item => item.reference === option.value);
+  const fits = option => {
+    const property = propertyOf(option);
+    return !option.value || !property || dealFilter === 'todos' || dealOf(property) === dealFilter;
+  };
+  const shown = () => {
+    const current = select.options[Math.max(0, select.selectedIndex)];
+    return [...select.options].filter(option => option === current || fits(option));
+  };
+  const choose = option => {
+    if (!option) return;
+    select.selectedIndex = option.index;
     select.dispatchEvent(new Event('change'));
   };
+  const go = step => {
+    const list = shown();
+    if (!list.length) return;
+    const at = Math.max(0, list.indexOf(select.options[select.selectedIndex]));
+    choose(list[(at + step + list.length) % list.length]);
+  };
+  const renderFilter = () => {
+    const kinds = [...select.options].map(propertyOf).filter(Boolean).map(dealOf);
+    const count = key => kinds.filter(kind => key === 'todos' || kind === key).length;
+    filterBox.hidden = !(count('venda') && count('arrendamento'));
+    filterBox.replaceChildren(...DEAL_FILTERS.map(([key, text]) => el('button', {type: 'button',
+      class: dealFilter === key ? 'active' : '', 'aria-pressed': dealFilter === key ? 'true' : 'false', onclick: () => {
+        setDealFilter(key);
+        const current = select.options[select.selectedIndex];
+        if (current && !fits(current)) choose([...select.options].find(option => option.value && fits(option)));
+        SWITCHERS.forEach(redraw => redraw());
+      }}, `${text} (${count(key)})`)));
+  };
   const render = () => {
-    const options = [...select.options], index = Math.max(0, select.selectedIndex), many = options.length > 1;
-    const option = options[index];
+    renderFilter();
+    const options = shown(), option = select.options[Math.max(0, select.selectedIndex)];
+    const index = Math.max(0, options.indexOf(option)), many = options.length > 1;
     if (!option) return box.replaceChildren(el('span', {class: 'muted small'}, 'Sem imóveis.'));
     const ref = option.value, property = (settings?.properties || []).find(item => item.reference === ref);
     box.classList.toggle('test-property', !!property?.test);  // 02/10: the test property, in light purple
     const inactive = property?.active === false || /inativo/i.test(option.textContent);
     box.replaceChildren(...el('div', {},
-      many && el('button', {type: 'button', class: 'slider-arrow prev', 'aria-label': 'Imóvel anterior', onclick: () => go(index - 1)}, '‹'),
-      // 30/09: a title on the left, on a line of its own, like the other cards' («CAIXA DE CORREIO»)
-      el('span', {class: 'eyebrow switcher-label'}, 'IMÓVEL'),
+      many && el('button', {type: 'button', class: 'slider-arrow prev', 'aria-label': 'Imóvel anterior', onclick: () => go(-1)}, '‹'),
+      // 30/09: a title on the left, on a line of its own, like the other cards' («CAIXA DE CORREIO»); 07/10: the kind of
+      // business on the right of that line
+      el('span', {class: 'eyebrow switcher-label'}, ref && dealKind(property), 'IMÓVEL'),
       el('div', {class: 'slider-title'},
         el('span', {class: 'property-ref'}, ref ? ref + (inactive ? ' · INATIVO' : '') : 'TODOS OS IMÓVEIS'),
         el('strong', {}, ref ? property?.description || option.textContent : 'Todos os imóveis, em conjunto'),
         many && el('div', {class: 'slider-dots'}, options.map((other, i) => el('button', {type: 'button',
           class: 'slider-dot' + (i === index ? ' active' : ''), 'aria-label': other.value || 'Todos', title: other.value || 'Todos',
-          'aria-current': i === index ? 'true' : false, onclick: () => go(i)})),
+          'aria-current': i === index ? 'true' : false, onclick: () => choose(other)})),
           el('span', {class: 'muted small'}, `${index + 1} / ${options.length}`))),
-      many && el('button', {type: 'button', class: 'slider-arrow next', 'aria-label': 'Imóvel seguinte', onclick: () => go(index + 1)}, '›')).childNodes);
+      many && el('button', {type: 'button', class: 'slider-arrow next', 'aria-label': 'Imóvel seguinte', onclick: () => go(1)}, '›')).childNodes);
   };
   box.addEventListener('keydown', event => {
-    if (event.key === 'ArrowLeft') go(select.selectedIndex - 1);
-    if (event.key === 'ArrowRight') go(select.selectedIndex + 1);
+    if (event.key === 'ArrowLeft') go(-1);
+    if (event.key === 'ArrowRight') go(1);
   });
   select.addEventListener('change', render);
   select.addEventListener('change', () => shareProperty(select.value));  // 05/10: the same property in every tab
@@ -4454,8 +4524,11 @@ function propertyCard(property) {
     link,
     knowledgeDetails(property.reference),
     el('button', {class: 'link', onclick: () => openPropertyEditor(property, property.reference)}, 'Editar dados do anúncio'),
-    activeSwitch(property)),
+    activeSwitch(property),
+    archiveControl(property),
+    dealButton(property)),
     el('div', {class: 'property-operations'},
+      dealSurveyReport(property),
       surveyReport(property),
       activeClientsList(property),
       callsList(property),
@@ -4474,6 +4547,285 @@ function activeSwitch(property) {
     renderSettings(); renderState();
     toast(active ? `${property.reference} ficou inativo: sai dos menus, mas continua aqui.` : `${property.reference} está outra vez ativo.`);
   }, event.currentTarget)}, active ? 'Marcar como inativo' : 'Voltar a ativar');
+}
+
+// 07/10: the value a deal closed for — the monthly rent or the sale's price —, typed in euros
+function priceInput(property, value = '') {
+  return el('span', {class: 'price-input'}, el('input', {inputmode: 'decimal', value, 'aria-label': 'Valor de fecho',
+    placeholder: property.deal === 'venda' ? 'ex.: 280.000' : 'ex.: 1.500'}),
+    el('span', {class: 'muted small'}, property.deal === 'venda' ? '€' : '€/mês'));
+}
+const euros = value => new Intl.NumberFormat('pt-PT', {style: 'currency', currency: 'EUR', maximumFractionDigits: 0}).format(value);
+// The archive card's line: the value it closed for, against the advertised one; changed or given later here
+function closingPrice(property) {
+  const value = property.archived.price, asked = property.advertised_rent_eur, unit = property.deal === 'venda' ? '' : '/mês';
+  const diff = value && asked ? Math.round((value / asked - 1) * 1000) / 10 : null;
+  const price = priceInput(property, value ?? '');
+  const save = el('button', {type: 'button', onclick: event => run(async () => {
+    const result = await call('api/property/closing-price', {reference: property.reference, price: price.querySelector('input').value});
+    settings = result.settings; renderSettings(); toast('Valor de fecho guardado.');
+  }, event.currentTarget)}, 'Guardar');
+  return el('div', {class: 'closing-price'},
+    el('p', {class: 'small'}, el('strong', {}, 'Valor de fecho: '), value ? euros(value) + unit : 'ainda por indicar',
+      asked ? el('span', {class: 'muted'}, ` · anunciado: ${euros(asked)}${unit}`
+        + (diff != null ? ` (${diff > 0 ? '+' : ''}${String(diff).replace('.', ',')} %)` : '')) : null),
+    el('details', {}, el('summary', {class: 'link small'}, value ? 'Alterar' : 'Indicar o valor'),
+      el('div', {class: 'row'}, price, save),
+      el('p', {class: 'muted small'}, 'Fica só nos teus dados: não vai para os clientes nem para a IA.')));
+}
+
+// 07/10: «Arquivar», with its reason. The property leaves the slider, the menus and «Por imóvel»; its numbers stay in the
+// averages, and «Reativar», in the archive at the end of Imóveis, brings it back.
+const ARCHIVE_REASONS = {fechado: 'Negócio fechado', proprietario_desistiu: 'O proprietário desistiu', desistimos: 'Desistimos nós',
+  pausa: 'Em pausa'};
+function archiveControl(property) {
+  if (property.archived) return false;
+  const reason = el('select', {'aria-label': 'Motivo do arquivo'},
+    Object.entries(ARCHIVE_REASONS).map(([key, label]) => el('option', {value: key}, label)));
+  reason.value = 'pausa';
+  // 07/10: a deal closed asks the value it closed for (only in the data folder: never to the customers nor the AI)
+  const price = priceInput(property);
+  price.hidden = true;
+  reason.addEventListener('change', () => { price.hidden = reason.value !== 'fechado'; });
+  return el('details', {class: 'archive-control'}, el('summary', {class: 'link'}, 'Arquivar'),
+    el('div', {class: 'row'}, reason, price, el('button', {type: 'button', onclick: event => run(async () => {
+      if (!confirm(`Arquivar ${property.reference} (${ARCHIVE_REASONS[reason.value].toLowerCase()})? Sai da lista e dos menus, `
+          + 'mas os números continuam nas médias. Podes reativá-lo no arquivo, no fim de Imóveis.'
+          + (reason.value === 'fechado' ? '\n\nNegócio fechado fecha também as visitas: os pedidos novos ouvem que já não está disponível.' : ''))) return;
+      const result = await call('api/property/archive', {reference: property.reference, reason: reason.value,
+        price: reason.value === 'fechado' ? price.querySelector('input').value : null});
+      settings = result.settings; state = result.state; renderSettings(); renderState();
+      toast(`${property.reference} está no arquivo (${ARCHIVE_REASONS[reason.value].toLowerCase()}), no fim de Imóveis.`);
+    }, event.currentTarget)}, 'Arquivar')));
+}
+
+// 07/10, «Negócio fechado»: the property was let or sold. One email to its customers — the active ones, all or the not
+// active ones, each switched on or off (the selected one comes off) —, the same text for all in their language, with a
+// short survey, written once and sent from here, like the visits' round. Once it goes out, the property is archived.
+const dealOpen = new Set();  // the properties whose «Negócio fechado» panel is open
+const dealDraft = {};  // property → {audience, off, note} while choosing who gets it
+function dealButton(property) {
+  if (property.archived) return false;
+  const ref = property.reference, open = dealOpen.has(ref) || property.deal_round?.pending > 0;
+  return el('button', {type: 'button', class: 'deal-button' + (open ? ' open' : ''), 'aria-expanded': open ? 'true' : 'false',
+    title: 'O imóvel foi ' + (property.deal === 'venda' ? 'vendido' : 'arrendado') + ': avisa todos os clientes e pede-lhes uma avaliação',
+    onclick: () => {
+      if (dealOpen.has(ref)) dealOpen.delete(ref); else dealOpen.add(ref);
+      renderPropertySlider();
+      if (dealOpen.has(ref)) $('deal-card')?.scrollIntoView({behavior: 'smooth', block: 'start'});
+    }}, el('span', {class: 'deal-icon', 'aria-hidden': 'true'}, '🔑'), el('span', {}, 'Negócio fechado'));
+}
+function dealCard(property) {
+  const ref = property.reference;
+  if (property.archived || !(dealOpen.has(ref) || property.deal_round?.pending > 0)) return false;
+  const box = el('div', {class: 'deal-body'}, el('p', {class: 'muted small'}, 'A carregar…'));
+  run(async () => {
+    const round = await call('api/property/deal-round', {property_ref: ref});
+    if (round.items.length) renderDealRound(box, property, round);
+    else renderDealPick(box, property, await call('api/property/deal-candidates', {property_ref: ref}));
+  });
+  return el('article', {class: 'card deal-card', id: 'deal-card'},
+    el('p', {class: 'eyebrow'}, 'NEGÓCIO FECHADO'),
+    el('h2', {}, `O imóvel foi ${property.deal === 'venda' ? 'vendido' : 'arrendado'}: avisa os clientes`), box);
+}
+const DEAL_AUDIENCES = [['ativos', 'Ativos'], ['todos', 'Todos'], ['inativos', 'Não ativos']];
+function renderDealPick(box, property, data) {
+  const ref = property.reference, customers = data.customers || [];
+  const draft = dealDraft[ref] ||= {audience: 'ativos', note: '',
+    off: new Set(customers.filter(customer => customer.selected).map(customer => customer.email))};
+  const inAudience = (customer, audience = draft.audience) => audience === 'todos' || (audience === 'ativos') === customer.active;
+  const shown = customers.filter(customer => inAudience(customer));
+  const going = () => shown.filter(customer => !draft.off.has(customer.email));
+  const step = number => el('span', {class: 'step-num', 'aria-hidden': 'true'}, number);
+  const prepare = el('button', {class: 'primary', onclick: event => run(async () => {
+    const emails = going().map(customer => customer.email);
+    if (!emails.length) throw new Error('Liga pelo menos um cliente.');
+    let round = await call('api/property/deal-prepare', {property_ref: ref, emails, note: draft.note, price: draft.price || null});
+    state = round.state;
+    if (apiOnly() || settings.openai_configured) {
+      try {
+        round = await call('api/property/deal-generate', {property_ref: ref});
+        state = round.state; applyFuel(round.fuel, ref);
+      } catch (error) { toast(`Os emails ficaram preparados, mas o texto não foi gerado: ${error.message}`, 'warn'); }
+    }
+    delete dealDraft[ref];
+    renderState(); renderDealRound(box, property, round);
+    toast('Texto pronto, logo abaixo: revê-o e depois «2 Enviar a todos». Nada foi enviado.');
+  }, event.currentTarget)});
+  const label = () => prepare.replaceChildren(step('1'), `Preparar o texto (${going().length} de ${shown.length})`);
+  label();
+  const note = el('textarea', {rows: 3, 'aria-label': 'O que este email deve dizer',
+    placeholder: 'O que este email deve dizer (opcional): por exemplo, que guardamos o contacto para outros imóveis na mesma zona.'},
+    draft.note);
+  note.addEventListener('input', () => { draft.note = note.value; });
+  const price = priceInput(property, draft.price || '');
+  price.querySelector('input').addEventListener('input', event => { draft.price = event.target.value; });
+  const left = data.left_out || {};
+  const outside = [[left.waiting, 'com email por responder (responde-lhes em Emails)'], [left.told, 'já receberam este email'],
+    [left.ignored, 'na lista negra ou cinzenta']].filter(([names]) => names?.length)
+    .map(([names, text]) => `${names.length} ${text}: ${names.map(name => shortName(name) || name).join(', ')}`);
+  box.replaceChildren(
+    el('p', {class: 'step'}, 'Um email a cada cliente deste imóvel, a dizer que já não está disponível e a pedir uma '
+      + 'avaliação de 1 a 5. O mesmo texto para todos, na língua de cada um. Depois de enviado, o imóvel passa para o arquivo.'),
+    el('div', {class: 'segmented deal-audience', role: 'group', 'aria-label': 'A quem'}, DEAL_AUDIENCES.map(([key, text]) =>
+      el('button', {type: 'button', class: draft.audience === key ? 'active' : '', 'aria-pressed': draft.audience === key ? 'true' : 'false',
+        onclick: () => { draft.audience = key; renderDealPick(box, property, data); }},
+        `${text} (${customers.filter(customer => inAudience(customer, key)).length})`))),
+    shown.length ? el('div', {class: 'client-list'}, shown.map(customer => el('div', {class: 'client-row'},
+      el('label', {class: 'round-pick', title: 'Desliga para o deixar de fora'},
+        el('input', {type: 'checkbox', checked: !draft.off.has(customer.email), onchange: event => {
+          if (event.target.checked) draft.off.delete(customer.email); else draft.off.add(customer.email);
+          label();
+        }}), el('span', {}, shortName(customer.name) || customer.email)),
+      customer.selected && el('span', {class: 'tag golden', title: 'Ficou com o imóvel: vem desligado'}, 'selecionado'),
+      el('span', {class: 'muted small'}, customer.active ? 'ativo' : (customer.reason || 'não ativo')))))
+      : el('p', {class: 'muted small'}, 'Ninguém nesta escolha.'),
+    outside.length > 0 && el('p', {class: 'muted small'}, 'De fora: ' + outside.join(' · ') + '.'),
+    note,
+    el('label', {class: 'field closing-field'}, el('span', {}, 'Valor de fecho (opcional, vai para o arquivo)'), price,
+      el('span', {class: 'muted small'}, 'Fica só nos teus dados: não vai para os clientes nem para a IA.')),
+    el('div', {class: 'actions'}, prepare,
+      el('button', {type: 'button', class: 'link', onclick: () => { dealOpen.delete(ref); renderPropertySlider(); }}, 'Fechar')));
+}
+function renderDealRound(box, property, data) {
+  const ref = property.reference, items = data.items || [], hasTexts = Object.keys(data.texts || {}).length > 0;
+  if (!items.length) { dealOpen.delete(ref); renderPropertySlider(); return; }
+  const redraw = next => { if (next.state) { state = next.state; renderState(); } renderDealRound(box, property, next); };
+  const count = lang => items.filter(item => item.language === lang).length;
+  const texts = Object.fromEntries(Object.keys(ROUND_LANGS).filter(lang => data.texts?.[lang]).map(lang =>
+    [lang, el('textarea', {rows: 14, 'aria-label': `Texto em ${ROUND_LANGS[lang]}`}, data.texts[lang])]));
+  const summaries = Object.fromEntries(Object.entries(data.summaries || {}).map(([lang, text]) =>
+    [lang, el('textarea', {rows: 6, 'aria-label': `Tradução em ${lang}`}, text)]));
+  const common = () => ({texts: Object.fromEntries(Object.entries(texts).map(([lang, area]) => [lang, area.value])),
+    summaries: Object.fromEntries(Object.entries(summaries).map(([lang, area]) => [lang, area.value])),
+    clients: Object.fromEntries(items.map(item => [item.id, {language: item.language, lang: item.lang, greeting: item.greeting || ''}]))});
+  const save = () => call('api/property/deal-save', {property_ref: ref, common: common()});
+  const promptText = el('pre', {}, '');
+  const promptBox = el('details', {class: 'copy-only prompt-view'}, el('summary', {class: 'muted small'}, 'Prompt do email'), promptText);
+  const pasted = el('textarea', {class: 'copy-only', rows: 4, placeholder: 'Cola aqui a resposta do ChatGPT (o bloco JSON).',
+    'aria-label': 'Resposta colada'});
+  const send = el('button', {class: 'primary send-action', disabled: !hasTexts, onclick: event => run(async () => {
+    const saved = await save();
+    const ids = saved.items.map(item => item.id);
+    const check = await call('api/preview', {property_ref: ref, ids});
+    if (!confirm(`Enviar agora ${ids.length} email(s) reais de negócio fechado, um a cada cliente, na conversa de cada um?`
+        + `\n\nPara: ${check.replies.map(reply => reply.to).join(', ')}`
+        + `\n\nDepois de saírem todos, ${ref} fica fechado e passa para o arquivo.`)) { redraw(saved); return; }
+    const result = await call('api/send', {property_ref: ref, preview_token: check.preview_token, confirmed: true});
+    const sent = result.results.filter(item => item.status === 'sent').length;
+    if (sent) playSound('send');
+    if (sent === ids.length) dealOpen.delete(ref);
+    await loadSettings(); await refreshState();
+    toast(`Negócio fechado: enviados ${sent} de ${ids.length}.` + (sent === ids.length
+      ? ` ${ref} passou para o arquivo, no fim de Imóveis.` : ' Os que não saíram continuam aqui, com o aviso.'),
+      sent === ids.length ? 'ok' : 'warn');
+  }, event.currentTarget)}, stepNum2(), buttonIcon('mail'), `Enviar a todos (${items.length})`);
+  box.replaceChildren(
+    el('p', {class: 'muted small'}, `${items.length} cliente(s) por enviar`),
+    data.note && el('p', {class: 'step'}, el('strong', {}, 'O que este email deve dizer: '), data.note),
+    el('div', {class: 'actions'},
+      el('button', {class: (hasTexts ? '' : 'primary ') + 'needs-fuel', 'data-ref': ref,
+        title: settings.openai_configured ? '' : 'Sem chave OpenAI configurada: o clique explica como.',
+        onclick: event => run(async () => {
+          if (hasTexts && !confirm('O texto é escrito de novo pela IA e perdes o que alteraste. Continuar?')) return;
+          const result = await call('api/property/deal-generate', {property_ref: ref});
+          applyFuel(result.fuel, ref); redraw(result);
+          toast('Texto pronto: revê-o abaixo antes de enviar.');
+        }, event.currentTarget)}, hasTexts ? 'Gerar de novo' : 'Gerar o texto'),
+      el('button', {class: 'copy-only', onclick: event => run(async () => {
+        promptText.textContent = (await call('api/property/deal-prompt', {property_ref: ref})).prompt;
+        await copyText(promptText.textContent, 'Prompt copiado: cola-o no ChatGPT e traz a resposta para a caixa abaixo.', promptBox);
+      }, event.currentTarget)}, 'Copiar o prompt'),
+      el('button', {class: 'copy-only', onclick: event => run(async () => {
+        if (!pasted.value.trim()) throw new Error('Cola primeiro a resposta do ChatGPT.');
+        redraw(await call('api/property/deal-paste', {property_ref: ref, text: pasted.value}));
+      }, event.currentTarget)}, 'Usar a resposta colada')),
+    promptBox, pasted,
+    Object.entries(texts).map(([lang, area]) => el('details', {class: 'round-text', open: lang === 'pt'},
+      el('summary', {class: 'muted small'}, `Texto em ${ROUND_LANGS[lang]} (${count(lang)} cliente(s))`
+        + (lang === 'en' ? ' — o completo e oficial para quem não escreve em português nem em espanhol' : '')), area)),
+    Object.entries(summaries).map(([lang, area]) => el('details', {class: 'round-text'},
+      el('summary', {class: 'muted small'}, `Tradução em «${langName(lang) || lang}», a seguir ao texto em inglês (`
+        + `${items.filter(item => item.lang === lang).length} cliente(s))`), area)),
+    el('div', {class: 'client-list'}, items.map(item => el('div', {class: 'client-row'},
+      el('span', {}, shortName(item.name) || item.email),
+      el('span', {class: 'tag' + (item.reply_status === 'error' ? ' warn' : '')},
+        item.reply_status === 'error' ? `não saiu: ${item.reply_error || 'erro'}`
+          : item.language ? ROUND_LANGS[item.language] + (item.lang && item.lang !== 'und' && item.lang !== item.language
+            ? ` · escreve em ${langName(item.lang)}` : '') : 'sem texto')))),
+    el('div', {class: 'actions'},
+      hasTexts && el('button', {onclick: event => run(async () => {
+        redraw(await save()); toast('Alterações guardadas em todos os emails.');
+      }, event.currentTarget)}, 'Guardar alterações'),
+      send,
+      el('button', {type: 'button', class: 'link danger', onclick: event => run(async () => {
+        if (!confirm(`Cancelar o email de negócio fechado? Os ${items.length} email(s) por enviar saem da fila e nada é enviado.`)) return;
+        const result = await call('api/property/deal-cancel', {property_ref: ref});
+        settings = result.settings; state = result.state; dealOpen.delete(ref);
+        renderState(); renderSettings();
+        toast(`Cancelado: ${result.cancelled} email(s) tirado(s) da fila, nada foi enviado.`);
+      }, event.currentTarget)}, 'Cancelar')));
+  holdFuelButtons();
+}
+
+// 07/10: the answers to the «Negócio fechado» survey of one property
+function dealSurveyReport(property) {
+  const report = property.deal_round?.survey;
+  if (!report?.responses) return false;
+  const mark = value => String(value).replace('.', ',');
+  const recommend = report.recommend || {};
+  return el('div', {class: 'deal-survey'},
+    el('p', {class: 'eyebrow'}, 'INQUÉRITO DO NEGÓCIO FECHADO'),
+    el('p', {class: 'muted small'}, `${report.responses} resposta(s)` + (report.alerts ? ` · ${report.alerts} com nota baixa` : '')),
+    el('ul', {class: 'deal-survey-parts'},
+      Object.values(report.parts).filter(part => part.count).map(part =>
+        el('li', {}, `${part.label}: ${mark(part.average)} / 5`, el('span', {class: 'muted small'}, ` (${part.count})`))),
+      el('li', {}, `Recomendaria: sim ${recommend.sim || 0} · talvez ${recommend.talvez || 0} · não ${recommend['não'] || 0}`)),
+    report.comments?.length > 0 && el('details', {}, el('summary', {class: 'muted small'}, `${report.comments.length} comentário(s)`),
+      el('ul', {}, report.comments.map(comment => el('li', {class: 'small'}, comment)))));
+}
+
+// 07/10: «Arquivo», at the end of Imóveis: the archived properties one at a time, with their own arrows — why and when,
+// the deal's survey, and «Reativar», back to the slider and the menus
+let archiveRef = null;
+function renderArchive() {
+  const box = $('property-archive');
+  if (!box) return;
+  const archived = (settings?.properties || []).filter(property => property.archived);
+  box.hidden = !archived.length;
+  if (!archived.length) { box.replaceChildren(); return; }
+  let index = archived.findIndex(property => property.reference === archiveRef);
+  if (index < 0) { index = 0; archiveRef = archived[0].reference; }
+  const property = archived[index], many = archived.length > 1;
+  const step = delta => { archiveRef = archived[(index + delta + archived.length) % archived.length].reference; renderArchive(); };
+  const at = property.archived.at ? fullDay(property.archived.at.slice(0, 10)) : '';
+  box.replaceChildren(
+    el('p', {class: 'eyebrow'}, `ARQUIVO · ${archived.length} ${archived.length === 1 ? 'imóvel' : 'imóveis'}`),
+    el('div', {class: 'property-slider property-switcher archive-slider'},
+      many && el('button', {class: 'slider-arrow prev', 'aria-label': 'Imóvel arquivado anterior', onclick: () => step(-1)}, '‹'),
+      el('span', {class: 'eyebrow switcher-label'}, dealKind(property), 'ARQUIVADO'),
+      el('div', {class: 'slider-title'},
+        el('span', {class: 'property-ref'}, `${property.reference} · ${property.archived.label.toUpperCase()}`),
+        el('strong', {}, property.description || ''),
+        many && el('span', {class: 'muted small'}, `${index + 1} / ${archived.length}`)),
+      many && el('button', {class: 'slider-arrow next', 'aria-label': 'Imóvel arquivado seguinte', onclick: () => step(1)}, '›')),
+    el('article', {class: 'card archive-card'},
+      el('div', {class: 'card-head'}, el('strong', {}, property.reference), el('span', {}, property.description || ''),
+        el('span', {class: 'tag'}, property.archived.label)),
+      el('p', {class: 'muted small'}, (at ? `Arquivado a ${at}` : 'Arquivado')
+        + (property.deal_round?.sent ? ` · negócio fechado: ${property.deal_round.sent} email(s) enviados aos clientes` : '')
+        + ' · os números continuam nas médias do Painel.'),
+      property.archived.reason === 'fechado' && closingPrice(property),
+      dealSurveyReport(property),
+      surveyReport(property),
+      el('div', {class: 'actions'}, el('button', {type: 'button', onclick: event => run(async () => {
+        if (!confirm(`Reativar ${property.reference}? Volta à lista de imóveis e aos menus`
+            + (property.archived.reason === 'fechado' ? ', e as visitas fechadas pelo negócio voltam a abrir.' : '.'))) return;
+        const result = await call('api/property/unarchive', {reference: property.reference});
+        settings = result.settings; state = result.state;
+        selectProperty(property.reference, 0, false); renderSettings(); renderState();
+        toast(`${property.reference} está outra vez ativo.`);
+      }, event.currentTarget)}, 'Reativar'))));
 }
 
 // The property's survey report: the three dials and every answer, the bad ones first to catch the eye. 04/10: always
@@ -5085,12 +5437,15 @@ function applySharedProperty(tab) {
 function openPropertyPanel(ref) { selectProperty(ref, 0, false); showPropertiesView('list'); showTab('properties'); }
 function selectProperty(ref, direction = 0, render = true) {
   propertyRef = ref; slideDirection = direction;
+  // 07/10: a property opened from elsewhere that «Arrendamento» or «Venda» would hide: back to «Todos»
+  const wanted = (settings?.properties || []).find(property => property.reference === ref);
+  if (wanted && !wanted.archived && dealFilter !== 'todos' && dealOf(wanted) !== dealFilter) setDealFilter('todos');
   try { localStorage.setItem('bot-mail-property', ref || ''); } catch { /* Storage may be unavailable. */ }
   if (render && settings) renderPropertySlider();
 }
 
 function stepProperty(step) {
-  const properties = settings?.properties || [];
+  const properties = liveProperties();
   if (properties.length < 2) return;
   const index = Math.max(0, properties.findIndex(property => property.reference === propertyRef));
   selectProperty(properties[(index + step + properties.length) % properties.length].reference, step);
@@ -5107,6 +5462,11 @@ function showPropertiesView(view) {
 }
 
 // ref: the property being edited (its data fills the form); null for a new one.
+// 07/10: for a sale, the same field is the asking price
+function priceLabel() {
+  $('f-price-label').textContent = $('f-deal').value === 'venda' ? 'Preço (€)' : 'Renda anunciada (€)';
+}
+$('f-deal').addEventListener('change', priceLabel);
 function openPropertyEditor(fields, ref = null) {
   editorRef = ref;
   // The owner's email is not in the listing: filled from an extraction, the form keeps the one already saved (27/09).
@@ -5115,6 +5475,7 @@ function openPropertyEditor(fields, ref = null) {
   const keep = {owner_email: saved?.owner_email, deal: saved?.deal || 'arrendamento'};
   for (const name of FIELDS) if (name !== 'sender' || fields.sender) $('f-' + name).value = fields[name] ?? keep[name] ?? '';
   $('f-facts').value = (fields.facts || []).join('\n');
+  priceLabel();
   $('editor-title').textContent = ref ? `Editar ${ref}` : 'Novo imóvel';
   // How far back the first read goes: asked only for a new property (45 days unless changed).
   $('first-read-field').hidden = Boolean(ref);
@@ -5122,13 +5483,39 @@ function openPropertyEditor(fields, ref = null) {
   showPropertiesView('editor');
 }
 
+// 07/10: the slider goes through the properties at work; the archived ones have their own, at the end («Arquivo»). Above
+// it, «Todos / Arrendamento / Venda» picks which (kept in this browser).
+function dealKind(property) {
+  const deal = property?.deal === 'venda' ? 'venda' : property ? 'arrendamento' : null;
+  return deal && el('span', {class: 'deal-kind ' + deal, title: deal === 'venda' ? 'Imóvel para vender' : 'Imóvel para arrendar'},
+    DEAL_KINDS[deal]);
+}
+function liveProperties() {
+  return (settings?.properties || []).filter(property => !property.archived && (dealFilter === 'todos' || dealOf(property) === dealFilter));
+}
+function renderDealFilter() {
+  const all = (settings?.properties || []).filter(property => !property.archived);
+  const count = key => all.filter(property => key === 'todos' || dealOf(property) === key).length;
+  const box = $('deal-filter');
+  box.hidden = !all.some(property => dealOf(property) === 'venda');  // only once there are both kinds
+  box.replaceChildren(...DEAL_FILTERS.map(([key, text]) =>
+    el('button', {type: 'button', class: dealFilter === key ? 'active' : '', 'aria-pressed': dealFilter === key ? 'true' : 'false',
+      onclick: () => { setDealFilter(key); renderPropertySlider(); SWITCHERS.forEach(redraw => redraw()); }},
+      `${text} (${count(key)})`)));
+  if (box.hidden && dealFilter !== 'todos') dealFilter = 'todos';
+}
 function renderPropertySlider() {
-  const properties = settings.properties;
+  renderDealFilter();
+  const properties = liveProperties();
+  renderArchive();
   if (!properties.length) {
     $('property-slider').replaceChildren();
     $('property-dashboard').replaceChildren();
-    $('property-list').replaceChildren(el('div', {class: 'empty-state'}, el('strong', {}, 'Ainda não há imóveis.'),
-      el('button', {class: 'link', onclick: () => openPropertyEditor({}, null)}, 'Criar o primeiro →')));
+    $('property-list').replaceChildren(el('div', {class: 'empty-state'}, el('strong', {},
+      dealFilter !== 'todos' && settings.properties.some(property => !property.archived)
+        ? `Não há imóveis para ${dealFilter === 'venda' ? 'vender' : 'arrendar'}: escolhe «Todos», lá em cima.`
+        : settings.properties.length ? 'Todos os imóveis estão no arquivo, lá em baixo.' : 'Ainda não há imóveis.'),
+      el('button', {class: 'link', onclick: () => openPropertyEditor({}, null)}, settings.properties.length ? 'Criar um imóvel →' : 'Criar o primeiro →')));
     return;
   }
   let index = properties.findIndex(property => property.reference === propertyRef);
@@ -5138,7 +5525,7 @@ function renderPropertySlider() {
   // Through el(), which drops a false child: replaceChildren itself would print it as the text "false".
   $('property-slider').replaceChildren(...el('div', {},
     many && el('button', {class: 'slider-arrow prev', 'aria-label': 'Imóvel anterior', onclick: () => stepProperty(-1)}, '‹'),
-    el('span', {class: 'eyebrow switcher-label'}, 'IMÓVEL'),  // 30/09: titled like the other switchers
+    el('span', {class: 'eyebrow switcher-label'}, dealKind(property), 'IMÓVEL'),  // 30/09: titled like the other switchers
     el('div', {class: 'slider-title'},
       el('span', {class: 'property-ref'}, property.reference + (property.active === false ? ' · INATIVO' : '')),
       el('strong', {}, property.description || ''),
@@ -5151,7 +5538,7 @@ function renderPropertySlider() {
   const slide = slideDirection > 0 ? 'slide-next' : slideDirection < 0 ? 'slide-prev' : '';
   const card = propertyCard(property);
   if (slide) card.classList.add(slide);
-  $('property-list').replaceChildren(card);
+  $('property-list').replaceChildren(...[card, dealCard(property)].filter(Boolean));
   renderPropertyDashboard(property, slide);
   slideDirection = 0;
 }
@@ -6061,21 +6448,22 @@ $('review-run').addEventListener('click', event => run(async () => {
     : 'O revisor não devolveu nada: tenta outra vez.', result.reviewed ? 'ok' : 'warn');
 }, event.currentTarget));
 $('listing-prompt').addEventListener('click', event => run(async () => {
-  const {prompt} = await call('api/property/prompt', {listing_url: $('listing-url').value});
+  const {prompt} = await call('api/property/prompt', {listing_url: $('listing-url').value, deal: $('listing-deal').value});
   $('listing-prompt-text').textContent = prompt;
   await copyText(prompt, 'Prompt copiado. Cola-o no ChatGPT e traz a resposta.', $('listing-prompt-box'));
 }, event.currentTarget));
 $('listing-extract').addEventListener('click', event => run(async () => {
-  const {fields} = await call('api/property/extract', {text: $('listing-text').value, listing_url: $('listing-url').value});
+  const {fields} = await call('api/property/extract', {text: $('listing-text').value, listing_url: $('listing-url').value,
+    deal: $('listing-deal').value});
   const existing = settings.properties.some(property => property.reference === fields.reference);
-  openPropertyEditor({...fields, sender: null}, existing ? fields.reference : null);
+  openPropertyEditor({...fields, sender: null, deal: $('listing-deal').value}, existing ? fields.reference : null);
   $('listing-text').value = '';
   toast('Campos extraídos pela API: revê-os antes de guardar.', 'warn');
 }, event.currentTarget));
 $('listing-parse').addEventListener('click', event => run(async () => {
   const {fields} = await call('api/property/parse', {text: $('listing-answer').value});
   const existing = settings.properties.some(property => property.reference === fields.reference);
-  openPropertyEditor({...fields, sender: null}, existing ? fields.reference : null);
+  openPropertyEditor({...fields, sender: null, deal: $('listing-deal').value}, existing ? fields.reference : null);
   toast('Campos preenchidos: revê-os antes de guardar.', 'warn');
 }, event.currentTarget));
 $('property-save').addEventListener('click', event => run(async () => {

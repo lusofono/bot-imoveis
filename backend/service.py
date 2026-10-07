@@ -20,7 +20,8 @@ from . import APP_NAME
 from .ai import (AFTER_VISIT_RULE, AFTER_VISIT_TEMPLATE, BOOKED_REPLY_RULE, DOCS_REQUEST_RULE, KNOWLEDGE_RULE, VISIT_REMINDER_RULE, VISITED_REPLY_RULE, extract_json, ficha_profile_prompt,
                  REMINDER_RULE, SURVEY_REPLY_RULE, VISIT_MISSED_RULE, CLOSING_FROM, CLOSING_REPLY_RULE, LATER_REPLY_RULE,
                  CONCLUSIVE_AT, CONCLUSIVE_REPLY_RULE, ALERT_KINDS, OWNER_REPLY_RULE, owner_prompt,
-                 SHORTLIST_REQUEST_RULE, SHORTLIST_DOCS_RULE,
+                 SHORTLIST_REQUEST_RULE, SHORTLIST_DOCS_RULE, SALE_COMMON, sale_profile, common_prompt,
+                 DEAL_CLOSED_RULE, DEAL_CLOSED_TEMPLATE,
                  fichas_prompt, parse_fichas_batch,
                  listing_text_prompt, parse_listing, agenda_prompt, describe, instructions,
                  parse_agenda, parse_survey, visit_analysis_prompt, clean_round, round_text)
@@ -32,7 +33,8 @@ from .openai_client import (BUILTIN_CONTEXT, BUILTIN_PRICES, CONTEXT_FALLBACK, E
                             estimate_cost_usd, models, HIDDEN)
 from .rules import (after_workdays, DAY, DEALS, EMAIL, KNOWLEDGE_FILE, deal_of, RGPD_STATES, SUBJECT_DEFAULT, VISIT_SLOT_DEFAULT, VISIT_STATES,
                     DOCUMENTS, FICHA_FIELDS, SELECTION_STATES, build_profile, check_profile, clean_ficha, documents_summary, draft_checks,
-                    ficha_summary, merge_ficha,
+                    documents_of, ficha_keys, ficha_summary, merge_ficha, ARCHIVE_REASONS, property_archived, closing_price,
+                    deal_survey, deal_survey_alerts, deal_survey_report,
                     survey_alerts, survey_report, check_slot, check_window, clean_property, consent_yes, free_times,
                     knowledge, photo_of, prepare, property_active, route, subject_of, QUOTE, addresses, has_token,
                     apply_portal, parse_call, call_notice, phone_key)
@@ -50,7 +52,7 @@ CONTACT_SOURCE = "Idealista"  # today's only portal; see README for the family o
 # of the four interactions and never resetting the clock the 2/4-day reminders are measured from.
 AI_MODES = ("api", "copy_paste")
 AUX_KINDS = {"reminder", "consent_request", "visits_closed", "addition", "visit_thanks", "visit_reminder", "docs_request",
-             "visit_missed"}  # "addition": «Escrever mais»; "visit_thanks": after the visit
+             "visit_missed", "deal_closed"}  # "addition": «Escrever mais»; "visit_thanks": after the visit; 07/10 «Negócio fechado»
 PROGRAM_KINDS = AUX_KINDS | {"visit_proposal"}  # drafts the program creates; not an email a customer sent
 REMINDER_HOURS = {"2d": 48, "4d": 96}
 REMINDER_MAX_HOURS = 144  # 6 days of silence: no more reminders (26/09)
@@ -66,6 +68,7 @@ NO_REPLY_DAYS = 3  # 27/09: our last email unanswered this long puts the custome
 ALERT_HOURS = {"our_turn_hours": 48, "no_visit_hours": 96}
 ALERT_HOURS_RANGE = (1, 720)
 SURVEY_NOTICE = "Resposta ao inquérito pós-visita registada (vê-a em Visitas e no relatório do imóvel)."
+DEAL_SURVEY_NOTICE = "Resposta ao inquérito do negócio fechado registada (vê-a no imóvel, no arquivo de Imóveis)."
 # 06/10: silence in two steps (the owner's rule; until then, inactive after two unanswered, the last four days old):
 # «ausente» when the 3rd email of ours in a row is 48 hours without an answer — only marked, still in the rounds and the
 # reminders; «inativo» when the 4th is two working days without one — out of them. Their next email brings them back.
@@ -97,7 +100,8 @@ COMMON_PROMPTS = {"application_instructions": "", "after_visit": AFTER_VISIT_RUL
                   "docs_request": DOCS_REQUEST_RULE, "survey_reply": SURVEY_REPLY_RULE, "reminder_rule": REMINDER_RULE,
                   "visit_missed": VISIT_MISSED_RULE, "later_reply": LATER_REPLY_RULE,
                   "conclusive_reply": CONCLUSIVE_REPLY_RULE, "closing_reply": CLOSING_REPLY_RULE,
-                  "owner_reply": OWNER_REPLY_RULE, "shortlist_request": SHORTLIST_REQUEST_RULE, "shortlist_docs": SHORTLIST_DOCS_RULE}
+                  "owner_reply": OWNER_REPLY_RULE, "shortlist_request": SHORTLIST_REQUEST_RULE, "shortlist_docs": SHORTLIST_DOCS_RULE,
+                  "deal_closed": DEAL_CLOSED_RULE, "deal_closed_template": DEAL_CLOSED_TEMPLATE}
 # Page field → (profile prompt, key), the same prompts the terminal setup asks for.
 PROMPT_FIELDS = {"general": ("general", "text"), "first": ("first_interaction", "text"),
                  "first_template": ("first_interaction", "reply_template"), "second": ("second_interaction", "text"),
@@ -198,13 +202,13 @@ def survey_of(conversation):
     return survey
 
 
-def ficha_update(old, new):
+def ficha_update(old, new, deal=None):
     """merge_ficha, stamped: "at" is this update; "complete_at", when the file first became complete, kept while it
     stays complete (a file complete before 27/09 counts from its last update)."""
     merged, at = merge_ficha(old, new), now()
-    if not ficha_summary(merged)["complete"]:
+    if not ficha_summary(merged, deal)["complete"]:
         return {**merged, "at": at}
-    since = ((old or {}).get("complete_at") or (old or {}).get("at")) if ficha_summary(old)["complete"] else None
+    since = ((old or {}).get("complete_at") or (old or {}).get("at")) if ficha_summary(old, deal)["complete"] else None
     return {**merged, "at": at, "complete_at": since or at}
 
 
@@ -353,6 +357,34 @@ def write_all_targets(data):
     return targets
 
 
+def deal_targets(data, candidates):
+    """07/10, «Negócio fechado»: who the email can go to — everyone we wrote to, each marked active or not (active: still
+    going, ok or with a visit booked, as «Clientes ativos»; not active: inactive, declined, another date only, closed) and
+    the selected one (the deal's), who comes switched off in the page. Left out, with their names: an email of theirs
+    waiting (answered in Emails), the black and grey lists, and who already got it. candidates: MailService.candidates."""
+    states = {customer["email"]: customer for customer in candidates}
+    waiting = {recipient_email(item) for item in data["emails"] if item.get("kind") != "deal_closed"} - {""}
+    conversations = data.get("conversations") or {}
+    customers, left = [], {"waiting": [], "ignored": [], "told": []}
+    for email, conversation in sorted(conversations.items()):
+        if not conversation.get("sent_message_ids"):
+            continue
+        name = conversation.get("name") or email
+        if conversation.get("ignored"):
+            left["ignored"].append(name)
+        elif conversation.get("deal_closed_sent_at"):
+            left["told"].append(name)
+        elif email in waiting:
+            left["waiting"].append(name)
+        else:
+            state = states.get(email) or {"state": "inactive", "reason": "inativo (sem resposta aos nossos emails)"}
+            customers.append({"email": email, "name": conversation.get("name") or "",
+                              "active": state["state"] in ("ok", "booked"), "reason": state.get("reason") or "",
+                              "selected": (conversation.get("selection") or {}).get("status") == "chosen"})
+    left["waiting"] += sorted(waiting - set(conversations))  # the new requests, never answered
+    return {"customers": customers, "left_out": left}
+
+
 def aware(value):
     """An ISO date as an aware datetime (UTC when it has no offset), or None."""
     try:
@@ -420,6 +452,10 @@ class MailService:
         if not account or "@" not in account or any(c in account for c in "\r\n"):
             raise ValueError("Configura uma conta válida antes de usar.")
         return cfg
+
+    def deal(self, ref):
+        """07/10: a property's kind of business (arrendamento when it says none)."""
+        return deal_of(self.profiles().get(ref) or {}) if ref else None
 
     def profiles(self):
         profiles = load_profiles(self.folder, self.config()["account"])
@@ -684,7 +720,7 @@ class MailService:
             self.log("token_price_set", model=model, reset=bool(reset))
         return self.ai_settings()
 
-    def extract_listing(self, text, url=None):
+    def extract_listing(self, text, url=None, deal=None):
         """«Extrair com a API»: the listing's text, pasted by the owner, becomes the fields they review. Charged to
         the property it names when that one already exists (its tank); a new property's first call is unattributed."""
         text = str(text or "").strip()
@@ -695,7 +731,7 @@ class MailService:
             raise ValueError("Sem chave da OpenAI: guarda-a com mac/openai_key.command para usar a API.")
         url = str(url or "").strip() or None
         model = self.model(cfg)
-        answer, usage = complete(openai_api_key(self.folder, cfg["account"]), model, listing_text_prompt(text, url))
+        answer, usage = complete(openai_api_key(self.folder, cfg["account"]), model, listing_text_prompt(text, url, deal))
         fields = parse_listing(answer)
         if url and not fields.get("listing_url"):
             fields = parse_listing(json.dumps({**fields, "listing_url": url}))
@@ -1118,6 +1154,7 @@ class MailService:
         def customer(item):
             return ((item.get("recipient") or {}).get("email") or "").casefold()
         conversations = data["conversations"]
+        deal = deal_of(profile) if profile else None  # 07/10: the customer's file and the documents follow it
         counts = Counter(customer(item) for item in data["emails"])
         # Still arranging a time: while a window the customer was invited to is open and they have no visit
         # booked, every reply after the proposal is the 4th interaction (book it, or offer the time left),
@@ -1164,7 +1201,7 @@ class MailService:
                 interaction = 2
             limit = qualifying and conversation.get("stage", 0) >= 4  # the 1st reply and three questions already
             ficha = conversation.get("ficha") or item.get("ficha")
-            missing = ficha_summary(ficha)["falta"] if ref and email else []
+            missing = ficha_summary(ficha, deal)["falta"] if ref and email else []
             if missing and not qualifying and (item.get("kind") in ("visit_proposal", "visit_reminder") or interaction == 4):
                 # 26/09: an incomplete file never holds back the proposal or the booking; the customer is
                 # reminded, and the owner decides whether to confirm.
@@ -1212,9 +1249,9 @@ class MailService:
                 "known_name": conversation.get("name") or "",  # 03/10: for taking their surnames out of the AI's texts
                 # 03/10: the short list's documents: asked yet, what is still missing, and whether there is a guarantor
                 "docs_requested": bool(selection.get("docs_requested_at")), "fiador": bool(selection.get("fiador")),
-                "docs_missing": documents_summary(selection)["missing"] if phase == "shortlist" else [],
+                "docs_missing": documents_summary(selection, deal)["missing"] if phase == "shortlist" else [],
                 "booked_at": ((visits or {}).get("booked_at") or {}).get(email) if phase == "booked" else None,
-                "ficha": ficha, "ficha_summary": ficha_summary(ficha) if ref else None, "qualifying_limit": limit,
+                "ficha": ficha, "ficha_summary": ficha_summary(ficha, deal) if ref else None, "qualifying_limit": limit,
                 "draft_checks": draft_checks(item.get("reply_text"), signature, house, item.get("visit_slot")),
                 # 30/09: the reviewer's marks hold only for the text it read
                 "review_fresh": bool(item.get("review")) and (item.get("review") or {}).get("hash") == text_hash(item.get("reply_text")),
@@ -1245,8 +1282,8 @@ class MailService:
         result = {"property_ref": ref, "revision": data["revision"], "last_read_at": data.get("last_read_at"),
                   "read_from": None if data.get("last_read_at") else (
                       data.get("read_from") or (date.today() - timedelta(days=FIRST_READ_DAYS)).isoformat()),
-                  "instructions": instructions(profile, voice, visits), "emails": emails, "active": active,
-                  "inactive": not property_active(profile),
+                  "instructions": instructions(profile, voice, visits), "deal": deal, "emails": emails, "active": active,
+                  "inactive": not property_active(profile), "archived": bool(property_archived(profile)),
                   # 04/10: how many «Escrever a todos» reaches, for each choice
                   "write_all": {key: len(value) for key, value in write_all_targets(data).items()} if ref else None}
         if added is not None:
@@ -1420,7 +1457,17 @@ class MailService:
                     # Known by their email already, whether this message is a direct reply (follow_up) or
                     # another portal notice (lead) from someone we have written to before either way.
                     conversation = queues[ref]["conversations"].get(email) if email else None
-                    if conversation is not None and (conversation.get("visit_check") or {}).get("thanks_sent_at"):
+                    closing = deal_survey(parse_survey(item["customer"].get("message") or item.get("body_text"))) \
+                        if conversation is not None and conversation.get("deal_closed_sent_at") else None
+                    if closing:
+                        # 07/10: an answer to the «Negócio fechado» email: its survey, kept on the customer
+                        conversation["deal_survey"] = {**closing, "at": item.get("date") or now()}
+                        item["survey_reply"] = {"alerts": deal_survey_alerts(closing), "deal": True}
+                        item.setdefault("warnings", []).append(DEAL_SURVEY_NOTICE)
+                        if item["survey_reply"]["alerts"]:
+                            item["warnings"].append("Atenção ao inquérito: " + "; ".join(item["survey_reply"]["alerts"])
+                                                    + ". Lê o comentário antes de responder.")
+                    elif conversation is not None and (conversation.get("visit_check") or {}).get("thanks_sent_at"):
                         # An answer to the after-visit email: the survey and the visit sheet, kept on the customer.
                         survey = parse_survey(item["customer"].get("message") or item.get("body_text"))
                         if survey:
@@ -1476,7 +1523,7 @@ class MailService:
                 data["last_read_at"] = start_at
                 data["stats"] = {"new_this_read": added[ref], "scanned": scanned, "mailbox": mailbox,
                                  "direct_replies": direct[ref]}
-                if ref and voice_ok:
+                if ref and voice_ok and not property_archived(profiles.get(ref)):  # 07/10: archived, nothing more
                     self.schedule_reminders(ref, data, voice_ok)
                     self.mark_inactive(ref, data)
                     self.schedule_visit_reminders(ref, data)
@@ -1767,7 +1814,8 @@ class MailService:
                     continue
                 email = ((item.get("recipient") or {}).get("email") or "").casefold()
                 conversation = data.get("conversations", {}).get(email)
-                item["ficha"] = ficha_update((conversation or {}).get("ficha") or item.get("ficha"), entry["ficha"])
+                item["ficha"] = ficha_update((conversation or {}).get("ficha") or item.get("ficha"), entry["ficha"],
+                                             self.deal(ref))
                 if conversation is not None:
                     conversation["ficha"] = item["ficha"]  # a new customer's is kept on their email until it is sent
             data.pop("send_preview", None)
@@ -2361,6 +2409,8 @@ class MailService:
             conversation["last_sent_at"] = now()
         if item.get("kind") == "visit_thanks":
             conversation.setdefault("visit_check", {})["thanks_sent_at"] = now()
+        if item.get("kind") == "deal_closed":
+            conversation["deal_closed_sent_at"] = now()  # 07/10: their next email may answer its survey
         if item.get("kind") == "visit_reminder" and item.get("visit_reminder"):
             sent = conversation.setdefault("visit_reminders_sent", [])
             sent.append(f"{item['visit_reminder']['at']}|{item['visit_reminder']['when']}")
@@ -2721,6 +2771,10 @@ class MailService:
         moment = moment or datetime.now(timezone.utc)
         hours = alert_hours(voice)
         conversations = data.get("conversations", {})
+        try:
+            deal = self.deal(ref)
+        except ValueError:
+            deal = None
         waiting, new = {}, {}
         for item in data["emails"]:
             email = recipient_email(item)
@@ -2762,7 +2816,7 @@ class MailService:
             elif email not in waiting and stage and (conversation.get("inactive") or conversation.get("absent") or silent):
                 column = "sem_resposta"
             else:
-                complete = ficha_summary(conversation.get("ficha") or (new.get(email) or {}).get("ficha"))["complete"]
+                complete = ficha_summary(conversation.get("ficha") or (new.get(email) or {}).get("ficha"), deal)["complete"]
                 column = ("contacto" if not stage
                           else "por_confirmar" if conversation.get("visit_accepted") or conversation.get("visit_offered")
                           else "proposta" if was_proposed(conversation, email, proposed)
@@ -2773,7 +2827,7 @@ class MailService:
             # their message waits for us past our_turn_hours, amber: it waits, not that long yet, blue: complete for
             # no_visit_hours and still no visit date from us; ok, green: up to date; black: declined or ignored)
             ficha = conversation.get("ficha") or item.get("ficha")
-            summary = ficha_summary(ficha)
+            summary = ficha_summary(ficha, deal)
             if column in ("desistiu", "greylist", "blacklist"):
                 them = "black"
             elif summary["complete"]:
@@ -2825,9 +2879,11 @@ class MailService:
                 ficha = conversation.get("ficha") or {}
                 visited[slot["customer"]] = {"name": conversation.get("name") or slot.get("name") or "(sem nome)",
                                              "at": slot["at"], "trabalho": ficha.get("trabalho"),
-                                             "agregado": ficha.get("agregado")}
+                                             "agregado": ficha.get("agregado"),
+                                             # 07/10: a buyer's file: what they look for and what for
+                                             "procura": ficha.get("procura"), "objetivo": ficha.get("objetivo")}
         return {"property_ref": ref, "description": profile["property"].get("description") or ref,
-                "owner_email": profile["property"].get("owner_email") or "",
+                "owner_email": profile["property"].get("owner_email") or "", "deal": deal_of(profile),
                 "active": property_active(profile), "contacted": len(conversations) + len(new),
                 "responded": len(answered),
                 "still_active": sum(1 for conversation in answered if not (conversation.get("ignored")
@@ -2862,9 +2918,11 @@ class MailService:
         if visited:
             lines += ["", "Quem já visitou:"]
             for person in visited:
-                lines += [f"- {person['name']} (visitou a {day(person['at'])})",
-                          f"  Situação profissional: {sentence(person['trabalho'], 'ainda por saber.')}",
-                          f"  Agregado familiar: {sentence(person['agregado'], 'ainda por saber.')}"]
+                lines += [f"- {person['name']} (visitou a {day(person['at'])})"] + (
+                    [f"  O que procura: {sentence(person.get('procura'), 'ainda por saber.')}",
+                     f"  Objetivo: {sentence(person.get('objetivo'), 'ainda por saber.')}"] if report.get("deal") == "venda" else
+                    [f"  Situação profissional: {sentence(person['trabalho'], 'ainda por saber.')}",
+                     f"  Agregado familiar: {sentence(person['agregado'], 'ainda por saber.')}"])
         if signature:
             lines += ["", signature]
         return "\n".join(lines)
@@ -3142,6 +3200,13 @@ class MailService:
                              else waited_hours(item))
                     if status == "uncertain":
                         break
+            dealt = [item for item, _, _ in messages if item.get("kind") == "deal_closed" and item.get("reply_status") == "sent"]
+            if ref and dealt:
+                record = data.setdefault("deal_round", {})
+                record["sent"] = record.get("sent", 0) + len(dealt)
+                if not any(item.get("kind") == "deal_closed" for item in data["emails"]):
+                    self.finish_deal(ref, data)
+                self.save(data, ref)
             return {"results": results, "remaining": len(data["emails"])}
 
     def dismiss(self, ids, expected_revision, property_ref=None):
@@ -3246,7 +3311,7 @@ class MailService:
 
     def candidates(self, ref, data):
         """Everyone this property has written to, and whether the visit proposal goes to them now."""
-        agenda = load_visits(self.folder, ref)
+        agenda, deal = load_visits(self.folder, ref), self.deal(ref)
         today = date.today().isoformat()
         booked = {slot["customer"] for slot in agenda["slots"] if slot["at"][:10] >= today}
         waiting = {((item.get("recipient") or {}).get("email") or "").casefold() for item in data["emails"]}
@@ -3272,7 +3337,7 @@ class MailService:
             else:
                 state, reason = "ok", ""
             found.append({"email": email, "name": conversation.get("name") or "", "state": state, "reason": reason,
-                          "stage": conversation.get("stage", 0), "ficha": ficha_summary(conversation.get("ficha"))})
+                          "stage": conversation.get("stage", 0), "ficha": ficha_summary(conversation.get("ficha"), deal)})
         return found
 
     def visit_candidates(self, property_ref=None):
@@ -3476,10 +3541,10 @@ class MailService:
         """The booked visits: the coming ones and those of the last back_days (None: every one, as the agenda shows
         them since 26/09 — a visit stays on record for good); each with its check and the survey answered."""
         since = "" if back_days is None else (date.fromisoformat(today) - timedelta(days=back_days)).isoformat()
-        conversations = self.load(ref).get("conversations", {})
+        conversations, deal = self.load(ref).get("conversations", {}), self.deal(ref)
         # Every booking shows whether the customer's file is complete (live: it fills as their answers arrive).
         return sorted(({**slot, "survey": survey_of(conversations.get(slot["customer"])),
-                        "ficha": ficha_summary((conversations.get(slot["customer"]) or {}).get("ficha")),
+                        "ficha": ficha_summary((conversations.get(slot["customer"]) or {}).get("ficha"), deal),
                         "selection": ((conversations.get(slot["customer"]) or {}).get("selection") or {}).get("status"),
                         "thanks_sent_at": ((conversations.get(slot["customer"]) or {}).get("visit_check") or {}).get("thanks_sent_at")}
                        for slot in load_visits(self.folder, ref)["slots"] if slot["at"][:10] >= since),
@@ -4072,6 +4137,197 @@ class MailService:
             self.log("visits_closed", reference=ref, drafted=drafted)
             return {"property_ref": ref, "drafted": drafted}
 
+    # ===== 07/10, «Negócio fechado»: one email to every customer of the property (the active ones, all, or the not active
+    # ones, each switched on or off in the page), the same text for all in their language, as in the visits' round, with
+    # a short survey. Once the last one goes out, the property closes (new requests hear it is no longer available) and
+    # goes to the archive, with «Negócio fechado» as its reason.
+    def deal_candidates(self, property_ref=None):
+        with locked(self.folder):
+            ref = self.pick(self.profiles(), property_ref)
+            if not ref:
+                raise ValueError("O negócio fechado só existe com imóveis.")
+            data = self.load(ref)
+            return {"property_ref": ref, **deal_targets(data, self.candidates(ref, data))}
+
+    @staticmethod
+    def deal_items(data):
+        return [item for item in data["emails"] if item.get("kind") == "deal_closed"]
+
+    def deal_round_view(self, ref, data):
+        record, items = data.get("deal_round") or {}, self.deal_items(data)
+        common = record.get("common") or {}
+        return {"property_ref": ref, "revision": data["revision"], "note": record.get("note") or "", "price": record.get("price"),
+                "created_at": record.get("created_at"), "finished_at": record.get("finished_at"), "sent": record.get("sent", 0),
+                "texts": common.get("texts") or {}, "summaries": common.get("summaries") or {},
+                "items": [{"id": item["id"], "name": (item.get("recipient") or {}).get("name") or "",
+                           "email": (item.get("recipient") or {}).get("email") or "",
+                           **((common.get("clients") or {}).get(item["id"]) or {}),
+                           "reply_status": item.get("reply_status"), "reply_error": item.get("reply_error"),
+                           "has_draft": bool(str(item.get("reply_text") or "").strip())} for item in items]}
+
+    def deal_round(self, property_ref=None):
+        with locked(self.folder):
+            ref = self.pick(self.profiles(), property_ref)
+            if not ref:
+                raise ValueError("O negócio fechado só existe com imóveis.")
+            return self.deal_round_view(ref, self.load(ref))
+
+    def prepare_deal_round(self, property_ref, emails, note="", price=None):
+        """One «Negócio fechado» email for each customer switched on (emails), with nothing written yet: the text comes
+        from the AI (deal_round_prompt) or the owner, reviewed once and sent from the property's panel."""
+        with locked(self.folder):
+            ref = self.pick(self.profiles(), property_ref)
+            if not ref:
+                raise ValueError("O negócio fechado só existe com imóveis.")
+            data = self.load(ref)
+            if self.deal_items(data):
+                raise ValueError("Já há um email de negócio fechado por enviar neste imóvel: envia-o ou cancela-o.")
+            price = closing_price(price, self.deal(ref))  # 07/10: the value it closed for, to the archive with it
+            targets = {customer["email"]: customer for customer in deal_targets(data, self.candidates(ref, data))["customers"]}
+            chosen = [email for email in dict.fromkeys(str(email or "").strip().casefold() for email in emails or [])
+                      if email in targets]
+            if not chosen:
+                raise ValueError("Liga pelo menos um cliente.")
+            stamp = now()
+            round_id = f"negocio-{hashlib.sha256(stamp.encode()).hexdigest()[:8]}"
+            for email in chosen:
+                conversation = data["conversations"][email]
+                key = f"negocio-{hashlib.sha256((email + stamp).encode()).hexdigest()[:12]}"
+                data["emails"].append(self.aux_item(key, "deal_closed", email, conversation, "", reply_status="pending",
+                                                    round=round_id, history=list(conversation.get("history") or [])))
+            data["deal_round"] = {"id": round_id, "created_at": stamp, "note": str(note or "").strip()[:2000],
+                                  **({"price": price} if price is not None else {})}
+            self.save(data, ref)
+            self.log("deal_prepared", reference=ref, created=len(chosen))
+            return self.deal_round_view(ref, data)
+
+    def deal_texts(self, ref):
+        """The rule and the survey of «Negócio fechado» for this property's kind of business (the Oficina's or the
+        code's), and the owner's note for it."""
+        voice, deal = load_voice(self.folder), self.deal(ref)
+        return (common_prompt(voice, "deal_closed", deal), common_prompt(voice, "deal_closed_template", deal),
+                (self.load(ref).get("deal_round") or {}).get("note") or "")
+
+    def save_deal_round(self, property_ref, common):
+        """The common texts (from the AI or edited in the page) become every customer's draft, with their greeting."""
+        with locked(self.folder):
+            ref = self.pick(self.profiles(), property_ref)
+            data = self.load(ref)
+            items = self.deal_items(data)
+            if not items:
+                raise ValueError("Este negócio já não tem emails por enviar.")
+            if any(item.get("reply_status") in ("sending", "uncertain") for item in items):
+                raise ValueError("Verifica primeiro no Gmail o envio com resultado incerto.")
+            common = clean_round(common, [item["id"] for item in items])
+            for item in items:
+                item.update(reply_text=round_text(common, item["id"], self.voice_signature()), send_reply=False,
+                            reply_status="draft")
+            data.pop("send_preview", None)
+            data.setdefault("deal_round", {})["common"] = common
+            self.save(data, ref)
+            self.log("deal_texts_saved", reference=ref, count=len(items))
+            return self.deal_round_view(ref, data)
+
+    def cancel_deal_round(self, property_ref, ids=None):
+        """Takes the «Negócio fechado» emails not sent out of the queue (or only ids); nothing is sent. When some had
+        already gone out and none is left, the deal is done as if the last one had just gone."""
+        with locked(self.folder):
+            ref = self.pick(self.profiles(), property_ref)
+            data = self.load(ref)
+            items = [item for item in self.deal_items(data) if item.get("reply_status") in (None, "pending", "draft", "error")
+                     and (ids is None or item["id"] in set(ids))]
+            if not items:
+                raise ValueError("Não há nenhum email de negócio fechado por enviar neste imóvel.")
+            data["emails"] = [item for item in data["emails"] if not any(item is gone for gone in items)]
+            record = data.get("deal_round") or {}
+            if not self.deal_items(data):
+                if record.get("sent"):
+                    self.finish_deal(ref, data)
+                else:
+                    data.pop("deal_round", None)
+            self.save(data, ref)
+            self.log("deal_cancelled", reference=ref, count=len(items))
+            return {"cancelled": len(items), "property_ref": ref, "round": self.deal_round_view(ref, data)}
+
+    def finish_deal(self, ref, data):
+        """The last «Negócio fechado» email went out: the visits close (the next new request gets the closing text) and
+        the property goes to the archive. Inside the caller's lock; the caller saves the queue."""
+        record = data.setdefault("deal_round", {})
+        record["finished_at"] = now()
+        self.archive_files(ref, "fechado", "negocio", record.get("price"))
+        self.log("deal_closed", reference=ref, sent=record.get("sent", 0))
+        self.notify(f"negocio-{ref}-{record['finished_at'][:10]}", f"Negócio fechado em {ref}: {record.get('sent', 0)} "
+                    "email(s) enviados aos clientes. O imóvel passou para o arquivo, no fim de Imóveis.", ref, "ok", "properties")
+
+    # ===== 07/10, the archive: out of the usual views, its numbers still in the averages; «Reativar» brings it back.
+    def archive_files(self, ref, reason, closed_by="arquivo", price=None):
+        """Writes the archive record (with the closing value, for a deal closed); «Negócio fechado» also closes the visits
+        (unless they were closed already)."""
+        path = self.folder / "properties" / ref / "profile.json"
+        profile = load_json(path, None)
+        if not profile:
+            raise ValueError("Imóvel desconhecido.")
+        profile["archived"] = {"reason": reason, "at": now(),
+                               **({"price": price} if reason == "fechado" and price is not None else {})}
+        save_json(path, profile)
+        if reason == "fechado":
+            agenda = load_visits(self.folder, ref)
+            if not agenda.get("closed_at"):
+                agenda.update(closed_at=now(), closed_by=closed_by)
+                save_visits(self.folder, ref, agenda)
+
+    def archive_property(self, ref, reason, price=None):
+        if reason not in ARCHIVE_REASONS:
+            raise ValueError("Escolhe o motivo: " + ", ".join(label.lower() for label in ARCHIVE_REASONS.values()) + ".")
+        with locked(self.folder):
+            if ref not in self.profiles():
+                raise ValueError("Imóvel desconhecido.")
+            self.archive_files(ref, reason, price=closing_price(price, self.deal(ref)) if reason == "fechado" else None)
+            self.log("property_archived", reference=ref, reason=reason)
+            return {"reference": ref, "archived": reason}
+
+    def set_closing_price(self, ref, price):
+        """07/10: the closing value of a property archived as «Negócio fechado», given or corrected later (empty: none)."""
+        with locked(self.folder):
+            path = self.folder / "properties" / ref / "profile.json"
+            profile = load_json(path, None)
+            if not profile or ref not in self.profiles():
+                raise ValueError("Imóvel desconhecido.")
+            if (profile.get("archived") or {}).get("reason") != "fechado":
+                raise ValueError("O valor de fecho é só para um imóvel arquivado como negócio fechado.")
+            value = closing_price(price, deal_of(profile))
+            if value is None:
+                profile["archived"].pop("price", None)
+            else:
+                profile["archived"]["price"] = value
+            save_json(path, profile)
+            self.log("closing_price_saved", reference=ref)
+            return {"reference": ref, "price": value}
+
+    def unarchive_property(self, ref):
+        """«Reativar»: back to the usual views; visits closed by the deal or the archive open again."""
+        with locked(self.folder):
+            path = self.folder / "properties" / ref / "profile.json"
+            profile = load_json(path, None)
+            if not profile or ref not in self.profiles():
+                raise ValueError("Imóvel desconhecido.")
+            if not profile.pop("archived", None):
+                raise ValueError("Este imóvel não está no arquivo.")
+            save_json(path, profile)
+            agenda = load_visits(self.folder, ref)
+            if agenda.get("closed_by") in ("negocio", "arquivo"):
+                agenda.pop("closed_at", None)
+                agenda.pop("closed_by", None)
+                save_visits(self.folder, ref, agenda)
+            self.log("property_unarchived", reference=ref)
+            return {"reference": ref, "archived": None}
+
+    def deal_survey_report(self, ref, data=None):
+        """The answers to the «Negócio fechado» survey of one property."""
+        data = data or self.load(ref)
+        return deal_survey_report([conversation.get("deal_survey") for conversation in
+                                   (data.get("conversations") or {}).values()])
+
     def request_consent(self, property_ref=None):
         """One consent-request draft per customer who already has a conversation and hasn't been asked."""
         with locked(self.folder):
@@ -4158,7 +4414,7 @@ class MailService:
         """The short list of one property, for the top of Contactos: each candidate's file, the visit (who came and
         the notes), the survey and the documents' checklist. The chosen one first, then the reserve."""
         slots = {slot["customer"]: slot for slot in load_visits(self.folder, ref)["slots"]}
-        order = {"chosen": 0, "suplente": 1, "shortlist": 2}
+        order, deal = {"chosen": 0, "suplente": 1, "shortlist": 2}, self.deal(ref)
         board = []
         for email, conversation in data.get("conversations", {}).items():
             selection = conversation.get("selection") or {}
@@ -4168,10 +4424,11 @@ class MailService:
             board.append({"property_ref": ref, "email": email, "name": conversation.get("name") or "",
                           "status": selection["status"], "label": SELECTION_STATES[selection["status"]],
                           "ficha": {key: (conversation.get("ficha") or {}).get(key) for key in FICHA_FIELDS},
-                          **{"ficha_" + key: value for key, value in ficha_summary(conversation.get("ficha")).items()},
+                          "ficha_keys": list(ficha_keys(deal)), "document_keys": list(documents_of(deal)),
+                          **{"ficha_" + key: value for key, value in ficha_summary(conversation.get("ficha"), deal).items()},
                           "visit": {"at": (slots.get(email) or {}).get("at"), "attended": check.get("attended"),
                                     "private": check.get("private") or "", "public": check.get("public") or ""},
-                          "survey": survey_of(conversation), "documents": documents_summary(selection),
+                          "survey": survey_of(conversation), "documents": documents_summary(selection, deal),
                           "docs_requested_at": selection.get("docs_requested_at")})
         return sorted(board, key=lambda item: (order[item["status"]], item["name"].casefold()))
 
@@ -4237,7 +4494,7 @@ class MailService:
                       and item.get("reply_status") in (None, "pending", "draft")]
             if theirs:
                 target = max(theirs, key=lambda item: str(item.get("date") or ""))
-                missing = documents_summary(conversation["selection"])["missing"]
+                missing = documents_summary(conversation["selection"], self.deal(ref))["missing"]
                 target["reply_note"] = ("Pede os documentos da candidatura que ainda faltam: " + "; ".join(missing)
                                         + ", a enviar em anexo em resposta a este email; diz que servem só para avaliar "
                                           "a candidatura e são apagados no fim do processo.") if missing else (
@@ -4274,7 +4531,7 @@ class MailService:
 
     def fichas(self, ref, data):
         """Each active customer's file (the ignored ones are left out), the most recent conversation first."""
-        agenda = load_visits(self.folder, ref)
+        agenda, deal = load_visits(self.folder, ref), self.deal(ref)
         proposed = self.proposed_to(agenda)
         phases = {"booked": "visita marcada", "nao_quer": "não quer visitar", "outra_data": "pediu outra data"}
         found = []
@@ -4290,7 +4547,7 @@ class MailService:
                           "selection": (conversation.get("selection") or {}).get("status"),
                           "pending": customer["state"] == "pending", "stage": customer["stage"], "last": last,
                           "ficha": {key: ficha.get(key) for key in FICHA_FIELDS}, "updated": ficha.get("at"),
-                          **ficha_summary(ficha)})
+                          "keys": list(ficha_keys(deal)), **ficha_summary(ficha, deal)})
         return sorted(found, key=lambda item: item["last"], reverse=True)
 
     def save_contact(self, fields):
@@ -4417,7 +4674,7 @@ class MailService:
         with locked(self.folder):
             data = self.load(ref)
             conversation = data["conversations"][email]
-            conversation["ficha"] = ficha_update(conversation.get("ficha"), ficha)
+            conversation["ficha"] = ficha_update(conversation.get("ficha"), ficha, self.deal(ref))
             self.save(data, ref)
             self.log("openai_usage", model=model, **usage, reference=ref, cost_usd=round(estimate_cost_usd(
                 model, **{k: usage[k] for k in ("prompt_tokens", "completion_tokens")}), 6))
@@ -4458,7 +4715,7 @@ class MailService:
                         model, **{k: usage[k] for k in ("prompt_tokens", "completion_tokens")}), 6))
                     for key_id, ficha in parse_fichas_batch(answer, set(ids)).items():
                         conversation = conversations[ids[key_id]]
-                        conversation["ficha"] = ficha_update(conversation.get("ficha"), ficha)
+                        conversation["ficha"] = ficha_update(conversation.get("ficha"), ficha, deal_of(profiles[ref]))
                         result["filled"] += 1
                 self.save(data, ref)
                 self.log("fichas_filled", reference=ref, asked=result["asked"], filled=result["filled"])
@@ -4569,6 +4826,7 @@ class MailService:
         listing = profile.get("property") or {}
         return {"property_ref": ref, "description": listing.get("description"), "test": True,
                 "advertised_rent_eur": listing.get("advertised_rent_eur"),  # 04/10: «Por imóvel» shows the rent
+                "deal": deal_of(profile),
                 "pending": len(emails), "drafts": status["draft"], "blocked": sum(1 for item in emails if item.get("blocked")),
                 "attention": status["uncertain"] + status["error"] + status["sending"],
                 "answered": 0,
@@ -4654,7 +4912,7 @@ class MailService:
                         intervene.append(customer["name"])
                     if customer["state"] != "ok" or was_proposed(conversation, customer["email"], proposed):
                         continue
-                    if ficha_summary(conversation.get("ficha"))["complete"]:
+                    if ficha_summary(conversation.get("ficha"), deal_of(profile))["complete"]:
                         ready.append(customer["name"])
                     elif conversation.get("stage", 0) >= 4:
                         brake.append(customer["name"])
@@ -4810,6 +5068,8 @@ class MailService:
                                    "last_read_at": data.get("last_read_at"), "description": listing.get("description"),
                                    "listing_url": listing.get("listing_url"),
                                    "advertised_rent_eur": listing.get("advertised_rent_eur"),
+                                   "deal": deal_of(profiles[ref]) if ref else None,  # 07/10: for a sale, the price
+                                   "archived": bool(ref and property_archived(profiles[ref])),  # 07/10: out of the table
                                    "photo": bool(ref) and find_photo(self.folder, ref) is not None})
             sent, waited = Counter(), []
             openai_period, openai_all_time, unattributed = Counter(), Counter(), Counter()
@@ -4961,6 +5221,9 @@ class MailService:
             for key, default in COMMON_PROMPTS.items():  # 30/09: the Oficina's prompts, as they stand (or the code's)
                 if key not in voice and key != "application_instructions":
                     voice[key] = (style.get(key) or {}).get("text") or default
+            # 07/10: the same prompts for the properties for sale, each in its own copy (voice.json's sale_style)
+            sale_style = load_json(self.folder / "voice.json", {}).get("sale_style") or {}
+            voice["sale"] = {key: (sale_style.get(key) or {}).get("text") or default for key, default in SALE_COMMON.items()}
             voice["digest_recipient"] = (style.get("digest_recipient") or {}).get("text") or ""
             voice["alerts"] = alert_hours({"style": style})
             today = date.today().isoformat()
@@ -4971,6 +5234,12 @@ class MailService:
                 properties.append({"sender": profile["match"]["from_address_equals"], "active": property_active(profile),
                                    "test": bool(profile.get("test")),
                                    "survey_report": self.survey_report(ref),
+                                   # 07/10: the archive, «Negócio fechado» in progress or done, and its survey
+                                   "archived": property_archived(profile),
+                                   "deal_round": (lambda queue: {"pending": len(self.deal_items(queue)),
+                                                                 **{key: (queue.get("deal_round") or {}).get(key)
+                                                                    for key in ("finished_at", "sent")},
+                                                                 "survey": self.deal_survey_report(ref, queue)})(self.load(ref)),
                                    "prompts": {name: (prompts.get(key) or {}).get(field) or ""
                                                for name, (key, field) in PROMPT_FIELDS.items()},
                                    "knowledge_files": [part["file"] for part in profile["_knowledge"]],
@@ -5102,16 +5371,20 @@ class MailService:
             save_json(path, voice)
             self.log("voice_saved")
 
-    def save_common_prompts(self, texts):
+    def save_common_prompts(self, texts, deal=None):
         """30/09, Oficina: the prompts common to every property (voice.json). A text left as the code's own is kept
-        empty, so it keeps following the code; an empty one goes back to it."""
+        empty, so it keeps following the code; an empty one goes back to it. 07/10: deal «venda», the copies for the
+        properties for sale (voice.json's sale_style)."""
+        if deal not in (None, "", *DEALS):
+            raise ValueError("O tipo de negócio é arrendamento ou venda.")
         with locked(self.folder):
             path = self.folder / "voice.json"
             voice = load_json(path, None)
             if not voice:
                 raise ValueError("Falta voice.json nesta pasta: corre o setup primeiro.")
-            style = voice["style"]
-            for key, default in COMMON_PROMPTS.items():
+            sale = deal == "venda"
+            style = voice.setdefault("sale_style", {}) if sale else voice["style"]
+            for key, default in (SALE_COMMON if sale else COMMON_PROMPTS).items():
                 if key not in texts:
                     continue
                 text = str(texts.get(key) or "").strip()
@@ -5124,7 +5397,7 @@ class MailService:
                 style.setdefault(key, {}).update(text="" if same else text,
                                                  status="configured" if text and not same else "not_configured")
             save_json(path, voice)
-            self.log("prompts_saved", reference="comuns")
+            self.log("prompts_saved", reference="comuns-venda" if sale else "comuns")
 
     def save_property(self, fields, first_read_days=None):
         """Create or update a property from listing data; the facts go to its knowledge base. A new property's
@@ -5139,9 +5412,21 @@ class MailService:
             account = self.config()["account"]
             profiles = load_profiles(self.folder, account)
             ref = fields["reference"]
-            # A new property copies the owner's first profile (their prompts), else the published example.
-            template = next(iter(profiles.values()), None) or example_profile(self.folder)
-            profile = build_profile(fields, account, template, profiles.get(ref), date.today())
+            # A new property copies the owner's first profile (their prompts), else the published example. 07/10: the
+            # first of the same kind of business — a property for sale gets a sale's prompts, never a rental's; the
+            # first for sale takes them from the code (SALE_PROMPTS). A property that changes its kind of business
+            # gets the interaction prompts of the new one the same way.
+            deal = fields.get("deal") or deal_of(profiles.get(ref) or {})
+            same = [profile for key, profile in profiles.items() if key != ref and deal_of(profile) == deal]
+            template = (same[0] if same else example_profile(self.folder) if deal != "venda"
+                        else sale_profile(next(iter(profiles.values()), None) or example_profile(self.folder)))
+            existing = profiles.get(ref)
+            if existing and deal != deal_of(existing):
+                existing = {**existing, "reply": {**existing.get("reply", {}), "prompts": {
+                    **existing.get("reply", {}).get("prompts", {}),
+                    **{key: value for key, value in template.get("reply", {}).get("prompts", {}).items()
+                       if key in ("first_interaction", "second_interaction", "third_interaction", "fourth_interaction")}}}}
+            profile = build_profile(fields, account, template, existing, date.today())
             check_profile(ref, profile, account)
             folder = self.folder / "properties" / ref
             save_json(folder / "profile.json", profile)

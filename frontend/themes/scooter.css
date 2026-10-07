@@ -115,10 +115,10 @@
 :root[data-theme="scooter"] .metric .label{color:var(--muted);font:800 11px/1.4 var(--round)}
 
 /* Switchgear: cream push-buttons in a chrome ring; primary is the rosso seat; sending is the mint horn button */
-:root[data-theme="scooter"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link){border:1px solid #c9cfd3;border-radius:999px;color:var(--text);
+:root[data-theme="scooter"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link,.deal-button){border:1px solid #c9cfd3;border-radius:999px;color:var(--text);
   font:800 13px/1.2 var(--round);background:linear-gradient(180deg,#fffdf8,#f3e6cb);box-shadow:0 0 0 2px #fff,0 0 0 3px #b9c1c6,0 3px 6px #5a3a2224}
-:root[data-theme="scooter"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link):hover{background:linear-gradient(180deg,#f2fbf8,#cdeee3);border-color:#3f8f7d}
-:root[data-theme="scooter"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link):active{transform:translateY(1px);box-shadow:0 0 0 2px #fff,0 0 0 3px #b9c1c6}
+:root[data-theme="scooter"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link,.deal-button):hover{background:linear-gradient(180deg,#f2fbf8,#cdeee3);border-color:#3f8f7d}
+:root[data-theme="scooter"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link,.deal-button):active{transform:translateY(1px);box-shadow:0 0 0 2px #fff,0 0 0 3px #b9c1c6}
 :root[data-theme="scooter"] :is(button,.button).primary{color:#fff;border-color:#7a120c;background:var(--lacquer-rosso);text-shadow:0 1px 1px #0006}
 :root[data-theme="scooter"] :is(button,.button).primary:hover{border-color:#7a120c;background:linear-gradient(180deg,#ff7b6e,#d42a20 45%,#a51a13)}
 :root[data-theme="scooter"] :is(button,.button).send-action{color:var(--mint-ink);border-color:#3f8f7d;background:var(--lacquer-mint)}
@@ -343,7 +343,7 @@
 :root[data-theme="scooter"] .card:hover{transform:translateY(-2px) rotate(-.15deg);box-shadow:8px 9px 0 #ce2b3730,0 16px 30px #5a3a2230}
 :root[data-theme="scooter"] .metric{border-width:3px;border-radius:26px 26px 26px 8px;box-shadow:5px 5px 0 #8fd5c366,0 10px 22px #5a3a221f}
 /* Buttons give a little «vroom» when pointed at */
-:root[data-theme="scooter"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link):not(:disabled):hover{animation:scooter-vroom .35s ease-out}
+:root[data-theme="scooter"] :is(button,.button):not(.tab,.link,.slider-dot,.slider-arrow,.segmented *,.pill-action,.quick-reply,.copy-icon,.pipeline-name,.stepper-arrow,.workshop-link,.deal-button):not(:disabled):hover{animation:scooter-vroom .35s ease-out}
 @keyframes scooter-vroom{0%{transform:none}30%{transform:translateX(-2px) rotate(-1.5deg)}60%{transform:translateX(2px) rotate(1deg)}100%{transform:none}}
 /* The top bar: a louder sunset, rays and all, and a bigger scooter puffing smoke, passing every 45 s */
 :root[data-theme="scooter"] .topbar{background:radial-gradient(circle at 80% 135%,#ffd27d 0 30px,#ffb86b 31px 38px,#0000 39px),

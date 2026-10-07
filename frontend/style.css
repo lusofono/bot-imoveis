@@ -1515,3 +1515,40 @@ main{padding-left:57px;padding-right:54px}
 /* 06/10: «Período de análise», a whole row of the grid between the two rows of cards (the Painel's and each property's) */
 .period-row{grid-column:1/-1;display:flex;justify-content:flex-end;align-items:center;gap:10px;margin:-4px 0}
 .period-row select{width:auto;padding:6px 10px;font-size:12px}
+/* 07/10, «Negócio fechado»: a golden button in the property's card (the selected one's gold), its panel under the card,
+   and the archive at the end of Imóveis, with its own arrows */
+:root .deal-button.deal-button{display:inline-flex;align-items:center;justify-content:center;gap:10px;width:100%;margin-top:14px;
+  min-height:46px;padding:10px 18px;border:1px solid #b8860b;border-radius:12px;color:#3d2a00;font-weight:700;letter-spacing:.02em;
+  text-shadow:0 1px 0 #fff7;box-shadow:inset 0 1px 0 #fff8,0 4px 14px #b8860b33;cursor:pointer;
+  background:linear-gradient(135deg,#fbe9a6 0%,#e2b93b 38%,#c99a1e 52%,#f3d77a 70%,#d4a62a 100%);transition:transform .15s,box-shadow .15s}
+:root .deal-button.deal-button:hover{transform:translateY(-1px);box-shadow:inset 0 1px 0 #fff8,0 6px 18px #b8860b55}
+:root .deal-button.deal-button.open{box-shadow:inset 0 2px 6px #6b4b0055}
+.deal-icon{font-size:18px;line-height:1}
+.deal-card{margin-top:18px;border-color:#b8860b}
+.deal-card .segmented{margin:6px 0 12px}
+.deal-card .client-list{margin:6px 0 12px}
+.deal-card textarea{margin:6px 0 10px}
+.archive-control{margin-top:8px}
+.archive-control>summary{list-style:none;cursor:pointer;display:inline}
+.archive-control>summary::-webkit-details-marker{display:none}
+.archive-control .row{margin-top:8px;gap:8px}
+.archive-control select{width:auto}
+.deal-survey{margin-bottom:14px}
+.deal-survey-parts{margin:6px 0;padding-left:18px;line-height:1.8}
+.property-archive{margin-top:34px;padding-top:18px;border-top:1px dashed var(--line)}
+.property-archive .archive-slider{opacity:.92}
+.archive-card{margin-top:4px}
+.archive-card .card-head .tag{margin-left:auto}
+/* 07/10: the kind of business on the right of the switcher's «IMÓVEL» line, and «Todos / Arrendamento / Venda» above the
+   Imóveis slider; the value a deal closed for */
+:is(#property-slider,.property-switcher) .switcher-label .deal-kind{float:right}
+.deal-kind{display:inline-block;padding:2px 10px;border-radius:99px;border:1px solid currentColor;font-weight:700;font-size:10px;line-height:1.6;
+  letter-spacing:.14em;text-transform:uppercase}
+.deal-kind.arrendamento{color:var(--accent);background:var(--accent-soft)}
+.deal-kind.venda{color:var(--warn);background:var(--warn-bg)}
+.deal-filter{display:flex;width:max-content;margin:0 0 10px auto}
+.price-input{display:inline-flex;align-items:center;gap:6px}
+.price-input input{width:130px;text-align:right}
+.closing-field{display:grid;gap:4px;margin:4px 0 10px}
+.closing-price{margin:6px 0 12px}
+.closing-price details .row{margin-top:6px;gap:8px}
